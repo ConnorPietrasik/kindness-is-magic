@@ -50,6 +50,10 @@ const EditItem = ({ item }: EditItemProps) => {
     defaultValues: {
       ...item,
       description: item.description ?? undefined,
+      given_name: item.given_name ?? undefined,
+      age: item.age ?? 0,
+      practical_wish: item.practical_wish ?? "",
+      fun_wish: item.fun_wish ?? "",
     },
   })
 
@@ -117,6 +121,60 @@ const EditItem = ({ item }: EditItemProps) => {
                 <Input
                   {...register("description")}
                   placeholder="Description"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                required
+                invalid={!!errors.given_name}
+                errorText={errors.given_name?.message}
+                label="Given Name"
+              >
+                <Input
+                  {...register("given_name", {
+                    required: "Name is required.",
+                  })}
+                  placeholder="Name"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                required
+                invalid={!!errors.age}
+                errorText={errors.age?.message}
+                label="Age"
+              >
+                <Input
+                  {...register("age", {
+                    required: "Age is required.",
+                  })}
+                  placeholder="Age"
+                  type="number"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.practical_wish}
+                errorText={errors.practical_wish?.message}
+                label="Practical Wish"
+              >
+                <Input
+                  {...register("practical_wish")}
+                  placeholder="Practical Wish"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.fun_wish}
+                errorText={errors.fun_wish?.message}
+                label="Fun Wish"
+              >
+                <Input
+                  {...register("fun_wish")}
+                  placeholder="fun Wish"
                   type="text"
                 />
               </Field>
