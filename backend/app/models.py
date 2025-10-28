@@ -60,6 +60,10 @@ class UsersPublic(SQLModel):
 class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
+    given_name: str | None = Field(min_length=1, max_length=30)
+    age: int | None
+    practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
+    fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 # Properties to receive on item creation
@@ -70,6 +74,10 @@ class ItemCreate(ItemBase):
 # Properties to receive on item update
 class ItemUpdate(ItemBase):
     title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
+    given_name: str | None = Field(min_length=1, max_length=30)
+    age: int | None
+    practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
+    fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 # Database model, database table inferred from class name
