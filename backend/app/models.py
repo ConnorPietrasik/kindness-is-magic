@@ -58,12 +58,11 @@ class UsersPublic(SQLModel):
 
 # Shared properties
 class FamilyMemberBase(SQLModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=255)
     given_name: str | None = Field(min_length=1, max_length=30)
     age: int = Field(default=-1)
     practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
     fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
+    note: str | None = Field(default=None, min_length=1, max_length=1000)
 
 
 # Properties to receive on FamilyMember creation
@@ -73,11 +72,11 @@ class FamilyMemberCreate(FamilyMemberBase):
 
 # Properties to receive on FamilyMember update
 class FamilyMemberUpdate(FamilyMemberBase):
-    title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
     given_name: str | None = Field(default=None, min_length=1, max_length=30)
     age: int = Field(default=-1)
     practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
     fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
+    note: str | None = Field(default=None, min_length=1, max_length=1000)
 
 
 # Database model, database table inferred from class name
