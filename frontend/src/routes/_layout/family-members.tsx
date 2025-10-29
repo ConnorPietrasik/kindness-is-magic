@@ -36,7 +36,7 @@ function getFamilyMembersQueryOptions({ page }: { page: number }) {
   }
 }
 
-export const Route = createFileRoute("/_layout/familymembers")({
+export const Route = createFileRoute("/_layout/family-members")({
   component: FamilyMembers,
   validateSearch: (search) => family_membersSearchSchema.parse(search),
 })
