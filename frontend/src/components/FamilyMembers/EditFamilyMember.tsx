@@ -31,12 +31,11 @@ interface EditFamilyMemberProps {
 }
 
 interface FamilyMemberUpdateForm {
-  title: string
-  description?: string
   given_name?: string
   age: number
   practical_wish?: string
   fun_wish?: string
+  note?: string
 }
 
 const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
@@ -159,8 +158,8 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
               </Field>
 
               <Field
-                invalid={!!errors.fun_wish}
-                errorText={errors.fun_wish?.message}
+                invalid={!!errors.note}
+                errorText={errors.note?.message}
                 label="Optional Note"
               >
                 <Input

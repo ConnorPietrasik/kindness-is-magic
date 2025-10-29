@@ -145,8 +145,8 @@ const AddFamilyMember = () => {
               </Field>
 
               <Field
-                invalid={!!errors.fun_wish}
-                errorText={errors.fun_wish?.message}
+                invalid={!!errors.note}
+                errorText={errors.note?.message}
                 label="Optional Note"
               >
                 <Input
