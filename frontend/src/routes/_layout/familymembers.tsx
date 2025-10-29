@@ -11,10 +11,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { FiSearch } from "react-icons/fi"
 import { z } from "zod"
 
-import { ItemsService } from "@/client"
-import { ItemActionsMenu } from "@/components/Common/ItemActionsMenu"
-import AddItem from "@/components/Items/AddItem"
-import PendingItems from "@/components/Pending/PendingItems"
+import { FamilyMembersService } from "@/client"
+import { FamilyMemberActionsMenu } from "@/components/Common/FamilyMemberActionsMenu"
+import AddFamilyMember from "@/components/FamilyMembers/AddFamilyMember"
+import PendingFamilyMembers from "@/components/Pending/PendingFamilyMembers"
 import {
   PaginationItems,
   PaginationNextTrigger,
@@ -22,49 +22,49 @@ import {
   PaginationRoot,
 } from "@/components/ui/pagination.tsx"
 
-const itemsSearchSchema = z.object({
+const family_membersSearchSchema = z.object({
   page: z.number().catch(1),
 })
 
 const PER_PAGE = 5
 
-function getItemsQueryOptions({ page }: { page: number }) {
+function getFamilyMembersQueryOptions({ page }: { page: number }) {
   return {
     queryFn: () =>
-      ItemsService.readItems({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
-    queryKey: ["items", { page }],
+      FamilyMembersService.readFamilyMembers({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
+    queryKey: ["family_members", { page }],
   }
 }
 
-export const Route = createFileRoute("/_layout/items")({
-  component: Items,
-  validateSearch: (search) => itemsSearchSchema.parse(search),
+export const Route = createFileRoute("/_layout/familymembers")({
+  component: FamilyMembers,
+  validateSearch: (search) => family_membersSearchSchema.parse(search),
 })
 
-function ItemsTable() {
+function FamilyMembersTable() {
   const navigate = useNavigate({ from: Route.fullPath })
   const { page } = Route.useSearch()
 
   const { data, isLoading, isPlaceholderData } = useQuery({
-    ...getItemsQueryOptions({ page }),
+    ...getFamilyMembersQueryOptions({ page }),
     placeholderData: (prevData) => prevData,
   })
 
   const setPage = (page: number) => {
     navigate({
-      to: "/items",
+      to: "/family-members",
       search: (prev) => ({ ...prev, page }),
     })
   }
 
-  const items = data?.data.slice(0, PER_PAGE) ?? []
+  const family_members = data?.data.slice(0, PER_PAGE) ?? []
   const count = data?.count ?? 0
 
   if (isLoading) {
-    return <PendingItems />
+    return <PendingFamilyMembers />
   }
 
-  if (items.length === 0) {
+  if (family_members.length === 0) {
     return (
       <EmptyState.Root>
         <EmptyState.Content>
@@ -72,9 +72,9 @@ function ItemsTable() {
             <FiSearch />
           </EmptyState.Indicator>
           <VStack textAlign="center">
-            <EmptyState.Title>You don't have any items yet</EmptyState.Title>
+            <EmptyState.Title>You don't have any family members yet</EmptyState.Title>
             <EmptyState.Description>
-              Add a new item to get started
+              Add a new family member to get started
             </EmptyState.Description>
           </VStack>
         </EmptyState.Content>
@@ -94,23 +94,23 @@ function ItemsTable() {
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {items?.map((item) => (
-            <Table.Row key={item.id} opacity={isPlaceholderData ? 0.5 : 1}>
+          {family_members?.map((family_member) => (
+            <Table.Row key={family_member.id} opacity={isPlaceholderData ? 0.5 : 1}>
               <Table.Cell truncate maxW="sm">
-                {item.id}
+                {family_member.id}
               </Table.Cell>
               <Table.Cell truncate maxW="sm">
-                {item.title}
+                {family_member.title}
               </Table.Cell>
               <Table.Cell
-                color={!item.description ? "gray" : "inherit"}
+                color={!family_member.description ? "gray" : "inherit"}
                 truncate
                 maxW="30%"
               >
-                {item.description || "N/A"}
+                {family_member.description || "N/A"}
               </Table.Cell>
               <Table.Cell>
-                <ItemActionsMenu item={item} />
+                <FamilyMemberActionsMenu family_member={family_member} />
               </Table.Cell>
             </Table.Row>
           ))}
@@ -133,14 +133,14 @@ function ItemsTable() {
   )
 }
 
-function Items() {
+function FamilyMembers() {
   return (
     <Container maxW="full">
       <Heading size="lg" pt={12}>
-        Items Management
+        FamilyMembers Management
       </Heading>
-      <AddItem />
-      <ItemsTable />
+      <AddFamilyMember />
+      <FamilyMembersTable />
     </Container>
   )
 }
