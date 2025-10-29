@@ -13,7 +13,7 @@ import { Field } from "@/components/ui/field"
 import { InputGroup } from "@/components/ui/input-group"
 import { PasswordInput } from "@/components/ui/password-input"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
-import Logo from "/assets/images/fastapi-logo.svg"
+import Logo from "/assets/images/logo.svg"
 import { emailPattern, passwordRules } from "../utils"
 
 export const Route = createFileRoute("/login")({
@@ -67,7 +67,7 @@ function Login() {
     >
       <Image
         src={Logo}
-        alt="FastAPI logo"
+        alt="Kindness is Magic logo"
         height="auto"
         maxW="2xs"
         alignSelf="center"
@@ -95,18 +95,18 @@ function Login() {
         placeholder="Password"
         errors={errors}
       />
-      <RouterLink to="/recover-password" className="main-link">
+      {/* <RouterLink to="/recover-password" className="main-link">     //Password recovery currently disabled
         Forgot Password?
-      </RouterLink>
+      </RouterLink> */}
       <Button variant="solid" type="submit" loading={isSubmitting} size="md">
         Log In
       </Button>
-      <Text>
+      {/* <Text>  //Signup currently disabled
         Don't have an account?{" "}
         <RouterLink to="/signup" className="main-link">
           Sign Up
         </RouterLink>
-      </Text>
+      </Text> */}
     </Container>
   )
 }
