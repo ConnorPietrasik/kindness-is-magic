@@ -88,10 +88,54 @@ export const ItemCreateSchema = {
                 }
             ],
             title: 'Description'
+        },
+        given_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Given Name'
+        },
+        age: {
+            type: 'integer',
+            title: 'Age',
+            default: -1
+        },
+        practical_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Practical Wish'
+        },
+        fun_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fun Wish'
         }
     },
     type: 'object',
-    required: ['title'],
+    required: ['title', 'given_name'],
     title: 'ItemCreate'
 } as const;
 
@@ -115,6 +159,50 @@ export const ItemPublicSchema = {
             ],
             title: 'Description'
         },
+        given_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Given Name'
+        },
+        age: {
+            type: 'integer',
+            title: 'Age',
+            default: -1
+        },
+        practical_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Practical Wish'
+        },
+        fun_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fun Wish'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -127,7 +215,7 @@ export const ItemPublicSchema = {
         }
     },
     type: 'object',
-    required: ['title', 'id', 'owner_id'],
+    required: ['title', 'given_name', 'id', 'owner_id'],
     title: 'ItemPublic'
 } as const;
 
@@ -157,6 +245,50 @@ export const ItemUpdateSchema = {
                 }
             ],
             title: 'Description'
+        },
+        given_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Given Name'
+        },
+        age: {
+            type: 'integer',
+            title: 'Age',
+            default: -1
+        },
+        practical_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Practical Wish'
+        },
+        fun_wish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fun Wish'
         }
     },
     type: 'object',
@@ -210,31 +342,6 @@ export const NewPasswordSchema = {
     type: 'object',
     required: ['token', 'new_password'],
     title: 'NewPassword'
-} as const;
-
-export const PrivateUserCreateSchema = {
-    properties: {
-        email: {
-            type: 'string',
-            title: 'Email'
-        },
-        password: {
-            type: 'string',
-            title: 'Password'
-        },
-        full_name: {
-            type: 'string',
-            title: 'Full Name'
-        },
-        is_verified: {
-            type: 'boolean',
-            title: 'Is Verified',
-            default: false
-        }
-    },
-    type: 'object',
-    required: ['email', 'password', 'full_name'],
-    title: 'PrivateUserCreate'
 } as const;
 
 export const TokenSchema = {
