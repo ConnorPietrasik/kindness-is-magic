@@ -33,6 +33,10 @@ interface EditItemProps {
 interface ItemUpdateForm {
   title: string
   description?: string
+  given_name?: string
+  age: number
+  practical_wish?: string
+  fun_wish?: string
 }
 
 const EditItem = ({ item }: EditItemProps) => {
