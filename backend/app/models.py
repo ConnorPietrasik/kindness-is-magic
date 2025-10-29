@@ -61,7 +61,7 @@ class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
     given_name: str | None = Field(min_length=1, max_length=30)
-    age: int | None
+    age: int = Field(default=-1)
     practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
     fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
 
@@ -74,8 +74,8 @@ class ItemCreate(ItemBase):
 # Properties to receive on item update
 class ItemUpdate(ItemBase):
     title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-    given_name: str | None = Field(min_length=1, max_length=30)
-    age: int | None
+    given_name: str | None = Field(default=None, min_length=1, max_length=30)
+    age: int = Field(default=-1)
     practical_wish: str | None = Field(default=None, min_length=1, max_length=255)
     fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
 
