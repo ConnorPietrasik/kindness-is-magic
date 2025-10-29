@@ -52,8 +52,8 @@ const useAuth = () => {
     mutationFn: login,
     onSuccess: () => {
       navigate({ 
-        to: "/",
-        search: {(page: 1,)},
+        to: "/family-members",
+        search: {page: 1,},
       })
     },
     onError: (err: ApiError) => {
