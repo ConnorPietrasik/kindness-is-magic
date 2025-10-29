@@ -51,7 +51,10 @@ const useAuth = () => {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: () => {
-      navigate({ to: "/" })
+      navigate({ 
+        to: "/",
+        search: {(page: 1,)},
+      })
     },
     onError: (err: ApiError) => {
       handleError(err)

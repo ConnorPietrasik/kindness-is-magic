@@ -23,6 +23,7 @@ export const Route = createFileRoute("/login")({
     if (isLoggedIn()) {
       throw redirect({
         to: "/family-members",
+        search: {(page: 1,)},
       })
     }
   },
