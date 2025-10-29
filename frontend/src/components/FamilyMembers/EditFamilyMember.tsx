@@ -53,11 +53,11 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
     criteriaMode: "all",
     defaultValues: {
       ...family_member,
-      description: family_member.description ?? undefined,
       given_name: family_member.given_name ?? undefined,
       age: family_member.age ?? 0,
       practical_wish: family_member.practical_wish ?? "",
       fun_wish: family_member.fun_wish ?? "",
+      note: family_member.fun_wish ?? ""
     },
   })
 
@@ -65,7 +65,7 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
     mutationFn: (data: FamilyMemberUpdateForm) =>
       FamilyMembersService.updateFamilyMember({ id: family_member.id, requestBody: data }),
     onSuccess: () => {
-      showSuccessToast("FamilyMember updated successfully.")
+      showSuccessToast("Family member updated successfully.")
       reset()
       setIsOpen(false)
     },
@@ -102,39 +102,14 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
           <DialogBody>
             <Text mb={4}>Update the family member details below.</Text>
             <VStack gap={4}>
-              <Field
-                required
-                invalid={!!errors.title}
-                errorText={errors.title?.message}
-                label="Title"
-              >
-                <Input
-                  {...register("title", {
-                    required: "Title is required",
-                  })}
-                  placeholder="Title"
-                  type="text"
-                />
-              </Field>
-
-              <Field
-                invalid={!!errors.description}
-                errorText={errors.description?.message}
-                label="Description"
-              >
-                <Input
-                  {...register("description")}
-                  placeholder="Description"
-                  type="text"
-                />
-              </Field>
-
+              
               <Field
                 required
                 invalid={!!errors.given_name}
                 errorText={errors.given_name?.message}
                 label="Given Name"
               >
+
                 <Input
                   {...register("given_name", {
                     required: "Name is required.",
@@ -178,7 +153,19 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
               >
                 <Input
                   {...register("fun_wish")}
-                  placeholder="fun Wish"
+                  placeholder="Fun Wish"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.fun_wish}
+                errorText={errors.fun_wish?.message}
+                label="Optional Note"
+              >
+                <Input
+                  {...register("note")}
+                  placeholder="Optional Note"
                   type="text"
                 />
               </Field>

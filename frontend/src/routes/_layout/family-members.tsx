@@ -87,28 +87,39 @@ function FamilyMembersTable() {
       <Table.Root size={{ base: "sm", md: "md" }}>
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader w="sm">ID</Table.ColumnHeader>
-            <Table.ColumnHeader w="sm">Title</Table.ColumnHeader>
-            <Table.ColumnHeader w="sm">Description</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Name</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Age</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Practical Wish</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Fun Wish</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Note</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">Actions</Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
         <Table.Body>
           {family_members?.map((family_member) => (
-            <Table.Row key={family_member.id} opacity={isPlaceholderData ? 0.5 : 1}>
+            <Table.Row key={family_member.given_name} opacity={isPlaceholderData ? 0.5 : 1}>
               <Table.Cell truncate maxW="sm">
-                {family_member.id}
+                {family_member.given_name}
               </Table.Cell>
               <Table.Cell truncate maxW="sm">
-                {family_member.title}
+                {family_member.age}
               </Table.Cell>
-              <Table.Cell
+              <Table.Cell truncate maxW="sm">
+                {family_member.practical_wish}
+              </Table.Cell>
+              <Table.Cell truncate maxW="sm">
+                {family_member.fun_wish}
+              </Table.Cell>
+              <Table.Cell truncate maxW="sm">
+                {family_member.note}
+              </Table.Cell>
+              {/* <Table.Cell           //Left this here for now for use as a reference
                 color={!family_member.description ? "gray" : "inherit"}
                 truncate
                 maxW="30%"
               >
                 {family_member.description || "N/A"}
-              </Table.Cell>
+              </Table.Cell> */}
               <Table.Cell>
                 <FamilyMemberActionsMenu family_member={family_member} />
               </Table.Cell>
@@ -137,7 +148,7 @@ function FamilyMembers() {
   return (
     <Container maxW="full">
       <Heading size="lg" pt={12}>
-        FamilyMembers Management
+        Family Member Management
       </Heading>
       <AddFamilyMember />
       <FamilyMembersTable />

@@ -39,12 +39,11 @@ const AddFamilyMember = () => {
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      title: "",
-      description: "",
       given_name: "",
       age: 0,
       practical_wish: "",
       fun_wish: "",
+      note: "",
     },
   })
 
@@ -89,39 +88,14 @@ const AddFamilyMember = () => {
           <DialogBody>
             <Text mb={4}>Fill in the details to add a new family member.</Text>
             <VStack gap={4}>
-              <Field
-                required
-                invalid={!!errors.title}
-                errorText={errors.title?.message}
-                label="Title"
-              >
-                <Input
-                  {...register("title", {
-                    required: "Title is required.",
-                  })}
-                  placeholder="Title"
-                  type="text"
-                />
-              </Field>
-
-              <Field
-                invalid={!!errors.description}
-                errorText={errors.description?.message}
-                label="Description"
-              >
-                <Input
-                  {...register("description")}
-                  placeholder="Description"
-                  type="text"
-                />
-              </Field>
-
+              
               <Field
                 required
                 invalid={!!errors.given_name}
                 errorText={errors.given_name?.message}
                 label="Given Name"
               >
+
                 <Input
                   {...register("given_name", {
                     required: "Name is required.",
@@ -165,7 +139,19 @@ const AddFamilyMember = () => {
               >
                 <Input
                   {...register("fun_wish")}
-                  placeholder="fun Wish"
+                  placeholder="Fun Wish"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.fun_wish}
+                errorText={errors.fun_wish?.message}
+                label="Optional Note"
+              >
+                <Input
+                  {...register("note")}
+                  placeholder="Optional Note"
                   type="text"
                 />
               </Field>
