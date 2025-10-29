@@ -10,21 +10,19 @@ export type Body_login_login_access_token = {
 };
 
 export type FamilyMemberCreate = {
-    title: string;
-    description?: (string | null);
     given_name: (string | null);
     age?: number;
     practical_wish?: (string | null);
     fun_wish?: (string | null);
+    note?: (string | null);
 };
 
 export type FamilyMemberPublic = {
-    title: string;
-    description?: (string | null);
     given_name: (string | null);
     age?: number;
     practical_wish?: (string | null);
     fun_wish?: (string | null);
+    note?: (string | null);
     id: string;
     owner_id: string;
 };
@@ -35,12 +33,11 @@ export type FamilyMembersPublic = {
 };
 
 export type FamilyMemberUpdate = {
-    title?: (string | null);
-    description?: (string | null);
     given_name?: (string | null);
     age?: number;
     practical_wish?: (string | null);
     fun_wish?: (string | null);
+    note?: (string | null);
 };
 
 export type HTTPValidationError = {
@@ -54,6 +51,13 @@ export type Message = {
 export type NewPassword = {
     token: string;
     new_password: string;
+};
+
+export type PrivateUserCreate = {
+    email: string;
+    password: string;
+    full_name: string;
+    is_verified?: boolean;
 };
 
 export type Token = {
@@ -169,6 +173,12 @@ export type LoginRecoverPasswordHtmlContentData = {
 };
 
 export type LoginRecoverPasswordHtmlContentResponse = (string);
+
+export type PrivateCreateUserData = {
+    requestBody: PrivateUserCreate;
+};
+
+export type PrivateCreateUserResponse = (UserPublic);
 
 export type UsersReadUsersData = {
     limit?: number;

@@ -57,24 +57,6 @@ export const Body_login_login_access_tokenSchema = {
 
 export const FamilyMemberCreateSchema = {
     properties: {
-        title: {
-            type: 'string',
-            maxLength: 255,
-            minLength: 1,
-            title: 'Title'
-        },
-        description: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Description'
-        },
         given_name: {
             anyOf: [
                 {
@@ -118,33 +100,28 @@ export const FamilyMemberCreateSchema = {
                 }
             ],
             title: 'Fun Wish'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1000,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
         }
     },
     type: 'object',
-    required: ['title', 'given_name'],
+    required: ['given_name'],
     title: 'FamilyMemberCreate'
 } as const;
 
 export const FamilyMemberPublicSchema = {
     properties: {
-        title: {
-            type: 'string',
-            maxLength: 255,
-            minLength: 1,
-            title: 'Title'
-        },
-        description: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Description'
-        },
         given_name: {
             anyOf: [
                 {
@@ -188,6 +165,19 @@ export const FamilyMemberPublicSchema = {
                 }
             ],
             title: 'Fun Wish'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1000,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
         },
         id: {
             type: 'string',
@@ -201,37 +191,12 @@ export const FamilyMemberPublicSchema = {
         }
     },
     type: 'object',
-    required: ['title', 'given_name', 'id', 'owner_id'],
+    required: ['given_name', 'id', 'owner_id'],
     title: 'FamilyMemberPublic'
 } as const;
 
 export const FamilyMemberUpdateSchema = {
     properties: {
-        title: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255,
-                    minLength: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Title'
-        },
-        description: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Description'
-        },
         given_name: {
             anyOf: [
                 {
@@ -275,6 +240,19 @@ export const FamilyMemberUpdateSchema = {
                 }
             ],
             title: 'Fun Wish'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1000,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
         }
     },
     type: 'object',
@@ -342,6 +320,31 @@ export const NewPasswordSchema = {
     type: 'object',
     required: ['token', 'new_password'],
     title: 'NewPassword'
+} as const;
+
+export const PrivateUserCreateSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        password: {
+            type: 'string',
+            title: 'Password'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        is_verified: {
+            type: 'boolean',
+            title: 'Is Verified',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['email', 'password', 'full_name'],
+    title: 'PrivateUserCreate'
 } as const;
 
 export const TokenSchema = {

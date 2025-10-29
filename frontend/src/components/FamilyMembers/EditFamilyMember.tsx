@@ -31,12 +31,11 @@ interface EditFamilyMemberProps {
 }
 
 interface FamilyMemberUpdateForm {
-  title: string
-  description?: string
   given_name?: string
   age: number
   practical_wish?: string
   fun_wish?: string
+  note?: string
 }
 
 const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
