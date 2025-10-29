@@ -9,11 +9,7 @@ export type Body_login_login_access_token = {
     client_secret?: (string | null);
 };
 
-export type HTTPValidationError = {
-    detail?: Array<ValidationError>;
-};
-
-export type ItemCreate = {
+export type FamilyMemberCreate = {
     title: string;
     description?: (string | null);
     given_name: (string | null);
@@ -22,7 +18,7 @@ export type ItemCreate = {
     fun_wish?: (string | null);
 };
 
-export type ItemPublic = {
+export type FamilyMemberPublic = {
     title: string;
     description?: (string | null);
     given_name: (string | null);
@@ -33,18 +29,22 @@ export type ItemPublic = {
     owner_id: string;
 };
 
-export type ItemsPublic = {
-    data: Array<ItemPublic>;
+export type FamilyMembersPublic = {
+    data: Array<FamilyMemberPublic>;
     count: number;
 };
 
-export type ItemUpdate = {
+export type FamilyMemberUpdate = {
     title?: (string | null);
     description?: (string | null);
     given_name?: (string | null);
     age?: number;
     practical_wish?: (string | null);
     fun_wish?: (string | null);
+};
+
+export type HTTPValidationError = {
+    detail?: Array<ValidationError>;
 };
 
 export type Message = {
@@ -112,37 +112,37 @@ export type ValidationError = {
     type: string;
 };
 
-export type ItemsReadItemsData = {
+export type FamilyMembersReadFamilyMembersData = {
     limit?: number;
     skip?: number;
 };
 
-export type ItemsReadItemsResponse = (ItemsPublic);
+export type FamilyMembersReadFamilyMembersResponse = (FamilyMembersPublic);
 
-export type ItemsCreateItemData = {
-    requestBody: ItemCreate;
+export type FamilyMembersCreateFamilyMemberData = {
+    requestBody: FamilyMemberCreate;
 };
 
-export type ItemsCreateItemResponse = (ItemPublic);
+export type FamilyMembersCreateFamilyMemberResponse = (FamilyMemberPublic);
 
-export type ItemsReadItemData = {
+export type FamilyMembersReadFamilyMemberData = {
     id: string;
 };
 
-export type ItemsReadItemResponse = (ItemPublic);
+export type FamilyMembersReadFamilyMemberResponse = (FamilyMemberPublic);
 
-export type ItemsUpdateItemData = {
+export type FamilyMembersUpdateFamilyMemberData = {
     id: string;
-    requestBody: ItemUpdate;
+    requestBody: FamilyMemberUpdate;
 };
 
-export type ItemsUpdateItemResponse = (ItemPublic);
+export type FamilyMembersUpdateFamilyMemberResponse = (FamilyMemberPublic);
 
-export type ItemsDeleteItemData = {
+export type FamilyMembersDeleteFamilyMemberData = {
     id: string;
 };
 
-export type ItemsDeleteItemResponse = (Message);
+export type FamilyMembersDeleteFamilyMemberResponse = (Message);
 
 export type LoginLoginAccessTokenData = {
     formData: Body_login_login_access_token;

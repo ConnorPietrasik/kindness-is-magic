@@ -55,21 +55,7 @@ export const Body_login_login_access_tokenSchema = {
     title: 'Body_login-login_access_token'
 } as const;
 
-export const HTTPValidationErrorSchema = {
-    properties: {
-        detail: {
-            items: {
-                '$ref': '#/components/schemas/ValidationError'
-            },
-            type: 'array',
-            title: 'Detail'
-        }
-    },
-    type: 'object',
-    title: 'HTTPValidationError'
-} as const;
-
-export const ItemCreateSchema = {
+export const FamilyMemberCreateSchema = {
     properties: {
         title: {
             type: 'string',
@@ -136,10 +122,10 @@ export const ItemCreateSchema = {
     },
     type: 'object',
     required: ['title', 'given_name'],
-    title: 'ItemCreate'
+    title: 'FamilyMemberCreate'
 } as const;
 
-export const ItemPublicSchema = {
+export const FamilyMemberPublicSchema = {
     properties: {
         title: {
             type: 'string',
@@ -216,10 +202,10 @@ export const ItemPublicSchema = {
     },
     type: 'object',
     required: ['title', 'given_name', 'id', 'owner_id'],
-    title: 'ItemPublic'
+    title: 'FamilyMemberPublic'
 } as const;
 
-export const ItemUpdateSchema = {
+export const FamilyMemberUpdateSchema = {
     properties: {
         title: {
             anyOf: [
@@ -292,14 +278,14 @@ export const ItemUpdateSchema = {
         }
     },
     type: 'object',
-    title: 'ItemUpdate'
+    title: 'FamilyMemberUpdate'
 } as const;
 
-export const ItemsPublicSchema = {
+export const FamilyMembersPublicSchema = {
     properties: {
         data: {
             items: {
-                '$ref': '#/components/schemas/ItemPublic'
+                '$ref': '#/components/schemas/FamilyMemberPublic'
             },
             type: 'array',
             title: 'Data'
@@ -311,7 +297,21 @@ export const ItemsPublicSchema = {
     },
     type: 'object',
     required: ['data', 'count'],
-    title: 'ItemsPublic'
+    title: 'FamilyMembersPublic'
+} as const;
+
+export const HTTPValidationErrorSchema = {
+    properties: {
+        detail: {
+            items: {
+                '$ref': '#/components/schemas/ValidationError'
+            },
+            type: 'array',
+            title: 'Detail'
+        }
+    },
+    type: 'object',
+    title: 'HTTPValidationError'
 } as const;
 
 export const MessageSchema = {

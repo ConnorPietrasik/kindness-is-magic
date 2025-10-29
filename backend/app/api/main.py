@@ -1,7 +1,6 @@
-from backend.app.api.routes import familymembers
 from fastapi import APIRouter
 
-from app.api.routes import login, private, users, utils
+from app.api.routes import familymembers, login, private, users, utils
 from app.core.config import settings
 
 api_router = APIRouter()
