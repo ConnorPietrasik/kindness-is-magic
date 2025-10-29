@@ -1,7 +1,8 @@
-import { Container, Image, Input, Text } from "@chakra-ui/react"
+//import { Container, Image, Input, Text } from "@chakra-ui/react"
+import { Container, Image, Input} from "@chakra-ui/react"
 import {
   createFileRoute,
-  Link as RouterLink,
+  // Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
 import { type SubmitHandler, useForm } from "react-hook-form"
