@@ -43,7 +43,7 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
-    items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+    family_members: list["FamilyMember"] = Relationship(back_populates="owner", cascade_delete=True)
 
 
 # Properties to return via API, id is always required
@@ -57,7 +57,7 @@ class UsersPublic(SQLModel):
 
 
 # Shared properties
-class ItemBase(SQLModel):
+class FamilyMemberBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
     given_name: str | None = Field(min_length=1, max_length=30)
@@ -66,13 +66,13 @@ class ItemBase(SQLModel):
     fun_wish: str | None = Field(default=None, min_length=1, max_length=255)
 
 
-# Properties to receive on item creation
-class ItemCreate(ItemBase):
+# Properties to receive on FamilyMember creation
+class FamilyMemberCreate(FamilyMemberBase):
     pass
 
 
-# Properties to receive on item update
-class ItemUpdate(ItemBase):
+# Properties to receive on FamilyMember update
+class FamilyMemberUpdate(FamilyMemberBase):
     title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
     given_name: str | None = Field(default=None, min_length=1, max_length=30)
     age: int = Field(default=-1)
@@ -81,22 +81,22 @@ class ItemUpdate(ItemBase):
 
 
 # Database model, database table inferred from class name
-class Item(ItemBase, table=True):
+class FamilyMember(FamilyMemberBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )
-    owner: User | None = Relationship(back_populates="items")
+    owner: User | None = Relationship(back_populates="family_members")
 
 
 # Properties to return via API, id is always required
-class ItemPublic(ItemBase):
+class FamilyMemberPublic(FamilyMemberBase):
     id: uuid.UUID
     owner_id: uuid.UUID
 
 
-class ItemsPublic(SQLModel):
-    data: list[ItemPublic]
+class FamilyMembersPublic(SQLModel):
+    data: list[FamilyMemberPublic]
     count: int
 
 
