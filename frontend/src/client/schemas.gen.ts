@@ -79,8 +79,7 @@ export const FamilyMemberCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -92,8 +91,7 @@ export const FamilyMemberCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -105,8 +103,7 @@ export const FamilyMemberCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 1000,
-                    minLength: 1
+                    maxLength: 1000
                 },
                 {
                     type: 'null'
@@ -144,8 +141,7 @@ export const FamilyMemberPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -157,8 +153,7 @@ export const FamilyMemberPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -170,8 +165,7 @@ export const FamilyMemberPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 1000,
-                    minLength: 1
+                    maxLength: 1000
                 },
                 {
                     type: 'null'
@@ -219,8 +213,7 @@ export const FamilyMemberUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -232,8 +225,7 @@ export const FamilyMemberUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 255,
-                    minLength: 1
+                    maxLength: 255
                 },
                 {
                     type: 'null'
@@ -245,8 +237,7 @@ export const FamilyMemberUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    maxLength: 1000,
-                    minLength: 1
+                    maxLength: 1000
                 },
                 {
                     type: 'null'
