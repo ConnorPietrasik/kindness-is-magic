@@ -11,7 +11,7 @@ import { useState } from "react"
 import { type SubmitHandler, useForm } from "react-hook-form"
 import { FaExchangeAlt } from "react-icons/fa"
 
-import { type ApiError, type ItemPublic, ItemsService } from "@/client"
+import { type ApiError, type FamilyMemberPublic, FamilyMembersService } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 import {
@@ -26,11 +26,11 @@ import {
 } from "../ui/dialog"
 import { Field } from "../ui/field"
 
-interface EditItemProps {
-  item: ItemPublic
+interface EditFamilyMemberProps {
+  family_member: FamilyMemberPublic
 }
 
-interface ItemUpdateForm {
+interface FamilyMemberUpdateForm {
   title: string
   description?: string
   given_name?: string
@@ -39,7 +39,7 @@ interface ItemUpdateForm {
   fun_wish?: string
 }
 
-const EditItem = ({ item }: EditItemProps) => {
+const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast } = useCustomToast()
@@ -48,24 +48,24 @@ const EditItem = ({ item }: EditItemProps) => {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ItemUpdateForm>({
+  } = useForm<FamilyMemberUpdateForm>({
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      ...item,
-      description: item.description ?? undefined,
-      given_name: item.given_name ?? undefined,
-      age: item.age ?? 0,
-      practical_wish: item.practical_wish ?? "",
-      fun_wish: item.fun_wish ?? "",
+      ...family_member,
+      description: family_member.description ?? undefined,
+      given_name: family_member.given_name ?? undefined,
+      age: family_member.age ?? 0,
+      practical_wish: family_member.practical_wish ?? "",
+      fun_wish: family_member.fun_wish ?? "",
     },
   })
 
   const mutation = useMutation({
-    mutationFn: (data: ItemUpdateForm) =>
-      ItemsService.updateItem({ id: item.id, requestBody: data }),
+    mutationFn: (data: FamilyMemberUpdateForm) =>
+      FamilyMembersService.updateFamilyMember({ id: family_member.id, requestBody: data }),
     onSuccess: () => {
-      showSuccessToast("Item updated successfully.")
+      showSuccessToast("FamilyMember updated successfully.")
       reset()
       setIsOpen(false)
     },
@@ -73,11 +73,11 @@ const EditItem = ({ item }: EditItemProps) => {
       handleError(err)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] })
+      queryClient.invalidateQueries({ queryKey: ["family_members"] })
     },
   })
 
-  const onSubmit: SubmitHandler<ItemUpdateForm> = async (data) => {
+  const onSubmit: SubmitHandler<FamilyMemberUpdateForm> = async (data) => {
     mutation.mutate(data)
   }
 
@@ -91,16 +91,16 @@ const EditItem = ({ item }: EditItemProps) => {
       <DialogTrigger asChild>
         <Button variant="ghost">
           <FaExchangeAlt fontSize="16px" />
-          Edit Item
+          Edit Family Member
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>Edit Item</DialogTitle>
+            <DialogTitle>Edit Family Member</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <Text mb={4}>Update the item details below.</Text>
+            <Text mb={4}>Update the family member details below.</Text>
             <VStack gap={4}>
               <Field
                 required
@@ -208,4 +208,4 @@ const EditItem = ({ item }: EditItemProps) => {
   )
 }
 
-export default EditItem
+export default EditFamilyMember
