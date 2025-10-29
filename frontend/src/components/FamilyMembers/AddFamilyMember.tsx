@@ -127,7 +127,7 @@ const AddFamilyMember = () => {
               >
                 <Input
                   {...register("practical_wish")}
-                  placeholder="Practical Wish"
+                  placeholder="Practical Wish - Please Stay Below $50"
                   type="text"
                 />
               </Field>
@@ -139,7 +139,7 @@ const AddFamilyMember = () => {
               >
                 <Input
                   {...register("fun_wish")}
-                  placeholder="Fun Wish"
+                  placeholder="Fun Wish - Please Stay Below $50"
                   type="text"
                 />
               </Field>
