@@ -136,7 +136,7 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
               <Field
                 invalid={!!errors.practical_wish}
                 errorText={errors.practical_wish?.message}
-                label="Practical Wish"
+                label="Practical Wish / Clothing Item (Please Specify Size For Clothing)"
               >
                 <Input
                   {...register("practical_wish")}
