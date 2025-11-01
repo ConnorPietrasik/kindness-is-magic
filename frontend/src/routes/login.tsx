@@ -1,8 +1,7 @@
-//import { Container, Image, Input, Text } from "@chakra-ui/react"
-import { Container, Image, Input} from "@chakra-ui/react"
+import { Container, Image, Input, Text } from "@chakra-ui/react"
 import {
   createFileRoute,
-  // Link as RouterLink,
+  Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -103,12 +102,12 @@ function Login() {
       <Button variant="solid" type="submit" loading={isSubmitting} size="md">
         Log In
       </Button>
-      {/* <Text>  //Signup currently disabled
+      { <Text>  //Signup currently disabled
         Don't have an account?{" "}
         <RouterLink to="/signup" className="main-link">
           Sign Up
         </RouterLink>
-      </Text> */}
+      </Text> }
     </Container>
   )
 }
