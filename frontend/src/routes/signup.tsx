@@ -120,6 +120,9 @@ function SignUp() {
           Sign Up
         </Button>
         <Text>
+          Note: Please log in with your email and password upon success
+        </Text>
+        <Text>
           Already have an account?{" "}
           <RouterLink to="/login" className="main-link">
             Log In
