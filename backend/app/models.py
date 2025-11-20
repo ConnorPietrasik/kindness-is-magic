@@ -60,6 +60,7 @@ class UsersPublic(SQLModel):
 class FamilyMemberBase(SQLModel):
     given_name: str | None = Field(min_length=1, max_length=30)
     age: int = Field(default=-1)
+    family_role: str | None = Field(default=None, max_length=30)
     practical_wish: str | None = Field(default=None, max_length=255)
     fun_wish: str | None = Field(default=None, max_length=255)
     note: str | None = Field(default=None, max_length=1000)
@@ -74,6 +75,7 @@ class FamilyMemberCreate(FamilyMemberBase):
 class FamilyMemberUpdate(FamilyMemberBase):
     given_name: str | None = Field(default=None, min_length=1, max_length=30)
     age: int = Field(default=-1)
+    family_role: str | None = Field(default=None, max_length=30)
     practical_wish: str | None = Field(default=None, max_length=255)
     fun_wish: str | None = Field(default=None, max_length=255)
     note: str | None = Field(default=None, max_length=1000)

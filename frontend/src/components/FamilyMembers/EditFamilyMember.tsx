@@ -106,7 +106,7 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
                 required
                 invalid={!!errors.given_name}
                 errorText={errors.given_name?.message}
-                label="Given Name"
+                label="First Name"
               >
 
                 <Input
@@ -130,6 +130,18 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
                   })}
                   placeholder="Age"
                   type="number"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.family_role}
+                errorText={errors.family_role?.message}
+                label="Family Role"
+              >
+                <Input
+                  {...register("note")}
+                  placeholder="E.g. son, grandmother, father"
+                  type="text"
                 />
               </Field>
 

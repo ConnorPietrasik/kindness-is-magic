@@ -41,6 +41,7 @@ const AddFamilyMember = () => {
     defaultValues: {
       given_name: "",
       age: 0,
+      family_role: "",
       practical_wish: "",
       fun_wish: "",
       note: "",
@@ -93,7 +94,7 @@ const AddFamilyMember = () => {
                 required
                 invalid={!!errors.given_name}
                 errorText={errors.given_name?.message}
-                label="Given Name"
+                label="First Name"
               >
 
                 <Input
@@ -117,6 +118,18 @@ const AddFamilyMember = () => {
                   })}
                   placeholder="Age"
                   type="number"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.family_role}
+                errorText={errors.family_role?.message}
+                label="Family Role"
+              >
+                <Input
+                  {...register("note")}
+                  placeholder="E.g. son, grandmother, father"
+                  type="text"
                 />
               </Field>
 
