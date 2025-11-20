@@ -79,7 +79,7 @@ const UserInformation = () => {
         as="form"
         onSubmit={handleSubmit(onSubmit)}
       >
-        <Field label="Full name">
+        <Field label="Full Name">
           {editMode ? (
             <Input
               {...register("full_name", { maxLength: 30 })}

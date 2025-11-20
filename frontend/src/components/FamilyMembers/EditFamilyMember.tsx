@@ -142,7 +142,7 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
               >
                 <Input
                   {...register("family_role")}
-                  placeholder="E.g. son, grandmother, father"
+                  placeholder="E.G. Son, Grandmother, Father"
                   type="text"
                 />
               </Field>
