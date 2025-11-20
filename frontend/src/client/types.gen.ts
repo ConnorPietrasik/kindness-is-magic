@@ -12,6 +12,7 @@ export type Body_login_login_access_token = {
 export type FamilyMemberCreate = {
     given_name: (string | null);
     age?: number;
+    family_role?: (string | null);
     practical_wish?: (string | null);
     fun_wish?: (string | null);
     note?: (string | null);
@@ -20,6 +21,7 @@ export type FamilyMemberCreate = {
 export type FamilyMemberPublic = {
     given_name: (string | null);
     age?: number;
+    family_role?: (string | null);
     practical_wish?: (string | null);
     fun_wish?: (string | null);
     note?: (string | null);
@@ -35,6 +37,7 @@ export type FamilyMembersPublic = {
 export type FamilyMemberUpdate = {
     given_name?: (string | null);
     age?: number;
+    family_role?: (string | null);
     practical_wish?: (string | null);
     fun_wish?: (string | null);
     note?: (string | null);

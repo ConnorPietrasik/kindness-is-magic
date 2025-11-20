@@ -75,6 +75,18 @@ export const FamilyMemberCreateSchema = {
             title: 'Age',
             default: -1
         },
+        family_role: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Family Role'
+        },
         practical_wish: {
             anyOf: [
                 {
@@ -136,6 +148,18 @@ export const FamilyMemberPublicSchema = {
             type: 'integer',
             title: 'Age',
             default: -1
+        },
+        family_role: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Family Role'
         },
         practical_wish: {
             anyOf: [
@@ -208,6 +232,18 @@ export const FamilyMemberUpdateSchema = {
             type: 'integer',
             title: 'Age',
             default: -1
+        },
+        family_role: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 30
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Family Role'
         },
         practical_wish: {
             anyOf: [
