@@ -127,7 +127,7 @@ const AddFamilyMember = () => {
                 label="Family Role"
               >
                 <Input
-                  {...register("note")}
+                  {...register("family_role")}
                   placeholder="E.g. son, grandmother, father"
                   type="text"
                 />
