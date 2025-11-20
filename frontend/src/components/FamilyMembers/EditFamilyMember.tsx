@@ -54,6 +54,7 @@ const EditFamilyMember = ({ family_member }: EditFamilyMemberProps) => {
       ...family_member,
       given_name: family_member.given_name ?? undefined,
       age: family_member.age ?? 0,
+      family_role: family_member.family_role ?? "",
       practical_wish: family_member.practical_wish ?? "",
       fun_wish: family_member.fun_wish ?? "",
       note: family_member.note ?? ""
