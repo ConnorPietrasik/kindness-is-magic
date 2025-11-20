@@ -89,6 +89,7 @@ function FamilyMembersTable() {
           <Table.Row>
             <Table.ColumnHeader w="sm">Name</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">Age</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">Family Role</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">Practical Wish</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">Fun Wish</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">Note</Table.ColumnHeader>
@@ -103,6 +104,9 @@ function FamilyMembersTable() {
               </Table.Cell>
               <Table.Cell truncate maxW="sm">
                 {family_member.age}
+              </Table.Cell>
+              <Table.Cell truncate maxW="sm">
+                {family_member.family_role}
               </Table.Cell>
               <Table.Cell truncate maxW="sm">
                 {family_member.practical_wish}
