@@ -33,6 +33,7 @@ interface EditFamilyMemberProps {
 interface FamilyMemberUpdateForm {
   given_name?: string
   age: number
+  family_role?: string
   practical_wish?: string
   fun_wish?: string
   note?: string
