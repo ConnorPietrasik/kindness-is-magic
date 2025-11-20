@@ -7,6 +7,7 @@ const PendingItems = () => (
       <Table.Row>
         <Table.ColumnHeader w="sm">Name</Table.ColumnHeader>
         <Table.ColumnHeader w="sm">Age</Table.ColumnHeader>
+        <Table.ColumnHeader w="sm">Family Role</Table.ColumnHeader>
         <Table.ColumnHeader w="sm">Practical Wish</Table.ColumnHeader>
         <Table.ColumnHeader w="sm">Fun Wish</Table.ColumnHeader>
         <Table.ColumnHeader w="sm">Note</Table.ColumnHeader>
@@ -16,6 +17,9 @@ const PendingItems = () => (
     <Table.Body>
       {[...Array(5)].map((_, index) => (
         <Table.Row key={index}>
+          <Table.Cell>
+            <SkeletonText noOfLines={1} />
+          </Table.Cell>
           <Table.Cell>
             <SkeletonText noOfLines={1} />
           </Table.Cell>
