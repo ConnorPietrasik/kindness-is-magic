@@ -2,7 +2,8 @@ import csv
 import io
 from typing import Any
 
-from fastapi import APIRouter, StreamingResponse
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from sqlmodel import select
 
 from app.api.deps import SessionDep
@@ -23,6 +24,8 @@ def read_wishlists(
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
+
+    writer.writerow(["Family ID", "Given Name", "Family Role", "Age", "Practical Wish", "Fun Wish", "Note"])
 
     for f in family_members:
         writer.writerow([f.owner_id, f.given_name, f.family_role, f.age, f.practical_wish, f.fun_wish, f.note])
