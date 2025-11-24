@@ -45,6 +45,8 @@ function SignUp() {
     defaultValues: {
       email: "",
       full_name: "",
+      phone: "",
+      address: "",
       password: "",
       confirm_password: "",
     },
@@ -102,6 +104,38 @@ function SignUp() {
             />
           </InputGroup>
         </Field>
+
+        <Field
+          invalid={!!errors.phone}
+          errorText={errors.phone?.message}
+        >
+          <InputGroup w="100%" startElement={<FiUser />}>
+            <Input
+              minLength={3}
+              {...register("phone", {
+                required: "Phone number is required",
+              })}
+              placeholder="xxx-xxx-xxxx"
+              type="tel"
+              pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+            />
+          </InputGroup>
+        </Field>
+
+        <Field
+          invalid={!!errors.address}
+          errorText={errors.address?.message}
+        >
+          <InputGroup w="100%" startElement={<FiUser />}>
+            <Input
+              minLength={3}
+              {...register("address")}
+              placeholder="*address*"
+              type="text"
+            />
+          </InputGroup>
+        </Field>
+
         <PasswordInput
           type="password"
           startElement={<FiLock />}

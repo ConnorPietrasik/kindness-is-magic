@@ -78,6 +78,8 @@ export type UserCreate = {
     is_active?: boolean;
     is_superuser?: boolean;
     full_name?: (string | null);
+    phone?: (string | null);
+    address?: (string | null);
     password: string;
 };
 
@@ -86,6 +88,8 @@ export type UserPublic = {
     is_active?: boolean;
     is_superuser?: boolean;
     full_name?: (string | null);
+    phone?: (string | null);
+    address?: (string | null);
     id: string;
 };
 
@@ -93,6 +97,8 @@ export type UserRegister = {
     email: string;
     password: string;
     full_name?: (string | null);
+    phone?: (string | null);
+    address?: (string | null);
 };
 
 export type UsersPublic = {
@@ -105,12 +111,16 @@ export type UserUpdate = {
     is_active?: boolean;
     is_superuser?: boolean;
     full_name?: (string | null);
+    phone?: (string | null);
+    address?: (string | null);
     password?: (string | null);
 };
 
 export type UserUpdateMe = {
     full_name?: (string | null);
     email?: (string | null);
+    phone?: (string | null);
+    address?: (string | null);
 };
 
 export type ValidationError = {
@@ -244,3 +254,5 @@ export type UtilsTestEmailData = {
 export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
+
+export type WishlistReadWishlistsResponse = (unknown);

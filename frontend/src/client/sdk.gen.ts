@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { FamilyMembersReadFamilyMembersData, FamilyMembersReadFamilyMembersResponse, FamilyMembersCreateFamilyMemberData, FamilyMembersCreateFamilyMemberResponse, FamilyMembersReadFamilyMemberData, FamilyMembersReadFamilyMemberResponse, FamilyMembersUpdateFamilyMemberData, FamilyMembersUpdateFamilyMemberResponse, FamilyMembersDeleteFamilyMemberData, FamilyMembersDeleteFamilyMemberResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { FamilyMembersReadFamilyMembersData, FamilyMembersReadFamilyMembersResponse, FamilyMembersCreateFamilyMemberData, FamilyMembersCreateFamilyMemberResponse, FamilyMembersReadFamilyMemberData, FamilyMembersReadFamilyMemberResponse, FamilyMembersUpdateFamilyMemberData, FamilyMembersUpdateFamilyMemberResponse, FamilyMembersDeleteFamilyMemberData, FamilyMembersDeleteFamilyMemberResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WishlistReadWishlistsResponse } from './types.gen';
 
 export class FamilyMembersService {
     /**
@@ -463,6 +463,21 @@ export class UtilsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/utils/health-check/'
+        });
+    }
+}
+
+export class WishlistService {
+    /**
+     * Read Wishlists
+     * Retrieve master wishlist.
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static readWishlists(): CancelablePromise<WishlistReadWishlistsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/wishlist/'
         });
     }
 }
