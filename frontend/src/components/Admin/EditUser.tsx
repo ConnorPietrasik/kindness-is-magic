@@ -126,6 +126,30 @@ const EditUser = ({ user }: EditUserProps) => {
               </Field>
 
               <Field
+                invalid={!!errors.phone}
+                errorText={errors.phone?.message}
+                label="Phone Number"
+              >
+                <Input
+                  {...register("phone")}
+                  placeholder="xxx-xxx-xxxx"
+                  type="text"
+                />
+              </Field>
+
+              <Field
+                invalid={!!errors.address}
+                errorText={errors.address?.message}
+                label="Address"
+              >
+                <Input
+                  {...register("address")}
+                  placeholder="*Address*"
+                  type="text"
+                />
+              </Field>
+
+              <Field
                 invalid={!!errors.password}
                 errorText={errors.password?.message}
                 label="Set Password"

@@ -119,6 +119,44 @@ const UserInformation = () => {
             </Text>
           )}
         </Field>
+        <Field label="Phone Number">
+          {editMode ? (
+            <Input
+              {...register("phone", { maxLength: 20 })}
+              type="text"
+              size="md"
+            />
+          ) : (
+            <Text
+              fontSize="md"
+              py={2}
+              color={!currentUser?.phone ? "gray" : "inherit"}
+              truncate
+              maxW="sm"
+            >
+              {currentUser?.phone || "N/A"}
+            </Text>
+          )}
+        </Field>
+        <Field label="Address">
+          {editMode ? (
+            <Input
+              {...register("address", { maxLength: 30 })}
+              type="text"
+              size="md"
+            />
+          ) : (
+            <Text
+              fontSize="md"
+              py={2}
+              color={!currentUser?.address ? "gray" : "inherit"}
+              truncate
+              maxW="sm"
+            >
+              {currentUser?.address || "N/A"}
+            </Text>
+          )}
+        </Field>
         <Flex mt={4} gap={3}>
           <Button
             variant="solid"

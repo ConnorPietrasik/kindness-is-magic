@@ -26,7 +26,7 @@ const family_membersSearchSchema = z.object({
   page: z.number().catch(1),
 })
 
-const PER_PAGE = 5
+const PER_PAGE = 10
 
 function getFamilyMembersQueryOptions({ page }: { page: number }) {
   return {
