@@ -117,7 +117,7 @@ function UsersTable() {
 
 //TODO: Learn how to do stuff like this properly instead of just shoving it directly
 const downloadFile = async () => {
-    const res = await fetch("hhttps://api.kindnessismagic.love/api/v1/wishlist/admin", {
+    const res = await fetch("https://api.kindnessismagic.love/api/v1/wishlist/admin", {
       headers: { Authorization: "Bearer " + localStorage.getItem("access_token")}
     });
     const blob = await res.blob();
