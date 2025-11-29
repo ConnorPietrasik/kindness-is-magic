@@ -256,3 +256,5 @@ export type UtilsTestEmailResponse = (Message);
 export type UtilsHealthCheckResponse = (boolean);
 
 export type WishlistReadWishlistsResponse = (unknown);
+
+export type WishlistReadUsersResponse = (unknown);

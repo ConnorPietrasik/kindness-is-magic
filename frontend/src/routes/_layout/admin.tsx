@@ -115,14 +115,24 @@ function UsersTable() {
   )
 }
 
-const downloadFile = () => {
-    window.location.href = "https://api.kindnessismagic.love/api/v1/wishlist/admin"
+//TODO: Learn how to do stuff like this properly instead of just shoving it directly
+const downloadFile = async () => {
+    const res = await fetch("hhttps://api.kindnessismagic.love/api/v1/wishlist/admin", {
+      headers: { Authorization: "Bearer " + localStorage.getItem("access_token")}
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "admin_list.csv";
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 function Admin() {
   return (
     <Container maxW="full">
-      <Button onClick={downloadFile} />
+      <Button onClick={downloadFile}>Download Admin List</Button>
       <Heading size="lg" pt={12}>
         Users Management
       </Heading>
