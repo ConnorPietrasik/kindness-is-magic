@@ -1,4 +1,4 @@
-import { Badge, Container, Flex, Heading, Table } from "@chakra-ui/react"
+import { Badge, Button, Container, Flex, Heading, Table } from "@chakra-ui/react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { z } from "zod"
@@ -115,9 +115,14 @@ function UsersTable() {
   )
 }
 
+const downloadFile = () => {
+    window.location.href = "https://api.kindnessismagic.love/api/v1/wishlist/admin"
+}
+
 function Admin() {
   return (
     <Container maxW="full">
+      <Button onClick={downloadFile} />
       <Heading size="lg" pt={12}>
         Users Management
       </Heading>
