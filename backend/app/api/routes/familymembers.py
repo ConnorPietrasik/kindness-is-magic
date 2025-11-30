@@ -21,7 +21,7 @@ def read_family_members(
     if current_user.is_superuser:
         count_statement = select(func.count()).select_from(FamilyMember)
         count = session.exec(count_statement).one()
-        statement = select(FamilyMember).offset(skip).limit(limit)
+        statement = select(FamilyMember).order_by(FamilyMember.owner_id).offset(skip).limit(limit)
         family_members = session.exec(statement).all()
     else:
         count_statement = (
