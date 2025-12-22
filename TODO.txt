@@ -1,0 +1,10 @@
+Separate user from family + add family gift per family + family bio
+Add family_num and family_member_num as integers, assigned by script when wish deadline passes (for easy organization)
+Add referrer user (with limited family slots + refer link + control over referred families)
+Add shopper user to mark gifts as purchased and such
+Add created date + updated date for family members
+Better admin / referrer view to track multiple families
+Wishlist views + pretty prints
+Add donor user to mark families as claimed or donate specifically for them
+Get email stuff working + automatic reminders and what not
+Change view automatically by date + logged in user type

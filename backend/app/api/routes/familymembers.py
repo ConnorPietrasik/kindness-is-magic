@@ -6,6 +6,7 @@ from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.models import FamilyMember, FamilyMemberCreate, FamilyMemberPublic, FamilyMembersPublic, FamilyMemberUpdate, Message
+from app.utils import is_wishing_over
 
 router = APIRouter(prefix="/family-members", tags=["family-members"])
 
@@ -50,7 +51,7 @@ def read_family_member(session: SessionDep, current_user: CurrentUser, id: uuid.
     if not family_member:
         raise HTTPException(status_code=404, detail="FamilyMember not found")
     if not current_user.is_superuser and (family_member.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
+        raise HTTPException(status_code=403, detail="Unauthorized to view family member")
     return family_member
 
 
@@ -61,6 +62,8 @@ def create_family_member(
     """
     Create new family_member.
     """
+    if is_wishing_over():
+        raise HTTPException(status_code=403, detail="Past wish submission deadline")
     family_member = FamilyMember.model_validate(family_member_in, update={"owner_id": current_user.id})
     session.add(family_member)
     session.commit()
@@ -82,8 +85,11 @@ def update_family_member(
     family_member = session.get(FamilyMember, id)
     if not family_member:
         raise HTTPException(status_code=404, detail="FamilyMember not found")
-    if not current_user.is_superuser and (family_member.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
+    if not current_user.is_superuser:
+        if family_member.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Can only update own family")
+        if is_wishing_over():
+            raise HTTPException(status_code=403, detail="Past wish submission deadline")
     update_dict = family_member_in.model_dump(exclude_unset=True)
     family_member.sqlmodel_update(update_dict)
     session.add(family_member)
@@ -102,8 +108,11 @@ def delete_family_member(
     family_member = session.get(FamilyMember, id)
     if not family_member:
         raise HTTPException(status_code=404, detail="FamilyMember not found")
-    if not current_user.is_superuser and (family_member.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
+    if not current_user.is_superuser:
+        if family_member.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Can only update own family")
+        if is_wishing_over():
+            raise HTTPException(status_code=403, detail="Past wish submission deadline")
     session.delete(family_member)
     session.commit()
     return Message(message="FamilyMember deleted successfully")

@@ -154,6 +154,11 @@ function FamilyMembers() {
       <Heading size="lg" pt={12}>
         Family Member Management
       </Heading>
+      <Box pt={36} m={4}>
+        <Text fontSize="6xl" truncate maxW="md">
+          NOTE: SUBMISSION DEADLINE HAS PASSED! Happy Holidays!
+        </Text>
+      </Box>
       <AddFamilyMember />
       <FamilyMembersTable />
     </Container>

@@ -1,0 +1,19 @@
+docker compose down
+
+If model changed:
+Backend 
+source .venv/bin/activate
+alembic revision --autogenerate -m "stuff"
+docker compose up backend --build
+alembic upgrade head
+
+If front changed:
+make sure backend is up
+./scripts/generate-client.sh
+
+For dev:
+docker compose watch
+
+For prod:
+docker compose -f docker-compose.yml up -d --build
+(make sure to specify file or dev settings will break stuff)

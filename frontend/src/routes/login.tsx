@@ -56,6 +56,11 @@ function Login() {
   }
 
   return (
+    <Box pt={36} m={4}>
+      <Text fontSize="6xl" truncate maxW="md">
+        NOTE: SUBMISSION DEADLINE HAS PASSED! Happy Holidays!
+      </Text>
+    </Box>
     <Container
       as="form"
       onSubmit={handleSubmit(onSubmit)}

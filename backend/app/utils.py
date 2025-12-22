@@ -121,3 +121,11 @@ def verify_password_reset_token(token: str) -> str | None:
         return str(decoded_token["sub"])
     except InvalidTokenError:
         return None
+
+
+#Checks if now is past the wish deadline
+#Uses hardcoded date because it's never expected to change
+#No timezone needed because server location is known
+def is_wishing_over() -> bool:
+    DEADLINE = datetime(2025, 11, 20)
+    return (datetime.today() > DEADLINE)
