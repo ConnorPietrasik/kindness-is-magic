@@ -1,0 +1,89 @@
+services:
+  traefik:
+    image: traefik:latest
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=ERROR"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8099:8080" # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - DOCKER_API_VERSION=1.44
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    networks:
+      - kindnet
+    env_file:
+      - .env
+    volumes:
+      - kindness_is_magic:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    expose:
+      - "8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.priority=100"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.docker.network=kindnet"
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    environment:
+      - VITE_BACKEND_URL=http://localhost/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.docker.network=kindnet"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+volumes:
+  kindness_is_magic:
+
+networks:
+  kindnet:
+    driver: bridge
+    name: kindnet
