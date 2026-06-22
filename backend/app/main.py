@@ -39,11 +39,11 @@ async def verify_database(db=Depends(get_db)):
 
     # 3. Create a test referrer + family + person
     test_referrer = db.execute(
-        text("INSERT INTO referrer (\"limit\", email, phone_number) VALUES (5, 'test@kind.is-magic', '111-222-3333') RETURNING id")
+        text("INSERT INTO referrer (name, family_limit, email, phone_number) VALUES ('test', 5, 'test@kind.is-magic', '111-222-3333') RETURNING id")
     ).scalar()
 
     test_family = db.execute(
-        text(f"INSERT INTO family (referrer_id, family_name, address, phone_number, family_wish) VALUES ({test_referrer}, 'TestFamily', '123 Kind St', '444-555-6666', 'world peace') RETURNING id")
+        text(f"INSERT INTO family (referrer_id, family_name, address, phone_number, family_wish, contact_name) VALUES ({test_referrer}, 'TestFamily', '123 Kind St', '444-555-6666', 'world peace', 'Family Contact') RETURNING id")
     ).scalar()
 
     test_person = db.execute(
