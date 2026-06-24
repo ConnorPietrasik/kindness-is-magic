@@ -1,9 +1,81 @@
-from fastapi import FastAPI, Depends, HTTPException
+import contextlib
+import os
+from collections.abc import Generator
+
+from fastapi import Depends, FastAPI, HTTPException
+import logging
+
+logger = logging.getLogger(__name__)
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
+from app.auth import get_password_hash
 from app.database import get_db
+from app.models import User, UserRole
 
-app = FastAPI()
+
+# ---------------------------------------------------------------------------
+# Lifespan: seed bootstrap admin if none exists
+# ---------------------------------------------------------------------------
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> Generator[None, None, None]:
+    """Seed bootstrap admin user on startup."""
+    admin_email = os.environ.get("ADMIN_EMAIL")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if admin_email and admin_password:
+        from sqlalchemy.exc import ProgrammingError
+
+        db = next(get_db())
+        try:
+            existing = db.query(User).filter(User.email == admin_email).first()
+            if not existing:
+                admin = User(
+                    email=admin_email,
+                    hashed_password=get_password_hash(admin_password),
+                    role=UserRole.admin,
+                    referrer_id=None,
+                    family_id=None,
+                    is_active=True,
+                )
+                db.add(admin)
+                db.commit()
+                logger.info("Bootstrap admin user created.")
+        except ProgrammingError:
+            logger.warning(
+                "Users table does not exist — skipping admin seed. "
+                "Run 'alembic upgrade head' to create tables."
+            )
+        finally:
+            db.close()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# CORS — required for HttpOnly cookie auth from a different origin
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------------
+# Include auth routes
+# ---------------------------------------------------------------------------
+from app.auth_routes import router as auth_router  # noqa: E402
+
+app.include_router(auth_router)
+
+
+# ---------------------------------------------------------------------------
+# Existing routes
+# ---------------------------------------------------------------------------
 
 
 @app.get("/api/health")

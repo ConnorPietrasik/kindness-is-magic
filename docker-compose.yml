@@ -80,6 +80,36 @@ services:
     networks:
       - kindnet
 
+  test_db:
+    image: postgres:15-alpine
+    restart: "no"
+    networks:
+      - kindnet
+    environment:
+      POSTGRES_USER: KindDB
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: kindness_is_magic_test
+    ports:
+      - "5433:5432"
+
+  test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://KindDB:testpassword@test_db:5432/kindness_is_magic_test
+      SECRET_KEY: test-secret-key-do-not-use
+      REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use
+      COOKIE_SECURE: "false"
+    depends_on:
+      - test_db
+    volumes:
+      - ./backend:/app
+    networks:
+      - kindnet
+    command: >
+      sh -c "pip install -r requirements-test.txt && pytest --tb=short -v"
+
 volumes:
   kindness_is_magic:
 
