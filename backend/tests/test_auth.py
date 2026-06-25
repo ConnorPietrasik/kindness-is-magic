@@ -448,10 +448,9 @@ class TestResetPassword:
 
         # Create a reset token (simulating forgot-password flow)
         raw_token = "test-reset-token-12345"
-        token_hash = get_password_hash(raw_token)
         reset = PasswordResetToken(
             user_id=admin_user.id,
-            token_hash=token_hash,
+            token=raw_token,
             expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
         )
         db.add(reset)
@@ -492,10 +491,9 @@ class TestResetPassword:
         from app.auth import get_password_hash
 
         raw_token = "expired-token"
-        token_hash = get_password_hash(raw_token)
         reset = PasswordResetToken(
             user_id=admin_user.id,
-            token_hash=token_hash,
+            token=raw_token,
             expires_at=datetime(2020, 1, 1, tzinfo=timezone.utc),  # long past
         )
         db.add(reset)
@@ -517,10 +515,9 @@ class TestResetPassword:
         from app.auth import get_password_hash
 
         raw_token = "short-pass-token"
-        token_hash = get_password_hash(raw_token)
         reset = PasswordResetToken(
             user_id=admin_user.id,
-            token_hash=token_hash,
+            token=raw_token,
             expires_at=datetime.now(timezone.utc).replace(hour=23),
         )
         db.add(reset)
@@ -531,6 +528,77 @@ class TestResetPassword:
             json={"token": raw_token, "new_password": "Short"},
         )
         assert resp.status_code == 422
+
+    def test_reset_password_cannot_cross_users(
+        self, test_client: TestClient, admin_user, db: Session
+    ):
+        """User B's reset token must not reset User A's password."""
+        from app.models import User, PasswordResetToken, UserRole
+        from app.auth import get_password_hash
+
+        # Create a second user
+        user_b = User(
+            email="userb@test.com",
+            hashed_password=get_password_hash("UserBPass1234!"),
+            role=UserRole.admin,
+            is_active=True,
+        )
+        db.add(user_b)
+        db.commit()
+        db.refresh(user_b)
+
+        # Create an unused reset token for user A (inserted first)
+        raw_token_a = "token-for-user-a"
+        reset_a = PasswordResetToken(
+            user_id=admin_user.id,
+            token=raw_token_a,
+            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+        )
+        db.add(reset_a)
+        db.commit()
+
+        # Create an unused reset token for user B (inserted second)
+        raw_token_b = "token-for-user-b"
+        reset_b = PasswordResetToken(
+            user_id=user_b.id,
+            token=raw_token_b,
+            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+        )
+        db.add(reset_b)
+        db.commit()
+
+        # User B tries to reset user A's password with their own token.
+        # This must fail — a token only resets the password of its owner.
+        resp = test_client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": raw_token_b,
+                "new_password": "HackedPass1234!",
+            },
+        )
+        # Should reset user B's password, not user A's
+        assert resp.status_code == 200
+
+        # Verify user A's password was NOT changed
+        login_a = test_client.post(
+            "/api/auth/login",
+            json={"email": "admin@test.com", "password": "AdminPass123!"},
+        )
+        assert login_a.status_code == 200, "User A's password should be unchanged"
+
+        # Verify user B's password WAS changed
+        login_b = test_client.post(
+            "/api/auth/login",
+            json={"email": "userb@test.com", "password": "HackedPass1234!"},
+        )
+        assert login_b.status_code == 200, "User B's password should have been reset"
+
+        # Verify user B's old password no longer works
+        login_b_old = test_client.post(
+            "/api/auth/login",
+            json={"email": "userb@test.com", "password": "UserBPass1234!"},
+        )
+        assert login_b_old.status_code == 401
 
 
 # ---------------------------------------------------------------------------

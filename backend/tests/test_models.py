@@ -177,7 +177,7 @@ class TestPasswordResetToken:
 
         token = PasswordResetToken(
             user_id=user.id,
-            token_hash=get_password_hash("raw-token"),
+            token="raw-token",
             expires_at=datetime.now(timezone.utc).replace(hour=23),
         )
         db.add(token)
@@ -202,7 +202,7 @@ class TestPasswordResetToken:
 
         token = PasswordResetToken(
             user_id=user.id,
-            token_hash=get_password_hash("raw"),
+            token="raw",
             expires_at=datetime.now(timezone.utc).replace(hour=23),
         )
         db.add(token)

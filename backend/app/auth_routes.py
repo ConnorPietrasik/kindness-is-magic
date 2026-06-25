@@ -237,7 +237,6 @@ async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
 
     # Generate token
     raw_token = secrets.token_urlsafe(32)
-    token_hash = get_password_hash(raw_token)
 
     # Invalidate any existing reset tokens for this user
     db.query(PasswordResetToken).filter(
@@ -247,7 +246,7 @@ async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
 
     reset = PasswordResetToken(
         user_id=user.id,
-        token_hash=token_hash,
+        token=raw_token,
         expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
     )
     db.add(reset)
@@ -271,12 +270,12 @@ async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
 @router.post("/reset-password")
 async def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     """Consume a reset token and set a new password."""
-    # Find an unused reset token whose hash matches
     reset = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == data.token,
         PasswordResetToken.used.is_(False),
     ).first()
 
-    if not reset or not verify_password(data.token, reset.token_hash):
+    if not reset:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     if reset.expires_at and reset.expires_at < datetime.now(timezone.utc):
