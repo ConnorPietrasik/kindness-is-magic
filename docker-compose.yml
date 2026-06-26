@@ -31,6 +31,11 @@ services:
       - kindness_is_magic:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
@@ -40,7 +45,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     expose:
@@ -81,6 +87,8 @@ services:
       - kindnet
 
   test_db:
+    profiles:
+      - test
     image: postgres:15-alpine
     restart: "no"
     networks:
@@ -91,8 +99,15 @@ services:
       POSTGRES_DB: kindness_is_magic_test
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U KindDB -d kindness_is_magic_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   test:
+    profiles:
+      - test
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -102,7 +117,8 @@ services:
       REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use
       COOKIE_SECURE: "false"
     depends_on:
-      - test_db
+      test_db:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     networks:
