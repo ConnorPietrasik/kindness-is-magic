@@ -80,6 +80,19 @@ from app.auth_routes import router as auth_router  # noqa: E402
 
 app.include_router(auth_router)
 
+# ---------------------------------------------------------------------------
+# Include admin routes (Phase 1)
+# ---------------------------------------------------------------------------
+from app.admin_routes import (  # noqa: E402
+    family_admin_router,
+    people_admin_router,
+    referrer_admin_router,
+)
+
+app.include_router(referrer_admin_router)
+app.include_router(family_admin_router)
+app.include_router(people_admin_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

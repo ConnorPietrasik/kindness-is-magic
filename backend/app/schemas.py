@@ -148,3 +148,134 @@ class ReferrerSelfRegisterResponse(BaseModel):
 
     user: UserResponse
     referrer: ReferrerSummary
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD schemas — Referrers
+# ---------------------------------------------------------------------------
+
+
+class ReferrerCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=60)
+    family_limit: int = Field(..., ge=1, le=999)
+    phone_number: str = Field(..., min_length=1, max_length=20)
+
+
+class ReferrerUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=60)
+    family_limit: Optional[int] = Field(None, ge=1, le=999)
+    phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
+
+
+class ReferrerDetail(BaseModel):
+    id: int
+    name: str
+    family_limit: int
+    phone_number: str
+    family_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class ReferrerListResponse(BaseModel):
+    referrers: list[ReferrerSummary]
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD schemas — Families
+# ---------------------------------------------------------------------------
+
+
+class FamilyCreate(BaseModel):
+    referrer_id: int
+    family_name: str = Field(..., min_length=1, max_length=40)
+    family_wish: str = Field(..., min_length=1, max_length=400)
+    contact_name: str = Field(..., min_length=1, max_length=40)
+    bio: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=20)
+
+
+class FamilyUpdate(BaseModel):
+    family_name: Optional[str] = Field(None, min_length=1, max_length=40)
+    family_wish: Optional[str] = Field(None, min_length=1, max_length=400)
+    contact_name: Optional[str] = Field(None, min_length=1, max_length=40)
+    bio: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=20)
+
+
+class FamilyDetail(BaseModel):
+    id: int
+    referrer_id: int
+    family_name: str
+    bio: Optional[str]
+    address: Optional[str]
+    phone_number: Optional[str]
+    family_wish: str
+    contact_name: str
+    person_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class FamilySummary(BaseModel):
+    id: int
+    family_name: str
+    contact_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyListResponse(BaseModel):
+    families: list[FamilySummary]
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD schemas — People
+# ---------------------------------------------------------------------------
+
+
+class PersonCreate(BaseModel):
+    family_id: int
+    given_name: str = Field(..., min_length=1, max_length=40)
+    age: int = Field(..., ge=0, le=200)
+    practical_wish: str = Field(..., min_length=1, max_length=400)
+    fun_wish: str = Field(..., min_length=1, max_length=400)
+    title: Optional[str] = Field(None, max_length=40)
+    note: Optional[str] = Field(None, max_length=400)
+
+
+class PersonUpdate(BaseModel):
+    given_name: Optional[str] = Field(None, min_length=1, max_length=40)
+    age: Optional[int] = Field(None, ge=0, le=200)
+    practical_wish: Optional[str] = Field(None, min_length=1, max_length=400)
+    fun_wish: Optional[str] = Field(None, min_length=1, max_length=400)
+    title: Optional[str] = Field(None, max_length=40)
+    note: Optional[str] = Field(None, max_length=400)
+
+
+class PersonDetail(BaseModel):
+    id: int
+    family_id: int
+    given_name: str
+    title: Optional[str]
+    age: int
+    practical_wish: str
+    fun_wish: str
+    note: Optional[str]
+
+    model_config = {"from_attributes": True}
+
+
+class PersonSummary(BaseModel):
+    id: int
+    family_id: int
+    given_name: str
+    age: int
+
+    model_config = {"from_attributes": True}
+
+
+class PersonListResponse(BaseModel):
+    people: list[PersonSummary]

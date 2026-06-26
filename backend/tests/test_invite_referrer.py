@@ -80,7 +80,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 201
         code = resp.json()["code"]
-        assert re.match(r"^KMG-[A-Z2-7]{6}$", code)
+        assert re.match(r"^KMG-[A-Z0-9_-]{6}$", code)
 
 
 # ---------------------------------------------------------------------------

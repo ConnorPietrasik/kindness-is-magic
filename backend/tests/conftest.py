@@ -259,3 +259,57 @@ def family_user(db: Session, family_record):
 def login_as(client: Any, email: str, password: str) -> dict:
     """POST to /api/auth/login and return the response JSON."""
     return client.post("/api/auth/login", json={"email": email, "password": password}).json()
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 fixtures — Referrer + Family + Person trees for admin CRUD tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def referrer_with_families(db: Session, referrer_record):
+    """Create a Referrer with 1-2 Family rows."""
+    from app.models import Family
+
+    f1 = Family(
+        referrer_id=referrer_record.id,
+        family_name="Smith Family",
+        family_wish="A new roof",
+        contact_name="Jane Smith",
+    )
+    f2 = Family(
+        referrer_id=referrer_record.id,
+        family_name="Jones Family",
+        family_wish="Warm clothes",
+        contact_name="Bob Jones",
+    )
+    db.add_all([f1, f2])
+    db.commit()
+    db.refresh(f1)
+    db.refresh(f2)
+    return {"referrer": referrer_record, "families": [f1, f2]}
+
+
+@pytest.fixture()
+def family_with_people(db: Session, family_record):
+    """Create a Family with 1-2 Person rows."""
+    from app.models import Person
+
+    p1 = Person(
+        family_id=family_record.id,
+        given_name="Alice",
+        age=8,
+        practical_wish="A backpack",
+        fun_wish="A doll",
+    )
+    p2 = Person(
+        family_id=family_record.id,
+        given_name="Charlie",
+        age=12,
+        practical_wish="New shoes",
+        fun_wish="A football",
+    )
+    db.add_all([p1, p2])
+    db.commit()
+    db.refresh(p1)
+    db.refresh(p2)
+    return {"family": family_record, "people": [p1, p2]}
