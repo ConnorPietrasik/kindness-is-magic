@@ -1,5 +1,5 @@
 /**
- * AuthContext — global auth state for the app.
+ * AuthContext — global auth state backed by React Query.
  *
  * Provides:
  *  - user: null | { id, email, role, referrer_id, family_id, is_active }
@@ -9,40 +9,38 @@
  *  - checkAuth() — re-fetch /api/auth/me
  */
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchCurrentUser,
   loginRequest,
   logoutRequest,
 } from '../lib/api';
 
+const AUTH_KEY = ['auth'];
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  /** Restore session from cookie on mount */
-  const checkAuth = useCallback(async () => {
-    try {
-      const data = await fetchCurrentUser();
-      setUser(data);
-    } catch {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { data: user, isLoading } = useQuery({
+    queryKey: AUTH_KEY,
+    queryFn: fetchCurrentUser,
+    staleTime: Infinity,       // auth doesn't become stale on its own
+    refetchOnWindowFocus: false,
+    retry: false,              // 401 → logged out, don't spin
+  });
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  const checkAuth = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: AUTH_KEY });
+  }, [queryClient]);
 
   const login = useCallback(async (email, password) => {
     const { data } = await loginRequest(email, password);
-    setUser(data.user);
+    queryClient.setQueryData(AUTH_KEY, data.user);
     return data.user;
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     try {
@@ -50,8 +48,8 @@ export function AuthProvider({ children }) {
     } catch {
       // Best-effort — still clear local state
     }
-    setUser(null);
-  }, []);
+    queryClient.setQueryData(AUTH_KEY, null);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, logout, checkAuth }}>

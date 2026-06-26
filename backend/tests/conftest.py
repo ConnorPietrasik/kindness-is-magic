@@ -92,7 +92,7 @@ def _setup_test_schema() -> Generator[None, None, None]:
 
     Base.metadata.create_all(bind=engine)
 
-    # Seed the orphan referrer that Family rows depend on (FK default = id 1)
+    # Seed the orphan referrer that Family rows depend on (FK default = id 0)
     session = TestingSessionLocal()
     try:
         session.add(

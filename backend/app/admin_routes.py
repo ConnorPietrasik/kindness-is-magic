@@ -153,7 +153,7 @@ def delete_referrer(
     if ref is None:
         raise HTTPException(status_code=404, detail="Referrer not found")
 
-    # Cascade families to orphan referrer (id=1)
+    # Cascade families to orphan referrer (id=0)
     db.query(Family).filter(Family.referrer_id == ref_id).update(
         {Family.referrer_id: Family.ORPHAN_REFERRER_ID},
         synchronize_session=False,
@@ -188,7 +188,7 @@ def list_families(
     families = db.query(Family).all()
     return FamilyListResponse(
         families=[
-            FamilySummary(id=f.id, family_name=f.family_name, contact_name=f.contact_name)
+            FamilySummary(id=f.id, family_name=f.family_name, contact_name=f.contact_name, referrer_id=f.referrer_id)
             for f in families
         ]
     )

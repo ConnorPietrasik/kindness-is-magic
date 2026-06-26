@@ -57,16 +57,21 @@ export default function Dashboard() {
                 <div style={styles.navLabel}>Register Users</div>
                 <div style={styles.navDesc}>Create new referrer or family accounts</div>
               </Link>
-              <div style={{ ...styles.navCard, background: '#f8fafc' }}>
+              <Link to="/admin/referrers" style={styles.navCard}>
                 <div style={styles.navIcon}>👥</div>
                 <div style={styles.navLabel}>Manage Referrers</div>
-                <div style={styles.navDesc}>Coming in Phase 3</div>
-              </div>
-              <div style={{ ...styles.navCard, background: '#f8fafc' }}>
+                <div style={styles.navDesc}>Create, edit, and delete referrers</div>
+              </Link>
+              <Link to="/admin/families" style={styles.navCard}>
                 <div style={styles.navIcon}>🏠</div>
                 <div style={styles.navLabel}>Manage Families</div>
-                <div style={styles.navDesc}>Coming in Phase 3</div>
-              </div>
+                <div style={styles.navDesc}>Create, edit, and delete families</div>
+              </Link>
+              <Link to="/admin/people" style={styles.navCard}>
+                <div style={styles.navIcon}>✨</div>
+                <div style={styles.navLabel}>Manage People</div>
+                <div style={styles.navDesc}>Create, edit, and delete people</div>
+              </Link>
             </>
           )}
 

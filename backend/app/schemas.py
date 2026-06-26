@@ -223,6 +223,7 @@ class FamilySummary(BaseModel):
     id: int
     family_name: str
     contact_name: str
+    referrer_id: int
 
     model_config = {"from_attributes": True}
 

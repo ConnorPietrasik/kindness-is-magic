@@ -115,7 +115,7 @@ class Family(Base):
     __tablename__ = "family"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ORPHAN_REFERRER_ID = 1
+    ORPHAN_REFERRER_ID = 0
 
     referrer_id: Mapped[int] = mapped_column(
         Integer,

@@ -8,6 +8,9 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import AdminReferrers from './pages/AdminReferrers';
+import AdminFamilies from './pages/AdminFamilies';
+import AdminPeople from './pages/AdminPeople';
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -64,6 +67,30 @@ export default function App() {
         element={
           <ProtectedRoute roles={['admin']}>
             <Register />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/referrers"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminReferrers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/families"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminFamilies />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/people"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminPeople />
           </ProtectedRoute>
         }
       />

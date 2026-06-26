@@ -94,4 +94,73 @@ export function changePasswordRequest(old_password, new_password) {
   return api.put('/api/auth/me/password', { old_password, new_password });
 }
 
+// ---------------------------------------------------------------------------
+// Admin — Referrers
+// ---------------------------------------------------------------------------
+export function adminListReferrers() {
+  return api.get('/api/admin/referrers').then((res) => res.data);
+}
+
+export function adminGetReferrer(id) {
+  return api.get(`/api/admin/referrers/${id}`).then((res) => res.data);
+}
+
+export function adminCreateReferrer(data) {
+  return api.post('/api/admin/referrers', data).then((res) => res.data);
+}
+
+export function adminUpdateReferrer(id, data) {
+  return api.patch(`/api/admin/referrers/${id}`, data).then((res) => res.data);
+}
+
+export function adminDeleteReferrer(id) {
+  return api.delete(`/api/admin/referrers/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Families
+// ---------------------------------------------------------------------------
+export function adminListFamilies() {
+  return api.get('/api/admin/families').then((res) => res.data);
+}
+
+export function adminGetFamily(id) {
+  return api.get(`/api/admin/families/${id}`).then((res) => res.data);
+}
+
+export function adminCreateFamily(data) {
+  return api.post('/api/admin/families', data).then((res) => res.data);
+}
+
+export function adminUpdateFamily(id, data) {
+  return api.patch(`/api/admin/families/${id}`, data).then((res) => res.data);
+}
+
+export function adminDeleteFamily(id) {
+  return api.delete(`/api/admin/families/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — People
+// ---------------------------------------------------------------------------
+export function adminListPeople() {
+  return api.get('/api/admin/people').then((res) => res.data);
+}
+
+export function adminGetPerson(id) {
+  return api.get(`/api/admin/people/${id}`).then((res) => res.data);
+}
+
+export function adminCreatePerson(data) {
+  return api.post('/api/admin/people', data).then((res) => res.data);
+}
+
+export function adminUpdatePerson(id, data) {
+  return api.patch(`/api/admin/people/${id}`, data).then((res) => res.data);
+}
+
+export function adminDeletePerson(id) {
+  return api.delete(`/api/admin/people/${id}`);
+}
+
 export default api;
