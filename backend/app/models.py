@@ -56,6 +56,27 @@ class User(Base):
     )
 
 
+class ReferrerInviteToken(Base):
+    """One-time invite codes that admins generate for referrer self-registration."""
+
+    __tablename__ = "referrer_invite_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    redeemed_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    redeemed_by_referrer_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("referrer.id"), nullable=True
+    )
+
+
 class PasswordResetToken(Base):
     """One-time tokens for password-reset flow."""
 
@@ -83,7 +104,6 @@ class Referrer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    email: Mapped[str] = mapped_column(String(40), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
 
     families: Mapped[list["Family"]] = relationship(

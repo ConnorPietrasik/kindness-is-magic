@@ -1,6 +1,7 @@
 """Authentication utilities: bcrypt password hashing, JWT creation/verification, cookie helpers."""
 
 import os
+import secrets
 
 import bcrypt
 import jwt
@@ -26,6 +27,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 )
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+INVITE_EXPIRY_HOURS = int(os.environ.get("INVITE_EXPIRY_HOURS", "168"))
+
+# ---------------------------------------------------------------------------
+# Invite code generation
+# ---------------------------------------------------------------------------
+
+
+def generate_invite_code() -> str:
+    """Return a human-readable invite code like KMG-A7X9P2."""
+    raw = secrets.token_urlsafe(6).upper()[:6]  # 6 chars from base62-ish pool
+    return f"KMG-{raw}"
+
 
 # ---------------------------------------------------------------------------
 # Password hashing (bcrypt)

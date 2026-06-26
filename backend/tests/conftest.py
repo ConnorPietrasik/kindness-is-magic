@@ -100,7 +100,6 @@ def _setup_test_schema() -> Generator[None, None, None]:
                 id=Family.ORPHAN_REFERRER_ID,
                 name="Orphan",
                 family_limit=0,
-                email="orphan@kindness.is-magic",
                 phone_number="000-0000",
             )
         )
@@ -191,7 +190,7 @@ def referrer_record(db: Session):
     """Create a Referrer row in the DB."""
     from app.models import Referrer
 
-    r = Referrer(name="Test Referrer", family_limit=10, email="ref@test.com", phone_number="555-0001")
+    r = Referrer(name="Test Referrer", family_limit=10, phone_number="555-0001")
     db.add(r)
     db.commit()
     db.refresh(r)

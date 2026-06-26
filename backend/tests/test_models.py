@@ -76,7 +76,6 @@ class TestReferrer:
         r = Referrer(
             name="Alice Smith",
             family_limit=5,
-            email="alice@example.com",
             phone_number="555-1234",
         )
         db.add(r)

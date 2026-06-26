@@ -74,6 +74,27 @@ class ResetPassword(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+class ReferrerInviteCreate(BaseModel):
+    """Admin: create an invite token."""
+
+    family_limit: int = Field(..., ge=1, le=999)
+
+
+class ReferrerSelfRegister(BaseModel):
+    """Public: redeem an invite code to register as a referrer."""
+
+    code: str
+    name: str = Field(..., min_length=1, max_length=60)
+    email: str = Field(..., min_length=1, max_length=40)
+    phone_number: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=8)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _validate_email(v)
+
+
 # ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
@@ -99,3 +120,31 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReferrerInviteResponse(BaseModel):
+    """Returned when admin creates an invite."""
+
+    code: str
+    family_limit: int
+    expires_at: datetime
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReferrerSummary(BaseModel):
+    """Minimal referrer info returned on self-registration."""
+
+    id: int
+    name: str
+    family_limit: int
+
+    model_config = {"from_attributes": True}
+
+
+class ReferrerSelfRegisterResponse(BaseModel):
+    """Returned when a person redeems an invite."""
+
+    user: UserResponse
+    referrer: ReferrerSummary

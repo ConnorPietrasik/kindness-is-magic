@@ -8,9 +8,11 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    INVITE_EXPIRY_HOURS,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    generate_invite_code,
     get_password_hash,
     verify_password,
     clear_auth_cookies,
@@ -18,7 +20,7 @@ from app.auth import (
     get_current_user,
 )
 from app.database import get_db
-from app.models import User, UserRole, PasswordResetToken, Referrer, Family
+from app.models import User, UserRole, PasswordResetToken, Referrer, Family, ReferrerInviteToken
 from app.permissions import require_admin
 from app.schemas import (
     UserCreate,
@@ -27,6 +29,11 @@ from app.schemas import (
     ChangePassword,
     ForgotPassword,
     ResetPassword,
+    ReferrerInviteCreate,
+    ReferrerInviteResponse,
+    ReferrerSelfRegister,
+    ReferrerSelfRegisterResponse,
+    ReferrerSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -290,3 +297,106 @@ async def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Password has been reset"}
+
+
+# ---------------------------------------------------------------------------
+# Invite referrer (admin-only)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/invite-referrer",
+    response_model=ReferrerInviteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def invite_referrer(
+    data: ReferrerInviteCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Admin creates a one-time invite code for a referrer to self-register."""
+    code = generate_invite_code()
+    invite = ReferrerInviteToken(
+        code=code,
+        family_limit=data.family_limit,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS),
+        used=False,
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+
+    logger.info("Invite token created: %s (family_limit=%d)", code, data.family_limit)
+    return invite
+
+
+# ---------------------------------------------------------------------------
+# Register referrer (public, via invite code)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/register-referrer",
+    response_model=ReferrerSelfRegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def register_referrer(
+    data: ReferrerSelfRegister,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Public self-registration: redeem an invite code to create a Referrer + User."""
+    # 1. Look up the invite token
+    invite = (
+        db.query(ReferrerInviteToken)
+        .filter(ReferrerInviteToken.code == data.code, ReferrerInviteToken.used.is_(False))
+        .first()
+    )
+    if not invite:
+        raise HTTPException(status_code=400, detail="Invalid or already-used invite code")
+
+    # 2. Check expiration
+    if invite.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Invite code has expired")
+
+    # 3. Check for duplicate email
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    # 4. Atomic creation inside the session transaction
+    referrer = Referrer(
+        name=data.name,
+        phone_number=data.phone_number,
+        family_limit=invite.family_limit,
+    )
+    db.add(referrer)
+    db.flush()  # Get referrer.id
+
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        role=UserRole.referrer,
+        referrer_id=referrer.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()  # Get user.id
+
+    # Mark the invite as redeemed
+    invite.used = True
+    invite.redeemed_by_user_id = user.id
+    invite.redeemed_by_referrer_id = referrer.id
+    db.commit()
+
+    # 5. Issue auth cookies (auto-login)
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info("Referrer self-registered via invite %s: %s", data.code, data.email)
+
+    return ReferrerSelfRegisterResponse(
+        user=UserResponse.model_validate(user),
+        referrer=ReferrerSummary.model_validate(referrer),
+    )
