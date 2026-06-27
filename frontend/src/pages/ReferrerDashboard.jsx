@@ -7,11 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getReferrerMe,
   patchReferrerMe,
@@ -20,6 +16,14 @@ import {
   updateReferrerFamily,
   deleteReferrerFamily,
 } from '../lib/api';
+import { HeaderBar, BackLink } from '../components/HeaderBar';
+import { Card } from '../components/Card';
+import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
+import FormField from '../components/FormField';
+import Button from '../components/Button';
+import { ErrorBox } from '../components/ErrorBox';
+import { PageSpinner, InlineSpinner } from '../components/Spinner';
+import { esc } from '../lib/utils';
 
 const REFERRER_ME_KEY = ['referrerMe'];
 const REFERRER_FAMILIES_KEY = ['referrerFamilies'];
@@ -30,22 +34,18 @@ const REFERRER_FAMILIES_KEY = ['referrerFamilies'];
 export default function ReferrerDashboard() {
   const queryClient = useQueryClient();
 
-  // Referrer's own info
   const { data: referrerInfo, isLoading: infoLoading } = useQuery({
     queryKey: REFERRER_ME_KEY,
     queryFn: getReferrerMe,
   });
 
-  // Family list
   const { data, isLoading: famLoading } = useQuery({
     queryKey: REFERRER_FAMILIES_KEY,
     queryFn: listReferrerFamilies,
   });
 
-  // Family detail for edit
   const [editingId, setEditingId] = useState(null);
 
-  // Mutations
   const updateSelfMut = useMutation({
     mutationFn: patchReferrerMe,
     onSuccess: () => {
@@ -76,7 +76,6 @@ export default function ReferrerDashboard() {
     onSuccess: () => queryClient.invalidateQueries(REFERRER_FAMILIES_KEY),
   });
 
-  // UI state
   const [showEditSelf, setShowEditSelf] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -104,25 +103,28 @@ export default function ReferrerDashboard() {
   const familyCount = referrerInfo?.family_count ?? 0;
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.headerTitle}>Kindness is Magic</h1>
-        <Link to="/dashboard" style={styles.backLink}>← Dashboard</Link>
-      </header>
+    <div className="min-h-screen bg-slate-50">
+      <HeaderBar
+        title="Kindness is Magic"
+        left={<BackLink to="/dashboard" label="Dashboard" />}
+      />
 
-      <main style={styles.main}>
-        <h2 style={styles.pageTitle}>Referrer Dashboard</h2>
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+          Referrer Dashboard
+        </h2>
 
         {/* ── Referrer info card ──────────────────────────────── */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h3 style={styles.cardTitle}>My Profile</h3>
-            <button
+        <Card className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-gray-900">My Profile</h3>
+            <Button
+              variant="secondary"
+              className="h-8 px-3 text-xs"
               onClick={() => setShowEditSelf(!showEditSelf)}
-              style={styles.btnSmall}
             >
               {showEditSelf ? 'Cancel' : 'Edit'}
-            </button>
+            </Button>
           </div>
 
           {showEditSelf ? (
@@ -133,24 +135,19 @@ export default function ReferrerDashboard() {
               loading={updateSelfMut.isPending}
             />
           ) : (
-            <div style={styles.infoGrid}>
+            <div className="space-y-0">
               <InfoRow label="Name" value={referrerInfo?.name} />
               <InfoRow label="Phone" value={referrerInfo?.phone_number} />
-              <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} />
+              <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast />
             </div>
           )}
-        </div>
+        </Card>
 
         {/* ── Families ────────────────────────────────────────── */}
-        <div style={styles.pageHeader}>
-          <h3 style={styles.sectionTitle}>My Families</h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">My Families</h3>
           {familyCount < familyLimit && (
-            <button
-              onClick={() => setShowCreate(true)}
-              style={styles.addBtn}
-            >
-              + Add Family
-            </button>
+            <Button onClick={() => setShowCreate(true)}>+ Add Family</Button>
           )}
         </div>
 
@@ -176,106 +173,138 @@ export default function ReferrerDashboard() {
           />
         )}
 
-        <div style={styles.tableWrap}>
+        <Table className="mb-6">
           {families.length === 0 ? (
-            <p style={styles.empty}>No families yet. Add one to get started.</p>
+            <TableBody>
+              <Tr>
+                <Td className="!text-center !text-gray-400 py-12">
+                  No families yet. Add one to get started.
+                </Td>
+              </Tr>
+            </TableBody>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Family Name</th>
-                  <th style={styles.th}>Contact</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <TableHead>
+                <Th>ID</Th>
+                <Th>Family Name</Th>
+                <Th>Family Wish</Th>
+                <Th>Contact</Th>
+                <Th>People</Th>
+                <Th>Actions</Th>
+              </TableHead>
+              <TableBody>
                 {families.map((f) => (
-                  <tr key={f.id}>
-                    <td style={styles.td}>{f.id}</td>
-                    <td style={styles.td}>{esc(f.family_name)}</td>
-                    <td style={styles.td}>{esc(f.contact_name)}</td>
-                    <td style={styles.td}>
-                      <Link
-                        to={`/referrer/families/${f.id}`}
-                        style={styles.btnView}
-                      >
-                        Manage
-                      </Link>
-                      <button
-                        onClick={() => setEditingId(f.id)}
-                        style={styles.btnEdit}
-                        disabled={!!editingId}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(f.id)}
-                        style={styles.btnDelete}
-                        disabled={deleteFamMut.isPending}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                  <Tr key={f.id}>
+                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
+                    <Td className="font-medium text-gray-900">{esc(f.family_name)}</Td>
+                    <Td className="max-w-xs truncate">{esc(f.family_wish ?? '')}</Td>
+                    <Td>{esc(f.contact_name)}</Td>
+                    <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/referrer/families/${f.id}`}
+                          className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                        >
+                          Manage
+                        </Link>
+                        <Button
+                          variant="secondary"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setEditingId(f.id)}
+                          disabled={!!editingId}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setDeleteConfirm(f.id)}
+                          disabled={deleteFamMut.isPending}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </>
           )}
-        </div>
+        </Table>
 
         {/* ── Delete confirmation ─────────────────────────────── */}
         {deleteConfirm !== null && (
-          <div style={styles.confirmOverlay}>
-            <div style={styles.confirmBox}>
-              <p>Delete family <strong>#{deleteConfirm}</strong>?</p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+              <p className="mb-4 text-sm text-gray-700">
+                Delete family <strong>#{deleteConfirm}</strong>?
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="danger"
+                  className="flex-1"
                   onClick={() => {
                     deleteFamMut.mutate(deleteConfirm);
                     setDeleteConfirm(null);
                   }}
-                  style={styles.confirmYes}
-                  disabled={deleteFamMut.isPending}
+                  loading={deleteFamMut.isPending}
                 >
                   {deleteFamMut.isPending ? 'Deleting…' : 'Yes, delete'}
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  style={styles.confirmNo}
-                >
+                </Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setDeleteConfirm(null)}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         )}
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        {[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].map(
-          (mut, i) =>
-            mut.error && (
-              <div key={i} style={styles.error}>
-                {mut.error?.response?.data?.detail ||
-                  mut.error?.response?.data?.msg ||
-                  JSON.stringify(mut.error?.response?.data) ||
-                  'Request failed.'}
-              </div>
-            )
-        )}
+        <div className="space-y-2">
+          {[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].map(
+            (mut, i) =>
+              mut.error && (
+                <ErrorBox
+                  key={i}
+                  message={
+                    mut.error?.response?.data?.detail ||
+                    mut.error?.response?.data?.msg ||
+                    JSON.stringify(mut.error?.response?.data) ||
+                    'Request failed.'
+                  }
+                />
+              )
+          )}
+        </div>
       </main>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
+/* OptionalLabel                                                       */
+/* ------------------------------------------------------------------ */
+function OptionalLabel({ text }) {
+  return (
+    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+      {text} <span className="font-normal text-gray-400">(optional)</span>
+    </label>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* InfoRow                                                             */
 /* ------------------------------------------------------------------ */
-function InfoRow({ label, value }) {
+function InfoRow({ label, value, isLast }) {
   return (
-    <div style={styles.infoRow}>
-      <span style={styles.infoLabel}>{label}</span>
-      <span style={styles.infoValue}>{esc(value ?? '—')}</span>
+    <div
+      className={`flex items-baseline justify-between px-1 py-2 ${
+        isLast ? '' : 'border-b border-gray-100'
+      }`}
+    >
+      <span className="text-sm font-medium text-gray-500">{label}</span>
+      <span className="text-sm font-semibold text-gray-900">{esc(value ?? '—')}</span>
     </div>
   );
 }
@@ -298,46 +327,42 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }) {
         e.preventDefault();
         onSubmit({ preventDefault: () => {}, data: form });
       }}
-      style={styles.selfForm}
+      className="mx-auto max-w-sm space-y-3"
     >
-      <label style={styles.label}>
-        Name
-        <input
-          type="text"
-          value={form.name}
-          onChange={(e) => update('name', e.target.value)}
-          required
-          maxLength={60}
-          style={styles.input}
-        />
-      </label>
-
-      <label style={styles.label}>
-        Phone
-        <input
-          type="text"
-          value={form.phone_number}
-          onChange={(e) => update('phone_number', e.target.value)}
-          required
-          maxLength={20}
-          style={styles.input}
-        />
-      </label>
-
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <button type="submit" disabled={loading} style={styles.submitBtn}>
+      <FormField
+        label="Name"
+        fieldProps={{
+          type: 'text',
+          value: form.name,
+          onChange: (e) => update('name', e.target.value),
+          required: true,
+          maxLength: 60,
+        }}
+      />
+      <FormField
+        label="Phone"
+        fieldProps={{
+          type: 'text',
+          value: form.phone_number,
+          onChange: (e) => update('phone_number', e.target.value),
+          required: true,
+          maxLength: 20,
+        }}
+      />
+      <div className="flex gap-3 pt-1">
+        <Button type="submit" loading={loading} className="flex-1">
           {loading ? 'Saving…' : 'Save'}
-        </button>
-        <button type="button" onClick={onCancel} style={styles.cancelBtn}>
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* FamilyForm (inline for dashboard)                                   */
+/* FamilyForm                                                          */
 /* ------------------------------------------------------------------ */
 function FamilyForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
   const [form, setForm] = useState(() => ({ ...initial }));
@@ -349,116 +374,87 @@ function FamilyForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
   const update = (key, val) => setForm((p) => ({ ...p, [key]: val }));
 
   return (
-    <div style={styles.formOverlay}>
-      <h3 style={styles.formTitle}>{title}</h3>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit({ preventDefault: () => {}, data: form });
-        }}
-      >
-        <label style={styles.label}>
-          Family Name
-          <input
-            type="text"
-            value={form.family_name}
-            onChange={(e) => update('family_name', e.target.value)}
-            required
-            maxLength={40}
-            style={styles.input}
+    <Card className="mb-6 border border-gray-200">
+      <h3 className="mb-4 text-base font-semibold text-gray-900">{title}</h3>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({ preventDefault: () => {}, data: form });
+      }}>
+        <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-x-4 sm:gap-y-3">
+          <FormField
+            label="Family Name"
+            fieldProps={{
+              type: 'text',
+              value: form.family_name,
+              onChange: (e) => update('family_name', e.target.value),
+              required: true,
+              maxLength: 40,
+            }}
           />
-        </label>
-
-        <label style={styles.label}>
-          Family Wish
-          <input
-            type="text"
-            value={form.family_wish}
-            onChange={(e) => update('family_wish', e.target.value)}
-            required
-            maxLength={400}
-            style={styles.input}
+          <FormField
+            label="Family Wish"
+            fieldProps={{
+              type: 'text',
+              value: form.family_wish,
+              onChange: (e) => update('family_wish', e.target.value),
+              required: true,
+              maxLength: 400,
+            }}
           />
-        </label>
-
-        <label style={styles.label}>
-          Contact Name
-          <input
-            type="text"
-            value={form.contact_name}
-            onChange={(e) => update('contact_name', e.target.value)}
-            required
-            maxLength={40}
-            style={styles.input}
+          <FormField
+            label="Contact Name"
+            fieldProps={{
+              type: 'text',
+              value: form.contact_name,
+              onChange: (e) => update('contact_name', e.target.value),
+              required: true,
+              maxLength: 40,
+            }}
           />
-        </label>
-
-        {isEdit && (
-          <>
-            <label style={styles.label}>
-              Bio <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
-              <textarea
-                value={form.bio || ''}
-                onChange={(e) => update('bio', e.target.value)}
-                rows={2}
-                style={{ ...styles.input, resize: 'vertical' }}
-              />
-            </label>
-
-            <label style={styles.label}>
-              Address <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
-              <input
-                type="text"
-                value={form.address || ''}
-                onChange={(e) => update('address', e.target.value)}
-                maxLength={200}
-                style={styles.input}
-              />
-            </label>
-
-            <label style={styles.label}>
-              Phone <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
-              <input
-                type="text"
-                value={form.phone_number || ''}
-                onChange={(e) => update('phone_number', e.target.value)}
-                maxLength={20}
-                style={styles.input}
-              />
-            </label>
-          </>
-        )}
-
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <button type="submit" disabled={loading} style={styles.submitBtn}>
+          {isEdit && (
+            <>
+              <div className="sm:col-span-2">
+                <OptionalLabel text="Bio" />
+                <textarea
+                  value={form.bio || ''}
+                  onChange={(e) => update('bio', e.target.value)}
+                  rows={2}
+                  className="w-full resize-vertical rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                />
+              </div>
+              <div>
+                <OptionalLabel text="Address" />
+                <input
+                  type="text"
+                  value={form.address || ''}
+                  onChange={(e) => update('address', e.target.value)}
+                  maxLength={200}
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                />
+              </div>
+              <div>
+                <OptionalLabel text="Phone" />
+                <input
+                  type="text"
+                  value={form.phone_number || ''}
+                  onChange={(e) => update('phone_number', e.target.value)}
+                  maxLength={20}
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <div className="mt-4 flex gap-3">
+          <Button type="submit" loading={loading}>
             {loading ? 'Saving…' : isEdit ? 'Update' : 'Create'}
-          </button>
-          <button type="button" onClick={onCancel} style={styles.cancelBtn}>
+          </Button>
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Spinner                                                             */
-/* ------------------------------------------------------------------ */
-function PageSpinner() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <svg
-        style={{ animation: 'spin 1s linear infinite', width: 48, height: 48, color: '#6366f1' }}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-      </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -473,235 +469,4 @@ const defaultFamilyForm = {
   bio: '',
   address: '',
   phone_number: '',
-};
-
-function esc(s) {
-  if (!s) return '';
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/* ------------------------------------------------------------------ */
-/* Styles                                                              */
-/* ------------------------------------------------------------------ */
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: '#f1f5f9',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  },
-  header: {
-    background: 'linear-gradient(135deg, #4c1d95, #6d28d9)',
-    color: '#fff',
-    padding: '1rem 2rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { margin: 0, fontSize: '1.25rem' },
-  backLink: { color: '#fff', textDecoration: 'none', fontSize: '0.9rem', opacity: 0.85 },
-  main: {
-    maxWidth: 900,
-    margin: '2rem auto',
-    padding: '0 1rem',
-  },
-  pageTitle: { margin: '0 0 1.5rem', fontSize: '1.4rem', color: '#1e1b4b' },
-  // Card
-  card: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '0.5rem',
-  },
-  cardTitle: { margin: 0, fontSize: '1.1rem', color: '#1e1b4b' },
-  infoGrid: { display: 'grid', gap: '0.5rem' },
-  infoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '0.4rem 0',
-    borderBottom: '1px solid #f3f4f6',
-  },
-  infoLabel: { fontSize: '0.85rem', color: '#6b7280', fontWeight: 500 },
-  infoValue: { fontSize: '0.9rem', color: '#1e1b4b', fontWeight: 600 },
-  selfForm: { display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: 360 },
-  // Section
-  sectionTitle: { margin: '0 0 0.5rem', fontSize: '1.1rem', color: '#1e1b4b' },
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '1rem',
-  },
-  addBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  // Table
-  tableWrap: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    overflowX: 'auto',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    textAlign: 'left',
-    padding: '0.6rem 0.8rem',
-    borderBottom: '2px solid #e5e7eb',
-    fontSize: '0.8rem',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.03em',
-  },
-  td: {
-    padding: '0.6rem 0.8rem',
-    borderBottom: '1px solid #f3f4f6',
-    fontSize: '0.9rem',
-    color: '#374151',
-  },
-  empty: { textAlign: 'center', color: '#9ca3af', padding: '2rem 0' },
-  // Buttons
-  btnSmall: {
-    padding: '0.3rem 0.7rem',
-    borderRadius: 6,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    color: '#374151',
-  },
-  btnView: {
-    padding: '0.3rem 0.8rem',
-    borderRadius: 6,
-    border: 'none',
-    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-    color: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    marginRight: '0.4rem',
-    textDecoration: 'none',
-    display: 'inline-block',
-  },
-  btnEdit: {
-    padding: '0.3rem 0.8rem',
-    borderRadius: 6,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    marginRight: '0.4rem',
-    color: '#374151',
-  },
-  btnDelete: {
-    padding: '0.3rem 0.8rem',
-    borderRadius: 6,
-    border: '1px solid #fca5a5',
-    background: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    color: '#dc2626',
-  },
-  // Form overlay
-  formOverlay: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    border: '1px solid #e5e7eb',
-  },
-  formTitle: { margin: '0 0 1rem', fontSize: '1.1rem', color: '#1e1b4b' },
-  label: {
-    display: 'flex',
-    flexDirection: 'column',
-    marginBottom: '0.8rem',
-    fontSize: '0.85rem',
-    fontWeight: 500,
-    color: '#374151',
-  },
-  input: {
-    marginTop: '0.3rem',
-    padding: '0.55rem 0.75rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    fontSize: '0.9rem',
-    outline: 'none',
-  },
-  submitBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  cancelBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    color: '#374151',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-  },
-  // Confirm
-  confirmOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.3)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 50,
-  },
-  confirmBox: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    maxWidth: 400,
-    width: '90%',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-  },
-  confirmYes: {
-    padding: '0.4rem 1rem',
-    borderRadius: 8,
-    border: 'none',
-    background: '#dc2626',
-    color: '#fff',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  confirmNo: {
-    padding: '0.4rem 1rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    color: '#374151',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-  },
-  error: {
-    background: '#fef2f2',
-    color: '#dc2626',
-    padding: '0.5rem 0.8rem',
-    borderRadius: 8,
-    marginTop: '0.5rem',
-    fontSize: '0.85rem',
-  },
 };

@@ -165,6 +165,8 @@ class TestReferrerListFamilies:
         body = resp.json()
         assert len(body["families"]) == 1
         assert body["families"][0]["family_name"] == "Tree Family"
+        assert body["families"][0]["family_wish"] == "A new home"
+        assert body["families"][0]["person_count"] == 1
 
     def test_200_empty(self, test_client: TestClient, another_referrer):
         _another_referrer_login(test_client)

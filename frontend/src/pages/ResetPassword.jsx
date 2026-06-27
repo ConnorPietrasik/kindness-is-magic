@@ -37,105 +37,80 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>✓ Password Reset!</h1>
-          <p style={styles.message}>Your password has been updated. Redirecting to login…</p>
-          <Link to="/login" style={styles.link}>Go to login</Link>
+      <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
+        <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 text-center shadow-lg">
+          <h1 className="mb-2 text-2xl font-bold text-brand-dark">✓ Password Reset!</h1>
+          <p className="mb-4 text-sm text-gray-700">
+            Your password has been updated. Redirecting to login…
+          </p>
+          <Link to="/login" className="text-btn-start hover:underline">
+            Go to login
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Reset Password</h1>
-        <p style={styles.subtitle}>Enter your new password below.</p>
+    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
+      <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 text-center shadow-lg">
+        <h1 className="mb-1 text-2xl font-bold text-brand-dark">Reset Password</h1>
+        <p className="mb-6 text-sm text-gray-500">Enter your new password below.</p>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <label style={styles.label}>
-            New Password
+          <div className="mb-4 text-left">
+            <label htmlFor="rp-new" className="mb-1.5 block text-sm font-medium text-gray-700">
+              New Password
+            </label>
             <input
+              id="rp-new"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={8}
-              style={styles.input}
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               placeholder="Min 8 characters"
             />
-          </label>
+          </div>
 
-          <label style={styles.label}>
-            Confirm Password
+          <div className="mb-4 text-left">
+            <label htmlFor="rp-confirm" className="mb-1.5 block text-sm font-medium text-gray-700">
+              Confirm Password
+            </label>
             <input
+              id="rp-confirm"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              style={styles.input}
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               placeholder="Re-enter password"
             />
-          </label>
+          </div>
 
-          <button type="submit" disabled={loading} style={styles.button}>
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 w-full rounded-lg bg-gradient-to-r from-btn-start to-btn-end py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             {loading ? 'Resetting…' : 'Reset Password'}
           </button>
         </form>
 
-        <p style={styles.footer}>
-          <Link to="/login" style={styles.link}>← Back to login</Link>
+        <p className="mt-4 text-sm">
+          <Link to="/login" className="text-btn-start hover:underline">
+            ← Back to login
+          </Link>
         </p>
       </div>
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Styles                                                              */
-/* ------------------------------------------------------------------ */
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '1rem',
-  },
-  card: {
-    background: '#fff',
-    borderRadius: 16,
-    padding: '2.5rem 2rem',
-    width: '100%',
-    maxWidth: 420,
-    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-    textAlign: 'center',
-  },
-  title: { margin: 0, fontSize: '1.5rem', color: '#4c1d95' },
-  subtitle: { margin: '0.5rem 0 1.5rem', fontSize: '0.9rem', color: '#6b7280' },
-  message: { margin: '0.5rem 0', fontSize: '0.95rem', color: '#374151' },
-  error: {
-    background: '#fef2f2', color: '#dc2626', padding: '0.6rem 0.8rem',
-    borderRadius: 8, marginBottom: '1rem', fontSize: '0.875rem',
-  },
-  label: {
-    display: 'flex', flexDirection: 'column', marginBottom: '1rem',
-    fontSize: '0.875rem', fontWeight: 500, color: '#374151',
-  },
-  input: {
-    marginTop: '0.35rem', padding: '0.65rem 0.85rem', borderRadius: 8,
-    border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none',
-  },
-  button: {
-    width: '100%', padding: '0.7rem', borderRadius: 8, border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', marginTop: '0.5rem',
-  },
-  footer: { textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' },
-  link: { color: '#6366f1', textDecoration: 'none' },
-};

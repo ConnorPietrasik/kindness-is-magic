@@ -193,6 +193,8 @@ class TestAdminListFamilies:
         body = resp.json()
         assert len(body["families"]) == 1
         assert body["families"][0]["family_name"] == "TestFamily"
+        assert body["families"][0]["family_wish"] == "World peace"
+        assert body["families"][0]["person_count"] == 0
 
 class TestAdminGetFamily:
     def test_200_detail_with_person_count(

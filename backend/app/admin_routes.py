@@ -188,7 +188,14 @@ def list_families(
     families = db.query(Family).all()
     return FamilyListResponse(
         families=[
-            FamilySummary(id=f.id, family_name=f.family_name, contact_name=f.contact_name, referrer_id=f.referrer_id)
+            FamilySummary(
+                id=f.id,
+                family_name=f.family_name,
+                family_wish=f.family_wish,
+                contact_name=f.contact_name,
+                referrer_id=f.referrer_id,
+                person_count=db.query(Person).filter(Person.family_id == f.id).count(),
+            )
             for f in families
         ]
     )

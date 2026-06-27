@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { PageSpinner } from './components/Spinner';
 
 // Pages (lazy-loaded on route visit)
 import Login from './pages/Login';
@@ -24,11 +25,7 @@ function DashboardRedirect() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div>Loading…</div>
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   // Route to role-specific sections (placeholders for Phase 3)

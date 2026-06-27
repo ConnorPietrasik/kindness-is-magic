@@ -231,8 +231,10 @@ class FamilyDetail(BaseModel):
 class FamilySummary(BaseModel):
     id: int
     family_name: str
+    family_wish: str
     contact_name: str
     referrer_id: int
+    person_count: int = 0
 
     model_config = {"from_attributes": True}
 

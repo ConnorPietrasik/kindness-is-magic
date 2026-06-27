@@ -7,11 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listFamilyPeople,
   createFamilyPerson,
@@ -19,6 +15,14 @@ import {
   updatePerson,
   deletePerson,
 } from '../lib/api';
+import { HeaderBar, BackLink } from '../components/HeaderBar';
+import { Card } from '../components/Card';
+import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
+import FormField from '../components/FormField';
+import Button from '../components/Button';
+import { ErrorBox } from '../components/ErrorBox';
+import { PageSpinner } from '../components/Spinner';
+import { esc } from '../lib/utils';
 
 const FAMILY_PEOPLE_KEY = ['familyPeople'];
 
@@ -28,13 +32,11 @@ const FAMILY_PEOPLE_KEY = ['familyPeople'];
 export default function FamilyPeople() {
   const queryClient = useQueryClient();
 
-  // People list
   const { data, isLoading } = useQuery({
     queryKey: FAMILY_PEOPLE_KEY,
     queryFn: listFamilyPeople,
   });
 
-  // Person detail for edit
   const [editingPersonId, setEditingPersonId] = useState(null);
   const personDetailQuery = useQuery({
     queryKey: ['personDetail', editingPersonId],
@@ -44,7 +46,6 @@ export default function FamilyPeople() {
   const { data: personDetail } = personDetailQuery;
   const personDetailLoading = !!editingPersonId && personDetailQuery.isLoading;
 
-  // Mutations
   const createMut = useMutation({
     mutationFn: createFamilyPerson,
     onSuccess: () => {
@@ -67,7 +68,6 @@ export default function FamilyPeople() {
     onSuccess: () => queryClient.invalidateQueries(FAMILY_PEOPLE_KEY),
   });
 
-  // UI state
   const [showCreate, setShowCreate] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -91,24 +91,25 @@ export default function FamilyPeople() {
   const people = data?.people ?? [];
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.headerTitle}>Kindness is Magic</h1>
-        <Link to="/family/dashboard" style={styles.backLink}>← Family Dashboard</Link>
-      </header>
+    <div className="min-h-screen bg-slate-50">
+      <HeaderBar
+        title="Kindness is Magic"
+        left={<BackLink to="/family/dashboard" label="Family Dashboard" />}
+      />
 
-      <main style={styles.main}>
-        <div style={styles.pageHeader}>
-          <h2 style={styles.pageTitle}>Manage People</h2>
-          <button
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+            Manage People
+          </h2>
+          <Button
             onClick={() => {
               setEditingPersonId(null);
               setShowCreate(true);
             }}
-            style={styles.addBtn}
           >
             + Add Person
-          </button>
+          </Button>
         </div>
 
         {/* Create form */}
@@ -125,10 +126,21 @@ export default function FamilyPeople() {
 
         {/* Edit loading */}
         {editingPersonId && personDetailLoading && (
-          <div style={styles.detailLoading}>
-            <InlineSpinner />
-            <span>Loading…</span>
-          </div>
+          <Card className="mb-6 border border-gray-200">
+            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+              <svg
+                className="h-5 w-5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+              <span className="text-sm font-medium">Loading person details…</span>
+            </div>
+          </Card>
         )}
 
         {/* Edit form */}
@@ -144,86 +156,100 @@ export default function FamilyPeople() {
         )}
 
         {/* Table */}
-        <div style={styles.tableWrap}>
+        <Table className="mb-6">
           {people.length === 0 ? (
-            <p style={styles.empty}>No people yet. Add one to get started.</p>
+            <TableBody>
+              <Tr>
+                <Td className="!text-center !text-gray-400 py-12">
+                  No people yet. Add one to get started.
+                </Td>
+              </Tr>
+            </TableBody>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Age</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <TableHead>
+                <Th>ID</Th>
+                <Th>Name</Th>
+                <Th>Age</Th>
+                <Th>Actions</Th>
+              </TableHead>
+              <TableBody>
                 {people.map((p) => (
-                  <tr key={p.id}>
-                    <td style={styles.td}>{p.id}</td>
-                    <td style={styles.td}>{esc(p.given_name)}</td>
-                    <td style={styles.td}>{p.age}</td>
-                    <td style={styles.td}>
-                      <button
-                        onClick={() => openEdit(p.id)}
-                        style={styles.btnEdit}
-                        disabled={!!editingPersonId}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(p.id)}
-                        style={styles.btnDelete}
-                        disabled={deleteMut.isPending}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                  <Tr key={p.id}>
+                    <Td className="whitespace-nowrap text-xs text-gray-400">{p.id}</Td>
+                    <Td className="font-medium text-gray-900">{esc(p.given_name)}</Td>
+                    <Td>{p.age}</Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => openEdit(p.id)}
+                          disabled={!!editingPersonId}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="h-7 border-red-300 bg-white text-xs text-red-600 hover:bg-red-50"
+                          onClick={() => setDeleteConfirm(p.id)}
+                          disabled={deleteMut.isPending}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </>
           )}
-        </div>
+        </Table>
 
         {/* Delete confirmation */}
         {deleteConfirm !== null && (
-          <div style={styles.confirmOverlay}>
-            <div style={styles.confirmBox}>
-              <p>Delete person <strong>#{deleteConfirm}</strong>?</p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+              <p className="mb-4 text-sm text-gray-700">
+                Delete person <strong>#{deleteConfirm}</strong>?
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="danger"
+                  className="flex-1"
                   onClick={() => {
                     deleteMut.mutate(deleteConfirm);
                     setDeleteConfirm(null);
                   }}
-                  style={styles.confirmYes}
-                  disabled={deleteMut.isPending}
+                  loading={deleteMut.isPending}
                 >
                   {deleteMut.isPending ? 'Deleting…' : 'Yes, delete'}
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  style={styles.confirmNo}
-                >
+                </Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setDeleteConfirm(null)}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         )}
 
         {/* Errors */}
-        {[createMut, updateMut, deleteMut].map((mut, i) =>
-          mut.error && (
-            <div key={i} style={styles.error}>
-              {mut.error?.response?.data?.detail ||
-                mut.error?.response?.data?.msg ||
-                JSON.stringify(mut.error?.response?.data) ||
-                'Request failed.'}
-            </div>
-          )
-        )}
+        <div className="space-y-2">
+          {[createMut, updateMut, deleteMut].map(
+            (mut, i) =>
+              mut.error && (
+                <ErrorBox
+                  key={i}
+                  message={
+                    mut.error?.response?.data?.detail ||
+                    mut.error?.response?.data?.msg ||
+                    JSON.stringify(mut.error?.response?.data) ||
+                    'Request failed.'
+                  }
+                />
+              )
+          )}
+        </div>
       </main>
     </div>
   );
@@ -242,129 +268,103 @@ function PersonForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
   const update = (key, val) => setForm((p) => ({ ...p, [key]: val }));
 
   return (
-    <div style={styles.formOverlay}>
-      <h3 style={styles.formTitle}>{title}</h3>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit({ preventDefault: () => {}, data: form });
-        }}
-      >
-        <label style={styles.label}>
-          Given Name
-          <input
-            type="text"
-            value={form.given_name}
-            onChange={(e) => update('given_name', e.target.value)}
-            required
-            maxLength={40}
-            style={styles.input}
-          />
-        </label>
+    <Card className="mb-6 border border-gray-200">
+      <h3 className="mb-4 text-base font-semibold text-gray-900">{title}</h3>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({ preventDefault: () => {}, data: form });
+      }}>
+        <div className="space-y-3">
+          <div className="sm:grid sm:grid-cols-3 sm:gap-x-4">
+            <FormField
+              label="Given Name"
+              fieldProps={{
+                type: 'text',
+                value: form.given_name,
+                onChange: (e) => update('given_name', e.target.value),
+                required: true,
+                maxLength: 40,
+              }}
+            />
+            <FormField
+              label="Age"
+              fieldProps={{
+                type: 'number',
+                value: form.age,
+                onChange: (e) => update('age', parseInt(e.target.value) || 0),
+                required: true,
+                min: 0,
+                max: 200,
+              }}
+            />
+            <div>
+              <OptionalLabel text="Title" />
+              <input
+                type="text"
+                value={form.title || ''}
+                onChange={(e) => update('title', e.target.value)}
+                maxLength={40}
+                className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              />
+            </div>
+          </div>
 
-        <label style={styles.label}>
-          Age
-          <input
-            type="number"
-            value={form.age}
-            onChange={(e) => update('age', parseInt(e.target.value) || 0)}
-            required
-            min={0}
-            max={200}
-            style={styles.input}
+          <FormField
+            label="Practical Wish"
+            as="textarea"
+            fieldProps={{
+              value: form.practical_wish,
+              onChange: (e) => update('practical_wish', e.target.value),
+              required: true,
+              maxLength: 400,
+              rows: 2,
+              className: 'resize-vertical',
+            }}
           />
-        </label>
-
-        <label style={styles.label}>
-          Title <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
-          <input
-            type="text"
-            value={form.title || ''}
-            onChange={(e) => update('title', e.target.value)}
-            maxLength={40}
-            style={styles.input}
+          <FormField
+            label="Fun Wish"
+            as="textarea"
+            fieldProps={{
+              value: form.fun_wish,
+              onChange: (e) => update('fun_wish', e.target.value),
+              required: true,
+              maxLength: 400,
+              rows: 2,
+              className: 'resize-vertical',
+            }}
           />
-        </label>
-
-        <label style={styles.label}>
-          Practical Wish
-          <textarea
-            value={form.practical_wish}
-            onChange={(e) => update('practical_wish', e.target.value)}
-            required
-            maxLength={400}
-            rows={2}
-            style={{ ...styles.input, resize: 'vertical' }}
-          />
-        </label>
-
-        <label style={styles.label}>
-          Fun Wish
-          <textarea
-            value={form.fun_wish}
-            onChange={(e) => update('fun_wish', e.target.value)}
-            required
-            maxLength={400}
-            rows={2}
-            style={{ ...styles.input, resize: 'vertical' }}
-          />
-        </label>
-
-        <label style={styles.label}>
-          Note <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
-          <textarea
-            value={form.note || ''}
-            onChange={(e) => update('note', e.target.value)}
-            maxLength={400}
-            rows={2}
-            style={{ ...styles.input, resize: 'vertical' }}
-          />
-        </label>
-
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <button type="submit" disabled={loading} style={styles.submitBtn}>
+          <div>
+            <OptionalLabel text="Note" />
+            <textarea
+              value={form.note || ''}
+              onChange={(e) => update('note', e.target.value)}
+              maxLength={400}
+              rows={2}
+              className="w-full resize-vertical rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex gap-3">
+          <Button type="submit" loading={loading}>
             {loading ? 'Saving…' : isEdit ? 'Update' : 'Create'}
-          </button>
-          <button type="button" onClick={onCancel} style={styles.cancelBtn}>
+          </Button>
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
+    </Card>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Spinners                                                            */
+/* OptionalLabel                                                       */
 /* ------------------------------------------------------------------ */
-function InlineSpinner() {
+function OptionalLabel({ text }) {
   return (
-    <svg
-      style={{ animation: 'spin 1s linear infinite', width: 20, height: 20, color: '#6366f1', flexShrink: 0 }}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-    >
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-    </svg>
-  );
-}
-
-function PageSpinner() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <svg
-        style={{ animation: 'spin 1s linear infinite', width: 48, height: 48, color: '#6366f1' }}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-      </svg>
-    </div>
+    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+      {text} <span className="font-normal text-gray-400">(optional)</span>
+    </label>
   );
 }
 
@@ -378,201 +378,4 @@ const defaultPersonForm = {
   practical_wish: '',
   fun_wish: '',
   note: '',
-};
-
-function esc(s) {
-  if (!s) return '';
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/* ------------------------------------------------------------------ */
-/* Styles                                                              */
-/* ------------------------------------------------------------------ */
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: '#f1f5f9',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  },
-  header: {
-    background: 'linear-gradient(135deg, #4c1d95, #6d28d9)',
-    color: '#fff',
-    padding: '1rem 2rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { margin: 0, fontSize: '1.25rem' },
-  backLink: { color: '#fff', textDecoration: 'none', fontSize: '0.9rem', opacity: 0.85 },
-  main: {
-    maxWidth: 960,
-    margin: '2rem auto',
-    padding: '0 1rem',
-  },
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '1.5rem',
-  },
-  pageTitle: { margin: 0, fontSize: '1.4rem', color: '#1e1b4b' },
-  addBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  // Table
-  tableWrap: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    overflowX: 'auto',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    textAlign: 'left',
-    padding: '0.6rem 0.8rem',
-    borderBottom: '2px solid #e5e7eb',
-    fontSize: '0.8rem',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.03em',
-  },
-  td: {
-    padding: '0.6rem 0.8rem',
-    borderBottom: '1px solid #f3f4f6',
-    fontSize: '0.9rem',
-    color: '#374151',
-  },
-  empty: { textAlign: 'center', color: '#9ca3af', padding: '2rem 0' },
-  detailLoading: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.6rem',
-    justifyContent: 'center',
-    padding: '1.5rem',
-    background: '#fff',
-    borderRadius: 12,
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    border: '1px solid #e5e7eb',
-    color: '#6366f1',
-    fontSize: '0.9rem',
-  },
-  // Buttons
-  btnEdit: {
-    padding: '0.3rem 0.8rem',
-    borderRadius: 6,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    marginRight: '0.4rem',
-    color: '#374151',
-  },
-  btnDelete: {
-    padding: '0.3rem 0.8rem',
-    borderRadius: 6,
-    border: '1px solid #fca5a5',
-    background: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    color: '#dc2626',
-  },
-  // Form overlay
-  formOverlay: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    border: '1px solid #e5e7eb',
-  },
-  formTitle: { margin: '0 0 1rem', fontSize: '1.1rem', color: '#1e1b4b' },
-  label: {
-    display: 'flex',
-    flexDirection: 'column',
-    marginBottom: '0.8rem',
-    fontSize: '0.85rem',
-    fontWeight: 500,
-    color: '#374151',
-  },
-  input: {
-    marginTop: '0.3rem',
-    padding: '0.55rem 0.75rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    fontSize: '0.9rem',
-    outline: 'none',
-  },
-  submitBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  cancelBtn: {
-    padding: '0.5rem 1.2rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    color: '#374151',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-  },
-  // Confirm
-  confirmOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.3)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 50,
-  },
-  confirmBox: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    maxWidth: 400,
-    width: '90%',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-  },
-  confirmYes: {
-    padding: '0.4rem 1rem',
-    borderRadius: 8,
-    border: 'none',
-    background: '#dc2626',
-    color: '#fff',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  confirmNo: {
-    padding: '0.4rem 1rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    color: '#374151',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-  },
-  error: {
-    background: '#fef2f2',
-    color: '#dc2626',
-    padding: '0.5rem 0.8rem',
-    borderRadius: 8,
-    marginTop: '0.5rem',
-    fontSize: '0.85rem',
-  },
 };
