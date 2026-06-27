@@ -3,7 +3,7 @@
 All endpoints are guarded with ``require_admin``.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -379,3 +379,69 @@ def delete_person(
     db.delete(per)
     db.commit()
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Admin — CSV Import
+# ---------------------------------------------------------------------------
+
+csv_admin_router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin-csv"],
+)
+
+
+csv_sample = """# referrers
+name,family_limit,phone_number
+John Smith,10,555-0001
+Jane Doe,15,555-0002
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+John Smith,The Johnsons,A warm blanket,Mom Johnson,,,555-1111
+Jane Doe,The Smiths,A computer,Dad Smith,,123 Main St,
+
+# people
+family_name,given_name,age,practical_wish,fun_wish,title,note
+The Johnsons,Alice,8,Backpack,Doll,,
+The Johnsons,Bob,12,New shoes,Game,,Allergic to peanuts
+The Smiths,Charlie,5,Winter coat,Puzzle,,
+
+# users
+email,password,role,referrer_name_or_id,family_name_or_id
+john@example.com,Password123!,referrer,John Smith,
+jane@example.com,Password123!,referrer,Jane Doe,
+mom@example.com,Password123!,family,,The Johnsons
+dad@example.com,Password123!,family,,The Smiths"""
+
+
+@csv_admin_router.get("/csv-sample")
+def get_csv_sample(_admin: object = Depends(require_admin)):
+    """Return a sample CSV template for admin reference."""
+    return {"csv_template": csv_sample}
+
+
+@csv_admin_router.post("/import-csv")
+async def import_csv_data(
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: object = Depends(require_admin),
+) -> dict:
+    """Import a CSV file (raw body) to bulk-create referrers, families, people, and users.
+
+    The CSV uses section headers (``# referrers``, ``# families``, ``# people``,
+    ``# users``) to group rows by entity type.
+    """
+    raw = await request.body()
+    if not raw.strip():
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    try:
+        content = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw.decode("latin-1")
+
+    from app.csv_import import import_csv as do_import
+
+    summary = do_import(db, content)
+    return summary.to_dict()

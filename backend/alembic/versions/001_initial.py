@@ -55,7 +55,7 @@ def upgrade() -> None:
     sa.Column('age', sa.Integer(), nullable=False),
     sa.Column('practical_wish', sa.String(length=400), nullable=False),
     sa.Column('fun_wish', sa.String(length=400), nullable=False),
-    sa.Column('note', sa.Text(), nullable=True),
+    sa.Column('note', sa.String(length=400), nullable=True),
     sa.ForeignKeyConstraint(['family_id'], ['family.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

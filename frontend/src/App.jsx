@@ -11,6 +11,11 @@ import Dashboard from './pages/Dashboard';
 import AdminReferrers from './pages/AdminReferrers';
 import AdminFamilies from './pages/AdminFamilies';
 import AdminPeople from './pages/AdminPeople';
+import CsvUpload from './pages/CsvUpload';
+import ReferrerDashboard from './pages/ReferrerDashboard';
+import ReferrerFamilyDetail from './pages/ReferrerFamilyDetail';
+import FamilyDashboard from './pages/FamilyDashboard';
+import FamilyPeople from './pages/FamilyPeople';
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -94,21 +99,47 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/csv-upload"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <CsvUpload />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* ── Role-specific dashboards (Phase 3 placeholders) ───── */}
+      {/* ── Referrer self-service ────────────────────────────── */}
       <Route
         path="/referrer/dashboard"
         element={
-          <ProtectedRoute roles={['admin', 'referrer']}>
-            <Dashboard />
+          <ProtectedRoute roles={['referrer']}>
+            <ReferrerDashboard />
           </ProtectedRoute>
         }
       />
       <Route
+        path="/referrer/families/:id"
+        element={
+          <ProtectedRoute roles={['referrer']}>
+            <ReferrerFamilyDetail />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ── Family self-service ──────────────────────────────── */}
+      <Route
         path="/family/dashboard"
         element={
-          <ProtectedRoute roles={['admin', 'referrer', 'family']}>
-            <Dashboard />
+          <ProtectedRoute roles={['family']}>
+            <FamilyDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family/people"
+        element={
+          <ProtectedRoute roles={['family']}>
+            <FamilyPeople />
           </ProtectedRoute>
         }
       />

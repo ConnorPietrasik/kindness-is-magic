@@ -1,0 +1,57 @@
+# referrers
+name,family_limit,phone_number
+Sarah Chen,10,212-555-0101
+Marcus Johnson,8,310-555-0102
+Aisha Patel,12,415-555-0103
+David Okonkwo,6,718-555-0104
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Sarah Chen,The Williams Family,A complete holiday dinner for everyone,Emily Williams,First-time family,842 Elm Street Apt 3,212-555-0201
+Sarah Chen,The Rodriguez Family,A big warm blanket,Luis Rodriguez,Loving grandparents with 4 grandkids,1650 Pine Ave,212-555-0202
+Marcus Johnson,The Thompson Family,Backpacks and school supplies,Tasha Thompson,Single mom of three,729 Birch Lane,310-555-0203
+Marcus Johnson,The Kim Family,A laptop for college research,Hyun Kim,Immigrant family,440 Maple Drive,310-555-0204
+Aisha Patel,The Garcia Family,Winter coats and boots,Carlos Garcia,Dad works two jobs to keep the lights on,118 Walnut Court,415-555-0205
+Aisha Patel,The Nguyen Family,Books and stationery for back-to-school,Tran Nguyen,Refugee family who arrived last year,673 Cedar Place,415-555-0206
+David Okonkwo,The Okafor Family,A microwave,Chidinma Okafor,Bargain hunter extraordinaire,901 Ash Boulevard,718-555-0207
+David Okonkwo,The Lee Family,New bedding and towels,Jane Lee,Homeless shelter family with two kids,250 Spruce Street,718-555-0208
+
+# people
+family_name,given_name,age,practical_wish,fun_wish,title,note
+The Williams Family,Emma,6,New coat and mittens,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
+The Williams Family,Liam,4,Boots for kindergarten,Toy truck set,son,
+The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,Play-Doh set,,Baby
+The Rodriguez Family,Sofia,11,Backpack and notebooks,LEGO set,granddaughter,Loves science
+The Rodriguez Family,Mateo,8,New sneakers,Foosball table,grandson,
+The Rodriguez Family,Valentina,3,Diapers size 4 and onesies,Peppa Pig plush,granddaughter,Granddaughter of Luis
+The Thompson Family,Jada,14,Period supplies and warm socks,Headphones and a music playlist,daughter,Teenager
+The Thompson Family,Malik,10,Backpack and pencils,Nintendo Switch game,son,Has asthma
+The Thompson Family,Zuri,5,Coat and winter hat,Disney Princess dress-up set,daughter,Kindergarten
+The Kim Family,Jae,16,College prep books and a laptop stand,Art supplies and sketchbook,son,Scholar
+The Kim Family,Mina,13,Notebooks and a calculator,Watercolor paint set,daughter,Loves to draw
+The Garcia Family,Lucas,9,Coat and boots,Basketball,son,
+The Garcia Family,Isabella,7,Winter jacket and scarf,Fisher-Price tea set,daughter,
+The Garcia Family,Diego,3,Boots size 7 and pajamas,Baby Shark toys,son,
+The Nguyen Family,Hoa,15,Laptop for school and a backpack,Kindle e-reader,daughter,Top student
+The Nguyen Family,Tam,12,New shoes and notebooks,Board game collection,son,
+The Nguyen Family,Linh,6,Coat and winter gloves,Puzzle set,daughter,
+The Okafor Family,Nkem,13,Coat,Skirt and accessories,daughter,Loves fashion
+The Okafor Family,Chigozie,11,Backpack and school supplies,Chess set,son,
+The Okafor Family,Uche,5,Winter hat and mittens,Thomas the Tank Engine train set,son,
+The Lee Family,Ethan,8,Backpack,Card games like Uno,son,
+The Lee Family,Grace,4,Coat and boots,Magnetic drawing board,daughter,
+
+# users
+email,password,role,referrer_name_or_id,family_name_or_id
+sarah.chen@example.com,Password123!,referrer,Sarah Chen,
+marcus.johnson@example.com,Password123!,referrer,Marcus Johnson,
+aisha.patel@example.com,Password123!,referrer,Aisha Patel,
+david.okonkwo@example.com,Password123!,referrer,David Okonkwo,
+emily.williams@example.com,Password123!,family,,The Williams Family
+luis.rodriguez@example.com,Password123!,family,,The Rodriguez Family
+tasha.thompson@example.com,Password123!,family,,The Thompson Family
+hyun.kim@example.com,Password123!,family,,The Kim Family
+carlos.garcia@example.com,Password123!,family,,The Garcia Family
+tran.nguyen@example.com,Password123!,family,,The Nguyen Family
+chidinma.okafor@example.com,Password123!,family,,The Okafor Family
+jane.lee@example.com,Password123!,family,,The Lee Family

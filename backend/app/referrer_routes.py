@@ -22,7 +22,7 @@ from app.schemas import (
     PersonSummary,
     PersonUpdate,
     ReferrerDetail,
-    ReferrerUpdate,
+    ReferrerSelfUpdate,
 )
 
 router = APIRouter(prefix="/api/referrer", tags=["referrer"])
@@ -109,7 +109,7 @@ def get_self(
 
 @router.patch("/me")
 def update_self(
-    body: ReferrerUpdate,
+    body: ReferrerSelfUpdate,
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:

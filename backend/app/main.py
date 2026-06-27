@@ -84,6 +84,7 @@ app.include_router(auth_router)
 # Include admin routes (Phase 1)
 # ---------------------------------------------------------------------------
 from app.admin_routes import (  # noqa: E402
+    csv_admin_router,
     family_admin_router,
     people_admin_router,
     referrer_admin_router,
@@ -92,6 +93,7 @@ from app.admin_routes import (  # noqa: E402
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
 app.include_router(people_admin_router)
+app.include_router(csv_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)

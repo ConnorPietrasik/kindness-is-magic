@@ -162,8 +162,17 @@ class ReferrerCreate(BaseModel):
 
 
 class ReferrerUpdate(BaseModel):
+    """Admin-only: full update including family_limit."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=60)
     family_limit: Optional[int] = Field(None, ge=1, le=999)
+    phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
+
+
+class ReferrerSelfUpdate(BaseModel):
+    """Referrer self-service update — family_limit is not allowed."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=60)
     phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
 
 

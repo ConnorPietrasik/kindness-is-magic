@@ -72,26 +72,31 @@ export default function Dashboard() {
                 <div style={styles.navLabel}>Manage People</div>
                 <div style={styles.navDesc}>Create, edit, and delete people</div>
               </Link>
+              <Link to="/admin/csv-upload" style={styles.navCard}>
+                <div style={styles.navIcon}>📊</div>
+                <div style={styles.navLabel}>CSV Import</div>
+                <div style={styles.navDesc}>Bulk-import referrers, families, people &amp; users</div>
+              </Link>
             </>
           )}
 
           {user?.role === 'referrer' && (
             <>
-              <div style={{ ...styles.navCard, background: '#f8fafc' }}>
+              <Link to="/referrer/dashboard" style={styles.navCard}>
                 <div style={styles.navIcon}>🏠</div>
                 <div style={styles.navLabel}>My Families</div>
-                <div style={styles.navDesc}>Coming in Phase 3</div>
-              </div>
+                <div style={styles.navDesc}>Manage your families and their members</div>
+              </Link>
             </>
           )}
 
           {user?.role === 'family' && (
             <>
-              <div style={{ ...styles.navCard, background: '#f8fafc' }}>
+              <Link to="/family/dashboard" style={styles.navCard}>
                 <div style={styles.navIcon}>✨</div>
-                <div style={styles.navLabel}>My Wishes</div>
-                <div style={styles.navDesc}>Coming in Phase 3</div>
-              </div>
+                <div style={styles.navLabel}>My Family</div>
+                <div style={styles.navDesc}>View your profile and manage people</div>
+              </Link>
             </>
           )}
         </div>

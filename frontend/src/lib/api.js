@@ -163,4 +163,110 @@ export function adminDeletePerson(id) {
   return api.delete(`/api/admin/people/${id}`);
 }
 
+export function adminListFamilyPeople(fid) {
+  return api.get(`/api/admin/families/${fid}/people`).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — CSV Import
+// ---------------------------------------------------------------------------
+export function adminGetCsvSample() {
+  return api.get('/api/admin/csv-sample').then((res) => res.data);
+}
+
+export function adminImportCsv(fileOrText) {
+  // Accept a File object or a plain string
+  if (fileOrText instanceof File) {
+    return api.post('/api/admin/import-csv', fileOrText, {
+      headers: { 'Content-Type': 'text/csv' },
+    }).then((res) => res.data);
+  }
+  // plain string
+  return api.post('/api/admin/import-csv', fileOrText, {
+    headers: { 'Content-Type': 'text/csv' },
+  }).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Referrer — Self
+// ---------------------------------------------------------------------------
+export function getReferrerMe() {
+  return api.get('/api/referrer/me').then((res) => res.data);
+}
+
+export function patchReferrerMe(data) {
+  return api.patch('/api/referrer/me', data).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Referrer — Families
+// ---------------------------------------------------------------------------
+export function listReferrerFamilies() {
+  return api.get('/api/referrer/families').then((res) => res.data);
+}
+
+export function getReferrerFamily(id) {
+  return api.get(`/api/referrer/families/${id}`).then((res) => res.data);
+}
+
+export function createReferrerFamily(data) {
+  return api.post('/api/referrer/families', data).then((res) => res.data);
+}
+
+export function updateReferrerFamily(id, data) {
+  return api.patch(`/api/referrer/families/${id}`, data).then((res) => res.data);
+}
+
+export function deleteReferrerFamily(id) {
+  return api.delete(`/api/referrer/families/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Referrer — People within a family
+// ---------------------------------------------------------------------------
+export function listReferrerFamilyPeople(fid) {
+  return api.get(`/api/referrer/families/${fid}/people`).then((res) => res.data);
+}
+
+export function createReferrerFamilyPerson(fid, data) {
+  return api.post(`/api/referrer/families/${fid}/people`, data).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Family — Self
+// ---------------------------------------------------------------------------
+export function getFamilyMe() {
+  return api.get('/api/family/me').then((res) => res.data);
+}
+
+export function patchFamilyMe(data) {
+  return api.patch('/api/family/me', data).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Family — People
+// ---------------------------------------------------------------------------
+export function listFamilyPeople() {
+  return api.get('/api/family/people').then((res) => res.data);
+}
+
+export function createFamilyPerson(data) {
+  return api.post('/api/family/people', data).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Shared — Individual person (multi-role ownership)
+// ---------------------------------------------------------------------------
+export function getPerson(id) {
+  return api.get(`/api/people/${id}`).then((res) => res.data);
+}
+
+export function updatePerson(id, data) {
+  return api.patch(`/api/people/${id}`, data).then((res) => res.data);
+}
+
+export function deletePerson(id) {
+  return api.delete(`/api/people/${id}`);
+}
+
 export default api;
