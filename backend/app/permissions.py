@@ -1,6 +1,6 @@
 """Role-based access-control dependencies for FastAPI."""
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -41,11 +41,11 @@ def require_referrer(current_user: User = Depends(_get_user_or_raise)) -> User:
 
 
 def require_family(current_user: User = Depends(_get_user_or_raise)) -> User:
-    """Raise 403 unless the user is a family, referrer, or admin."""
-    if current_user.role not in (UserRole.admin, UserRole.referrer, UserRole.family):
+    """Raise 403 unless the user is a family"""
+    if current_user.role not in (UserRole.family):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Family, referrer, or admin access required",
+            detail="Family access required",
         )
     return current_user
 
@@ -82,3 +82,54 @@ def require_owner_or_admin(resource_id: int):
         return current_user
 
     return _check
+
+
+# ---------------------------------------------------------------------------
+# Shared person ownership guard
+# ---------------------------------------------------------------------------
+
+
+def require_person_owner(
+    request: Request,
+    current_user: User = Depends(_get_user_or_raise),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Dependency that ensures the current user has ownership of the person record.
+
+    - Admin: always allowed
+    - Referrer: person.family.referrer_id == user.referrer_id
+    - Family: person.family_id == user.family_id
+    """
+    from app.models import Family, Person
+
+    if current_user.role == UserRole.admin:
+        return current_user
+
+    per_id = request.path_params.get("per_id")
+    if per_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing per_id path parameter",
+        )
+
+    per = db.query(Person).filter(Person.id == int(per_id)).first()
+    if per is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Person not found",
+        )
+
+    if current_user.role == UserRole.referrer:
+        fam = db.query(Family).filter(Family.id == per.family_id).first()
+        if fam and fam.referrer_id == current_user.referrer_id:
+            return current_user
+
+    elif current_user.role == UserRole.family:
+        if per.family_id == current_user.family_id:
+            return current_user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this resource",
+    )

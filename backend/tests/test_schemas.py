@@ -337,15 +337,16 @@ class TestFamilyDetail:
 
 class TestFamilySummary:
     def test_minimal(self):
-        s = FamilySummary(id=1, family_name="Test", contact_name="Jane")
+        s = FamilySummary(id=1, family_name="Test", contact_name="Jane", referrer_id=2)
         assert s.id == 1
         assert s.family_name == "Test"
         assert s.contact_name == "Jane"
+        assert s.referrer_id == 2
 
 
 class TestFamilyListResponse:
     def test_with_families(self):
-        summary = FamilySummary(id=1, family_name="Test", contact_name="Jane")
+        summary = FamilySummary(id=1, family_name="Test", contact_name="Jane", referrer_id=1)
         resp = FamilyListResponse(families=[summary])
         assert len(resp.families) == 1
 

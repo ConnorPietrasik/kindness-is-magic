@@ -529,10 +529,11 @@ class TestResetPassword:
         )
         assert resp.status_code == 422
 
-    def test_reset_password_cannot_cross_users(
+    def test_reset_token_only_affects_its_owner(
         self, test_client: TestClient, admin_user, db: Session
     ):
-        """User B's reset token must not reset User A's password."""
+        """A reset token only changes the password of its associated user,
+        not someone else's."""
         from app.models import User, PasswordResetToken, UserRole
         from app.auth import get_password_hash
 
@@ -567,16 +568,14 @@ class TestResetPassword:
         db.add(reset_b)
         db.commit()
 
-        # User B tries to reset user A's password with their own token.
-        # This must fail — a token only resets the password of its owner.
+        # Redeeming user B's token should only reset user B's password
         resp = test_client.post(
             "/api/auth/reset-password",
             json={
                 "token": raw_token_b,
-                "new_password": "HackedPass1234!",
+                "new_password": "BNewPass1234!",
             },
         )
-        # Should reset user B's password, not user A's
         assert resp.status_code == 200
 
         # Verify user A's password was NOT changed
@@ -589,7 +588,7 @@ class TestResetPassword:
         # Verify user B's password WAS changed
         login_b = test_client.post(
             "/api/auth/login",
-            json={"email": "userb@test.com", "password": "HackedPass1234!"},
+            json={"email": "userb@test.com", "password": "BNewPass1234!"},
         )
         assert login_b.status_code == 200, "User B's password should have been reset"
 
@@ -625,25 +624,17 @@ class TestRefresh:
 
 
 # ---------------------------------------------------------------------------
-# Cookie assertions
+# Post-logout session invalidation
 # ---------------------------------------------------------------------------
 
 class TestAuthCookies:
-    def test_login_sets_httponly_cookies(self, test_client: TestClient, admin_user):
-        resp = test_client.post(
-            "/api/auth/login",
-            json={"email": "admin@test.com", "password": "AdminPass123!"},
-        )
-        assert resp.status_code == 200
-        access_cookie = resp.cookies.get("access_token")
-        refresh_cookie = resp.cookies.get("refresh_token")
-        assert access_cookie is not None
-        assert refresh_cookie is not None
+    def test_logout_invalidates_session(self, test_client: TestClient, admin_user):
+        """After logout, authenticated endpoints should reject the user.
 
-    def test_logout_clears_cookies(self, test_client: TestClient, admin_user):
+        Cookie presence after login is already verified in
+        TestLogin.test_login_success; this test focuses only on post-logout state.
+        """
         login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post("/api/auth/logout")
-        assert resp.status_code == 200
-        # After logout, /me should fail
-        resp2 = test_client.get("/api/auth/me")
-        assert resp2.status_code == 401
+        test_client.post("/api/auth/logout")
+        resp = test_client.get("/api/auth/me")
+        assert resp.status_code == 401

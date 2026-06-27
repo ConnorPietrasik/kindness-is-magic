@@ -93,6 +93,17 @@ app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
 app.include_router(people_admin_router)
 
+# ---------------------------------------------------------------------------
+# Include self-service routes (Phase 3)
+# ---------------------------------------------------------------------------
+from app.referrer_routes import router as referrer_router  # noqa: E402
+from app.family_routes import router as family_router  # noqa: E402
+from app.people_routes import router as people_router  # noqa: E402
+
+app.include_router(referrer_router)
+app.include_router(family_router)
+app.include_router(people_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

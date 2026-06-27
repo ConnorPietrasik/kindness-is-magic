@@ -313,3 +313,140 @@ def family_with_people(db: Session, family_record):
     db.refresh(p1)
     db.refresh(p2)
     return {"family": family_record, "people": [p1, p2]}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 fixtures — Self-service trees for referrer/family ownership tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def referrer_with_full_tree(db: Session):
+    """Referrer with 1 Family + 1 Person, plus a referrer-role User.
+
+    Returns a dict with keys: referrer, family, person, user.
+    """
+    from app.models import Referrer, Family, Person, User, UserRole
+    from app.auth import get_password_hash
+
+    ref = Referrer(name="Tree Referrer", family_limit=5, phone_number="555-1000")
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+
+    fam = Family(
+        referrer_id=ref.id,
+        family_name="Tree Family",
+        family_wish="A new home",
+        contact_name="Tree Contact",
+    )
+    db.add(fam)
+    db.commit()
+    db.refresh(fam)
+
+    person = Person(
+        family_id=fam.id,
+        given_name="Tree Person",
+        age=10,
+        practical_wish="A bike",
+        fun_wish="A game",
+    )
+    db.add(person)
+    db.commit()
+    db.refresh(person)
+
+    user = User(
+        email="tree_referrer@test.com",
+        hashed_password=get_password_hash("TreeRef1234!"),
+        role=UserRole.referrer,
+        referrer_id=ref.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {"referrer": ref, "family": fam, "person": person, "user": user}
+
+
+@pytest.fixture()
+def another_referrer(db: Session):
+    """Second Referrer + referrer-role User (for 403 cross-referrer tests).
+
+    Returns a dict with keys: referrer, user.
+    """
+    from app.models import Referrer, User, UserRole
+    from app.auth import get_password_hash
+
+    ref = Referrer(name="Another Referrer", family_limit=5, phone_number="555-2000")
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+
+    user = User(
+        email="another_referrer@test.com",
+        hashed_password=get_password_hash("AnotherRef1234!"),
+        role=UserRole.referrer,
+        referrer_id=ref.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {"referrer": ref, "user": user}
+
+
+@pytest.fixture()
+def another_family(db: Session, referrer_record):
+    """Second Family + family-role User (for 403 cross-family tests).
+
+    Returns a dict with keys: family, user.
+    """
+    from app.models import Family, User, UserRole
+    from app.auth import get_password_hash
+
+    fam = Family(
+        referrer_id=referrer_record.id,
+        family_name="Another Family",
+        family_wish="A computer",
+        contact_name="Another Contact",
+    )
+    db.add(fam)
+    db.commit()
+    db.refresh(fam)
+
+    user = User(
+        email="another_family@test.com",
+        hashed_password=get_password_hash("AnotherFam1234!"),
+        role=UserRole.family,
+        family_id=fam.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {"family": fam, "user": user}
+
+
+@pytest.fixture()
+def person_in_another_family(db: Session, another_family):
+    """Person in another_family (for 403 cross-family person tests).
+
+    Returns a dict with keys: family, person.
+    """
+    from app.models import Person
+
+    fam = another_family["family"]
+    person = Person(
+        family_id=fam.id,
+        given_name="Another Person",
+        age=7,
+        practical_wish="A jacket",
+        fun_wish="A toy",
+    )
+    db.add(person)
+    db.commit()
+    db.refresh(person)
+
+    return {"family": fam, "person": person}

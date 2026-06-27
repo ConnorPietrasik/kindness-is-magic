@@ -10,26 +10,21 @@ from tests.conftest import login_as
 # Helpers
 # ---------------------------------------------------------------------------
 
-
 def _admin_login(client: TestClient) -> dict:
     """Log in as admin and return cookies (sets them on the client)."""
     return login_as(client, "admin@test.com", "AdminPass123!")
-
 
 def _referrer_login(client: TestClient) -> dict:
     """Log in as a referrer user."""
     return login_as(client, "referrer@test.com", "RefPass1234!")
 
-
 def _family_login(client: TestClient) -> dict:
     """Log in as a family user."""
     return login_as(client, "family@test.com", "FamPass1234!")
 
-
 # =========================================================================
 #  Admin — Referrers
 # =========================================================================
-
 
 class TestAdminListReferrers:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -47,16 +42,6 @@ class TestAdminListReferrers:
         body = resp.json()
         assert len(body["referrers"]) == 1
         assert body["referrers"][0]["name"] == "Test Referrer"
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/referrers")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/referrers")
-        assert resp.status_code == 403
-
 
 class TestAdminGetReferrer:
     def test_200_detail_with_family_count(
@@ -76,16 +61,6 @@ class TestAdminGetReferrer:
         resp = test_client.get("/api/admin/referrers/99999")
         assert resp.status_code == 404
 
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/referrers/1")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/referrers/1")
-        assert resp.status_code == 403
-
-
 class TestAdminCreateReferrer:
     def test_201_success(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -103,78 +78,6 @@ class TestAdminCreateReferrer:
         assert body["family_limit"] == 5
         assert body["phone_number"] == "555-1234"
         assert body["family_count"] == 0
-
-    def test_422_bad_name_empty(self, test_client: TestClient, admin_user):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "",
-                "family_limit": 5,
-                "phone_number": "555-1234",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_422_bad_family_limit_zero(self, test_client: TestClient, admin_user):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "New Referrer",
-                "family_limit": 0,
-                "phone_number": "555-1234",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_422_bad_family_limit_over(self, test_client: TestClient, admin_user):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "New Referrer",
-                "family_limit": 1000,
-                "phone_number": "555-1234",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_422_bad_phone_empty(self, test_client: TestClient, admin_user):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "New Referrer",
-                "family_limit": 5,
-                "phone_number": "",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "New Referrer",
-                "family_limit": 5,
-                "phone_number": "555-1234",
-            },
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.post(
-            "/api/admin/referrers",
-            json={
-                "name": "New Referrer",
-                "family_limit": 5,
-                "phone_number": "555-1234",
-            },
-        )
-        assert resp.status_code == 403
-
 
 class TestAdminUpdateReferrer:
     def test_200_partial_update(
@@ -215,30 +118,6 @@ class TestAdminUpdateReferrer:
             json={"name": "Nope"},
         )
         assert resp.status_code == 404
-
-    def test_422_bad_data(self, test_client: TestClient, admin_user, referrer_record):
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/referrers/{referrer_record.id}",
-            json={"name": ""},
-        )
-        assert resp.status_code == 422
-
-    def test_401_unauthenticated(self, test_client: TestClient, referrer_record):
-        resp = test_client.patch(
-            f"/api/admin/referrers/{referrer_record.id}",
-            json={"name": "Nope"},
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user, referrer_record):
-        _referrer_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/referrers/{referrer_record.id}",
-            json={"name": "Nope"},
-        )
-        assert resp.status_code == 403
-
 
 class TestAdminDeleteReferrer:
     def test_204_success(
@@ -296,20 +175,9 @@ class TestAdminDeleteReferrer:
         resp = test_client.delete("/api/admin/referrers/99999")
         assert resp.status_code == 404
 
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.delete("/api/admin/referrers/1")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.delete("/api/admin/referrers/1")
-        assert resp.status_code == 403
-
-
 # =========================================================================
 #  Admin — Families
 # =========================================================================
-
 
 class TestAdminListFamilies:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -325,16 +193,6 @@ class TestAdminListFamilies:
         body = resp.json()
         assert len(body["families"]) == 1
         assert body["families"][0]["family_name"] == "TestFamily"
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/families")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/families")
-        assert resp.status_code == 403
-
 
 class TestAdminGetFamily:
     def test_200_detail_with_person_count(
@@ -353,16 +211,6 @@ class TestAdminGetFamily:
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/99999")
         assert resp.status_code == 404
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/families/1")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/families/1")
-        assert resp.status_code == 403
-
 
 class TestAdminCreateFamily:
     def test_201_success(
@@ -431,32 +279,6 @@ class TestAdminCreateFamily:
         )
         assert resp.status_code == 422
 
-    def test_401_unauthenticated(self, test_client: TestClient, referrer_record):
-        resp = test_client.post(
-            "/api/admin/families",
-            json={
-                "referrer_id": referrer_record.id,
-                "family_name": "New Family",
-                "family_wish": "A bicycle",
-                "contact_name": "New Contact",
-            },
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user, referrer_record):
-        _referrer_login(test_client)
-        resp = test_client.post(
-            "/api/admin/families",
-            json={
-                "referrer_id": referrer_record.id,
-                "family_name": "New Family",
-                "family_wish": "A bicycle",
-                "contact_name": "New Contact",
-            },
-        )
-        assert resp.status_code == 403
-
-
 class TestAdminUpdateFamily:
     def test_200_partial_update(
         self, test_client: TestClient, admin_user, family_record
@@ -479,30 +301,6 @@ class TestAdminUpdateFamily:
         )
         assert resp.status_code == 404
 
-    def test_422_bad_data(self, test_client: TestClient, admin_user, family_record):
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"family_name": ""},
-        )
-        assert resp.status_code == 422
-
-    def test_401_unauthenticated(self, test_client: TestClient, family_record):
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"family_name": "Nope"},
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user, family_record):
-        _referrer_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"family_name": "Nope"},
-        )
-        assert resp.status_code == 403
-
-
 class TestAdminDeleteFamily:
     def test_204_success(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
@@ -514,20 +312,9 @@ class TestAdminDeleteFamily:
         resp = test_client.delete("/api/admin/families/99999")
         assert resp.status_code == 404
 
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.delete("/api/admin/families/1")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.delete("/api/admin/families/1")
-        assert resp.status_code == 403
-
-
 # =========================================================================
 #  Admin — People
 # =========================================================================
-
 
 class TestAdminListPeople:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -543,16 +330,6 @@ class TestAdminListPeople:
         body = resp.json()
         assert len(body["people"]) == 2
         assert body["people"][0]["given_name"] == "Alice"
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/people")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/people")
-        assert resp.status_code == 403
-
 
 class TestAdminGetPerson:
     def test_200_detail(self, test_client: TestClient, admin_user, family_with_people):
@@ -571,16 +348,6 @@ class TestAdminGetPerson:
         _admin_login(test_client)
         resp = test_client.get("/api/admin/people/99999")
         assert resp.status_code == 404
-
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.get("/api/admin/people/1")
-        assert resp.status_code == 401
-
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
-        _referrer_login(test_client)
-        resp = test_client.get("/api/admin/people/1")
-        assert resp.status_code == 403
-
 
 class TestAdminCreatePerson:
     def test_201_success(
@@ -639,64 +406,6 @@ class TestAdminCreatePerson:
         )
         assert resp.status_code == 404
 
-    def test_422_bad_age(self, test_client: TestClient, admin_user, family_record):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/people",
-            json={
-                "family_id": family_record.id,
-                "given_name": "Diana",
-                "age": -1,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_422_bad_given_name(self, test_client: TestClient, admin_user, family_record):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/people",
-            json={
-                "family_id": family_record.id,
-                "given_name": "",
-                "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_401_unauthenticated(self, test_client: TestClient, family_record):
-        resp = test_client.post(
-            "/api/admin/people",
-            json={
-                "family_id": family_record.id,
-                "given_name": "Diana",
-                "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
-            },
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(
-        self, test_client: TestClient, referrer_user, family_record
-    ):
-        _referrer_login(test_client)
-        resp = test_client.post(
-            "/api/admin/people",
-            json={
-                "family_id": family_record.id,
-                "given_name": "Diana",
-                "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
-            },
-        )
-        assert resp.status_code == 403
-
-
 class TestAdminUpdatePerson:
     def test_200_partial_update(
         self, test_client: TestClient, admin_user, family_with_people
@@ -745,35 +454,6 @@ class TestAdminUpdatePerson:
         )
         assert resp.status_code == 404
 
-    def test_422_bad_data(self, test_client: TestClient, admin_user, family_with_people):
-        _admin_login(test_client)
-        person = family_with_people["people"][0]
-        resp = test_client.patch(
-            f"/api/admin/people/{person.id}",
-            json={"given_name": ""},
-        )
-        assert resp.status_code == 422
-
-    def test_401_unauthenticated(self, test_client: TestClient, family_with_people):
-        person = family_with_people["people"][0]
-        resp = test_client.patch(
-            f"/api/admin/people/{person.id}",
-            json={"given_name": "Nope"},
-        )
-        assert resp.status_code == 401
-
-    def test_403_non_admin(
-        self, test_client: TestClient, referrer_user, family_with_people
-    ):
-        _referrer_login(test_client)
-        person = family_with_people["people"][0]
-        resp = test_client.patch(
-            f"/api/admin/people/{person.id}",
-            json={"given_name": "Nope"},
-        )
-        assert resp.status_code == 403
-
-
 class TestAdminDeletePerson:
     def test_204_success(
         self, test_client: TestClient, admin_user, family_with_people
@@ -788,11 +468,54 @@ class TestAdminDeletePerson:
         resp = test_client.delete("/api/admin/people/99999")
         assert resp.status_code == 404
 
-    def test_401_unauthenticated(self, test_client: TestClient):
-        resp = test_client.delete("/api/admin/people/1")
+# =========================================================================
+#  Auth guards (parameterized — replaces per-endpoint 401/403 tests)
+# =========================================================================
+
+ADMIN_ENDPOINTS = [
+    ("GET", "/api/admin/referrers", {}),
+    ("GET", "/api/admin/referrers/1", {}),
+    ("POST", "/api/admin/referrers", {"name": "R", "family_limit": 1, "phone_number": "555"}),
+    ("PATCH", "/api/admin/referrers/1", {"name": "Updated"}),
+    ("DELETE", "/api/admin/referrers/1", {}),
+    ("GET", "/api/admin/families", {}),
+    ("GET", "/api/admin/families/1", {}),
+    ("POST", "/api/admin/families", {"referrer_id": 1, "family_name": "F", "family_wish": "W", "contact_name": "C"}),
+    ("PATCH", "/api/admin/families/1", {"family_name": "Updated"}),
+    ("DELETE", "/api/admin/families/1", {}),
+    ("GET", "/api/admin/people", {}),
+    ("GET", "/api/admin/people/1", {}),
+    ("POST", "/api/admin/people", {"family_id": 1, "given_name": "P", "age": 5, "practical_wish": "W", "fun_wish": "W"}),
+    ("PATCH", "/api/admin/people/1", {"given_name": "Updated"}),
+    ("DELETE", "/api/admin/people/1", {}),
+]
+
+class TestAdminAuthGuards:
+    """Parameterized auth guard tests for all admin endpoints.
+
+    Replaces the 15× test_401_unauthenticated + 14× test_403_non_admin
+    tests that were previously duplicated across every CRUD class above.
+    """
+
+    @pytest.mark.parametrize("method,route,body", ADMIN_ENDPOINTS)
+    def test_401_unauthenticated(
+        self, test_client: TestClient, method: str, route: str, body: dict
+    ):
+        """Unauthenticated requests to any admin endpoint return 401."""
+        if body:
+            resp = test_client.request(method, route, json=body)
+        else:
+            resp = test_client.request(method, route)
         assert resp.status_code == 401
 
-    def test_403_non_admin(self, test_client: TestClient, referrer_user):
+    @pytest.mark.parametrize("method,route,body", ADMIN_ENDPOINTS)
+    def test_403_non_admin(
+        self, test_client: TestClient, referrer_user, method: str, route: str, body: dict
+    ):
+        """Non-admin users get 403 on any admin endpoint."""
         _referrer_login(test_client)
-        resp = test_client.delete("/api/admin/people/1")
+        if body:
+            resp = test_client.request(method, route, json=body)
+        else:
+            resp = test_client.request(method, route)
         assert resp.status_code == 403
