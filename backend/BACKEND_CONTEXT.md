@@ -184,7 +184,14 @@ IDs don't collide with id=0.
 | GET | `/csv-sample` | Get sample CSV template |
 | POST | `/import-csv` | Bulk import (referrers → families → people → users) |
 
-CSV format uses `# section_name` headers. Sections processed in dependency order. Duplicate records are skipped (idempotent). Errors are reported per-row.
+CSV format uses `# section_name` headers. Sections processed in dependency order.
+Duplicate records are skipped (idempotent). Errors are reported per-row.
+
+**People deduplication:** A person row is skipped if an existing `Person` row
+has the same `family_id`, `given_name`, and `age`.  A person with the same
+name but a different age (or same name/age in a different family) is **not**
+a duplicate and will be created.  Implemented via `_find_person()` in
+csv_import.py.
 
 ### Referrer Self-Service (`/api/referrer/*`)
 
@@ -244,12 +251,16 @@ On startup, if `ADMIN_EMAIL` and `ADMIN_PASSWORD` env vars are set and no admin 
   - `login_as(client, email, password)` — helper function
 - Run with: `./run-compose.sh run test` (from project root)
 
+> **⚠ Sandbox limitation:** Neither `docker` nor `python` are available in this
+> sandbox environment.  Tests cannot be executed here — code changes are verified
+> by reading and reviewing the source directly.
+
 ## Known Patterns / Gotchas
 
 1. **Partial updates** use `model_dump(exclude_unset=True)` + manual `setattr` — not `model_dump()` which includes defaults.
 2. **Computed fields** like `family_count` and `person_count` are calculated at response time via separate queries (not ORM eager-loading).
 3. **Orphan referrer** (id=0) must exist before any Family row is created. The migration seeds it explicitly and advances the sequence.
-4. **CSV import** processes sections in dependency order (referrers → families → people → users) and resolves foreign keys by name or ID.
+4. **CSV import** processes sections in dependency order (referrers → families → people → users) and resolves foreign keys by name or ID.  Referrers are deduplicated by name, families by family_name, users by email, and **people by (family_id, given_name, age)**.
 5. **Admin CRUD** and **self-service routes** have separate implementations with duplicated helper functions (`_build_referrer_detail`, `_build_family_detail`, `_partial_update`). This is intentional — they live in different route modules with different guards.
 6. **Person `note` column** is `Text()` in the migration but `String(400)` in the model — a minor schema inconsistency.
 7. **`require_family`** only allows `UserRole.family` (not admin) — this is intentional for the self-service family routes, but means admins must use the admin routes to access family data.

@@ -166,6 +166,18 @@ def _find_family(db: Session, name: str) -> Family | None:
     return db.query(Family).filter(Family.family_name == name).first()
 
 
+def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Person | None:
+    return (
+        db.query(Person)
+        .filter(
+            Person.family_id == family_id,
+            Person.given_name == given_name,
+            Person.age == age,
+        )
+        .first()
+    )
+
+
 def _find_user_by_email(db: Session, email: str) -> User | None:
     return db.query(User).filter(User.email == email.lower()).first()
 
@@ -360,6 +372,20 @@ def _process_people(
         if family_id is None:
             summary.rows.append(RowResult(row_num, "person", "error", f"Family '{family_name_or_id}' not found"))
             summary.people_errors += 1
+            continue
+
+        # Skip if a person with the same family_id, given_name, and age already exists
+        existing = _find_person(db, family_id, given_name, age)
+        if existing:
+            summary.rows.append(
+                RowResult(
+                    row_num,
+                    "person",
+                    "skipped",
+                    f"Person '{given_name}' (age {age}) already exists in family (id={existing.id})",
+                )
+            )
+            summary.people_skipped += 1
             continue
 
         per = Person(

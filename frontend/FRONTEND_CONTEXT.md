@@ -49,10 +49,10 @@ frontend/
       ForgotPassword.jsx
       ResetPassword.jsx
       Dashboard.jsx
-      AdminReferrers.jsx      # ← inline styles (not Tailwind)
-      AdminFamilies.jsx       # ← inline styles (not Tailwind)
-      AdminPeople.jsx         # ← inline styles (not Tailwind)
-      CsvUpload.jsx           # ← inline styles (not Tailwind)
+      AdminReferrers.jsx      # ← Tailwind + shared components
+      AdminFamilies.jsx       # ← Tailwind + shared components
+      AdminPeople.jsx         # ← Tailwind + shared components
+      CsvUpload.jsx           # ← Tailwind + shared components
       ReferrerDashboard.jsx   # ← Tailwind
       ReferrerFamilyDetail.jsx # ← Tailwind
       FamilyDashboard.jsx     # ← Tailwind
@@ -213,14 +213,14 @@ Single Axios instance, all functions are plain (no React hooks). Grouped by doma
 - Change password section (inline form)
 
 ### Admin CRUD Pages (AdminReferrers, AdminFamilies, AdminPeople, CsvUpload)
-**⚠️ NOTE: These pages use inline `styles` objects instead of Tailwind classes.** They were written before the shared component library and are stylistically inconsistent with the rest of the frontend.
+- Tailwind + shared components ✅ — migrated from inline `styles` objects
+- Uses: `HeaderBar` + `BackLink`, `Card`, `Button`, `FormField`, `ErrorBox`, `PageSpinner`, `Table` family, `esc()` from `lib/utils`
 - Pattern: list table + inline create/edit form + delete confirmation modal
 - Form data synced via `useEffect` on `initial` prop change
-- Custom `PageSpinner`/`InlineSpinner`/`esc()` duplicated inline (not using shared components)
 - AdminReferrers: CRUD referrers (name, family_limit, phone_number)
 - AdminFamilies: CRUD families with referrer dropdown, fields: referrer_id, family_name, family_wish, contact_name, bio, address, phone_number
 - AdminPeople: CRUD people with family dropdown, fields: family_id, given_name, age, title, practical_wish, fun_wish, note
-- CsvUpload: Drag-and-drop CSV upload, template preview, per-row results table
+- CsvUpload: Drag-and-drop CSV upload, template preview, per-row results table. On successful import, invalidates `adminReferrers`, `adminFamilies`, `adminPeople` query keys so list pages refresh automatically.
 
 ### Referrer Dashboard
 - Tailwind + shared components ✅
@@ -282,17 +282,13 @@ Query key conventions:
 
 ## Known Inconsistencies / Debt
 
-1. **Admin pages use inline styles** — AdminReferrers, AdminFamilies, AdminPeople, CsvUpload all define a `const styles` object with raw JS styles. They should be migrated to Tailwind + shared components (HeaderBar, Card, Button, Table, FormField, ErrorBox, Spinner) for consistency.
+1. **No pagination** — All list endpoints return full datasets; no frontend pagination or infinite scroll.
 
-2. **Duplicated utilities** — `esc()` is defined locally in AdminReferrers, AdminFamilies, AdminPeople, CsvUpload, and several self-service pages instead of importing from `lib/utils.js`.
+2. **No optimistic updates** — All mutations rely on `invalidateQueries` (refetch) rather than optimistic cache updates.
 
-3. **Duplicated spinners** — Admin pages define their own `PageSpinner`/`InlineSpinner` instead of using `components/Spinner.jsx`.
+3. **Form pattern inconsistency** — Auth pages use inline inputs; self-service and admin pages use `FormField`. The "submit as custom event" pattern (`onSubmit({ preventDefault, data: form })`) is used in self-service and admin pages but not auth pages.
 
-4. **No pagination** — All list endpoints return full datasets; no frontend pagination or infinite scroll.
-
-5. **No optimistic updates** — All mutations rely on `invalidateQueries` (refetch) rather than optimistic cache updates.
-
-6. **Form pattern inconsistency** — Auth pages use inline inputs; self-service pages use `FormField`; admin pages use raw inputs with inline styles. The "submit as custom event" pattern (`onSubmit({ preventDefault, data: form })`) is used in self-service and admin pages but not auth pages.
+4. **Duplicated `esc()`** — `esc()` is still defined locally in some self-service pages (e.g. ReferrerDashboard, ReferrerFamilyDetail) instead of importing from `lib/utils.js`.
 
 ---
 

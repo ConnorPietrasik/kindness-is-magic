@@ -6,14 +6,20 @@
  */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminGetCsvSample, adminImportCsv } from '../lib/api';
+import { HeaderBar, BackLink } from '../components/HeaderBar';
+import { Card } from '../components/Card';
+import Button from '../components/Button';
+import { ErrorBox } from '../components/ErrorBox';
+import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
+import { esc } from '../lib/utils';
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function CsvUpload() {
+  const queryClient = useQueryClient();
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
@@ -24,6 +30,10 @@ export default function CsvUpload() {
     mutationFn: (text) => adminImportCsv(text),
     onSuccess: () => {
       setFile(null);
+      // Refresh admin list pages so they show newly imported data
+      queryClient.invalidateQueries(['adminReferrers']);
+      queryClient.invalidateQueries(['adminFamilies']);
+      queryClient.invalidateQueries(['adminPeople']);
     },
   });
 
@@ -87,36 +97,43 @@ export default function CsvUpload() {
   }
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.headerTitle}>Kindness is Magic</h1>
-        <Link to="/dashboard" style={styles.backLink}>← Dashboard</Link>
-      </header>
+    <div className="min-h-screen bg-slate-50">
+      <HeaderBar
+        title="Kindness is Magic"
+        left={<BackLink />}
+      />
 
-      <main style={styles.main}>
-        <div style={styles.pageHeader}>
+      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
+        {/* Header */}
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 style={styles.pageTitle}>CSV Import</h2>
-            <p style={styles.pageDesc}>
+            <h2 className="text-xl font-bold text-violet-950">CSV Import</h2>
+            <p className="mt-1 text-sm text-gray-500">
               Bulk-import referrers, families, people, and users from a single CSV file.
             </p>
           </div>
-          <button onClick={fetchTemplate} style={styles.templateBtn}>
-            {showTemplate ? 'Hide Template' : '📄 Show Template'}
-          </button>
+          <Button
+            variant={showTemplate ? 'secondary' : 'primary'}
+            onClick={fetchTemplate}
+            loading={fetchingTemplate && !template}
+          >
+            {showTemplate ? 'Hide Template' : '\u{1F4C4} Show Template'}
+          </Button>
         </div>
 
         {/* Template preview */}
         {showTemplate && template && (
-          <div style={styles.templateCard}>
-            <div style={styles.templateHeader}>
-              <h3 style={styles.templateTitle}>CSV Template</h3>
-              <button onClick={handleDownloadTemplate} style={styles.downloadBtn}>
-                ⬇ Download .csv
-              </button>
+          <Card className="mb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-violet-950">CSV Template</h3>
+              <Button variant="primary" className="px-3 py-1.5 text-xs" onClick={handleDownloadTemplate}>
+                {'\u2B07'} Download .csv
+              </Button>
             </div>
-            <pre style={styles.templateCode}>{esc(template)}</pre>
-          </div>
+            <pre className="max-h-[400px] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 whitespace-pre-wrap break-words">
+              {esc(template)}
+            </pre>
+          </Card>
         )}
 
         {/* Upload area */}
@@ -124,56 +141,57 @@ export default function CsvUpload() {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          style={{
-            ...styles.dropZone,
-            borderColor: dragOver ? '#6366f1' : '#d1d5db',
-            background: dragOver ? '#eef2ff' : '#fff',
-          }}
+          className={`cursor-pointer rounded-xl border-2 border-dashed p-10 text-center transition-colors mb-4 ${
+            dragOver
+              ? 'border-btn-start bg-indigo-50'
+              : 'border-gray-300 bg-white'
+          }`}
         >
           {!file ? (
-            <div style={styles.dropContent}>
-              <div style={styles.dropIcon}>📁</div>
-              <p style={styles.dropText}>
+            <div>
+              <div className="mb-2 text-4xl">{'\u{1F4C1}'}</div>
+              <p className="text-gray-500">
                 Drag &amp; drop your CSV file here, or{' '}
-                <label style={styles.browseLink}>
+                <label className="cursor-pointer font-semibold text-btn-start underline">
                   browse
                   <input
                     type="file"
                     accept=".csv"
                     onChange={handleSelect}
-                    style={{ display: 'none' }}
+                    className="hidden"
                   />
                 </label>
               </p>
             </div>
           ) : (
-            <div style={styles.fileInfo}>
-              <div style={styles.fileIcon}>📄</div>
-              <div>
-                <strong style={styles.fileName}>{esc(file.name)}</strong>
-                <p style={styles.fileSize}>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-2xl">{'\u{1F4C4}'}</span>
+              <div className="text-left">
+                <strong className="block text-base text-violet-950">{esc(file.name)}</strong>
+                <span className="text-xs text-gray-400">
                   {(file.size / 1024).toFixed(1)} KB
-                </p>
+                </span>
               </div>
-              <button onClick={() => setFile(null)} style={styles.removeBtn}>
-                ✕
+              <button
+                onClick={() => setFile(null)}
+                className="ml-2 rounded-md p-1 text-red-600 hover:bg-red-50"
+              >
+                {'\u2715'}
               </button>
             </div>
           )}
         </div>
 
         {/* Import button */}
-        <div style={styles.actions}>
-          <button
+        <div className="mb-6 flex justify-center">
+          <Button
             onClick={handleImport}
             disabled={!file || importMut.isPending}
-            style={{
-              ...styles.importBtn,
-              opacity: (!file || importMut.isPending) ? 0.5 : 1,
-            }}
+            loading={importMut.isPending}
+            className={!file ? 'opacity-50' : ''}
           >
-            {importMut.isPending ? 'Importing…' : 'Import CSV'}
-          </button>
+            {importMut.isPending ? 'Importing\u2026' : 'Import CSV'}
+          </Button>
         </div>
 
         {/* Results */}
@@ -183,11 +201,13 @@ export default function CsvUpload() {
 
         {/* Error */}
         {importMut.error && (
-          <div style={styles.error}>
-            {importMut.error?.response?.data?.detail ||
+          <ErrorBox
+            message={
+              importMut.error?.response?.data?.detail ||
               JSON.stringify(importMut.error?.response?.data) ||
-              'Import failed.'}
-          </div>
+              'Import failed.'
+            }
+          />
         )}
       </main>
     </div>
@@ -202,12 +222,12 @@ function ImportResults({ data }) {
 
   function sectionStat(label, s) {
     return (
-      <div style={styles.statBox}>
-        <div style={styles.statLabel}>{label}</div>
-        <div style={styles.statRow}>
-          <span style={styles.statGreen}>+{s.created}</span>
-          <span style={styles.statYellow} title="Skipped (already exists)">={s.skipped}</span>
-          <span style={styles.statRed} title="Errors">×{s.errors}</span>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</div>
+        <div className="flex gap-3 text-lg font-bold">
+          <span className="text-green-600" title="Created">+{s.created}</span>
+          <span className="text-amber-600" title="Skipped (already exists)">={s.skipped}</span>
+          <span className="text-red-600" title="Errors">{'\u00d7'}{s.errors}</span>
         </div>
       </div>
     );
@@ -216,11 +236,11 @@ function ImportResults({ data }) {
   const hasErrors = rows.some((r) => r.action === 'error');
 
   return (
-    <div style={styles.resultsCard}>
-      <h3 style={styles.resultsTitle}>Import Results</h3>
+    <Card className="mt-4">
+      <h3 className="mb-4 text-lg font-semibold text-violet-950">Import Results</h3>
 
       {/* Summary grid */}
-      <div style={styles.statsGrid}>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {sectionStat('Referrers', summary.referrers)}
         {sectionStat('Families', summary.families)}
         {sectionStat('People', summary.people)}
@@ -231,7 +251,7 @@ function ImportResults({ data }) {
       {rows.length > 0 && (
         <RowDetailTable rows={rows} defaultOpen={hasErrors} />
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -239,251 +259,41 @@ function RowDetailTable({ rows, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const actionColor = {
-    created: '#16a34a',
-    skipped: '#d97706',
-    error: '#dc2626',
+    created: 'text-green-600',
+    skipped: 'text-amber-600',
+    error: 'text-red-600',
   };
 
   return (
-    <div style={styles.rowDetail}>
+    <div className="border-t border-gray-200 pt-3">
       <button
         onClick={() => setOpen(!open)}
-        style={styles.toggleBtn}
+        className="mb-2 text-sm font-medium text-btn-start hover:underline"
       >
-        {open ? '▾' : '▸'} Row details ({rows.length} rows)
+        {open ? '\u25BC' : '\u25B6'} Row details ({rows.length} rows)
       </button>
       {open && (
-        <div style={styles.rowTableWrap}>
-          <table style={styles.rowTable}>
-            <thead>
-              <tr>
-                <th style={styles.rowTh}>Row</th>
-                <th style={styles.rowTh}>Type</th>
-                <th style={styles.rowTh}>Status</th>
-                <th style={styles.rowTh}>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i}>
-                  <td style={styles.rowTd}>{r.row_number}</td>
-                  <td style={styles.rowTd}>{r.entity_type}</td>
-                  <td style={{ ...styles.rowTd, color: actionColor[r.action] || '#6b7280', fontWeight: 600 }}>
-                    {r.action}
-                  </td>
-                  <td style={styles.rowTd}>{esc(r.message)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHead>
+            <Th>Row</Th>
+            <Th>Type</Th>
+            <Th>Status</Th>
+            <Th>Message</Th>
+          </TableHead>
+          <TableBody>
+            {rows.map((r, i) => (
+              <Tr key={i}>
+                <Td>{r.row_number}</Td>
+                <Td>{r.entity_type}</Td>
+                <Td className={`font-semibold ${actionColor[r.action] || 'text-gray-500'}`}>
+                  {r.action}
+                </Td>
+                <Td>{esc(r.message)}</Td>
+              </Tr>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-function esc(s) {
-  if (!s) return '';
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-/* ------------------------------------------------------------------ */
-/* Styles                                                              */
-/* ------------------------------------------------------------------ */
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: '#f1f5f9',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  },
-  header: {
-    background: 'linear-gradient(135deg, #4c1d95, #6d28d9)',
-    color: '#fff',
-    padding: '1rem 2rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { margin: 0, fontSize: '1.25rem' },
-  backLink: { color: '#fff', textDecoration: 'none', fontSize: '0.9rem', opacity: 0.85 },
-  main: {
-    maxWidth: 900,
-    margin: '2rem auto',
-    padding: '0 1rem',
-  },
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '1.5rem',
-    gap: '1rem',
-    flexWrap: 'wrap',
-  },
-  pageTitle: { margin: 0, fontSize: '1.4rem', color: '#1e1b4b' },
-  pageDesc: { margin: '0.25rem 0 0', fontSize: '0.9rem', color: '#6b7280' },
-  templateBtn: {
-    padding: '0.45rem 1rem',
-    borderRadius: 8,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    color: '#374151',
-    whiteSpace: 'nowrap',
-  },
-  templateCard: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.25rem',
-    marginBottom: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    border: '1px solid #e5e7eb',
-  },
-  templateHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '0.75rem',
-  },
-  templateTitle: { margin: 0, fontSize: '1rem', color: '#1e1b4b' },
-  downloadBtn: {
-    padding: '0.35rem 0.8rem',
-    borderRadius: 8,
-    border: 'none',
-    background: '#6366f1',
-    color: '#fff',
-    fontSize: '0.8rem',
-    cursor: 'pointer',
-    fontWeight: 600,
-  },
-  templateCode: {
-    background: '#f8fafc',
-    border: '1px solid #e5e7eb',
-    borderRadius: 8,
-    padding: '0.75rem 1rem',
-    fontSize: '0.8rem',
-    lineHeight: 1.6,
-    color: '#374151',
-    overflowX: 'auto',
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-    margin: 0,
-    maxHeight: 400,
-    overflowY: 'auto',
-  },
-  dropZone: {
-    border: '2px dashed',
-    borderRadius: 12,
-    padding: '2.5rem 1rem',
-    textAlign: 'center',
-    marginBottom: '1rem',
-    transition: 'border-color 0.15s, background 0.15s',
-    cursor: 'pointer',
-  },
-  dropContent: {},
-  dropIcon: { fontSize: '2.5rem', marginBottom: '0.5rem' },
-  dropText: { margin: 0, fontSize: '0.95rem', color: '#6b7280' },
-  browseLink: {
-    color: '#6366f1',
-    fontWeight: 600,
-    cursor: 'pointer',
-    textDecoration: 'underline',
-  },
-  fileInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.75rem',
-  },
-  fileIcon: { fontSize: '1.5rem' },
-  fileName: { fontSize: '0.95rem', color: '#1e1b4b' },
-  fileSize: { margin: 0, fontSize: '0.8rem', color: '#9ca3af' },
-  removeBtn: {
-    marginLeft: '0.75rem',
-    background: 'none',
-    border: 'none',
-    fontSize: '1rem',
-    color: '#dc2626',
-    cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    borderRadius: 6,
-  },
-  actions: { display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' },
-  importBtn: {
-    padding: '0.6rem 2rem',
-    borderRadius: 8,
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: '1rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  error: {
-    background: '#fef2f2',
-    color: '#dc2626',
-    padding: '0.75rem 1rem',
-    borderRadius: 8,
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
-  },
-  // Results
-  resultsCard: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-    border: '1px solid #e5e7eb',
-  },
-  resultsTitle: { margin: '0 0 1rem', fontSize: '1.1rem', color: '#1e1b4b' },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: '0.75rem',
-    marginBottom: '1rem',
-  },
-  statBox: {
-    background: '#f8fafc',
-    borderRadius: 8,
-    padding: '0.75rem 1rem',
-    border: '1px solid #e5e7eb',
-  },
-  statLabel: { fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', marginBottom: '0.25rem' },
-  statRow: { display: 'flex', gap: '0.75rem', fontSize: '1.1rem', fontWeight: 700 },
-  statGreen: { color: '#16a34a' },
-  statYellow: { color: '#d97706' },
-  statRed: { color: '#dc2626' },
-  // Row detail table
-  rowDetail: { borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' },
-  toggleBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '0.85rem',
-    color: '#6366f1',
-    cursor: 'pointer',
-    fontWeight: 500,
-    padding: 0,
-    marginBottom: '0.5rem',
-  },
-  rowTableWrap: { overflowX: 'auto' },
-  rowTable: { width: '100%', borderCollapse: 'collapse', fontSize: '0.825rem' },
-  rowTh: {
-    textAlign: 'left',
-    padding: '0.4rem 0.6rem',
-    borderBottom: '2px solid #e5e7eb',
-    fontSize: '0.75rem',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-  },
-  rowTd: {
-    padding: '0.35rem 0.6rem',
-    borderBottom: '1px solid #f3f4f6',
-    color: '#374151',
-  },
-};

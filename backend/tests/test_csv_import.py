@@ -169,7 +169,8 @@ class TestCsvImportMinimal:
         assert body["summary"]["referrers"]["created"] == 0
         assert body["summary"]["families"]["skipped"] == 1
         assert body["summary"]["families"]["created"] == 0
-        assert body["summary"]["people"]["created"] == 1  # people are not deduplicated
+        assert body["summary"]["people"]["skipped"] == 1
+        assert body["summary"]["people"]["created"] == 0
         assert body["summary"]["users"]["skipped"] == 1
         assert body["summary"]["users"]["created"] == 0
 
@@ -380,3 +381,78 @@ class TestCsvImportRowDetail:
         assert rows[0]["entity_type"] == "referrer"
         assert rows[0]["action"] == "created"
         assert rows[0].get("db_id") is not None
+
+
+class TestCsvImportPeopleDedup:
+    def test_duplicate_person_same_family_name_age_skipped(
+        self, test_client: TestClient, admin_user
+    ):
+        """A person with the same family, given_name, and age is skipped."""
+        csv_data = """# referrers
+name,family_limit,phone_number
+Dedup Ref,5,555-0001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Dedup Ref,Dedup Fam,Wish,Contact,,,
+
+# people
+family_name,given_name,age,practical_wish,fun_wish,title,note
+Dedup Fam,Alice,8,Backpack,Doll,,
+Dedup Fam,Alice,8,Backpack,Doll,,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["created"] == 1
+        assert body["summary"]["people"]["skipped"] == 1
+
+    def test_same_name_different_family_not_duplicate(
+        self, test_client: TestClient, admin_user
+    ):
+        """Same name+age in a different family is NOT a duplicate."""
+        csv_data = """# referrers
+name,family_limit,phone_number
+Dedup Ref2,5,555-0002
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Dedup Ref2,Fam A,Wish A,Contact A,,,
+Dedup Ref2,Fam B,Wish B,Contact B,,,
+
+# people
+family_name,given_name,age,practical_wish,fun_wish,title,note
+Fam A,Alice,8,Backpack,Doll,,
+Fam B,Alice,8,Coat,Game,,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["created"] == 2
+        assert body["summary"]["people"]["skipped"] == 0
+
+    def test_same_name_different_age_same_family_not_duplicate(
+        self, test_client: TestClient, admin_user
+    ):
+        """Same name but different age in the same family is NOT a duplicate."""
+        csv_data = """# referrers
+name,family_limit,phone_number
+Dedup Ref3,5,555-0003
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Dedup Ref3,Dedup Fam3,Wish,Contact,,,
+
+# people
+family_name,given_name,age,practical_wish,fun_wish,title,note
+Dedup Fam3,Alice,8,Backpack,Doll,,
+Dedup Fam3,Alice,12,Coat,Game,,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["created"] == 2
+        assert body["summary"]["people"]["skipped"] == 0
