@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { changePasswordRequest } from '../lib/api';
+import { ROUTES } from '../lib/routes';
 import { useState } from 'react';
 import { HeaderBar, LogoutButton } from '../components/HeaderBar';
 import { Card } from '../components/Card';
@@ -15,7 +16,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate(ROUTES.LOGIN);
   };
 
   const roleColors = {
@@ -58,20 +59,20 @@ export default function Dashboard() {
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {user?.role === 'admin' && (
             <>
-              <NavCard to="/register" icon="👤" label="Register Users" desc="Create new accounts" />
-              <NavCard to="/admin/referrers" icon="👥" label="Manage Referrers" desc="Create, edit, delete referrers" />
-              <NavCard to="/admin/families" icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
-              <NavCard to="/admin/people" icon="✨" label="Manage People" desc="Create, edit, delete people" />
-              <NavCard to="/admin/csv-upload" icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
+              <NavCard to={ROUTES.REGISTER} icon="👤" label="Register Users" desc="Create new accounts" />
+              <NavCard to={ROUTES.ADMIN_REFERRERS} icon="👥" label="Manage Referrers" desc="Create, edit, delete referrers" />
+              <NavCard to={ROUTES.ADMIN_FAMILIES} icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
+              <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />
+              <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
             </>
           )}
 
           {user?.role === 'referrer' && (
-            <NavCard to="/referrer/dashboard" icon="🏠" label="My Families" desc="Manage your families and members" />
+            <NavCard to={ROUTES.REFERRER_DASHBOARD} icon="🏠" label="My Families" desc="Manage your families and members" />
           )}
 
           {user?.role === 'family' && (
-            <NavCard to="/family/dashboard" icon="✨" label="My Family" desc="View your profile and manage people" />
+            <NavCard to={ROUTES.FAMILY_DASHBOARD} icon="✨" label="My Family" desc="View your profile and manage people" />
           )}
         </div>
 

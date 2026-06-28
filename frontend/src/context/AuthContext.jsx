@@ -4,6 +4,7 @@
  * Provides:
  *  - user: null | { id, email, role, referrer_id, family_id, is_active }
  *  - isLoading: boolean (true while checking session on mount)
+ *  - isAdmin, isReferrer, isFamily: boolean (derived from user?.role)
  *  - login(email, password)
  *  - logout()
  *  - checkAuth() — re-fetch /api/auth/me
@@ -51,8 +52,23 @@ export function AuthProvider({ children }) {
     queryClient.setQueryData(AUTH_KEY, null);
   }, [queryClient]);
 
+  const isAdmin = user?.role === 'admin';
+  const isReferrer = user?.role === 'referrer';
+  const isFamily = user?.role === 'family';
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, checkAuth }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        logout,
+        checkAuth,
+        isAdmin,
+        isReferrer,
+        isFamily,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

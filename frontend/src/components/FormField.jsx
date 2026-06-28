@@ -11,7 +11,7 @@ import { forwardRef, useId } from 'react';
  * @param {string}  className     — extra classes on the wrapper
  */
 const FormField = forwardRef(function FormField(
-  { label, htmlFor, type = 'text', as = 'input', fieldProps = {}, className = '' },
+  { label, htmlFor, type = 'text', as = 'input', fieldProps = {}, className = '', children },
   ref,
 ) {
   const autoId = useId();
@@ -34,7 +34,9 @@ const FormField = forwardRef(function FormField(
         type={Component === 'input' ? type : undefined}
         className={`${baseInputClass}${extraClass ? ` ${extraClass}` : ''}`}
         {...restProps}
-      />
+      >
+        {children}
+      </Component>
     </div>
   );
 });

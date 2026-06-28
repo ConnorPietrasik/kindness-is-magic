@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { memo } from 'react';
+import { ROUTES } from '../lib/routes';
 
 /**
  * HeaderBar — purple gradient top bar with title and optional actions.
@@ -9,10 +10,10 @@ import { memo } from 'react';
  * @param {ReactNode} right    — rendered on the right (e.g. logout button)
  */
 export const HeaderBar = memo(({ title, left, right }) => (
-  <header className="relative flex items-center bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6">
-    <div className="z-10 min-w-0 flex-shrink-0 pr-12">{left}</div>
-    <h1 className="absolute inset-x-0 truncate text-center text-lg font-semibold">{title}</h1>
-    <div className="z-10 ml-auto min-w-0 flex-shrink-0 pl-12">{right}</div>
+  <header className="relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6">
+    <div className="z-10">{left}</div>
+    <h1 className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold">{title}</h1>
+    <div className="z-10">{right}</div>
   </header>
 ));
 
@@ -33,7 +34,7 @@ export function LogoutButton({ onClick }) {
 /**
  * BackLink — arrow link back to the dashboard or a custom path.
  */
-export function BackLink({ to = '/dashboard', label = 'Back' }) {
+export function BackLink({ to = ROUTES.DASHBOARD, label = 'Back' }) {
   return (
     <Link to={to} className="text-sm text-white/80 transition-colors hover:text-white">
       ← {label}

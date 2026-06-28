@@ -20,6 +20,8 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* reserve scrollbar space so viewport width never changes */
+  scrollbar-gutter: stable;
 }
 
 body {

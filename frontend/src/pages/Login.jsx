@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ROUTES } from '../lib/routes';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,7 +83,7 @@ export default function Login() {
         </form>
 
         <p className="mt-4 text-center text-sm">
-          <Link to="/forgot-password" className="text-btn-start hover:underline">
+          <Link to={ROUTES.FORGOT_PASSWORD} className="text-btn-start hover:underline">
             Forgot your password?
           </Link>
         </p>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerRequest } from '../lib/api';
+import { ROUTES } from '../lib/routes';
 
 const ROLES = [
   { value: 'referrer', label: 'Referrer' },
@@ -189,7 +190,7 @@ export default function Register() {
         </form>
 
         <p className="mt-4 text-center text-sm">
-          <Link to="/dashboard" className="text-btn-start hover:underline">
+          <Link to={ROUTES.DASHBOARD} className="text-btn-start hover:underline">
             ← Back to dashboard
           </Link>
         </p>

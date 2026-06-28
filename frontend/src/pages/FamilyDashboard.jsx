@@ -9,13 +9,15 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getFamilyMe, patchFamilyMe } from '../lib/api';
+import { ROUTES } from '../lib/routes';
 import { HeaderBar, BackLink } from '../components/HeaderBar';
 import { Card } from '../components/Card';
-import FormField from '../components/FormField';
 import Button from '../components/Button';
 import { ErrorBox } from '../components/ErrorBox';
 import { PageSpinner } from '../components/Spinner';
-import { esc } from '../lib/utils';
+import { InfoRow } from '../components/InfoRow';
+import FamilyForm from '../components/FamilyForm';
+import { defaultFamilyForm } from '../components/defaults';
 
 const FAMILY_ME_KEY = ['familyMe'];
 
@@ -40,9 +42,8 @@ export default function FamilyDashboard() {
 
   const [showEdit, setShowEdit] = useState(false);
 
-  function handleUpdateSelf(e) {
-    e.preventDefault();
-    updateSelfMut.mutate(e.data);
+  function handleUpdateSelf(formData) {
+    updateSelfMut.mutate(formData);
   }
 
   if (isLoading) return <PageSpinner />;
@@ -51,7 +52,7 @@ export default function FamilyDashboard() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
         title="Kindness is Magic"
-        left={<BackLink to="/dashboard" label="Dashboard" />}
+        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
       />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
@@ -73,8 +74,10 @@ export default function FamilyDashboard() {
           </div>
 
           {showEdit ? (
-            <FamilySelfForm
+            <FamilyForm
+              title="Edit Family Profile"
               initial={familyInfo ?? defaultFamilyForm}
+              isEdit={true}
               onSubmit={handleUpdateSelf}
               onCancel={() => setShowEdit(false)}
               loading={updateSelfMut.isPending}
@@ -97,7 +100,7 @@ export default function FamilyDashboard() {
         {/* ── Quick nav cards ───────────────────────────────── */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
-            to="/family/people"
+            to={ROUTES.FAMILY_PEOPLE}
             className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
           >
             <span className="text-2xl">✨</span>
@@ -124,139 +127,3 @@ export default function FamilyDashboard() {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* InfoRow                                                             */
-/* ------------------------------------------------------------------ */
-function InfoRow({ label, value, isLast }) {
-  return (
-    <div
-      className={`flex items-baseline justify-between px-1 py-2 ${
-        isLast ? '' : 'border-b border-gray-100'
-      }`}
-    >
-      <span className="text-sm font-medium text-gray-500">{label}</span>
-      <span className="max-w-[60%] text-right text-sm font-semibold text-gray-900">
-        {esc(value ?? '—')}
-      </span>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* FamilySelfForm                                                      */
-/* ------------------------------------------------------------------ */
-function FamilySelfForm({ initial, onSubmit, onCancel, loading }) {
-  const [form, setForm] = useState(() => ({ ...initial }));
-
-  useEffect(() => {
-    setForm({ ...initial });
-  }, [initial]);
-
-  const update = (key, val) => setForm((p) => ({ ...p, [key]: val }));
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({ preventDefault: () => {}, data: form });
-      }}
-      className="mx-auto max-w-lg space-y-3"
-    >
-      <div className="sm:grid sm:grid-cols-2 sm:gap-x-4">
-        <FormField
-          label="Family Name"
-          fieldProps={{
-            type: 'text',
-            value: form.family_name,
-            onChange: (e) => update('family_name', e.target.value),
-            required: true,
-            maxLength: 40,
-          }}
-        />
-        <FormField
-          label="Family Wish"
-          fieldProps={{
-            type: 'text',
-            value: form.family_wish,
-            onChange: (e) => update('family_wish', e.target.value),
-            required: true,
-            maxLength: 400,
-          }}
-        />
-        <FormField
-          label="Contact Name"
-          fieldProps={{
-            type: 'text',
-            value: form.contact_name,
-            onChange: (e) => update('contact_name', e.target.value),
-            required: true,
-            maxLength: 40,
-          }}
-        />
-      </div>
-      <div className="sm:col-span-2">
-        <OptionalLabel text="Bio" />
-        <textarea
-          value={form.bio || ''}
-          onChange={(e) => update('bio', e.target.value)}
-          rows={2}
-          className="w-full resize-vertical rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-        />
-      </div>
-      <div className="sm:grid sm:grid-cols-2 sm:gap-x-4">
-        <div>
-          <OptionalLabel text="Address" />
-          <input
-            type="text"
-            value={form.address || ''}
-            onChange={(e) => update('address', e.target.value)}
-            maxLength={200}
-            className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          />
-        </div>
-        <div>
-          <OptionalLabel text="Phone" />
-          <input
-            type="text"
-            value={form.phone_number || ''}
-            onChange={(e) => update('phone_number', e.target.value)}
-            maxLength={20}
-            className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          />
-        </div>
-      </div>
-      <div className="flex gap-3 pt-1">
-        <Button type="submit" loading={loading}>
-          {loading ? 'Saving…' : 'Save'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* OptionalLabel                                                       */
-/* ------------------------------------------------------------------ */
-function OptionalLabel({ text }) {
-  return (
-    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-      {text} <span className="font-normal text-gray-400">(optional)</span>
-    </label>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-const defaultFamilyForm = {
-  family_name: '',
-  family_wish: '',
-  contact_name: '',
-  bio: '',
-  address: '',
-  phone_number: '',
-};

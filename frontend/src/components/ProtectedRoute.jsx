@@ -6,6 +6,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PageSpinner } from './Spinner';
+import { ROUTES } from '../lib/routes';
 
 export default function ProtectedRoute({ children, roles }) {
   const { user, isLoading } = useAuth();
@@ -16,11 +17,11 @@ export default function ProtectedRoute({ children, roles }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
   }
 
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
 
   return children;

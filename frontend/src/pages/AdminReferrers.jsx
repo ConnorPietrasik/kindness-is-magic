@@ -2,15 +2,10 @@
  * Admin — Manage Referrers
  *
  * List, create, edit, delete referrers.
- * Uses React Query for data fetching and mutations.
+ * Uses useCrudManager for data fetching and mutations.
  */
 
 import { useState, useEffect } from 'react';
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
 import {
   adminListReferrers,
   adminGetReferrer,
@@ -18,14 +13,16 @@ import {
   adminUpdateReferrer,
   adminDeleteReferrer,
 } from '../lib/api';
+import { useCrudManager } from '../hooks/useCrudManager';
 import { HeaderBar, BackLink } from '../components/HeaderBar';
 import { Card } from '../components/Card';
 import Button from '../components/Button';
 import FormField from '../components/FormField';
-import { ErrorBox } from '../components/ErrorBox';
-import { PageSpinner } from '../components/Spinner';
+import { PageSpinner, Spinner } from '../components/Spinner';
 import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { esc } from '../lib/utils';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MutationErrors } from '../components/MutationErrors';
+import { defaultReferrerForm } from '../components/defaults';
 
 const REFERRER_KEYS = ['adminReferrers'];
 
@@ -33,78 +30,43 @@ const REFERRER_KEYS = ['adminReferrers'];
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
-  const queryClient = useQueryClient();
-
-  // List
-  const { data, isLoading } = useQuery({
-    queryKey: REFERRER_KEYS,
-    queryFn: adminListReferrers,
+  const {
+    listData,
+    listLoading,
+    detail,
+    detailLoading,
+    createMut,
+    updateMut,
+    deleteMut,
+    showForm,
+    editingId,
+    deleteConfirm,
+    openCreate,
+    openEdit,
+    cancelForm,
+    confirmDelete,
+    cancelDelete,
+  } = useCrudManager({
+    rootKey: REFERRER_KEYS,
+    listFn: adminListReferrers,
+    detailFn: adminGetReferrer,
+    createFn: adminCreateReferrer,
+    updateFn: adminUpdateReferrer,
+    deleteFn: adminDeleteReferrer,
   });
 
-  // Detail for edit
-  const [editingId, setEditingId] = useState(null);
-  const detailQuery = useQuery({
-    queryKey: ['adminReferrerDetail', editingId],
-    queryFn: () => adminGetReferrer(editingId),
-    enabled: !!editingId,
-  });
-  const { data: detail } = detailQuery;
-  const detailLoading = !!editingId && detailQuery.isLoading;
-
-  // Mutations
-  const createMut = useMutation({
-    mutationFn: adminCreateReferrer,
-    onSuccess: () => {
-      queryClient.invalidateQueries(REFERRER_KEYS);
-      setShowForm(false);
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }) => adminUpdateReferrer(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(REFERRER_KEYS);
-      queryClient.invalidateQueries(['adminReferrerDetail']);
-      setEditingId(null);
-    },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: adminDeleteReferrer,
-    onSuccess: () => queryClient.invalidateQueries(REFERRER_KEYS),
-  });
-
-  // Create form
-  const [showForm, setShowForm] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-
-  function handleCreate(e) {
-    e.preventDefault();
-    createMut.mutate(e.data);
+  function handleCreate(formData) {
+    createMut.mutate(formData);
   }
 
-  function handleUpdate(e) {
-    e.preventDefault();
+  function handleUpdate(formData) {
     if (!editingId) return;
-    updateMut.mutate({ id: editingId, data: e.data });
+    updateMut.mutate({ id: editingId, data: formData });
   }
 
-  function openEdit(id) {
-    setEditingId(id);
-  }
+  if (listLoading) return <PageSpinner />;
 
-  function confirmDelete(id) {
-    setDeleteConfirm(id);
-  }
-
-  function executeDelete(id) {
-    deleteMut.mutate(id);
-    setDeleteConfirm(null);
-  }
-
-  if (isLoading) return <PageSpinner />;
-
-  const referrers = data?.referrers ?? [];
+  const referrers = listData?.referrers ?? [];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -117,7 +79,7 @@ export default function AdminReferrers() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
-          <Button onClick={() => { setEditingId(null); setShowForm(true); }}>
+          <Button onClick={openCreate}>
             + Add Referrer
           </Button>
         </div>
@@ -125,9 +87,7 @@ export default function AdminReferrers() {
         {/* Create / Edit form */}
         {editingId && detailLoading && (
           <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            </svg>
+            <Spinner size="sm" />
             <span>Loading…</span>
           </Card>
         )}
@@ -135,13 +95,10 @@ export default function AdminReferrers() {
         {(showForm || (editingId && detail)) && (
           <ReferrerForm
             title={editingId ? 'Edit Referrer' : 'Add Referrer'}
-            initial={editingId ? (detail ?? defaultForm) : defaultForm}
+            initial={editingId ? (detail ?? defaultReferrerForm) : defaultReferrerForm}
             isEdit={!!editingId}
             onSubmit={editingId ? handleUpdate : handleCreate}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingId(null);
-            }}
+            onCancel={cancelForm}
             loading={createMut.isPending || updateMut.isPending}
           />
         )}
@@ -163,7 +120,7 @@ export default function AdminReferrers() {
               {referrers.map((r) => (
                 <Tr key={r.id}>
                   <Td>{r.id}</Td>
-                  <Td>{esc(r.name)}</Td>
+                  <Td>{r.name}</Td>
                   <Td>{r.family_limit}</Td>
                   <Td>
                     <div className="flex gap-2">
@@ -185,52 +142,32 @@ export default function AdminReferrers() {
           </Table>
         )}
 
-        {/* Delete confirmation modal */}
-        {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-            <div className="w-[90%] max-w-sm rounded-xl bg-white p-6 shadow-xl">
-              <p className="mb-4">
-                Delete referrer <strong>#{deleteConfirm}</strong>?
-                <br />
-                <span className="block text-xs text-gray-500">
-                  Families will be reassigned to orphan. Linked users will be detached.
-                </span>
-              </p>
-              <div className="flex gap-2">
-                <Button variant="danger" onClick={() => executeDelete(deleteConfirm)} loading={deleteMut.isPending}>
-                  {deleteMut.isPending ? 'Deleting…' : 'Yes, delete'}
-                </Button>
-                <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          open={deleteConfirm !== null}
+          title={
+            <>
+              Delete referrer <strong>#{deleteConfirm}</strong>?
+            </>
+          }
+          description="Families will be reassigned to orphan. Linked users will be detached."
+          onConfirm={() => {
+            deleteMut.mutate(deleteConfirm);
+            cancelDelete();
+          }}
+          onCancel={cancelDelete}
+          loading={deleteMut.isPending}
+        />
 
         {/* Errors */}
-        <div className="mt-4 flex flex-col gap-2">
-          {[createMut, updateMut, deleteMut].map((mut, i) =>
-            mut.error ? (
-              <ErrorBox
-                key={i}
-                message={
-                  mut.error?.response?.data?.detail ||
-                  mut.error?.response?.data?.msg ||
-                  JSON.stringify(mut.error?.response?.data) ||
-                  'Request failed.'
-                }
-              />
-            ) : null
-          )}
-        </div>
+        <MutationErrors mutations={[createMut, updateMut, deleteMut]} />
       </main>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* ReferrerForm sub-component                                          */
+/* ReferrerForm sub-component (inline — not shared per spec)           */
 /* ------------------------------------------------------------------ */
 function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
   const [form, setForm] = useState(() => ({ ...initial }));
@@ -246,7 +183,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
       <h3 className="mb-4 text-lg font-semibold text-violet-950">{title}</h3>
       <form onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ preventDefault: () => {}, data: form });
+        onSubmit(form);
       }}>
         <div className="flex flex-col gap-4 sm:flex-row">
           <FormField
@@ -291,8 +228,3 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
     </Card>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-const defaultForm = { name: '', family_limit: 1, phone_number: '' };

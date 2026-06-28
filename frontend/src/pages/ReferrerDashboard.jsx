@@ -3,6 +3,7 @@
  *
  * Shows the referrer's own info, family list with actions,
  * and a card linking to manage each family's people.
+ * Uses useCrudManager for family CRUD; self-edit stays inline.
  */
 
 import { useState, useEffect } from 'react';
@@ -16,14 +17,19 @@ import {
   updateReferrerFamily,
   deleteReferrerFamily,
 } from '../lib/api';
+import { ROUTES, route } from '../lib/routes';
+import { useCrudManager } from '../hooks/useCrudManager';
 import { HeaderBar, BackLink } from '../components/HeaderBar';
 import { Card } from '../components/Card';
 import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
 import FormField from '../components/FormField';
 import Button from '../components/Button';
-import { ErrorBox } from '../components/ErrorBox';
-import { PageSpinner, InlineSpinner } from '../components/Spinner';
-import { esc } from '../lib/utils';
+import { PageSpinner } from '../components/Spinner';
+import { InfoRow } from '../components/InfoRow';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MutationErrors } from '../components/MutationErrors';
+import FamilyForm from '../components/FamilyForm';
+import { defaultReferrerForm, defaultFamilyForm } from '../components/defaults';
 
 const REFERRER_ME_KEY = ['referrerMe'];
 const REFERRER_FAMILIES_KEY = ['referrerFamilies'];
@@ -34,18 +40,37 @@ const REFERRER_FAMILIES_KEY = ['referrerFamilies'];
 export default function ReferrerDashboard() {
   const queryClient = useQueryClient();
 
+  // Referrer self-info
   const { data: referrerInfo, isLoading: infoLoading } = useQuery({
     queryKey: REFERRER_ME_KEY,
     queryFn: getReferrerMe,
   });
 
-  const { data, isLoading: famLoading } = useQuery({
-    queryKey: REFERRER_FAMILIES_KEY,
-    queryFn: listReferrerFamilies,
+  // Family CRUD via hook (no detailFn — data sourced from list)
+  const {
+    listData,
+    listLoading: famLoading,
+    createMut: createFamMut,
+    updateMut: updateFamMut,
+    deleteMut: deleteFamMut,
+    showForm,
+    editingId,
+    deleteConfirm,
+    openCreate,
+    openEdit,
+    cancelForm,
+    confirmDelete,
+    cancelDelete,
+  } = useCrudManager({
+    rootKey: REFERRER_FAMILIES_KEY,
+    listFn: listReferrerFamilies,
+    createFn: createReferrerFamily,
+    updateFn: updateReferrerFamily,
+    deleteFn: deleteReferrerFamily,
+    invalidationKeys: [REFERRER_FAMILIES_KEY, REFERRER_ME_KEY],
   });
 
-  const [editingId, setEditingId] = useState(null);
-
+  // Self-edit mutation (not part of CRUD pattern)
   const updateSelfMut = useMutation({
     mutationFn: patchReferrerMe,
     onSuccess: () => {
@@ -54,51 +79,24 @@ export default function ReferrerDashboard() {
     },
   });
 
-  const createFamMut = useMutation({
-    mutationFn: createReferrerFamily,
-    onSuccess: () => {
-      queryClient.invalidateQueries(REFERRER_FAMILIES_KEY);
-      queryClient.invalidateQueries(REFERRER_ME_KEY);
-      setShowCreate(false);
-    },
-  });
-
-  const updateFamMut = useMutation({
-    mutationFn: ({ id, data }) => updateReferrerFamily(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(REFERRER_FAMILIES_KEY);
-      setEditingId(null);
-    },
-  });
-
-  const deleteFamMut = useMutation({
-    mutationFn: deleteReferrerFamily,
-    onSuccess: () => queryClient.invalidateQueries(REFERRER_FAMILIES_KEY),
-  });
-
   const [showEditSelf, setShowEditSelf] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  function handleUpdateSelf(e) {
-    e.preventDefault();
-    updateSelfMut.mutate(e.data);
+  function handleUpdateSelf(formData) {
+    updateSelfMut.mutate(formData);
   }
 
-  function handleCreateFam(e) {
-    e.preventDefault();
-    createFamMut.mutate(e.data);
+  function handleCreateFam(formData) {
+    createFamMut.mutate(formData);
   }
 
-  function handleUpdateFam(e) {
-    e.preventDefault();
+  function handleUpdateFam(formData) {
     if (!editingId) return;
-    updateFamMut.mutate({ id: editingId, data: e.data });
+    updateFamMut.mutate({ id: editingId, data: formData });
   }
 
   if (infoLoading || famLoading) return <PageSpinner />;
 
-  const families = data?.families ?? [];
+  const families = listData?.families ?? [];
   const familyLimit = referrerInfo?.family_limit ?? 0;
   const familyCount = referrerInfo?.family_count ?? 0;
 
@@ -106,7 +104,7 @@ export default function ReferrerDashboard() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
         title="Kindness is Magic"
-        left={<BackLink to="/dashboard" label="Dashboard" />}
+        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -136,9 +134,9 @@ export default function ReferrerDashboard() {
             />
           ) : (
             <div className="space-y-0">
-              <InfoRow label="Name" value={referrerInfo?.name} />
-              <InfoRow label="Phone" value={referrerInfo?.phone_number} />
-              <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast />
+              <InfoRow label="Name" value={referrerInfo?.name} truncate={false} />
+              <InfoRow label="Phone" value={referrerInfo?.phone_number} truncate={false} />
+              <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast truncate={false} />
             </div>
           )}
         </Card>
@@ -147,18 +145,19 @@ export default function ReferrerDashboard() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-gray-900">My Families</h3>
           {familyCount < familyLimit && (
-            <Button onClick={() => setShowCreate(true)}>+ Add Family</Button>
+            <Button onClick={openCreate}>+ Add Family</Button>
           )}
         </div>
 
-        {showCreate && (
+        {showForm && (
           <FamilyForm
             title="Add Family"
             initial={defaultFamilyForm}
             isEdit={false}
             onSubmit={handleCreateFam}
-            onCancel={() => setShowCreate(false)}
+            onCancel={cancelForm}
             loading={createFamMut.isPending}
+            showOptionalFields={false}
           />
         )}
 
@@ -168,7 +167,7 @@ export default function ReferrerDashboard() {
             initial={families.find((f) => f.id === editingId) || defaultFamilyForm}
             isEdit={true}
             onSubmit={handleUpdateFam}
-            onCancel={() => setEditingId(null)}
+            onCancel={cancelForm}
             loading={updateFamMut.isPending}
           />
         )}
@@ -196,14 +195,14 @@ export default function ReferrerDashboard() {
                 {families.map((f) => (
                   <Tr key={f.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
-                    <Td className="font-medium text-gray-900">{esc(f.family_name)}</Td>
-                    <Td className="max-w-xs truncate">{esc(f.family_wish ?? '')}</Td>
-                    <Td>{esc(f.contact_name)}</Td>
+                    <Td className="font-medium text-gray-900">{f.family_name}</Td>
+                    <Td className="max-w-xs truncate">{f.family_wish ?? ''}</Td>
+                    <Td>{f.contact_name}</Td>
                     <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
                         <Link
-                          to={`/referrer/families/${f.id}`}
+                          to={route.referrerFamilyDetail(f.id)}
                           className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
                         >
                           Manage
@@ -211,7 +210,7 @@ export default function ReferrerDashboard() {
                         <Button
                           variant="secondary"
                           className="h-7 px-2 text-xs"
-                          onClick={() => setEditingId(f.id)}
+                          onClick={() => openEdit(f.id)}
                           disabled={!!editingId}
                         >
                           Edit
@@ -219,7 +218,7 @@ export default function ReferrerDashboard() {
                         <Button
                           variant="danger"
                           className="h-7 px-2 text-xs"
-                          onClick={() => setDeleteConfirm(f.id)}
+                          onClick={() => confirmDelete(f.id)}
                           disabled={deleteFamMut.isPending}
                         >
                           Delete
@@ -234,83 +233,30 @@ export default function ReferrerDashboard() {
         </Table>
 
         {/* ── Delete confirmation ─────────────────────────────── */}
-        {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-              <p className="mb-4 text-sm text-gray-700">
-                Delete family <strong>#{deleteConfirm}</strong>?
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="danger"
-                  className="flex-1"
-                  onClick={() => {
-                    deleteFamMut.mutate(deleteConfirm);
-                    setDeleteConfirm(null);
-                  }}
-                  loading={deleteFamMut.isPending}
-                >
-                  {deleteFamMut.isPending ? 'Deleting…' : 'Yes, delete'}
-                </Button>
-                <Button variant="secondary" className="flex-1" onClick={() => setDeleteConfirm(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          open={deleteConfirm !== null}
+          title={
+            <>
+              Delete family <strong>#{deleteConfirm}</strong>?
+            </>
+          }
+          onConfirm={() => {
+            deleteFamMut.mutate(deleteConfirm);
+            cancelDelete();
+          }}
+          onCancel={cancelDelete}
+          loading={deleteFamMut.isPending}
+        />
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        <div className="space-y-2">
-          {[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].map(
-            (mut, i) =>
-              mut.error && (
-                <ErrorBox
-                  key={i}
-                  message={
-                    mut.error?.response?.data?.detail ||
-                    mut.error?.response?.data?.msg ||
-                    JSON.stringify(mut.error?.response?.data) ||
-                    'Request failed.'
-                  }
-                />
-              )
-          )}
-        </div>
+        <MutationErrors mutations={[updateSelfMut, createFamMut, updateFamMut, deleteFamMut]} />
       </main>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* OptionalLabel                                                       */
-/* ------------------------------------------------------------------ */
-function OptionalLabel({ text }) {
-  return (
-    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-      {text} <span className="font-normal text-gray-400">(optional)</span>
-    </label>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* InfoRow                                                             */
-/* ------------------------------------------------------------------ */
-function InfoRow({ label, value, isLast }) {
-  return (
-    <div
-      className={`flex items-baseline justify-between px-1 py-2 ${
-        isLast ? '' : 'border-b border-gray-100'
-      }`}
-    >
-      <span className="text-sm font-medium text-gray-500">{label}</span>
-      <span className="text-sm font-semibold text-gray-900">{esc(value ?? '—')}</span>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* ReferrerSelfForm                                                    */
+/* ReferrerSelfForm (inline — not shared per spec)                    */
 /* ------------------------------------------------------------------ */
 function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }) {
   const [form, setForm] = useState(() => ({ ...initial }));
@@ -325,7 +271,7 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }) {
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ preventDefault: () => {}, data: form });
+        onSubmit(form);
       }}
       className="mx-auto max-w-sm space-y-3"
     >
@@ -360,113 +306,3 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }) {
     </form>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* FamilyForm                                                          */
-/* ------------------------------------------------------------------ */
-function FamilyForm({ title, initial, isEdit, onSubmit, onCancel, loading }) {
-  const [form, setForm] = useState(() => ({ ...initial }));
-
-  useEffect(() => {
-    setForm({ ...initial });
-  }, [initial]);
-
-  const update = (key, val) => setForm((p) => ({ ...p, [key]: val }));
-
-  return (
-    <Card className="mb-6 border border-gray-200">
-      <h3 className="mb-4 text-base font-semibold text-gray-900">{title}</h3>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({ preventDefault: () => {}, data: form });
-      }}>
-        <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-x-4 sm:gap-y-3">
-          <FormField
-            label="Family Name"
-            fieldProps={{
-              type: 'text',
-              value: form.family_name,
-              onChange: (e) => update('family_name', e.target.value),
-              required: true,
-              maxLength: 40,
-            }}
-          />
-          <FormField
-            label="Family Wish"
-            fieldProps={{
-              type: 'text',
-              value: form.family_wish,
-              onChange: (e) => update('family_wish', e.target.value),
-              required: true,
-              maxLength: 400,
-            }}
-          />
-          <FormField
-            label="Contact Name"
-            fieldProps={{
-              type: 'text',
-              value: form.contact_name,
-              onChange: (e) => update('contact_name', e.target.value),
-              required: true,
-              maxLength: 40,
-            }}
-          />
-          {isEdit && (
-            <>
-              <div className="sm:col-span-2">
-                <OptionalLabel text="Bio" />
-                <textarea
-                  value={form.bio || ''}
-                  onChange={(e) => update('bio', e.target.value)}
-                  rows={2}
-                  className="w-full resize-vertical rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-                />
-              </div>
-              <div>
-                <OptionalLabel text="Address" />
-                <input
-                  type="text"
-                  value={form.address || ''}
-                  onChange={(e) => update('address', e.target.value)}
-                  maxLength={200}
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-                />
-              </div>
-              <div>
-                <OptionalLabel text="Phone" />
-                <input
-                  type="text"
-                  value={form.phone_number || ''}
-                  onChange={(e) => update('phone_number', e.target.value)}
-                  maxLength={20}
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-                />
-              </div>
-            </>
-          )}
-        </div>
-        <div className="mt-4 flex gap-3">
-          <Button type="submit" loading={loading}>
-            {loading ? 'Saving…' : isEdit ? 'Update' : 'Create'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-const defaultReferrerForm = { name: '', family_limit: 1, phone_number: '' };
-const defaultFamilyForm = {
-  family_name: '',
-  family_wish: '',
-  contact_name: '',
-  bio: '',
-  address: '',
-  phone_number: '',
-};

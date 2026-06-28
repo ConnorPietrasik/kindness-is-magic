@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPasswordRequest } from '../lib/api';
+import { ROUTES } from '../lib/routes';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -34,7 +35,7 @@ export default function ForgotPassword() {
           <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-xs text-gray-400">
             <em>Dev note: Check the backend logs for the reset token.</em>
           </p>
-          <Link to="/login" className="text-btn-start hover:underline">
+          <Link to={ROUTES.LOGIN} className="text-btn-start hover:underline">
             ← Back to login
           </Link>
         </div>
@@ -82,7 +83,7 @@ export default function ForgotPassword() {
         </form>
 
         <p className="mt-4 text-sm">
-          <Link to="/login" className="text-btn-start hover:underline">
+          <Link to={ROUTES.LOGIN} className="text-btn-start hover:underline">
             ← Back to login
           </Link>
         </p>

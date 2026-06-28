@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { resetPasswordRequest } from '../lib/api';
+import { ROUTES } from '../lib/routes';
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -27,7 +28,7 @@ export default function ResetPassword() {
       setSuccess(true);
 
       // Auto-redirect to login after 3 seconds
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate(ROUTES.LOGIN), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Reset failed. The token may be invalid or expired.');
     } finally {
@@ -43,7 +44,7 @@ export default function ResetPassword() {
           <p className="mb-4 text-sm text-gray-700">
             Your password has been updated. Redirecting to login…
           </p>
-          <Link to="/login" className="text-btn-start hover:underline">
+          <Link to={ROUTES.LOGIN} className="text-btn-start hover:underline">
             Go to login
           </Link>
         </div>
@@ -106,7 +107,7 @@ export default function ResetPassword() {
         </form>
 
         <p className="mt-4 text-sm">
-          <Link to="/login" className="text-btn-start hover:underline">
+          <Link to={ROUTES.LOGIN} className="text-btn-start hover:underline">
             ← Back to login
           </Link>
         </p>

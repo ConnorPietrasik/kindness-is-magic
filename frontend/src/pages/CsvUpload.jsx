@@ -13,7 +13,6 @@ import { Card } from '../components/Card';
 import Button from '../components/Button';
 import { ErrorBox } from '../components/ErrorBox';
 import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { esc } from '../lib/utils';
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -131,7 +130,7 @@ export default function CsvUpload() {
               </Button>
             </div>
             <pre className="max-h-[400px] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 whitespace-pre-wrap break-words">
-              {esc(template)}
+              {template}
             </pre>
           </Card>
         )}
@@ -167,7 +166,7 @@ export default function CsvUpload() {
             <div className="flex items-center justify-center gap-3">
               <span className="text-2xl">{'\u{1F4C4}'}</span>
               <div className="text-left">
-                <strong className="block text-base text-violet-950">{esc(file.name)}</strong>
+                <strong className="block text-base text-violet-950">{file.name}</strong>
                 <span className="text-xs text-gray-400">
                   {(file.size / 1024).toFixed(1)} KB
                 </span>
@@ -288,7 +287,7 @@ function RowDetailTable({ rows, defaultOpen }) {
                 <Td className={`font-semibold ${actionColor[r.action] || 'text-gray-500'}`}>
                   {r.action}
                 </Td>
-                <Td>{esc(r.message)}</Td>
+                <Td>{r.message}</Td>
               </Tr>
             ))}
           </TableBody>
