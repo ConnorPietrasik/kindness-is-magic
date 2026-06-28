@@ -1,18 +1,67 @@
 import contextlib
-import os
-from collections.abc import Generator
-
-from fastapi import Depends, FastAPI, HTTPException
+import json
 import logging
+import os
+import sys
+from collections.abc import Generator
+from datetime import datetime, timezone
 
-logger = logging.getLogger(__name__)
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.database import get_db
 from app.models import User, UserRole
+
+
+# ---------------------------------------------------------------------------
+# Logging — structured JSON to stdout (Docker's logging driver captures it)
+# ---------------------------------------------------------------------------
+
+class JsonFormatter(logging.Formatter):
+    """Emit one JSON object per log line to stdout.
+
+    Docker's ``json-file`` logging driver picks up stdout automatically,
+    rotates the backing file, and exposes it via ``docker logs``.
+    No file handlers are used — files inside containers disappear on
+    restart and waste disk I/O.
+
+    Usage:
+
+        docker logs backend     # human-readable
+        docker logs backend | jq '.level == "ERROR"'  # filter
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        # Attach exception info when present
+        if record.exc_info and record.exc_info[0] is not None:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
+
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(JsonFormatter())
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    handlers=[_handler],
+)
+# Silence noisy third-party loggers at INFO unless explicitly asked
+for _quiet in ("uvicorn.access", "watchfiles"):
+    logging.getLogger(_quiet).setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -22,7 +71,7 @@ from app.models import User, UserRole
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     """Seed bootstrap admin user on startup."""
-    admin_email = os.environ.get("ADMIN_EMAIL")
+    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
     admin_password = os.environ.get("ADMIN_PASSWORD")
     if admin_email and admin_password:
         from sqlalchemy.exc import ProgrammingError, OperationalError
@@ -72,6 +121,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Global exception handlers
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Catch all SQLAlchemy errors (IntegrityError, OperationalError, etc.)
+    and return a generic 500 — never leak DB internals to the client."""
+    logger.error("Database error: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An internal database error occurred"},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return structured Pydantic validation errors as 422.
+
+    Uses ``jsonable_encoder`` so that nested exception objects inside the
+    ``ctx`` field (e.g. the ValueError from our email validator) are
+    serialized to strings instead of raising TypeError.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=jsonable_encoder({"detail": exc.errors()}),
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Catch-all for any unhandled exception — return 500 without stack traces."""
+    logger.error("Unexpected error: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An unexpected error occurred"},
+    )
+
 
 # ---------------------------------------------------------------------------
 # Include auth routes

@@ -1,20 +1,12 @@
-"""Pydantic request/response schemas for authentication."""
+"""Pydantic request/response schemas."""
 
-import re
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.models import UserRole
-
-_EMAIL_RE = re.compile(r"^[\w.+-]+@[\w-]+\.[\w.-]+$")
-
-
-def _validate_email(v: str) -> str:
-    if not _EMAIL_RE.match(v):
-        raise ValueError("Invalid email address")
-    return v.lower()
+from app.user_validation import validate_email
 
 
 # ---------------------------------------------------------------------------
@@ -33,8 +25,8 @@ class UserCreate(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
 
 
 class UserLogin(BaseModel):
@@ -45,8 +37,8 @@ class UserLogin(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
 
 
 class ChangePassword(BaseModel):
@@ -63,8 +55,8 @@ class ForgotPassword(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
 
 
 class ResetPassword(BaseModel):
@@ -91,8 +83,8 @@ class ReferrerSelfRegister(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +180,10 @@ class ReferrerDetail(BaseModel):
 
 class ReferrerListResponse(BaseModel):
     referrers: list[ReferrerSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +219,7 @@ class FamilyDetail(BaseModel):
     phone_number: Optional[str]
     family_wish: str
     contact_name: str
+    is_deleted: bool
     person_count: int
 
     model_config = {"from_attributes": True}
@@ -234,6 +231,7 @@ class FamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     referrer_id: int
+    is_deleted: bool
     person_count: int = 0
 
     model_config = {"from_attributes": True}
@@ -241,6 +239,10 @@ class FamilySummary(BaseModel):
 
 class FamilyListResponse(BaseModel):
     families: list[FamilySummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +278,7 @@ class PersonDetail(BaseModel):
     practical_wish: str
     fun_wish: str
     note: Optional[str]
+    is_deleted: bool
 
     model_config = {"from_attributes": True}
 
@@ -285,9 +288,41 @@ class PersonSummary(BaseModel):
     family_id: int
     given_name: str
     age: int
+    is_deleted: bool
 
     model_config = {"from_attributes": True}
 
 
 class PersonListResponse(BaseModel):
     people: list[PersonSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Self-service schemas (referrer / family — no FK IDs in body)
+# ---------------------------------------------------------------------------
+
+
+class FamilyCreateByReferrer(BaseModel):
+    """Referrer creates a family — referrer_id is inferred from the session."""
+
+    family_name: str = Field(..., min_length=1, max_length=40)
+    family_wish: str = Field(..., min_length=1, max_length=400)
+    contact_name: str = Field(..., min_length=1, max_length=40)
+    bio: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=20)
+
+
+class PersonCreateInFamily(BaseModel):
+    """Create a person inside a family — family_id is inferred from the URL or session."""
+
+    given_name: str = Field(..., min_length=1, max_length=40)
+    age: int = Field(..., ge=0, le=200)
+    practical_wish: str = Field(..., min_length=1, max_length=400)
+    fun_wish: str = Field(..., min_length=1, max_length=400)
+    title: Optional[str] = Field(None, max_length=40)
+    note: Optional[str] = Field(None, max_length=400)

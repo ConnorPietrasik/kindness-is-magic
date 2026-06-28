@@ -34,6 +34,10 @@ class TestAdminListReferrers:
         body = resp.json()
         assert "referrers" in body
         assert len(body["referrers"]) == 0
+        assert body["total"] == 0
+        assert body["page"] == 1
+        assert body["page_size"] == 50
+        assert body["total_pages"] == 0
 
     def test_200_with_data(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
@@ -42,6 +46,40 @@ class TestAdminListReferrers:
         body = resp.json()
         assert len(body["referrers"]) == 1
         assert body["referrers"][0]["name"] == "Test Referrer"
+        assert body["total"] == 1
+        assert body["total_pages"] == 1
+
+    def test_pagination(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Referrer
+
+        _admin_login(test_client)
+        # Create 5 referrers
+        for i in range(5):
+            r = Referrer(name=f"Referrer {i}", family_limit=10, phone_number="555-0000")
+            db.add(r)
+        db.commit()
+
+        # Page 1, page_size=2
+        resp = test_client.get("/api/admin/referrers?page=1&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["referrers"]) == 2
+        assert body["total"] == 5
+        assert body["page"] == 1
+        assert body["page_size"] == 2
+        assert body["total_pages"] == 3
+
+        # Page 3 (last page)
+        resp = test_client.get("/api/admin/referrers?page=3&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["referrers"]) == 1
+
+        # Page beyond range returns empty
+        resp = test_client.get("/api/admin/referrers?page=10&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["referrers"]) == 0
 
 class TestAdminGetReferrer:
     def test_200_detail_with_family_count(
@@ -184,7 +222,10 @@ class TestAdminListFamilies:
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families")
         assert resp.status_code == 200
-        assert len(resp.json()["families"]) == 0
+        body = resp.json()
+        assert len(body["families"]) == 0
+        assert body["total"] == 0
+        assert body["total_pages"] == 0
 
     def test_200_with_data(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
@@ -195,6 +236,39 @@ class TestAdminListFamilies:
         assert body["families"][0]["family_name"] == "TestFamily"
         assert body["families"][0]["family_wish"] == "World peace"
         assert body["families"][0]["person_count"] == 0
+        assert body["total"] == 1
+        assert body["total_pages"] == 1
+
+    def test_pagination(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family
+
+        _admin_login(test_client)
+        # Create 4 families
+        for i in range(4):
+            f = Family(
+                referrer_id=Family.ORPHAN_REFERRER_ID,
+                family_name=f"Family {i}",
+                family_wish="Wish",
+                contact_name="Contact",
+            )
+            db.add(f)
+        db.commit()
+
+        # Page 1, page_size=2
+        resp = test_client.get("/api/admin/families?page=1&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["families"]) == 2
+        assert body["total"] == 4
+        assert body["page"] == 1
+        assert body["page_size"] == 2
+        assert body["total_pages"] == 2
+
+        # Page 2
+        resp = test_client.get("/api/admin/families?page=2&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["families"]) == 2
 
 class TestAdminGetFamily:
     def test_200_detail_with_person_count(
@@ -314,6 +388,34 @@ class TestAdminDeleteFamily:
         resp = test_client.delete("/api/admin/families/99999")
         assert resp.status_code == 404
 
+    def test_delete_cascade_soft_deletes_persons(
+        self, test_client: TestClient, admin_user, family_with_people, db: Session
+    ):
+        """Deleting a family must soft-delete all its persons."""
+        from app.models import Person
+
+        family = family_with_people["family"]
+        people = family_with_people["people"]
+        assert len(people) >= 1
+
+        # Persons start live
+        for p in people:
+            assert p.is_deleted is False
+
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/families/{family.id}")
+        assert resp.status_code == 204
+
+        # Family is soft-deleted
+        assert family.is_deleted is True
+
+        # All persons in that family are also soft-deleted
+        for p in people:
+            pid = p.id
+            db.expunge(p)
+            refreshed = db.get(Person, pid)
+            assert refreshed.is_deleted is True
+
 # =========================================================================
 #  Admin — People
 # =========================================================================
@@ -323,7 +425,10 @@ class TestAdminListPeople:
         _admin_login(test_client)
         resp = test_client.get("/api/admin/people")
         assert resp.status_code == 200
-        assert len(resp.json()["people"]) == 0
+        body = resp.json()
+        assert len(body["people"]) == 0
+        assert body["total"] == 0
+        assert body["total_pages"] == 0
 
     def test_200_with_data(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
@@ -332,6 +437,40 @@ class TestAdminListPeople:
         body = resp.json()
         assert len(body["people"]) == 2
         assert body["people"][0]["given_name"] == "Alice"
+        assert body["total"] == 2
+        assert body["total_pages"] == 1
+
+    def test_pagination(self, test_client: TestClient, admin_user, family_record, db: Session):
+        from app.models import Person
+
+        _admin_login(test_client)
+        # Create 5 people in the family
+        for i in range(5):
+            p = Person(
+                family_id=family_record.id,
+                given_name=f"Person {i}",
+                age=10,
+                practical_wish="Wish",
+                fun_wish="Fun",
+            )
+            db.add(p)
+        db.commit()
+
+        # Page 1, page_size=2
+        resp = test_client.get("/api/admin/people?page=1&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["people"]) == 2
+        assert body["total"] == 5
+        assert body["page"] == 1
+        assert body["page_size"] == 2
+        assert body["total_pages"] == 3
+
+        # Page 3 (last page, 1 item)
+        resp = test_client.get("/api/admin/people?page=3&page_size=2")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["people"]) == 1
 
 class TestAdminGetPerson:
     def test_200_detail(self, test_client: TestClient, admin_user, family_with_people):

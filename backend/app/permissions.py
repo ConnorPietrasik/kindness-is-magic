@@ -1,7 +1,10 @@
 """Role-based access-control dependencies for FastAPI."""
 
+from dataclasses import dataclass
+from typing import Union
+
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload, Session
 
 from app.auth import get_current_user
 from app.database import get_db
@@ -41,7 +44,7 @@ def require_referrer(current_user: User = Depends(_get_user_or_raise)) -> User:
 
 
 def require_family(current_user: User = Depends(_get_user_or_raise)) -> User:
-    """Raise 403 unless the user is a family"""
+    """Raise 403 unless the user is a family. This intentionally excludes admins because they have their own routes"""
     if current_user.role not in (UserRole.family):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -88,23 +91,31 @@ def require_owner_or_admin(resource_id: int):
 # Shared person ownership guard
 # ---------------------------------------------------------------------------
 
+@dataclass
+class PersonOwner:
+    """Returned by require_person_owner so route handlers can reuse the loaded Person."""
+    user: User
+    person: "Person | None"  # None for admins; loaded Person for referrer/family
+
 
 def require_person_owner(
     request: Request,
     current_user: User = Depends(_get_user_or_raise),
     db: Session = Depends(get_db),
-) -> User:
+) -> PersonOwner:
     """
     Dependency that ensures the current user has ownership of the person record.
+    Returns both the authenticated user and the already-loaded Person object
+    so route handlers don't need to re-query.
 
-    - Admin: always allowed
+    - Admin: always allowed (person=None — handler should load with desired eager-loading)
     - Referrer: person.family.referrer_id == user.referrer_id
     - Family: person.family_id == user.family_id
     """
-    from app.models import Family, Person
+    from app.models import Person
 
     if current_user.role == UserRole.admin:
-        return current_user
+        return PersonOwner(user=current_user, person=None)
 
     per_id = request.path_params.get("per_id")
     if per_id is None:
@@ -113,21 +124,31 @@ def require_person_owner(
             detail="Missing per_id path parameter",
         )
 
-    per = db.query(Person).filter(Person.id == int(per_id)).first()
+    # Use joinedload to get Family in the same query — avoids the separate Family lookup
+    per = (
+        db.query(Person)
+        .options(joinedload(Person.family))
+        .filter(Person.id == int(per_id))
+        .first()
+    )
     if per is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Person not found",
+        )
+    if per.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Person not found",
         )
 
     if current_user.role == UserRole.referrer:
-        fam = db.query(Family).filter(Family.id == per.family_id).first()
-        if fam and fam.referrer_id == current_user.referrer_id:
-            return current_user
+        if per.family and not per.family.is_deleted and per.family.referrer_id == current_user.referrer_id:
+            return PersonOwner(user=current_user, person=per)
 
     elif current_user.role == UserRole.family:
         if per.family_id == current_user.family_id:
-            return current_user
+            return PersonOwner(user=current_user, person=per)
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

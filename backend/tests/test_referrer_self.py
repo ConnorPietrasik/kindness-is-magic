@@ -430,6 +430,26 @@ class TestReferrerDeleteFamily:
         resp = test_client.delete("/api/referrer/families/1")
         assert resp.status_code == 401
 
+    def test_delete_cascade_soft_deletes_persons(
+        self, test_client: TestClient, referrer_with_full_tree, db: Session
+    ):
+        """Deleting a family must soft-delete all its persons."""
+        from app.models import Person
+
+        family = referrer_with_full_tree["family"]
+        person = referrer_with_full_tree["person"]
+        assert person.is_deleted is False
+
+        _tree_referrer_login(test_client)
+        resp = test_client.delete(f"/api/referrer/families/{family.id}")
+        assert resp.status_code == 204
+
+        # Person in that family is now soft-deleted
+        pid = person.id
+        db.expunge(person)
+        refreshed = db.get(Person, pid)
+        assert refreshed.is_deleted is True
+
 
 # =========================================================================
 # Referrer — People within a family

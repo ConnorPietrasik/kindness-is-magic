@@ -35,6 +35,7 @@ from app.schemas import (
     ReferrerSelfRegisterResponse,
     ReferrerSummary,
 )
+from app.user_validation import validate_email, validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
 
@@ -57,34 +58,11 @@ async def register(
 ):
     """Create a new user. Admin-only."""
     # Validate role consistency
-    if data.role == UserRole.admin:
-        if data.referrer_id is not None or data.family_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="Admin users must not have referrer_id or family_id",
-            )
-    elif data.role == UserRole.referrer:
-        if data.referrer_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Referrer users must have a referrer_id",
-            )
-        if data.family_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="Referrer users must not have a family_id",
-            )
-    elif data.role == UserRole.family:
-        if data.family_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Family users must have a family_id",
-            )
-        if data.referrer_id is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="Family users must not have a referrer_id",
-            )
+    errors = validate_user_role_consistency(
+        data.role, data.referrer_id, data.family_id
+    )
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
 
     # Check for duplicate email
     existing = db.query(User).filter(User.email == data.email).first()
@@ -93,7 +71,8 @@ async def register(
 
     # Validate foreign key references exist
     if data.family_id is not None:
-        if not db.query(Family).filter(Family.id == data.family_id).first():
+        fam = db.query(Family).filter(Family.id == data.family_id).first()
+        if not fam or fam.is_deleted:
             raise HTTPException(
                 status_code=404,
                 detail=f"Family with id={data.family_id} not found",
@@ -145,6 +124,8 @@ async def login(data: UserLogin, response: Response, db: Session = Depends(get_d
 
     set_auth_cookies(response, access_token, refresh_token)
 
+    logger.info("User logged in: %s (role=%s)", user.email, user.role)
+
     return {
         "message": "Login successful",
         "user": UserResponse.model_validate(user),
@@ -160,6 +141,7 @@ async def login(data: UserLogin, response: Response, db: Session = Depends(get_d
 async def logout(response: Response, _user: User = Depends(get_current_user)):
     """Clear auth cookies."""
     clear_auth_cookies(response)
+    logger.info("User logged out: %s", _user.email)
     return {"message": "Logged out"}
 
 
@@ -225,6 +207,7 @@ async def change_password(
     user.hashed_password = get_password_hash(data.new_password)
     db.commit()
 
+    logger.info("User changed password: %s", user.email)
     return {"message": "Password changed"}
 
 
@@ -296,6 +279,7 @@ async def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     reset.used = True
     db.commit()
 
+    logger.info("User reset password via token: %s", user.email)
     return {"message": "Password has been reset"}
 
 

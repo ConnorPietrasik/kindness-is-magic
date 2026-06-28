@@ -3,59 +3,25 @@
 All endpoints are guarded with ``require_family``.
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, Person
 from app.permissions import require_family
+from app.response_builders import build_family_detail, partial_update
 from app.schemas import (
     FamilyDetail,
-    PersonCreate,
+    FamilyUpdate,
+    PersonCreateInFamily,
     PersonDetail,
     PersonListResponse,
     PersonSummary,
-    PersonUpdate,
-    FamilyUpdate,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/family", tags=["family"])
-
-# ---------------------------------------------------------------------------
-# Schemas for family-initiated creates (no family_id in body)
-# ---------------------------------------------------------------------------
-
-
-class PersonCreateInFamily(BaseModel):
-    given_name: str = Field(..., min_length=1, max_length=40)
-    age: int = Field(..., ge=0, le=200)
-    practical_wish: str = Field(..., min_length=1, max_length=400)
-    fun_wish: str = Field(..., min_length=1, max_length=400)
-    title: str | None = Field(None, max_length=40)
-    note: str | None = Field(None, max_length=400)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_family_detail(fam: Family, db: Session) -> dict:
-    """Build FamilyDetail dict with computed person_count."""
-    person_count = db.query(Person).filter(Person.family_id == fam.id).count()
-    return {
-        "id": fam.id,
-        "referrer_id": fam.referrer_id,
-        "family_name": fam.family_name,
-        "bio": fam.bio,
-        "address": fam.address,
-        "phone_number": fam.phone_number,
-        "family_wish": fam.family_wish,
-        "contact_name": fam.contact_name,
-        "person_count": person_count,
-    }
-
 
 # ---------------------------------------------------------------------------
 # Family — Self
@@ -70,7 +36,9 @@ def get_self(
     fam = db.query(Family).filter(Family.id == user.family_id).first()
     if fam is None:
         raise HTTPException(status_code=404, detail="Family record not found")
-    return FamilyDetail(**_build_family_detail(fam, db))
+    if fam.is_deleted:
+        raise HTTPException(status_code=404, detail="Family record not found")
+    return FamilyDetail(**build_family_detail(fam, db))
 
 
 @router.patch("/me")
@@ -82,16 +50,15 @@ def update_self(
     fam = db.query(Family).filter(Family.id == user.family_id).first()
     if fam is None:
         raise HTTPException(status_code=404, detail="Family record not found")
+    if fam.is_deleted:
+        raise HTTPException(status_code=404, detail="Family record not found")
 
-    # Partial update: set-only non-None fields
-    update_data = body.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        if value is not None:
-            setattr(fam, field, value)
+    partial_update(fam, body)
 
     db.commit()
     db.refresh(fam)
-    return FamilyDetail(**_build_family_detail(fam, db))
+    logger.info("Family user %s updated own profile (family id=%s)", user.email, fam.id)
+    return FamilyDetail(**build_family_detail(fam, db))
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +71,9 @@ def list_people(
     user=Depends(require_family),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    people = db.query(Person).filter(Person.family_id == user.family_id).all()
+    people = db.query(Person).filter(
+        Person.family_id == user.family_id, Person.is_deleted == False
+    ).all()
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -112,6 +81,7 @@ def list_people(
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
+                is_deleted=p.is_deleted,
             )
             for p in people
         ]
@@ -138,13 +108,8 @@ def create_person(
     db.add(per)
     db.commit()
     db.refresh(per)
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
+    logger.info(
+        "Family user %s created person '%s' (id=%s) in family %s",
+        user.email, per.given_name, per.id, family_id,
     )
+    return PersonDetail.model_validate(per)

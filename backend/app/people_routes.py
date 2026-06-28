@@ -6,17 +6,20 @@ Ownership is enforced via ``require_person_owner()`` which checks:
 - Family: person.family_id == user.family_id
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Person, UserRole
-from app.permissions import require_person_owner
+from app.models import Person
+from app.permissions import PersonOwner, require_person_owner
+from app.response_builders import partial_update
 from app.schemas import (
     PersonDetail,
     PersonUpdate,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/people", tags=["people"])
 
 # ---------------------------------------------------------------------------
@@ -27,64 +30,62 @@ router = APIRouter(prefix="/api/people", tags=["people"])
 @router.get("/{per_id}")
 def get_person(
     per_id: int,
-    user=Depends(require_person_owner),
+    owner: PersonOwner = Depends(require_person_owner),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
-    per = db.query(Person).filter(Person.id == per_id).first()
+    # Reuse the Person already loaded by require_person_owner (with Family joined).
+    # For admins, person is None so we load it fresh.
+    per = owner.person
     if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
-    )
+        per = db.query(Person).filter(Person.id == per_id).first()
+        if per is None:
+            raise HTTPException(status_code=404, detail="Person not found")
+        if per.is_deleted:
+            raise HTTPException(status_code=404, detail="Person not found")
+    return PersonDetail.model_validate(per)
 
 
 @router.patch("/{per_id}")
 def update_person(
     per_id: int,
     body: PersonUpdate,
-    user=Depends(require_person_owner),
+    owner: PersonOwner = Depends(require_person_owner),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
-    per = db.query(Person).filter(Person.id == per_id).first()
+    per = owner.person
     if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        per = db.query(Person).filter(Person.id == per_id).first()
+        if per is None:
+            raise HTTPException(status_code=404, detail="Person not found")
+        if per.is_deleted:
+            raise HTTPException(status_code=404, detail="Person not found")
 
-    # Partial update: set-only non-None fields
-    update_data = body.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        if value is not None:
-            setattr(per, field, value)
+    partial_update(per, body)
 
     db.commit()
     db.refresh(per)
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
+    logger.info(
+        "%s updated person (id=%s)", owner.user.email, per_id
     )
+    return PersonDetail.model_validate(per)
 
 
 @router.delete("/{per_id}", status_code=204)
 def delete_person(
     per_id: int,
-    user=Depends(require_person_owner),
+    owner: PersonOwner = Depends(require_person_owner),
     db: Session = Depends(get_db),
 ) -> Response:
-    per = db.query(Person).filter(Person.id == per_id).first()
+    per = owner.person
     if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
-    db.delete(per)
+        per = db.query(Person).filter(Person.id == per_id).first()
+        if per is None:
+            raise HTTPException(status_code=404, detail="Person not found")
+        if per.is_deleted:
+            raise HTTPException(status_code=404, detail="Person not found")
+    per.is_deleted = True
     db.commit()
+    logger.info(
+        "%s soft-deleted person (id=%s)", owner.user.email, per_id
+    )
     return Response(status_code=204)

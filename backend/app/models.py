@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -12,7 +13,7 @@ from sqlalchemy import (
     func,
     Enum as SAEnum,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.database import Base
 
@@ -32,6 +33,12 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+
+    @validates("email")
+    def _normalize_email(self, _key: str, value: str) -> str:
+        """Always store email in lowercase for consistent lookups."""
+        return value.strip().lower()
+
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False
@@ -81,6 +88,10 @@ class PasswordResetToken(Base):
     """One-time tokens for password-reset flow."""
 
     __tablename__ = "password_reset_tokens"
+    __table_args__ = (
+        # Invalidation query filters (user_id, used) together.
+        Index("ix_password_reset_tokens_user_id_used", "user_id", "used"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
@@ -113,6 +124,11 @@ class Referrer(Base):
 
 class Family(Base):
     __tablename__ = "family"
+    __table_args__ = (
+        # Queries always filter (referrer_id, is_deleted) together —
+        # e.g. referrer list_families, family_limit check, build_referrer_detail.
+        Index("ix_family_referrer_id_is_deleted", "referrer_id", "is_deleted"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ORPHAN_REFERRER_ID = 0
@@ -124,11 +140,12 @@ class Family(Base):
         nullable=False,
     )
     family_name: Mapped[str] = mapped_column(String(40), nullable=False)
-    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bio: Mapped[str | None] = mapped_column(String(400), nullable=True)
     address: Mapped[str] = mapped_column(String(200), nullable=True)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     referrer: Mapped["Referrer"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship(
@@ -138,6 +155,11 @@ class Family(Base):
 
 class Person(Base):
     __tablename__ = "person"
+    __table_args__ = (
+        # Queries always filter (family_id, is_deleted) together —
+        # e.g. build_family_detail, list_family_people, list_people.
+        Index("ix_person_family_id_is_deleted", "family_id", "is_deleted"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     family_id: Mapped[int] = mapped_column(
@@ -149,5 +171,6 @@ class Person(Base):
     practical_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     fun_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     note: Mapped[str] = mapped_column(String(400), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")

@@ -3,12 +3,16 @@
 All endpoints are guarded with ``require_admin``.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import logging
+import math
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, Person, Referrer
 from app.permissions import require_admin
+from app.response_builders import build_family_detail, build_referrer_detail, partial_update
 from app.schemas import (
     FamilyCreate,
     FamilyDetail,
@@ -27,45 +31,7 @@ from app.schemas import (
     ReferrerUpdate,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_referrer_detail(ref: Referrer, db: Session) -> dict:
-    """Build ReferrerDetail dict with computed family_count."""
-    family_count = db.query(Family).filter(Family.referrer_id == ref.id).count()
-    return {
-        "id": ref.id,
-        "name": ref.name,
-        "family_limit": ref.family_limit,
-        "phone_number": ref.phone_number,
-        "family_count": family_count,
-    }
-
-
-def _build_family_detail(fam: Family, db: Session) -> dict:
-    """Build FamilyDetail dict with computed person_count."""
-    person_count = db.query(Person).filter(Person.family_id == fam.id).count()
-    return {
-        "id": fam.id,
-        "referrer_id": fam.referrer_id,
-        "family_name": fam.family_name,
-        "bio": fam.bio,
-        "address": fam.address,
-        "phone_number": fam.phone_number,
-        "family_wish": fam.family_wish,
-        "contact_name": fam.contact_name,
-        "person_count": person_count,
-    }
-
-
-def _partial_update(obj, schema_model):
-    """Apply non-None fields from a Pydantic model to a SQLAlchemy object."""
-    update_data = schema_model.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        if value is not None:
-            setattr(obj, field, value)
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -80,19 +46,33 @@ referrer_admin_router = APIRouter(
 
 @referrer_admin_router.get("")
 def list_referrers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> ReferrerListResponse:
+    total = (
+        db.query(Referrer)
+        .filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
+        .count()
+    )
     referrers = (
         db.query(Referrer)
         .filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
+        .order_by(Referrer.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
     return ReferrerListResponse(
         referrers=[
             ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit)
             for r in referrers
-        ]
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
     )
 
 
@@ -105,7 +85,7 @@ def get_referrer(
     ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
     if ref is None:
         raise HTTPException(status_code=404, detail="Referrer not found")
-    return ReferrerDetail(**_build_referrer_detail(ref, db))
+    return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
 @referrer_admin_router.post("", status_code=201)
@@ -122,7 +102,8 @@ def create_referrer(
     db.add(ref)
     db.commit()
     db.refresh(ref)
-    return ReferrerDetail(**_build_referrer_detail(ref, db))
+    logger.info("Admin %s created referrer '%s' (id=%s)", _admin.email, ref.name, ref.id)
+    return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
 @referrer_admin_router.patch("/{ref_id}")
@@ -135,10 +116,11 @@ def update_referrer(
     ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
     if ref is None:
         raise HTTPException(status_code=404, detail="Referrer not found")
-    _partial_update(ref, body)
+    partial_update(ref, body)
     db.commit()
     db.refresh(ref)
-    return ReferrerDetail(**_build_referrer_detail(ref, db))
+    logger.info("Admin %s updated referrer (id=%s)", _admin.email, ref_id)
+    return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
 @referrer_admin_router.delete("/{ref_id}", status_code=204)
@@ -167,6 +149,7 @@ def delete_referrer(
 
     db.delete(ref)
     db.commit()
+    logger.info("Admin %s deleted referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
     return Response(status_code=204)
 
 
@@ -182,10 +165,30 @@ family_admin_router = APIRouter(
 
 @family_admin_router.get("")
 def list_families(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> FamilyListResponse:
-    families = db.query(Family).all()
+    total = db.query(Family).filter(Family.is_deleted == False).count()
+    families = (
+        db.query(Family)
+        .filter(Family.is_deleted == False)
+        .order_by(Family.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    # Single aggregation query instead of N+1 count() calls
+    counts = (
+        db.query(Person.family_id, func.count(Person.id))
+        .filter(Person.is_deleted == False)
+        .group_by(Person.family_id)
+        .all()
+    )
+    count_map = {fid: cnt for fid, cnt in counts}
+
     return FamilyListResponse(
         families=[
             FamilySummary(
@@ -194,10 +197,15 @@ def list_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
-                person_count=db.query(Person).filter(Person.family_id == f.id).count(),
+                is_deleted=f.is_deleted,
+                person_count=count_map.get(f.id, 0),
             )
             for f in families
-        ]
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
     )
 
 
@@ -210,7 +218,9 @@ def get_family(
     fam = db.query(Family).filter(Family.id == fam_id).first()
     if fam is None:
         raise HTTPException(status_code=404, detail="Family not found")
-    return FamilyDetail(**_build_family_detail(fam, db))
+    if fam.is_deleted:
+        raise HTTPException(status_code=404, detail="Family not found")
+    return FamilyDetail(**build_family_detail(fam, db))
 
 
 @family_admin_router.post("", status_code=201)
@@ -236,7 +246,8 @@ def create_family(
     db.add(fam)
     db.commit()
     db.refresh(fam)
-    return FamilyDetail(**_build_family_detail(fam, db))
+    logger.info("Admin %s created family '%s' (id=%s)", _admin.email, fam.family_name, fam.id)
+    return FamilyDetail(**build_family_detail(fam, db))
 
 
 @family_admin_router.patch("/{fam_id}")
@@ -249,10 +260,11 @@ def update_family(
     fam = db.query(Family).filter(Family.id == fam_id).first()
     if fam is None:
         raise HTTPException(status_code=404, detail="Family not found")
-    _partial_update(fam, body)
+    partial_update(fam, body)
     db.commit()
     db.refresh(fam)
-    return FamilyDetail(**_build_family_detail(fam, db))
+    logger.info("Admin %s updated family (id=%s)", _admin.email, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
 
 
 @family_admin_router.delete("/{fam_id}", status_code=204)
@@ -264,8 +276,15 @@ def delete_family(
     fam = db.query(Family).filter(Family.id == fam_id).first()
     if fam is None:
         raise HTTPException(status_code=404, detail="Family not found")
-    db.delete(fam)
+    if fam.is_deleted:
+        raise HTTPException(status_code=404, detail="Family not found")
+    # Soft-delete all persons in the family first to avoid orphans.
+    db.query(Person).filter(Person.family_id == fam_id).update(
+        {Person.is_deleted: True}, synchronize_session=False
+    )
+    fam.is_deleted = True
     db.commit()
+    logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
     return Response(status_code=204)
 
 
@@ -281,15 +300,32 @@ people_admin_router = APIRouter(
 
 @people_admin_router.get("")
 def list_people(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> PersonListResponse:
-    people = db.query(Person).all()
+    total = db.query(Person).filter(Person.is_deleted == False).count()
+    people = (
+        db.query(Person)
+        .filter(Person.is_deleted == False)
+        .order_by(Person.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
     return PersonListResponse(
         people=[
-            PersonSummary(id=p.id, family_id=p.family_id, given_name=p.given_name, age=p.age)
+            PersonSummary(
+                id=p.id, family_id=p.family_id, given_name=p.given_name,
+                age=p.age, is_deleted=p.is_deleted,
+            )
             for p in people
-        ]
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
     )
 
 
@@ -302,16 +338,9 @@ def get_person(
     per = db.query(Person).filter(Person.id == per_id).first()
     if per is None:
         raise HTTPException(status_code=404, detail="Person not found")
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
-    )
+    if per.is_deleted:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return PersonDetail.model_validate(per)
 
 
 @people_admin_router.post("", status_code=201)
@@ -337,16 +366,8 @@ def create_person(
     db.add(per)
     db.commit()
     db.refresh(per)
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
-    )
+    logger.info("Admin %s created person '%s' (id=%s) in family %s", _admin.email, per.given_name, per.id, body.family_id)
+    return PersonDetail.model_validate(per)
 
 
 @people_admin_router.patch("/{per_id}")
@@ -359,19 +380,13 @@ def update_person(
     per = db.query(Person).filter(Person.id == per_id).first()
     if per is None:
         raise HTTPException(status_code=404, detail="Person not found")
-    _partial_update(per, body)
+    if per.is_deleted:
+        raise HTTPException(status_code=404, detail="Person not found")
+    partial_update(per, body)
     db.commit()
     db.refresh(per)
-    return PersonDetail(
-        id=per.id,
-        family_id=per.family_id,
-        given_name=per.given_name,
-        title=per.title,
-        age=per.age,
-        practical_wish=per.practical_wish,
-        fun_wish=per.fun_wish,
-        note=per.note,
-    )
+    logger.info("Admin %s updated person (id=%s)", _admin.email, per_id)
+    return PersonDetail.model_validate(per)
 
 
 @people_admin_router.delete("/{per_id}", status_code=204)
@@ -383,8 +398,11 @@ def delete_person(
     per = db.query(Person).filter(Person.id == per_id).first()
     if per is None:
         raise HTTPException(status_code=404, detail="Person not found")
-    db.delete(per)
+    if per.is_deleted:
+        raise HTTPException(status_code=404, detail="Person not found")
+    per.is_deleted = True
     db.commit()
+    logger.info("Admin %s soft-deleted person (id=%s)", _admin.email, per_id)
     return Response(status_code=204)
 
 
@@ -451,4 +469,12 @@ async def import_csv_data(
     from app.csv_import import import_csv as do_import
 
     summary = do_import(db, content)
+    logger.info(
+        "Admin %s imported CSV — R:%d F:%d P:%d U:%d (errors: R:%d F:%d P:%d U:%d)",
+        _admin.email,
+        summary.referrers_created, summary.families_created,
+        summary.people_created, summary.users_created,
+        summary.referrers_errors, summary.families_errors,
+        summary.people_errors, summary.users_errors,
+    )
     return summary.to_dict()

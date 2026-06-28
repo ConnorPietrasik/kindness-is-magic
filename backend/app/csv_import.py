@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.models import Family, Person, Referrer, User, UserRole
+from app.user_validation import validate_email, validate_user_role_consistency
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +164,11 @@ def _find_referrer(db: Session, name: str) -> Referrer | None:
 
 
 def _find_family(db: Session, name: str) -> Family | None:
-    return db.query(Family).filter(Family.family_name == name).first()
+    return (
+        db.query(Family)
+        .filter(Family.family_name == name, Family.is_deleted == False)
+        .first()
+    )
 
 
 def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Person | None:
@@ -173,6 +178,7 @@ def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Pers
             Person.family_id == family_id,
             Person.given_name == given_name,
             Person.age == age,
+            Person.is_deleted == False,
         )
         .first()
     )
@@ -207,7 +213,7 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
         return None
     try:
         fid = int(name_or_id)
-        fam = db.query(Family).filter(Family.id == fid).first()
+        fam = db.query(Family).filter(Family.id == fid, Family.is_deleted == False).first()
         if fam:
             return fid
     except ValueError:
@@ -425,6 +431,15 @@ def _process_users(
             summary.rows.append(RowResult(row_num, "user", "error", "Missing 'email'"))
             summary.users_errors += 1
             continue
+
+        # Validate email format using shared helper
+        try:
+            email = validate_email(email)
+        except ValueError:
+            summary.rows.append(RowResult(row_num, "user", "error", "Invalid email format"))
+            summary.users_errors += 1
+            continue
+
         if not password:
             summary.rows.append(RowResult(row_num, "user", "error", "Missing 'password'"))
             summary.users_errors += 1
@@ -451,30 +466,22 @@ def _process_users(
         referrer_id = _resolve_ref_id(referrer_ref, db) if referrer_ref else None
         family_id = _resolve_family_id(family_ref, db) if family_ref else None
 
-        # Validate role constraints
-        if role == UserRole.admin:
-            if referrer_id or family_id:
-                summary.rows.append(RowResult(row_num, "user", "error", "Admin users cannot have referrer_id or family_id"))
+        # Validate role constraints using shared helper
+        role_errors = validate_user_role_consistency(role, referrer_id, family_id)
+        if role_errors:
+            # Translate generic messages to CSV-friendly wording
+            friendly = {
+                "Admin users must not have referrer_id": "Admin users cannot have referrer_id or family_id",
+                "Admin users must not have family_id": "Admin users cannot have referrer_id or family_id",
+                "Referrer users must have a referrer_id": "Referrer users must have a referrer_name_or_id",
+                "Referrer users must not have a family_id": "Referrer users cannot have a family_name_or_id",
+                "Family users must have a family_id": "Family users must have a family_name_or_id",
+                "Family users must not have a referrer_id": "Family users cannot have a referrer_name_or_id",
+            }
+            for err in role_errors:
+                summary.rows.append(RowResult(row_num, "user", "error", friendly.get(err, err)))
                 summary.users_errors += 1
-                continue
-        elif role == UserRole.referrer:
-            if referrer_id is None:
-                summary.rows.append(RowResult(row_num, "user", "error", "Referrer users must have a referrer_name_or_id"))
-                summary.users_errors += 1
-                continue
-            if family_id is not None:
-                summary.rows.append(RowResult(row_num, "user", "error", "Referrer users cannot have a family_name_or_id"))
-                summary.users_errors += 1
-                continue
-        elif role == UserRole.family:
-            if family_id is None:
-                summary.rows.append(RowResult(row_num, "user", "error", "Family users must have a family_name_or_id"))
-                summary.users_errors += 1
-                continue
-            if referrer_id is not None:
-                summary.rows.append(RowResult(row_num, "user", "error", "Family users cannot have a referrer_name_or_id"))
-                summary.users_errors += 1
-                continue
+            continue
 
         user = User(
             email=email,
