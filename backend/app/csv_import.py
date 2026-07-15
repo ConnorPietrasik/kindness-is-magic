@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.models import Family, Person, Referrer, User, UserRole
-from app.user_validation import validate_email, validate_user_role_consistency
+from app.user_validation import sanitize_plain_text, validate_email, validate_user_role_consistency
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +242,12 @@ def _process_referrers(
             summary.rows.append(RowResult(row_num, "referrer", "error", "Missing 'name' column"))
             summary.referrers_errors += 1
             continue
+        try:
+            name = sanitize_plain_text(name)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "referrer", "error", str(exc)))
+            summary.referrers_errors += 1
+            continue
 
         family_limit_raw = rec.get("family_limit", "").strip()
         phone = rec.get("phone_number", "").strip()
@@ -299,6 +305,26 @@ def _process_families(
             summary.families_errors += 1
             continue
 
+        # Sanitize freeform text fields
+        try:
+            family_name = sanitize_plain_text(family_name)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "family", "error", f"family_name: {exc}"))
+            summary.families_errors += 1
+            continue
+        try:
+            family_wish = sanitize_plain_text(family_wish)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "family", "error", f"family_wish: {exc}"))
+            summary.families_errors += 1
+            continue
+        try:
+            contact_name = sanitize_plain_text(contact_name)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "family", "error", f"contact_name: {exc}"))
+            summary.families_errors += 1
+            continue
+
         # Resolve referrer
         referrer_name_or_id = rec.get("referrer_name", "").strip()
         referrer_id = _resolve_ref_id(referrer_name_or_id, db)
@@ -314,13 +340,31 @@ def _process_families(
             summary.families_skipped += 1
             continue
 
+        # Sanitize optional text fields
+        raw_bio = rec.get("bio", "").strip() or None
+        raw_address = rec.get("address", "").strip() or None
+        if raw_bio is not None:
+            try:
+                raw_bio = sanitize_plain_text(raw_bio)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "family", "error", f"bio: {exc}"))
+                summary.families_errors += 1
+                continue
+        if raw_address is not None:
+            try:
+                raw_address = sanitize_plain_text(raw_address)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "family", "error", f"address: {exc}"))
+                summary.families_errors += 1
+                continue
+
         fam = Family(
             referrer_id=referrer_id,
             family_name=family_name,
             family_wish=family_wish,
             contact_name=contact_name,
-            bio=rec.get("bio", "").strip() or None,
-            address=rec.get("address", "").strip() or None,
+            bio=raw_bio,
+            address=raw_address,
             phone_number=rec.get("phone_number", "").strip() or None,
         )
         db.add(fam)
@@ -366,6 +410,26 @@ def _process_people(
             summary.people_errors += 1
             continue
 
+        # Sanitize freeform text fields
+        try:
+            given_name = sanitize_plain_text(given_name)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "person", "error", f"given_name: {exc}"))
+            summary.people_errors += 1
+            continue
+        try:
+            practical_wish = sanitize_plain_text(practical_wish)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "person", "error", f"practical_wish: {exc}"))
+            summary.people_errors += 1
+            continue
+        try:
+            fun_wish = sanitize_plain_text(fun_wish)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "person", "error", f"fun_wish: {exc}"))
+            summary.people_errors += 1
+            continue
+
         try:
             age = int(age_raw)
         except ValueError:
@@ -394,14 +458,32 @@ def _process_people(
             summary.people_skipped += 1
             continue
 
+        # Sanitize optional text fields
+        raw_title = rec.get("title", "").strip() or None
+        raw_note = rec.get("note", "").strip() or None
+        if raw_title is not None:
+            try:
+                raw_title = sanitize_plain_text(raw_title)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "person", "error", f"title: {exc}"))
+                summary.people_errors += 1
+                continue
+        if raw_note is not None:
+            try:
+                raw_note = sanitize_plain_text(raw_note)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "person", "error", f"note: {exc}"))
+                summary.people_errors += 1
+                continue
+
         per = Person(
             family_id=family_id,
             given_name=given_name,
             age=age,
             practical_wish=practical_wish,
             fun_wish=fun_wish,
-            title=rec.get("title", "").strip() or None,
-            note=rec.get("note", "").strip() or None,
+            title=raw_title,
+            note=raw_note,
         )
         db.add(per)
         db.flush()

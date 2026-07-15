@@ -65,20 +65,46 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: seed bootstrap admin if none exists
+# Lifespan: seed orphan referrer + bootstrap admin on startup
 # ---------------------------------------------------------------------------
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:
-    """Seed bootstrap admin user on startup."""
-    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
-    admin_password = os.environ.get("ADMIN_PASSWORD")
-    if admin_email and admin_password:
-        from sqlalchemy.exc import ProgrammingError, OperationalError
+    """Seed bootstrap admin user and orphan referrer on startup."""
+    from sqlalchemy.exc import ProgrammingError, OperationalError
 
-        db = None
-        try:
-            db = next(get_db())
+    db = None
+    try:
+        db = next(get_db())
+
+        # -----------------------------------------------------------------
+        # Orphan referrer (id=0) — required by Family.referrer_id FK default
+        # -----------------------------------------------------------------
+        from app.models import Family, Referrer
+        from sqlalchemy import text
+
+        orphan = db.query(Referrer).filter(Referrer.id == Family.ORPHAN_REFERRER_ID).first()
+        if not orphan:
+            db.add(
+                Referrer(
+                    id=Family.ORPHAN_REFERRER_ID,
+                    name="Orphan",
+                    family_limit=0,
+                    phone_number="",
+                )
+            )
+            db.commit()
+            # Advance the sequence so next auto-generated id doesn't collide
+            db.execute(text("SELECT setval('referrer_id_seq', 1, true)"))
+            db.commit()
+            logger.info("Orphan referrer seeded.")
+
+        # -----------------------------------------------------------------
+        # Bootstrap admin user (only if env vars are set)
+        # -----------------------------------------------------------------
+        admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+        if admin_email and admin_password:
             existing = db.query(User).filter(User.email == admin_email).first()
             if not existing:
                 admin = User(
@@ -92,20 +118,22 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
                 db.add(admin)
                 db.commit()
                 logger.info("Bootstrap admin user created.")
-        except (ProgrammingError, OperationalError) as exc:
-            logger.warning(
-                "Database error during admin seed — skipping: %s",
-                exc,
-            )
-        except Exception as exc:
-            logger.error(
-                "Unexpected error during admin seed — skipping: %s",
-                exc,
-                exc_info=True,
-            )
-        finally:
-            if db:
-                db.close()
+
+    except (ProgrammingError, OperationalError) as exc:
+        logger.warning(
+            "Database error during startup seed — skipping: %s",
+            exc,
+        )
+    except Exception as exc:
+        logger.error(
+            "Unexpected error during startup seed — skipping: %s",
+            exc,
+            exc_info=True,
+        )
+    finally:
+        if db:
+            db.close()
+
     yield
 
 

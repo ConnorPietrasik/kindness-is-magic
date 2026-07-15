@@ -9,6 +9,25 @@ import re
 from app.models import UserRole
 
 # ---------------------------------------------------------------------------
+# Plain-text sanitization
+# ---------------------------------------------------------------------------
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def sanitize_plain_text(value: str) -> str:
+    """Reject any HTML-like content and normalize whitespace.
+
+    Raises ``ValueError`` if angle-bracket tag patterns are detected,
+    preventing XSS payloads from entering the database.
+    """
+    if _HTML_TAG_RE.search(value):
+        raise ValueError("HTML tags are not allowed")
+    # Collapse runs of whitespace (newlines, tabs, multiple spaces)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+# ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
 

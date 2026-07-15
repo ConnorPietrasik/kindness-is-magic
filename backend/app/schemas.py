@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.models import UserRole
-from app.user_validation import validate_email
+from app.user_validation import sanitize_plain_text, validate_email
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +86,11 @@ class ReferrerSelfRegister(BaseModel):
     def check_email(cls, v: str) -> str:
         return validate_email(v)
 
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
 
 # ---------------------------------------------------------------------------
 # Response schemas
@@ -152,6 +157,11 @@ class ReferrerCreate(BaseModel):
     family_limit: int = Field(..., ge=1, le=999)
     phone_number: str = Field(..., min_length=1, max_length=20)
 
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
 
 class ReferrerUpdate(BaseModel):
     """Admin-only: full update including family_limit."""
@@ -160,12 +170,26 @@ class ReferrerUpdate(BaseModel):
     family_limit: Optional[int] = Field(None, ge=1, le=999)
     phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
 
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
 
 class ReferrerSelfUpdate(BaseModel):
     """Referrer self-service update — family_limit is not allowed."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=60)
     phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
 
 class ReferrerDetail(BaseModel):
@@ -200,6 +224,18 @@ class FamilyCreate(BaseModel):
     address: Optional[str] = Field(None, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
 
+    @field_validator("family_name", "family_wish", "contact_name")
+    @classmethod
+    def clean_text(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("bio", "address")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
 
 class FamilyUpdate(BaseModel):
     family_name: Optional[str] = Field(None, min_length=1, max_length=40)
@@ -208,6 +244,13 @@ class FamilyUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
 
 class FamilyDetail(BaseModel):
@@ -259,6 +302,18 @@ class PersonCreate(BaseModel):
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
+    @field_validator("given_name", "practical_wish", "fun_wish")
+    @classmethod
+    def clean_text(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("title", "note")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
 
 class PersonUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=40)
@@ -267,6 +322,13 @@ class PersonUpdate(BaseModel):
     fun_wish: Optional[str] = Field(None, min_length=1, max_length=400)
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
+
+    @field_validator("given_name", "practical_wish", "fun_wish", "title", "note")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
 
 class PersonDetail(BaseModel):
@@ -316,6 +378,18 @@ class FamilyCreateByReferrer(BaseModel):
     address: Optional[str] = Field(None, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
 
+    @field_validator("family_name", "family_wish", "contact_name")
+    @classmethod
+    def clean_text(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("bio", "address")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
 
 class PersonCreateInFamily(BaseModel):
     """Create a person inside a family — family_id is inferred from the URL or session."""
@@ -326,3 +400,15 @@ class PersonCreateInFamily(BaseModel):
     fun_wish: str = Field(..., min_length=1, max_length=400)
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
+
+    @field_validator("given_name", "practical_wish", "fun_wish")
+    @classmethod
+    def clean_text(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("title", "note")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
