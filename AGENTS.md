@@ -18,5 +18,3 @@
 
 - `backend/` — FastAPI + SQLAlchemy backend (Python). See `backend/AGENTS.md`.
 - `frontend/` — React + Vite frontend (JavaScript/JSX). See `frontend/AGENTS.md`.
-- `backend/REFACTOR_PLAN.md` — Checklist of backend refactoring tasks. Work through them one at a time.
-- `TODO.txt` — Product backlog items (future features).

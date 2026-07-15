@@ -22,7 +22,7 @@
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
 | `people_routes.py` | Person endpoints |
-| `csv_import.py` | Bulk CSV import (~400 lines, referrers/families/people/users) |
+| `csv_import.py` | Bulk CSV import (referrers/families/people/users) |
 
 ## Migrations
 
