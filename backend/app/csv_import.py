@@ -31,32 +31,37 @@ import csv
 import io
 import re
 from dataclasses import dataclass, field
-import dataclasses as _dc
+import dataclasses
 
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.models import Family, Person, Referrer, User, UserRole
-from app.user_validation import sanitize_plain_text, validate_email, validate_user_role_consistency
+from app.user_validation import (
+    sanitize_plain_text,
+    validate_email,
+    validate_user_role_consistency,
+)
 
 
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RowResult:
     """Per-row outcome."""
 
-    row_number: int          # 1-based line in the CSV file
-    entity_type: str         # "referrer" | "family" | "person" | "user"
-    action: str              # "created" | "skipped" | "error"
-    message: str = ""        # human-readable detail
-    db_id: int | None = None # primary key of the created/updated record
+    row_number: int  # 1-based line in the CSV file
+    entity_type: str  # "referrer" | "family" | "person" | "user"
+    action: str  # "created" | "skipped" | "error"
+    message: str = ""  # human-readable detail
+    db_id: int | None = None  # primary key of the created/updated record
 
 
 def _row_result_to_dict(r: RowResult) -> dict:
-    return _dc.asdict(r)
+    return dataclasses.asdict(r)
 
 
 @dataclass
@@ -140,7 +145,9 @@ def _parse_sections(csv_text: str) -> dict[str, list[list[str]]]:
     return sections
 
 
-def _rows_to_dicts(section_rows: list[list[str]]) -> tuple[list[str], list[dict[str, str]]]:
+def _rows_to_dicts(
+    section_rows: list[list[str]],
+) -> tuple[list[str], list[dict[str, str]]]:
     """Convert raw row lists into dicts keyed by the header row."""
     if not section_rows:
         return [], []
@@ -158,6 +165,7 @@ def _rows_to_dicts(section_rows: list[list[str]]) -> tuple[list[str], list[dict[
 # Lookup helpers — match by name within a session
 # ---------------------------------------------------------------------------
 
+
 def _find_referrer(db: Session, name: str) -> Referrer | None:
     return db.query(Referrer).filter(Referrer.name == name).first()
 
@@ -170,7 +178,9 @@ def _find_family(db: Session, name: str) -> Family | None:
     )
 
 
-def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Person | None:
+def _find_person(
+    db: Session, family_id: int, given_name: str, age: int
+) -> Person | None:
     return (
         db.query(Person)
         .filter(
@@ -212,7 +222,11 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
         return None
     try:
         fid = int(name_or_id)
-        fam = db.query(Family).filter(Family.id == fid, Family.is_deleted == False).first()
+        fam = (
+            db.query(Family)
+            .filter(Family.id == fid, Family.is_deleted == False)
+            .first()
+        )
         if fam:
             return fid
     except ValueError:
@@ -224,271 +238,350 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
 
 
 # ---------------------------------------------------------------------------
-# Processors — one per entity type
+# Field schema definitions
 # ---------------------------------------------------------------------------
 
-def _process_referrers(
-    db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
-    summary: ImportSummary,
-) -> None:
-    """Create referrers from CSV records."""
-    for i, rec in enumerate(records):
-        row_num = base_row + i
-        name = rec.get("name", "").strip()
-        if not name:
-            summary.rows.append(RowResult(row_num, "referrer", "error", "Missing 'name' column"))
-            summary.referrers_errors += 1
-            continue
-        try:
-            name = sanitize_plain_text(name)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "referrer", "error", str(exc)))
-            summary.referrers_errors += 1
-            continue
 
-        family_limit_raw = rec.get("family_limit", "").strip()
-        phone = rec.get("phone_number", "").strip()
+@dataclass
+class FieldDef:
+    """Schema for a single CSV column."""
 
-        if not family_limit_raw:
-            summary.rows.append(RowResult(row_num, "referrer", "error", "Missing 'family_limit' column"))
-            summary.referrers_errors += 1
-            continue
-
-        try:
-            family_limit = int(family_limit_raw)
-        except ValueError:
-            summary.rows.append(RowResult(row_num, "referrer", "error", f"Invalid family_limit: {family_limit_raw}"))
-            summary.referrers_errors += 1
-            continue
-
-        # Skip if name already exists (idempotent)
-        existing = _find_referrer(db, name)
-        if existing:
-            summary.rows.append(RowResult(row_num, "referrer", "skipped", f"Referrer '{name}' already exists (id={existing.id})"))
-            summary.referrers_skipped += 1
-            continue
-
-        ref = Referrer(name=name, family_limit=family_limit, phone_number=phone)
-        db.add(ref)
-        db.flush()
-        db.refresh(ref)
-        summary.rows.append(RowResult(row_num, "referrer", "created", f"Referrer '{name}' created (id={ref.id})", ref.id))
-        summary.referrers_created += 1
+    name: str
+    key: str = ""  # internal key in resolved dict; defaults to name if empty
+    required: bool = True
+    sanitize: bool = True
+    converter: callable = None  # e.g., int for family_limit, age
+    resolver: callable = None  # e.g., _resolve_ref_id for FK lookups
 
 
-def _process_families(
-    db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
-    summary: ImportSummary,
-) -> None:
-    """Create families from CSV records."""
-    for i, rec in enumerate(records):
-        row_num = base_row + i
-        family_name = rec.get("family_name", "").strip()
-        family_wish = rec.get("family_wish", "").strip()
-        contact_name = rec.get("contact_name", "").strip()
+# ---------------------------------------------------------------------------
+# Model-introspection helper — derive FieldDefs from SQLAlchemy columns
+# ---------------------------------------------------------------------------
 
-        if not family_name:
-            summary.rows.append(RowResult(row_num, "family", "error", "Missing 'family_name'"))
-            summary.families_errors += 1
-            continue
-        if not family_wish:
-            summary.rows.append(RowResult(row_num, "family", "error", "Missing 'family_wish'"))
-            summary.families_errors += 1
-            continue
-        if not contact_name:
-            summary.rows.append(RowResult(row_num, "family", "error", "Missing 'contact_name'"))
-            summary.families_errors += 1
-            continue
+# Columns that are managed by the framework, never imported from CSV
+_SKIP_COLUMNS = {"id", "is_deleted", "created_at"}
 
-        # Sanitize freeform text fields
-        try:
-            family_name = sanitize_plain_text(family_name)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "family", "error", f"family_name: {exc}"))
-            summary.families_errors += 1
-            continue
-        try:
-            family_wish = sanitize_plain_text(family_wish)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "family", "error", f"family_wish: {exc}"))
-            summary.families_errors += 1
-            continue
-        try:
-            contact_name = sanitize_plain_text(contact_name)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "family", "error", f"contact_name: {exc}"))
-            summary.families_errors += 1
-            continue
 
-        # Resolve referrer
-        referrer_name_or_id = rec.get("referrer_name", "").strip()
-        referrer_id = _resolve_ref_id(referrer_name_or_id, db)
-        if referrer_id is None:
-            summary.rows.append(RowResult(row_num, "family", "error", f"Referrer '{referrer_name_or_id}' not found"))
-            summary.families_errors += 1
+def _build_fields(
+    model: type,
+    *,
+    csv_name_map: dict[str, str] | None = None,
+    fk_resolvers: dict[str, callable] | None = None,
+    converters: dict[str, callable] | None = None,
+    optional: set[str] | None = None,
+    skip: set[str] | None = None,
+) -> list[FieldDef]:
+    """Build a list of FieldDefs by introspecting *model* columns.
+
+    System columns (``id``, ``is_deleted``, ``created_at``) are always
+    skipped.  Additional columns can be excluded via ``skip``.
+
+    Parameters
+    ----------
+    csv_name_map:
+        Map model column name → CSV header name (when they differ).
+    fk_resolvers:
+        Map model FK column name → resolver callable.
+    converters:
+        Map model column name → type converter (e.g. ``int``).
+    optional:
+        Extra column names that should be treated as optional even if the
+        model column is ``nullable=False``.
+    skip:
+        Extra column names to exclude beyond the default system columns.
+    """
+    csv_name_map = csv_name_map or {}
+    fk_resolvers = fk_resolvers or {}
+    converters = converters or {}
+    optional = optional or set()
+    extra_skip = (skip or set()) | _SKIP_COLUMNS
+
+    fields: list[FieldDef] = []
+    for col in model.__table__.columns:  # type: ignore[union-attr]
+        colname = col.name
+        if colname in extra_skip:
             continue
 
-        # Skip if family name already exists
-        existing = _find_family(db, family_name)
-        if existing:
-            summary.rows.append(RowResult(row_num, "family", "skipped", f"Family '{family_name}' already exists (id={existing.id})"))
-            summary.families_skipped += 1
-            continue
+        is_fk = col.foreign_keys is not None and len(col.foreign_keys) > 0
+        is_string = hasattr(col.type, "length")
 
-        # Sanitize optional text fields
-        raw_bio = rec.get("bio", "").strip() or None
-        raw_address = rec.get("address", "").strip() or None
-        if raw_bio is not None:
-            try:
-                raw_bio = sanitize_plain_text(raw_bio)
-            except ValueError as exc:
-                summary.rows.append(RowResult(row_num, "family", "error", f"bio: {exc}"))
-                summary.families_errors += 1
-                continue
-        if raw_address is not None:
-            try:
-                raw_address = sanitize_plain_text(raw_address)
-            except ValueError as exc:
-                summary.rows.append(RowResult(row_num, "family", "error", f"address: {exc}"))
-                summary.families_errors += 1
-                continue
-
-        fam = Family(
-            referrer_id=referrer_id,
-            family_name=family_name,
-            family_wish=family_wish,
-            contact_name=contact_name,
-            bio=raw_bio,
-            address=raw_address,
-            phone_number=rec.get("phone_number", "").strip() or None,
+        fields.append(
+            FieldDef(
+                name=csv_name_map.get(colname, colname),
+                key=colname,
+                required=col.nullable is False and colname not in optional,
+                sanitize=is_string and not is_fk,
+                converter=converters.get(colname),
+                resolver=fk_resolvers.get(colname),
+            )
         )
-        db.add(fam)
-        db.flush()
-        db.refresh(fam)
-        summary.rows.append(RowResult(row_num, "family", "created", f"Family '{family_name}' created (id={fam.id})", fam.id))
-        summary.families_created += 1
+    return fields
 
 
-def _process_people(
+# Entity field schemas — derived from models, with CSV-specific overrides.
+
+REFERRER_FIELDS: list[FieldDef] = _build_fields(
+    Referrer,
+    optional={"phone_number"},
+)
+
+FAMILY_FIELDS: list[FieldDef] = _build_fields(
+    Family,
+    csv_name_map={"referrer_id": "referrer_name"},
+    fk_resolvers={"referrer_id": _resolve_ref_id},
+    optional={"bio", "address", "phone_number"},
+)
+
+PERSON_FIELDS: list[FieldDef] = _build_fields(
+    Person,
+    csv_name_map={"family_id": "family_name"},
+    fk_resolvers={"family_id": _resolve_family_id},
+    converters={"age": int},
+    optional={"title", "note"},
+)
+
+
+@dataclass
+class EntitySchema:
+    """Ties a CSV section to its entity class and dedup logic."""
+
+    section_name: str
+    entity_type: str  # singular, for RowResult
+    summary_prefix: str  # e.g. "families", "people" — prefix for ImportSummary attrs
+    entity_cls: type
+    fields: list[FieldDef]
+    find_existing: callable  # (db, **resolved_values) -> existing entity or None
+    display_name_field: str  # field used in "created" / "skipped" messages
+    create_kwargs: callable  # (resolved_values) -> dict for entity constructor
+
+
+# ---------------------------------------------------------------------------
+# Generic section processor
+# ---------------------------------------------------------------------------
+
+
+def _process_field(
+    rec: dict[str, str],
+    fld: FieldDef,
     db: Session,
+) -> tuple[str | None, str | None]:
+    """Process a single field: extract, validate, convert, resolve.
+
+    Returns ``(value, error_message)``.  If error_message is not None the
+    caller should abort the row.  If the field is optional and missing,
+    value is None.
+    """
+    raw = rec.get(fld.name, "").strip()
+
+    # Handle missing optional fields
+    if not raw:
+        if fld.required:
+            return None, f"Missing '{fld.name}'"
+        return None, None
+
+    # Sanitize (text fields only — skip if converter will handle it)
+    if fld.sanitize:
+        try:
+            raw = sanitize_plain_text(raw)
+        except ValueError as exc:
+            return None, f"{fld.name}: {exc}"
+
+    # Convert (e.g. int)
+    if fld.converter is not None:
+        try:
+            raw = fld.converter(raw)
+        except (ValueError, TypeError):
+            return None, f"Invalid {fld.name}: {raw}"
+
+    # Resolve FK lookups
+    if fld.resolver is not None:
+        resolved = fld.resolver(raw, db)
+        if resolved is None:
+            return (
+                None,
+                f"{fld.name.replace('_', ' ').title()} '{rec.get(fld.name, '').strip()}' not found",
+            )
+        return resolved, None
+
+    return raw, None
+
+
+def _process_section(
+    db: Session,
+    schema: EntitySchema,
     records: list[dict[str, str]],
     base_row: int,
     summary: ImportSummary,
+    dry_run: bool = False,
 ) -> None:
-    """Create people from CSV records."""
+    """Generic processor for referrers, families, and people."""
+
+    entity_type = schema.entity_type
+    prefix = schema.summary_prefix
+    summary_attr_created = f"{prefix}_created"
+    summary_attr_skipped = f"{prefix}_skipped"
+    summary_attr_errors = f"{prefix}_errors"
+
     for i, rec in enumerate(records):
         row_num = base_row + i
-        family_name_or_id = rec.get("family_name", "").strip()
-        given_name = rec.get("given_name", "").strip()
-        age_raw = rec.get("age", "").strip()
-        practical_wish = rec.get("practical_wish", "").strip()
-        fun_wish = rec.get("fun_wish", "").strip()
 
-        if not family_name_or_id:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'family_name'"))
-            summary.people_errors += 1
-            continue
-        if not given_name:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'given_name'"))
-            summary.people_errors += 1
-            continue
-        if not age_raw:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'age'"))
-            summary.people_errors += 1
-            continue
-        if not practical_wish:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'practical_wish'"))
-            summary.people_errors += 1
-            continue
-        if not fun_wish:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'fun_wish'"))
-            summary.people_errors += 1
+        # --- Phase 1: process all fields ---
+        resolved: dict[str, object] = {}
+        errors: list[str] = []
+
+        for fld in schema.fields:
+            value, err = _process_field(rec, fld, db)
+            if err is not None:
+                errors.append(err)
+                continue
+            resolved[fld.key or fld.name] = value
+
+        if errors:
+            for err in errors:
+                summary.rows.append(RowResult(row_num, entity_type, "error", err))
+            setattr(
+                summary,
+                summary_attr_errors,
+                getattr(summary, summary_attr_errors) + len(errors),
+            )
             continue
 
-        # Sanitize freeform text fields
-        try:
-            given_name = sanitize_plain_text(given_name)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "person", "error", f"given_name: {exc}"))
-            summary.people_errors += 1
-            continue
-        try:
-            practical_wish = sanitize_plain_text(practical_wish)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "person", "error", f"practical_wish: {exc}"))
-            summary.people_errors += 1
-            continue
-        try:
-            fun_wish = sanitize_plain_text(fun_wish)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "person", "error", f"fun_wish: {exc}"))
-            summary.people_errors += 1
-            continue
-
-        try:
-            age = int(age_raw)
-        except ValueError:
-            summary.rows.append(RowResult(row_num, "person", "error", f"Invalid age: {age_raw}"))
-            summary.people_errors += 1
-            continue
-
-        # Resolve family (try integer id first, then name)
-        family_id = _resolve_family_id(family_name_or_id, db)
-        if family_id is None:
-            summary.rows.append(RowResult(row_num, "person", "error", f"Family '{family_name_or_id}' not found"))
-            summary.people_errors += 1
-            continue
-
-        # Skip if a person with the same family_id, given_name, and age already exists
-        existing = _find_person(db, family_id, given_name, age)
+        # --- Phase 2: skip if already exists ---
+        existing = schema.find_existing(db, **resolved)
         if existing:
+            display = resolved[schema.display_name_field]
             summary.rows.append(
                 RowResult(
                     row_num,
-                    "person",
+                    entity_type,
                     "skipped",
-                    f"Person '{given_name}' (age {age}) already exists in family (id={existing.id})",
+                    f"{schema.entity_cls.__name__} '{display}' already exists (id={existing.id})",
                 )
             )
-            summary.people_skipped += 1
+            setattr(
+                summary,
+                summary_attr_skipped,
+                getattr(summary, summary_attr_skipped) + 1,
+            )
             continue
 
-        # Sanitize optional text fields
-        raw_title = rec.get("title", "").strip() or None
-        raw_note = rec.get("note", "").strip() or None
-        if raw_title is not None:
-            try:
-                raw_title = sanitize_plain_text(raw_title)
-            except ValueError as exc:
-                summary.rows.append(RowResult(row_num, "person", "error", f"title: {exc}"))
-                summary.people_errors += 1
-                continue
-        if raw_note is not None:
-            try:
-                raw_note = sanitize_plain_text(raw_note)
-            except ValueError as exc:
-                summary.rows.append(RowResult(row_num, "person", "error", f"note: {exc}"))
-                summary.people_errors += 1
-                continue
-
-        per = Person(
-            family_id=family_id,
-            given_name=given_name,
-            age=age,
-            practical_wish=practical_wish,
-            fun_wish=fun_wish,
-            title=raw_title,
-            note=raw_note,
-        )
-        db.add(per)
+        # --- Phase 3: create entity ---
+        kwargs = schema.create_kwargs(resolved)
+        entity = schema.entity_cls(**kwargs)
+        db.add(entity)
         db.flush()
-        db.refresh(per)
-        summary.rows.append(RowResult(row_num, "person", "created", f"Person '{given_name}' created (id={per.id})", per.id))
-        summary.people_created += 1
+        db.refresh(entity)
+
+        display = resolved[schema.display_name_field]
+        summary.rows.append(
+            RowResult(
+                row_num,
+                entity_type,
+                "created" if not dry_run else "would_create",
+                f"{schema.entity_cls.__name__} '{display}' {'created' if not dry_run else 'would be created'} (id={entity.id})",
+                entity.id,
+            )
+        )
+        setattr(
+            summary, summary_attr_created, getattr(summary, summary_attr_created) + 1
+        )
+
+
+# ---------------------------------------------------------------------------
+# Entity schema registrations
+# ---------------------------------------------------------------------------
+
+
+def _find_existing_referrer(db: Session, name: str, **_kw) -> Referrer | None:
+    return _find_referrer(db, name)
+
+
+def _find_existing_family(db: Session, family_name: str, **_kw) -> Family | None:
+    return _find_family(db, family_name)
+
+
+def _find_existing_person(
+    db: Session, family_id: int, given_name: str, age: int, **_kw
+) -> Person | None:
+    return _find_person(db, family_id, given_name, age)
+
+
+def _referrer_kwargs(resolved: dict) -> dict:
+    return {
+        "name": resolved["name"],
+        "family_limit": resolved["family_limit"],
+        "phone_number": resolved.get("phone_number") or "",
+    }
+
+
+def _family_kwargs(resolved: dict) -> dict:
+    return {
+        "referrer_id": resolved["referrer_id"],
+        "family_name": resolved["family_name"],
+        "family_wish": resolved["family_wish"],
+        "contact_name": resolved["contact_name"],
+        "bio": resolved.get("bio"),
+        "address": resolved.get("address"),
+        "phone_number": resolved.get("phone_number"),
+    }
+
+
+def _person_kwargs(resolved: dict) -> dict:
+    return {
+        "family_id": resolved["family_id"],
+        "given_name": resolved["given_name"],
+        "age": resolved["age"],
+        "practical_wish": resolved["practical_wish"],
+        "fun_wish": resolved["fun_wish"],
+        "title": resolved.get("title"),
+        "note": resolved.get("note"),
+    }
+
+
+REFERRER_SCHEMA = EntitySchema(
+    section_name="referrers",
+    entity_type="referrer",
+    summary_prefix="referrers",
+    entity_cls=Referrer,
+    fields=REFERRER_FIELDS,
+    find_existing=_find_existing_referrer,
+    display_name_field="name",
+    create_kwargs=_referrer_kwargs,
+)
+
+FAMILY_SCHEMA = EntitySchema(
+    section_name="families",
+    entity_type="family",
+    summary_prefix="families",
+    entity_cls=Family,
+    fields=FAMILY_FIELDS,
+    find_existing=_find_existing_family,
+    display_name_field="family_name",
+    create_kwargs=_family_kwargs,
+)
+
+PERSON_SCHEMA = EntitySchema(
+    section_name="people",
+    entity_type="person",
+    summary_prefix="people",
+    entity_cls=Person,
+    fields=PERSON_FIELDS,
+    find_existing=_find_existing_person,
+    display_name_field="given_name",
+    create_kwargs=_person_kwargs,
+)
+
+# Map section names to schemas (for the generic dispatch loop)
+_GENERIC_SCHEMAS: dict[str, EntitySchema] = {
+    "referrers": REFERRER_SCHEMA,
+    "families": FAMILY_SCHEMA,
+    "people": PERSON_SCHEMA,
+}
+
+
+# ---------------------------------------------------------------------------
+# User processor — kept separate due to bcrypt hashing and role logic
+# ---------------------------------------------------------------------------
 
 
 def _process_users(
@@ -496,9 +589,14 @@ def _process_users(
     records: list[dict[str, str]],
     base_row: int,
     summary: ImportSummary,
+    dry_run: bool = False,
 ) -> None:
     """Create users from CSV records."""
-    ROLE_MAP = {"admin": UserRole.admin, "referrer": UserRole.referrer, "family": UserRole.family}
+    ROLE_MAP = {
+        "admin": UserRole.admin,
+        "referrer": UserRole.referrer,
+        "family": UserRole.family,
+    }
 
     for i, rec in enumerate(records):
         row_num = base_row + i
@@ -517,12 +615,16 @@ def _process_users(
         try:
             email = validate_email(email)
         except ValueError:
-            summary.rows.append(RowResult(row_num, "user", "error", "Invalid email format"))
+            summary.rows.append(
+                RowResult(row_num, "user", "error", "Invalid email format")
+            )
             summary.users_errors += 1
             continue
 
         if not password:
-            summary.rows.append(RowResult(row_num, "user", "error", "Missing 'password'"))
+            summary.rows.append(
+                RowResult(row_num, "user", "error", "Missing 'password'")
+            )
             summary.users_errors += 1
             continue
         if not role_str:
@@ -532,14 +634,28 @@ def _process_users(
 
         role = ROLE_MAP.get(role_str)
         if role is None:
-            summary.rows.append(RowResult(row_num, "user", "error", f"Invalid role: {role_str} (must be admin, referrer, or family)"))
+            summary.rows.append(
+                RowResult(
+                    row_num,
+                    "user",
+                    "error",
+                    f"Invalid role: {role_str} (must be admin, referrer, or family)",
+                )
+            )
             summary.users_errors += 1
             continue
 
         # Skip if email already exists
         existing = _find_user_by_email(db, email)
         if existing:
-            summary.rows.append(RowResult(row_num, "user", "skipped", f"User '{email}' already exists (id={existing.id})"))
+            summary.rows.append(
+                RowResult(
+                    row_num,
+                    "user",
+                    "skipped",
+                    f"User '{email}' already exists (id={existing.id})",
+                )
+            )
             summary.users_skipped += 1
             continue
 
@@ -560,7 +676,9 @@ def _process_users(
                 "Family users must not have a referrer_id": "Family users cannot have a referrer_name_or_id",
             }
             for err in role_errors:
-                summary.rows.append(RowResult(row_num, "user", "error", friendly.get(err, err)))
+                summary.rows.append(
+                    RowResult(row_num, "user", "error", friendly.get(err, err))
+                )
                 summary.users_errors += 1
             continue
 
@@ -575,7 +693,15 @@ def _process_users(
         db.add(user)
         db.flush()
         db.refresh(user)
-        summary.rows.append(RowResult(row_num, "user", "created", f"User '{email}' created (id={user.id})", user.id))
+        summary.rows.append(
+            RowResult(
+                row_num,
+                "user",
+                "created",
+                f"User '{email}' created (id={user.id})",
+                user.id,
+            )
+        )
         summary.users_created += 1
 
 
@@ -583,17 +709,24 @@ def _process_users(
 # Public entry-point
 # ---------------------------------------------------------------------------
 
-def import_csv(db: Session, csv_text: str) -> ImportSummary:
+
+def import_csv(
+    db: Session,
+    csv_text: str,
+    dry_run: bool = False,
+) -> ImportSummary:
     """Parse and import a CSV string into the database.
 
     Returns an ``ImportSummary`` with counts and per-row results.
+
+    If ``dry_run`` is True, no database writes are committed — entities are
+    still flushed (to get surrogate keys) but the transaction is rolled back
+    at the end.
     """
     sections = _parse_sections(csv_text)
     summary = ImportSummary()
 
     # Track row offsets for accurate row numbering
-    # We need to compute where each section's data rows start in the original file.
-    # For simplicity we just number them sequentially within the section.
     row_offset = 0
 
     # Process in dependency order
@@ -606,15 +739,23 @@ def import_csv(db: Session, csv_text: str) -> ImportSummary:
         if not records:
             continue
 
-        processor = {
-            "referrers": _process_referrers,
-            "families": _process_families,
-            "people": _process_people,
-            "users": _process_users,
-        }[section_name]
+        if section_name in _GENERIC_SCHEMAS:
+            _process_section(
+                db,
+                _GENERIC_SCHEMAS[section_name],
+                records,
+                row_offset + 1,
+                summary,
+                dry_run=dry_run,
+            )
+        elif section_name == "users":
+            _process_users(db, records, row_offset + 1, summary, dry_run=dry_run)
 
-        processor(db, records, row_offset + 1, summary)
         row_offset += len(section_rows)  # header + data rows
 
-    db.commit()
+    if dry_run:
+        db.rollback()
+    else:
+        db.commit()
+
     return summary
