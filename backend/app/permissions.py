@@ -91,6 +91,61 @@ def require_owner_or_admin(resource_id: int):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Family ownership guard
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FamilyOwner:
+    """Returned by require_family_owner so route handlers can reuse the loaded Family."""
+
+    user: User
+    family: "Family"  # noqa: F821
+
+
+def require_family_owner(
+    request: Request,
+    current_user: User = Depends(_get_user_or_raise),
+    db: Session = Depends(get_db),
+) -> FamilyOwner:
+    """
+    Runtime dependency that ensures the current user owns the family.
+    Returns both the authenticated user and the already-loaded Family object
+    so route handlers don't need to re-query.
+
+    - Referrer: family.referrer_id == user.referrer_id
+    """
+    from app.models import Family
+
+    fam_id = request.path_params.get("fam_id") or request.path_params.get("fid")
+    if fam_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing family id path parameter",
+        )
+
+    fam = db.query(Family).filter(Family.id == int(fam_id)).first()
+    if fam is None or fam.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Family not found",
+        )
+
+    if fam.referrer_id != current_user.referrer_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this resource",
+        )
+
+    return FamilyOwner(user=current_user, family=fam)
+
+
+# ---------------------------------------------------------------------------
+# Shared person ownership guard
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class PersonOwner:
     """Returned by require_person_owner so route handlers can reuse the loaded Person."""

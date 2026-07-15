@@ -1,7 +1,8 @@
 """Referrer self-service routes: own info, family CRUD, family people collection.
 
-All endpoints are guarded with ``require_referrer``.
-Ownership is enforced so a referrer can only act on their own families/people.
+Self endpoints use ``require_referrer``. Family-scoped endpoints use
+``require_family_owner`` which authenticates the referrer and verifies
+ownership of the target family in a single dependency.
 """
 
 import logging
@@ -11,11 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, Person, Referrer
-from app.permissions import require_referrer
+from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
     build_referrer_detail,
-    get_active_or_404,
     get_or_404,
     partial_update,
 )
@@ -106,16 +106,10 @@ def list_families(
 @router.get("/families/{fam_id}")
 def get_family(
     fam_id: int,
-    user=Depends(require_referrer),
+    owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    if fam.referrer_id != user.referrer_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource",
-        )
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(owner.family, db))
 
 
 @router.post("/families", status_code=201)
@@ -164,39 +158,28 @@ def create_family(
 def update_family(
     fam_id: int,
     body: FamilyUpdate,
-    user=Depends(require_referrer),
+    owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    if fam.referrer_id != user.referrer_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource",
-        )
-    partial_update(fam, body)
+    partial_update(owner.family, body)
     db.commit()
-    db.refresh(fam)
-    logger.info("Referrer %s updated family (id=%s)", user.email, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    db.refresh(owner.family)
+    logger.info("Referrer %s updated family (id=%s)", owner.user.email, fam_id)
+    return FamilyDetail(**build_family_detail(owner.family, db))
 
 
 @router.delete("/families/{fam_id}", status_code=204)
 def delete_family(
     fam_id: int,
-    user=Depends(require_referrer),
+    owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> Response:
-    fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    if fam.referrer_id != user.referrer_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource",
-        )
+    fam = owner.family
     # Soft-delete all persons in the family first to avoid orphans.
     db.query(Person).filter(Person.family_id == fam_id).update({Person.is_deleted: True}, synchronize_session=False)
     fam.is_deleted = True
     db.commit()
-    logger.info("Referrer %s soft-deleted family '%s' (id=%s)", user.email, fam.family_name, fam_id)
+    logger.info("Referrer %s soft-deleted family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
     return Response(status_code=204)
 
 
@@ -208,15 +191,9 @@ def delete_family(
 @router.get("/families/{fid}/people")
 def list_family_people(
     fid: int,
-    user=Depends(require_referrer),
+    owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    fam = get_active_or_404(db, Family, fid, "Family not found")
-    if fam.referrer_id != user.referrer_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource",
-        )
     people = db.query(Person).filter(Person.family_id == fid, Person.is_deleted == False).all()
     return PersonListResponse(
         people=[
@@ -236,16 +213,9 @@ def list_family_people(
 def create_family_person(
     fid: int,
     body: PersonCreateInFamily,
-    user=Depends(require_referrer),
+    owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
-    fam = get_or_404(db, Family, fid, "Family not found")
-    if fam.referrer_id != user.referrer_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource",
-        )
-
     per = Person(
         family_id=fid,
         given_name=body.given_name,
@@ -258,5 +228,5 @@ def create_family_person(
     db.add(per)
     db.commit()
     db.refresh(per)
-    logger.info("Referrer %s created person '%s' (id=%s) in family %s", user.email, per.given_name, per.id, fid)
+    logger.info("Referrer %s created person '%s' (id=%s) in family %s", owner.user.email, per.given_name, per.id, fid)
     return PersonDetail.model_validate(per)
