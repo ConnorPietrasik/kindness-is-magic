@@ -6,11 +6,16 @@
 - **PyJWT** for auth (access tokens + refresh tokens), **bcrypt** for password hashing
 - **psycopg** (v3) for Postgres
 
+## Runtime
+
+- **Python 3.11** (Docker image `python:3.11-slim`).
+- Do not upgrade dependencies unless requested.
+
 ## Key Patterns
 
-- **Soft deletes:** Models use an `is_deleted` boolean column. Queries filter `is_deleted == False`.
-  - Never use `not Model.is_deleted` - that evaluates the SQLAlchemy Column in Python (always truthy). Use `Model.is_deleted == False` so SQLAlchemy generates SQL.
-- **Role-based access:** Four roles - `admin`, `referrer`, `family`, `person`. Auth middleware (`auth.py`) validates JWTs and attaches the user to the request. `permissions.py` provides ownership and admin-check dependencies.
+- **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.is_deleted == False`) unless the endpoint explicitly needs deleted data. Deletion sets `is_deleted = True` rather than removing the row.
+  - Never use `not Model.is_deleted` — that evaluates the SQLAlchemy Column in Python (always truthy). Use `Model.is_deleted == False` so SQLAlchemy generates SQL.
+- **Role-based access:** Four roles — `admin`, `referrer`, `family`, `person`. Auth middleware (`auth.py`) validates JWTs and attaches the user to the request. `permissions.py` provides ownership and admin-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 
 ## Project Structure
@@ -36,9 +41,29 @@ All app code lives under `app/` (flat, no subdirectories):
 
 Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibling to `app/`).
 
+## Database Rules
+
+- Use the existing `get_db` dependency from `database.py`. Never create new engines or sessions inside route handlers.
+- Commit mutations explicitly in the route handler (e.g. `db.commit()`).
+- Do not call `commit()` in helper functions unless they own the transaction.
+
 ## Migrations
 
-Any model change in `models.py` needs a matching Alembic migration in `alembic/versions/`. Use `alembic revision --autogenerate -m "description"` to generate.
+- Any model change in `models.py` needs a matching Alembic migration in `alembic/versions/`. Use `alembic revision --autogenerate -m "description"` to generate.
+- Never edit existing migrations. Create a new one instead.
+- Do not delete migrations to fix failures.
+
+## Authorization Rules
+
+- Never trust role or ownership information from request bodies. Always use the authenticated user from JWT dependencies.
+- Admins access resources via `admin_routes.py` only. They are explicitly excluded from self-service guards (`require_family`, `require_referrer`) — e.g. `require_family` rejects admins because they have their own routes.
+- Referrers may only manage their assigned families/people. Families may only access their own data.
+
+## API Conventions
+
+- Keep route handlers thin. Reuse existing helpers and response builders.
+- Match existing HTTP status codes and response formats. Do not introduce new ones without discussion.
+- Do not suppress Ruff errors unless there is a documented reason.
 
 ## Config
 
@@ -64,6 +89,13 @@ cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://Kind
 Then read the summary with `tail -5 /tmp/test-output.txt`. If there are failures, read more of the file to inspect tracebacks.
 
 **When running tests after changes:** iterate until tests pass. Avoid pasting full test output unless a failure needs user input. Report: final test status, pass/fail count, and a brief summary of any fixes made. If a failure requires a design decision, ask the user.
+
+## Validation Workflow
+
+After making code changes:
+1. Run `ruff check .` and `ruff format --check .` first (instant).
+2. If the change could affect behaviour, run the test suite (see "Running Tests").
+3. For trivial changes (typos, formatting, renames), skip tests unless asked.
 
 ## Validation
 
