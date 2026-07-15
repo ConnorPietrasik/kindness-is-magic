@@ -89,7 +89,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
                 Referrer(
                     id=Family.ORPHAN_REFERRER_ID,
                     name="Orphan",
-                    family_limit=0,
+                    family_limit=999,
                     phone_number="",
                 )
             )
