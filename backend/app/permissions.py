@@ -33,11 +33,11 @@ def require_admin(current_user: User = Depends(_get_user_or_raise)) -> User:
 
 
 def require_referrer(current_user: User = Depends(_get_user_or_raise)) -> User:
-    """Raise 403 unless the user is a referrer or admin."""
-    if current_user.role not in (UserRole.admin, UserRole.referrer):
+    """Raise 403 unless the user is a referrer. Admins are excluded because they have their own routes."""
+    if current_user.role != UserRole.referrer:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Referrer or admin access required",
+            detail="Referrer access required",
         )
     return current_user
 
