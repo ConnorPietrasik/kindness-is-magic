@@ -23,6 +23,7 @@ from app.auth import (
 # Password hashing
 # ---------------------------------------------------------------------------
 
+
 class TestPasswordHashing:
     def test_hash_and_verify(self):
         password = "MySecret1234!"
@@ -55,6 +56,7 @@ class TestPasswordHashing:
 # ---------------------------------------------------------------------------
 # Access token
 # ---------------------------------------------------------------------------
+
 
 class TestAccessToken:
     def test_create_and_decode(self):
@@ -96,6 +98,7 @@ class TestAccessToken:
 # Refresh token
 # ---------------------------------------------------------------------------
 
+
 class TestRefreshToken:
     def test_create_and_decode(self):
         data = {"sub": "99"}
@@ -132,6 +135,7 @@ class TestRefreshToken:
 # ---------------------------------------------------------------------------
 # Cookie helpers
 # ---------------------------------------------------------------------------
+
 
 class TestCookieHelpers:
     def test_set_auth_cookies(self):

@@ -38,9 +38,7 @@ class TestFamilyGetSelf:
         assert body["family_wish"] == "World peace"
         assert body["person_count"] == 0
 
-    def test_404_missing_family_record(
-        self, test_client: TestClient, db: Session
-    ):
+    def test_404_missing_family_record(self, test_client: TestClient, db: Session):
         """Create a family user whose family_id points to a deleted/missing family."""
         from app.models import Family, User, UserRole
         from app.auth import get_password_hash
@@ -103,9 +101,7 @@ class TestFamilyUpdateSelf:
         assert body["phone_number"] == "555-9999"
         assert body["family_wish"] == "World peace"  # unchanged
 
-    def test_404_missing_family_record(
-        self, test_client: TestClient, db: Session
-    ):
+    def test_404_missing_family_record(self, test_client: TestClient, db: Session):
         from app.models import Family, User, UserRole
         from app.auth import get_password_hash
 

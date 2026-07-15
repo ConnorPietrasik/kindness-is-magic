@@ -42,9 +42,7 @@ class TestReferrerGetSelf:
         assert body["phone_number"] == "555-1000"
         assert body["family_count"] == 1
 
-    def test_404_missing_referrer_record(
-        self, test_client: TestClient, db: Session
-    ):
+    def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
         """A referrer-role User whose linked Referrer row has been deleted
         (FK ondelete="SET NULL" nulls user.referrer_id) should get 404."""
         from app.models import Referrer, User, UserRole
@@ -104,9 +102,7 @@ class TestReferrerUpdateSelf:
         assert body["phone_number"] == "555-9999"
         assert body["family_limit"] == 5  # unchanged
 
-    def test_404_missing_referrer_record(
-        self, test_client: TestClient, db: Session
-    ):
+    def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
         """A referrer-role User whose linked Referrer row is gone should 404
         on update as well."""
         from app.models import Referrer, User, UserRole
@@ -184,9 +180,7 @@ class TestReferrerListFamilies:
 
 
 class TestReferrerGetFamily:
-    def test_200_detail_with_person_count(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_200_detail_with_person_count(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
         resp = test_client.get(f"/api/referrer/families/{fam.id}")
@@ -249,9 +243,7 @@ class TestReferrerCreateFamily:
         assert body["referrer_id"] == referrer_with_full_tree["referrer"].id
         assert body["person_count"] == 0
 
-    def test_201_with_optional_fields(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_201_with_optional_fields(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         resp = test_client.post(
             "/api/referrer/families",
@@ -270,16 +262,12 @@ class TestReferrerCreateFamily:
         assert body["address"] == "456 Oak Ave"
         assert body["phone_number"] == "555-3333"
 
-    def test_family_limit_enforced(
-        self, test_client: TestClient, another_referrer, db: Session
-    ):
+    def test_family_limit_enforced(self, test_client: TestClient, another_referrer, db: Session):
         from app.models import Family, Referrer
 
         ref = another_referrer["referrer"]
         # Set limit to 1 and create 1 family
-        db.query(Referrer).filter(Referrer.id == ref.id).update(
-            {"family_limit": 1}, synchronize_session=False
-        )
+        db.query(Referrer).filter(Referrer.id == ref.id).update({"family_limit": 1}, synchronize_session=False)
         existing = Family(
             referrer_id=ref.id,
             family_name="Limit Family",
@@ -333,9 +321,7 @@ class TestReferrerCreateFamily:
 
 
 class TestReferrerUpdateFamily:
-    def test_200_partial_update(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_200_partial_update(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
         resp = test_client.patch(
@@ -429,9 +415,7 @@ class TestReferrerDeleteFamily:
         resp = test_client.delete("/api/referrer/families/1")
         assert resp.status_code == 401
 
-    def test_delete_cascade_soft_deletes_persons(
-        self, test_client: TestClient, referrer_with_full_tree, db: Session
-    ):
+    def test_delete_cascade_soft_deletes_persons(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """Deleting a family must soft-delete all its persons."""
         from app.models import Person
 
@@ -456,9 +440,7 @@ class TestReferrerDeleteFamily:
 
 
 class TestReferrerListFamilyPeople:
-    def test_200_people_in_own_family(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_200_people_in_own_family(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
         resp = test_client.get(f"/api/referrer/families/{fam.id}/people")
@@ -539,9 +521,7 @@ class TestReferrerCreateFamilyPerson:
         assert body["family_id"] == fam.id
         assert body["age"] == 6
 
-    def test_201_with_optional_fields(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_201_with_optional_fields(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
         resp = test_client.post(

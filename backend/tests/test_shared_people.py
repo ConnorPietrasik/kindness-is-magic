@@ -39,9 +39,7 @@ def _another_family_login(client: TestClient) -> dict:
 
 
 class TestPersonGetShared:
-    def test_200_referrer_gets_own_person(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_200_referrer_gets_own_person(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         person = referrer_with_full_tree["person"]
         resp = test_client.get(f"/api/people/{person.id}")
@@ -50,9 +48,7 @@ class TestPersonGetShared:
         assert body["id"] == person.id
         assert body["given_name"] == "Tree Person"
 
-    def test_200_family_gets_own_person(
-        self, test_client: TestClient, family_user, family_with_people
-    ):
+    def test_200_family_gets_own_person(self, test_client: TestClient, family_user, family_with_people):
         _family_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.get(f"/api/people/{person.id}")
@@ -60,9 +56,7 @@ class TestPersonGetShared:
         body = resp.json()
         assert body["given_name"] == "Alice"
 
-    def test_200_admin_gets_any(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_200_admin_gets_any(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.get(f"/api/people/{person.id}")
@@ -134,9 +128,7 @@ class TestPersonGetShared:
 
 
 class TestPersonUpdateShared:
-    def test_200_referrer_updates_own(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_200_referrer_updates_own(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         person = referrer_with_full_tree["person"]
         resp = test_client.patch(
@@ -148,9 +140,7 @@ class TestPersonUpdateShared:
         assert body["given_name"] == "Updated Tree Person"
         assert body["age"] == 10  # unchanged
 
-    def test_200_family_updates_own(
-        self, test_client: TestClient, family_user, family_with_people
-    ):
+    def test_200_family_updates_own(self, test_client: TestClient, family_user, family_with_people):
         _family_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.patch(
@@ -162,9 +152,7 @@ class TestPersonUpdateShared:
         assert body["age"] == 9
         assert body["given_name"] == "Alice"  # unchanged
 
-    def test_200_admin_updates_any(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_200_admin_updates_any(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.patch(
@@ -258,25 +246,19 @@ class TestPersonUpdateShared:
 
 
 class TestPersonDeleteShared:
-    def test_204_referrer_deletes_own(
-        self, test_client: TestClient, referrer_with_full_tree
-    ):
+    def test_204_referrer_deletes_own(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         person = referrer_with_full_tree["person"]
         resp = test_client.delete(f"/api/people/{person.id}")
         assert resp.status_code == 204
 
-    def test_204_family_deletes_own(
-        self, test_client: TestClient, family_user, family_with_people
-    ):
+    def test_204_family_deletes_own(self, test_client: TestClient, family_user, family_with_people):
         _family_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.delete(f"/api/people/{person.id}")
         assert resp.status_code == 204
 
-    def test_204_admin_deletes_any(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_204_admin_deletes_any(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.delete(f"/api/people/{person.id}")

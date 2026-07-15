@@ -54,7 +54,7 @@ class TestSanitizePlainText:
 
     def test_rejects_self_closing_tag(self):
         with pytest.raises(ValueError, match="HTML tags are not allowed"):
-            sanitize_plain_text('Hello<br/>world')
+            sanitize_plain_text("Hello<br/>world")
 
     def test_rejects_svg_tag(self):
         with pytest.raises(ValueError, match="HTML tags are not allowed"):

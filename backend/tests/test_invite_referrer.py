@@ -35,9 +35,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 401
 
-    def test_non_admin_referrer_rejected(
-        self, test_client: TestClient, referrer_user
-    ):
+    def test_non_admin_referrer_rejected(self, test_client: TestClient, referrer_user):
         login_as(test_client, "referrer@test.com", "RefPass1234!")
         resp = test_client.post(
             "/api/auth/invite-referrer",
@@ -72,6 +70,7 @@ class TestInviteReferrerCreate:
     def test_code_format(self, test_client: TestClient, admin_user):
         """Code should be KMG-<6 uppercase alphanumeric chars>."""
         import re
+
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/invite-referrer",
@@ -100,9 +99,7 @@ class TestReferrerSelfRegister:
         assert resp.status_code == 201
         return resp.json()["code"]
 
-    def test_valid_code_registers_successfully(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_valid_code_registers_successfully(self, test_client: TestClient, admin_user, db: Session):
         code = self._create_invite(test_client, admin_user, family_limit=5)
 
         resp = test_client.post(
@@ -134,6 +131,7 @@ class TestReferrerSelfRegister:
 
         # Token marked as used
         from app.models import ReferrerInviteToken
+
         token = db.query(ReferrerInviteToken).filter_by(code=code).first()
         assert token is not None
         assert token.used is True
@@ -179,9 +177,7 @@ class TestReferrerSelfRegister:
         assert resp.status_code == 400
         assert "expired" in resp.json()["detail"].lower()
 
-    def test_already_used_code(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_already_used_code(self, test_client: TestClient, admin_user, db: Session):
         code = self._create_invite(test_client, admin_user, family_limit=5)
 
         # First redemption succeeds
@@ -312,14 +308,13 @@ class TestReferrerSelfRegister:
 class TestInviteRedemptionAtomicity:
     """Ensure failed redemptions don't leave partial data."""
 
-    def test_duplicate_email_rolls_back(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_duplicate_email_rolls_back(self, test_client: TestClient, admin_user, db: Session):
         """If email already exists, no partial Referrer or User should be created."""
         from app.models import Referrer, User
 
         # Seed an existing user with the target email
         from app.auth import get_password_hash
+
         existing = User(
             email="existing@test.com",
             hashed_password=get_password_hash("ExistingPass1!"),
@@ -333,10 +328,14 @@ class TestInviteRedemptionAtomicity:
 
         # Count rows before
         referrer_count = db.query(Referrer).count()
-        user_count = db.query(User).filter(
-            User.email == "existing@test.com",
-            User.role == "referrer",
-        ).count()
+        user_count = (
+            db.query(User)
+            .filter(
+                User.email == "existing@test.com",
+                User.role == "referrer",
+            )
+            .count()
+        )
 
         # Try to redeem with existing email
         resp = test_client.post(
@@ -353,10 +352,15 @@ class TestInviteRedemptionAtomicity:
 
         # No new referrer or user row was created
         assert db.query(Referrer).count() == referrer_count
-        assert db.query(User).filter(
-            User.email == "existing@test.com",
-            User.role == "referrer",
-        ).count() == user_count
+        assert (
+            db.query(User)
+            .filter(
+                User.email == "existing@test.com",
+                User.role == "referrer",
+            )
+            .count()
+            == user_count
+        )
 
     def _create_invite(self, test_client: TestClient, admin_user, family_limit: int = 10):
         """Helper: login as admin, create an invite, return the code."""

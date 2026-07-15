@@ -10,21 +10,26 @@ from tests.conftest import login_as
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _admin_login(client: TestClient) -> dict:
     """Log in as admin and return cookies (sets them on the client)."""
     return login_as(client, "admin@test.com", "AdminPass123!")
+
 
 def _referrer_login(client: TestClient) -> dict:
     """Log in as a referrer user."""
     return login_as(client, "referrer@test.com", "RefPass1234!")
 
+
 def _family_login(client: TestClient) -> dict:
     """Log in as a family user."""
     return login_as(client, "family@test.com", "FamPass1234!")
 
+
 # =========================================================================
 #  Admin — Referrers
 # =========================================================================
+
 
 class TestAdminListReferrers:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -81,10 +86,9 @@ class TestAdminListReferrers:
         body = resp.json()
         assert len(body["referrers"]) == 0
 
+
 class TestAdminGetReferrer:
-    def test_200_detail_with_family_count(
-        self, test_client: TestClient, admin_user, referrer_with_families
-    ):
+    def test_200_detail_with_family_count(self, test_client: TestClient, admin_user, referrer_with_families):
         _admin_login(test_client)
         ref = referrer_with_families["referrer"]
         resp = test_client.get(f"/api/admin/referrers/{ref.id}")
@@ -98,6 +102,7 @@ class TestAdminGetReferrer:
         _admin_login(test_client)
         resp = test_client.get("/api/admin/referrers/99999")
         assert resp.status_code == 404
+
 
 class TestAdminCreateReferrer:
     def test_201_success(self, test_client: TestClient, admin_user):
@@ -117,10 +122,9 @@ class TestAdminCreateReferrer:
         assert body["phone_number"] == "555-1234"
         assert body["family_count"] == 0
 
+
 class TestAdminUpdateReferrer:
-    def test_200_partial_update(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_200_partial_update(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/referrers/{referrer_record.id}",
@@ -131,9 +135,7 @@ class TestAdminUpdateReferrer:
         assert body["name"] == "Updated Name"
         assert body["phone_number"] == "555-0001"  # unchanged
 
-    def test_200_full_update(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_200_full_update(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/referrers/{referrer_record.id}",
@@ -157,17 +159,14 @@ class TestAdminUpdateReferrer:
         )
         assert resp.status_code == 404
 
+
 class TestAdminDeleteReferrer:
-    def test_204_success(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_204_success(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
         resp = test_client.delete(f"/api/admin/referrers/{referrer_record.id}")
         assert resp.status_code == 204
 
-    def test_cascade_families_to_orphan(
-        self, test_client: TestClient, admin_user, referrer_with_families, db: Session
-    ):
+    def test_cascade_families_to_orphan(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         from app.models import Family
 
         _admin_login(test_client)
@@ -188,9 +187,7 @@ class TestAdminDeleteReferrer:
             f = db.get(Family, fid)
             assert f.referrer_id == Family.ORPHAN_REFERRER_ID
 
-    def test_cascade_null_user_referrer_id(
-        self, test_client: TestClient, admin_user, referrer_user, db: Session
-    ):
+    def test_cascade_null_user_referrer_id(self, test_client: TestClient, admin_user, referrer_user, db: Session):
 
         _admin_login(test_client)
         ref_id = referrer_user.referrer_id
@@ -212,9 +209,11 @@ class TestAdminDeleteReferrer:
         resp = test_client.delete("/api/admin/referrers/99999")
         assert resp.status_code == 404
 
+
 # =========================================================================
 #  Admin — Families
 # =========================================================================
+
 
 class TestAdminListFamilies:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -269,10 +268,9 @@ class TestAdminListFamilies:
         body = resp.json()
         assert len(body["families"]) == 2
 
+
 class TestAdminGetFamily:
-    def test_200_detail_with_person_count(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_200_detail_with_person_count(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         fam = family_with_people["family"]
         resp = test_client.get(f"/api/admin/families/{fam.id}")
@@ -287,10 +285,9 @@ class TestAdminGetFamily:
         resp = test_client.get("/api/admin/families/99999")
         assert resp.status_code == 404
 
+
 class TestAdminCreateFamily:
-    def test_201_success(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_201_success(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
         resp = test_client.post(
             "/api/admin/families",
@@ -307,9 +304,7 @@ class TestAdminCreateFamily:
         assert body["referrer_id"] == referrer_record.id
         assert body["person_count"] == 0
 
-    def test_201_with_optional_fields(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_201_with_optional_fields(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
         resp = test_client.post(
             "/api/admin/families",
@@ -354,10 +349,9 @@ class TestAdminCreateFamily:
         )
         assert resp.status_code == 422
 
+
 class TestAdminUpdateFamily:
-    def test_200_partial_update(
-        self, test_client: TestClient, admin_user, family_record
-    ):
+    def test_200_partial_update(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/families/{family_record.id}",
@@ -376,6 +370,7 @@ class TestAdminUpdateFamily:
         )
         assert resp.status_code == 404
 
+
 class TestAdminDeleteFamily:
     def test_204_success(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
@@ -387,9 +382,7 @@ class TestAdminDeleteFamily:
         resp = test_client.delete("/api/admin/families/99999")
         assert resp.status_code == 404
 
-    def test_delete_cascade_soft_deletes_persons(
-        self, test_client: TestClient, admin_user, family_with_people, db: Session
-    ):
+    def test_delete_cascade_soft_deletes_persons(self, test_client: TestClient, admin_user, family_with_people, db: Session):
         """Deleting a family must soft-delete all its persons."""
         from app.models import Person
 
@@ -415,9 +408,11 @@ class TestAdminDeleteFamily:
             refreshed = db.get(Person, pid)
             assert refreshed.is_deleted is True
 
+
 # =========================================================================
 #  Admin — People
 # =========================================================================
+
 
 class TestAdminListPeople:
     def test_200_empty(self, test_client: TestClient, admin_user):
@@ -471,6 +466,7 @@ class TestAdminListPeople:
         body = resp.json()
         assert len(body["people"]) == 1
 
+
 class TestAdminGetPerson:
     def test_200_detail(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
@@ -489,10 +485,9 @@ class TestAdminGetPerson:
         resp = test_client.get("/api/admin/people/99999")
         assert resp.status_code == 404
 
+
 class TestAdminCreatePerson:
-    def test_201_success(
-        self, test_client: TestClient, admin_user, family_record
-    ):
+    def test_201_success(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.post(
             "/api/admin/people",
@@ -511,9 +506,7 @@ class TestAdminCreatePerson:
         assert body["family_id"] == family_record.id
         assert body["note"] is None
 
-    def test_201_with_optional_fields(
-        self, test_client: TestClient, admin_user, family_record
-    ):
+    def test_201_with_optional_fields(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.post(
             "/api/admin/people",
@@ -546,10 +539,9 @@ class TestAdminCreatePerson:
         )
         assert resp.status_code == 404
 
+
 class TestAdminUpdatePerson:
-    def test_200_partial_update(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_200_partial_update(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.patch(
@@ -561,9 +553,7 @@ class TestAdminUpdatePerson:
         assert body["given_name"] == "Alice Updated"
         assert body["age"] == 8  # unchanged
 
-    def test_200_full_update(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_200_full_update(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.patch(
@@ -594,10 +584,9 @@ class TestAdminUpdatePerson:
         )
         assert resp.status_code == 404
 
+
 class TestAdminDeletePerson:
-    def test_204_success(
-        self, test_client: TestClient, admin_user, family_with_people
-    ):
+    def test_204_success(self, test_client: TestClient, admin_user, family_with_people):
         _admin_login(test_client)
         person = family_with_people["people"][0]
         resp = test_client.delete(f"/api/admin/people/{person.id}")
@@ -607,6 +596,7 @@ class TestAdminDeletePerson:
         _admin_login(test_client)
         resp = test_client.delete("/api/admin/people/99999")
         assert resp.status_code == 404
+
 
 # =========================================================================
 #  Auth guards (parameterized — replaces per-endpoint 401/403 tests)
@@ -630,6 +620,7 @@ ADMIN_ENDPOINTS = [
     ("DELETE", "/api/admin/people/1", {}),
 ]
 
+
 class TestAdminAuthGuards:
     """Parameterized auth guard tests for all admin endpoints.
 
@@ -638,9 +629,7 @@ class TestAdminAuthGuards:
     """
 
     @pytest.mark.parametrize("method,route,body", ADMIN_ENDPOINTS)
-    def test_401_unauthenticated(
-        self, test_client: TestClient, method: str, route: str, body: dict
-    ):
+    def test_401_unauthenticated(self, test_client: TestClient, method: str, route: str, body: dict):
         """Unauthenticated requests to any admin endpoint return 401."""
         if body:
             resp = test_client.request(method, route, json=body)
@@ -649,9 +638,7 @@ class TestAdminAuthGuards:
         assert resp.status_code == 401
 
     @pytest.mark.parametrize("method,route,body", ADMIN_ENDPOINTS)
-    def test_403_non_admin(
-        self, test_client: TestClient, referrer_user, method: str, route: str, body: dict
-    ):
+    def test_403_non_admin(self, test_client: TestClient, referrer_user, method: str, route: str, body: dict):
         """Non-admin users get 403 on any admin endpoint."""
         _referrer_login(test_client)
         if body:

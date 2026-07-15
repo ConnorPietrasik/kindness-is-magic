@@ -141,6 +141,7 @@ def db(_setup_test_schema: None) -> Generator[Session, Any, None]:
 # Override get_db so every route hit during tests uses the test DB
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def test_client(db: Session) -> Generator[Any, Any, None]:
     """Yield a synchronous TestClient bound to the Postgres test DB."""
@@ -165,6 +166,7 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
 # ---------------------------------------------------------------------------
 # Helper: create seed data for auth testing
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def admin_user(db: Session):
@@ -255,6 +257,7 @@ def family_user(db: Session, family_record):
 # Helper: log in as a user and return the response JSON
 # ---------------------------------------------------------------------------
 
+
 def login_as(client: Any, email: str, password: str) -> dict:
     """POST to /api/auth/login and return the response JSON."""
     return client.post("/api/auth/login", json={"email": email, "password": password}).json()
@@ -263,6 +266,7 @@ def login_as(client: Any, email: str, password: str) -> dict:
 # ---------------------------------------------------------------------------
 # Phase 1 fixtures — Referrer + Family + Person trees for admin CRUD tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def referrer_with_families(db: Session, referrer_record):
@@ -317,6 +321,7 @@ def family_with_people(db: Session, family_record):
 # ---------------------------------------------------------------------------
 # Phase 3 fixtures — Self-service trees for referrer/family ownership tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def referrer_with_full_tree(db: Session):

@@ -10,6 +10,7 @@ from tests.conftest import login_as
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _admin_login(client: TestClient) -> dict:
     return login_as(client, "admin@test.com", "AdminPass123!")
 
@@ -90,6 +91,7 @@ byid_fam@test.com,Password123!,family,,ID Fam
 #  CSV sample template endpoint
 # =========================================================================
 
+
 class TestCsvSample:
     def test_200_returns_template(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -115,6 +117,7 @@ class TestCsvSample:
 # =========================================================================
 #  CSV import - happy path
 # =========================================================================
+
 
 class TestCsvImportMinimal:
     def test_200_creates_all_entities(self, test_client: TestClient, admin_user, db: Session):
@@ -178,6 +181,7 @@ class TestCsvImportMinimal:
 #  CSV import - full optionals
 # =========================================================================
 
+
 class TestCsvImportFull:
     def test_creates_multiple_entities(self, test_client: TestClient, admin_user, db: Session):
         from app.models import User, Family, Person
@@ -199,7 +203,7 @@ class TestCsvImportFull:
         assert fam.address == "123 Main St"
         assert fam.phone_number == "555-2001"
 
-        fam2 = db.query(Family).filter(Family.family_name =="Family Beta").first()
+        fam2 = db.query(Family).filter(Family.family_name == "Family Beta").first()
         assert fam2.bio is None
 
         person = db.query(Person).filter(Person.given_name == "Baby One").first()
@@ -220,6 +224,7 @@ class TestCsvImportFull:
 # =========================================================================
 #  CSV import - users by ID reference
 # =========================================================================
+
 
 class TestCsvImportUsersById:
     def test_users_resolve_by_name(self, test_client: TestClient, admin_user, db: Session):
@@ -244,6 +249,7 @@ class TestCsvImportUsersById:
 # =========================================================================
 #  CSV import - error handling
 # =========================================================================
+
 
 class TestCsvImportErrors:
     def test_missing_required_fields(self, test_client: TestClient, admin_user):
@@ -358,6 +364,7 @@ adminbad@test.com,Password123!,admin,AdminRef,
 #  CSV import - row-level detail
 # =========================================================================
 
+
 class TestCsvImportRowDetail:
     def test_rows_contain_expected_fields(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -383,9 +390,7 @@ class TestCsvImportRowDetail:
 
 
 class TestCsvImportPeopleDedup:
-    def test_duplicate_person_same_family_name_age_skipped(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_duplicate_person_same_family_name_age_skipped(self, test_client: TestClient, admin_user):
         """A person with the same family, given_name, and age is skipped."""
         csv_data = """# referrers
 name,family_limit,phone_number
@@ -407,9 +412,7 @@ Dedup Fam,Alice,8,Backpack,Doll,,
         assert body["summary"]["people"]["created"] == 1
         assert body["summary"]["people"]["skipped"] == 1
 
-    def test_same_name_different_family_not_duplicate(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_same_name_different_family_not_duplicate(self, test_client: TestClient, admin_user):
         """Same name+age in a different family is NOT a duplicate."""
         csv_data = """# referrers
 name,family_limit,phone_number
@@ -432,9 +435,7 @@ Fam B,Alice,8,Coat,Game,,
         assert body["summary"]["people"]["created"] == 2
         assert body["summary"]["people"]["skipped"] == 0
 
-    def test_same_name_different_age_same_family_not_duplicate(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_same_name_different_age_same_family_not_duplicate(self, test_client: TestClient, admin_user):
         """Same name but different age in the same family is NOT a duplicate."""
         csv_data = """# referrers
 name,family_limit,phone_number

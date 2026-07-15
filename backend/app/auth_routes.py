@@ -4,7 +4,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -35,6 +35,7 @@ from app.schemas import (
     ReferrerSelfRegisterResponse,
     ReferrerSummary,
 )
+from app.rate_limit import limiter
 from app.user_validation import validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,8 @@ async def register(
 
 
 @router.post("/login")
-async def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, data: UserLogin, response: Response, db: Session = Depends(get_db)):
     """Authenticate and set HttpOnly cookies."""
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
@@ -149,7 +151,9 @@ async def logout(response: Response, _user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh")
+@limiter.limit("30/minute")
 async def refresh(
+    request: Request,
     response: Response,
     refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
     db: Session = Depends(get_db),
@@ -215,7 +219,8 @@ async def change_password(
 
 
 @router.post("/forgot-password")
-async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
     """Generate a password-reset token. In dev mode the token is logged."""
     user = db.query(User).filter(User.email == data.email).first()
 
@@ -256,7 +261,8 @@ async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password")
-async def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def reset_password(request: Request, data: ResetPassword, db: Session = Depends(get_db)):
     """Consume a reset token and set a new password."""
     reset = (
         db.query(PasswordResetToken)

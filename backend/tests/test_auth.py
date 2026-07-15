@@ -11,6 +11,7 @@ from tests.conftest import login_as
 # Login
 # ---------------------------------------------------------------------------
 
+
 class TestLogin:
     def test_login_success(self, test_client: TestClient, admin_user):
         resp = test_client.post(
@@ -74,6 +75,7 @@ class TestLogin:
 # Logout
 # ---------------------------------------------------------------------------
 
+
 class TestLogout:
     def test_logout_success(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -89,6 +91,7 @@ class TestLogout:
 # ---------------------------------------------------------------------------
 # Register (admin-only)
 # ---------------------------------------------------------------------------
+
 
 class TestRegister:
     def test_register_admin_user(self, test_client: TestClient, admin_user):
@@ -107,9 +110,7 @@ class TestRegister:
         assert body["role"] == "admin"
         assert "hashed_password" not in body
 
-    def test_register_referrer_user(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_register_referrer_user(self, test_client: TestClient, admin_user, referrer_record):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -123,9 +124,7 @@ class TestRegister:
         assert resp.status_code == 201
         assert resp.json()["role"] == "referrer"
 
-    def test_register_family_user(
-        self, test_client: TestClient, admin_user, family_record
-    ):
+    def test_register_family_user(self, test_client: TestClient, admin_user, family_record):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -185,9 +184,7 @@ class TestRegister:
         )
         assert resp2.status_code == 409
 
-    def test_register_admin_with_referrer_id_rejected(
-        self, test_client: TestClient, admin_user, referrer_record
-    ):
+    def test_register_admin_with_referrer_id_rejected(self, test_client: TestClient, admin_user, referrer_record):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -201,9 +198,7 @@ class TestRegister:
         assert resp.status_code == 400
         assert "must not have" in resp.json()["detail"]
 
-    def test_register_referrer_missing_referrer_id(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_register_referrer_missing_referrer_id(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -216,9 +211,7 @@ class TestRegister:
         assert resp.status_code == 400
         assert "must have a referrer_id" in resp.json()["detail"]
 
-    def test_register_family_missing_family_id(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_register_family_missing_family_id(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -231,9 +224,7 @@ class TestRegister:
         assert resp.status_code == 400
         assert "must have a family_id" in resp.json()["detail"]
 
-    def test_register_family_with_referrer_id_rejected(
-        self, test_client: TestClient, admin_user, family_record, referrer_record
-    ):
+    def test_register_family_with_referrer_id_rejected(self, test_client: TestClient, admin_user, family_record, referrer_record):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -248,9 +239,7 @@ class TestRegister:
         assert resp.status_code == 400
         assert "must not have a referrer_id" in resp.json()["detail"]
 
-    def test_register_referrer_with_family_id_rejected(
-        self, test_client: TestClient, admin_user, referrer_record, family_record
-    ):
+    def test_register_referrer_with_family_id_rejected(self, test_client: TestClient, admin_user, referrer_record, family_record):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -265,9 +254,7 @@ class TestRegister:
         assert resp.status_code == 400
         assert "must not have a family_id" in resp.json()["detail"]
 
-    def test_register_referrer_id_not_found(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_register_referrer_id_not_found(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -280,9 +267,7 @@ class TestRegister:
         )
         assert resp.status_code == 404
 
-    def test_register_family_id_not_found(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_register_family_id_not_found(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -295,9 +280,7 @@ class TestRegister:
         )
         assert resp.status_code == 404
 
-    def test_register_password_too_short(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_register_password_too_short(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/register",
@@ -326,6 +309,7 @@ class TestRegister:
 # /api/auth/me
 # ---------------------------------------------------------------------------
 
+
 class TestMe:
     def test_me_returns_profile(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -345,6 +329,7 @@ class TestMe:
 # ---------------------------------------------------------------------------
 # /api/auth/me/password (change own password)
 # ---------------------------------------------------------------------------
+
 
 class TestChangePassword:
     def test_change_password_success(self, test_client: TestClient, admin_user):
@@ -385,9 +370,7 @@ class TestChangePassword:
         assert resp.status_code == 400
         assert "Incorrect old password" in resp.json()["detail"]
 
-    def test_change_password_new_too_short(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_change_password_new_too_short(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.put(
             "/api/auth/me/password",
@@ -410,10 +393,9 @@ class TestChangePassword:
 # Forgot / Reset password
 # ---------------------------------------------------------------------------
 
+
 class TestForgotPassword:
-    def test_forgot_password_existing_user(
-        self, test_client: TestClient, admin_user
-    ):
+    def test_forgot_password_existing_user(self, test_client: TestClient, admin_user):
         resp = test_client.post(
             "/api/auth/forgot-password",
             json={"email": "admin@test.com"},
@@ -439,9 +421,7 @@ class TestForgotPassword:
 
 
 class TestResetPassword:
-    def test_reset_password_success(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_reset_password_success(self, test_client: TestClient, admin_user, db: Session):
         from app.models import PasswordResetToken
 
         # Create a reset token (simulating forgot-password flow)
@@ -482,9 +462,7 @@ class TestResetPassword:
         assert resp.status_code == 400
         assert "Invalid or expired" in resp.json()["detail"]
 
-    def test_reset_password_expired_token(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_reset_password_expired_token(self, test_client: TestClient, admin_user, db: Session):
         from app.models import PasswordResetToken
 
         raw_token = "expired-token"
@@ -505,9 +483,7 @@ class TestResetPassword:
         )
         assert resp.status_code == 400
 
-    def test_reset_password_new_too_short(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_reset_password_new_too_short(self, test_client: TestClient, admin_user, db: Session):
         from app.models import PasswordResetToken
 
         raw_token = "short-pass-token"
@@ -525,9 +501,7 @@ class TestResetPassword:
         )
         assert resp.status_code == 422
 
-    def test_reset_token_only_affects_its_owner(
-        self, test_client: TestClient, admin_user, db: Session
-    ):
+    def test_reset_token_only_affects_its_owner(self, test_client: TestClient, admin_user, db: Session):
         """A reset token only changes the password of its associated user,
         not someone else's."""
         from app.models import User, PasswordResetToken, UserRole
@@ -600,6 +574,7 @@ class TestResetPassword:
 # Token refresh
 # ---------------------------------------------------------------------------
 
+
 class TestRefresh:
     def test_refresh_success(self, test_client: TestClient, admin_user):
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -622,6 +597,7 @@ class TestRefresh:
 # ---------------------------------------------------------------------------
 # Post-logout session invalidation
 # ---------------------------------------------------------------------------
+
 
 class TestAuthCookies:
     def test_logout_invalidates_session(self, test_client: TestClient, admin_user):

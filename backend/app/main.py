@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth import get_password_hash
@@ -139,6 +140,25 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+from app.rate_limit import limiter  # noqa: E402
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Return rate-limit errors with `detail` key so the frontend displays them."""
+    response = JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": f"Rate limit exceeded. {exc.detail}"},
+    )
+    response = limiter._inject_headers(response, request.state.view_rate_limit)
+    return response
+
 
 # ---------------------------------------------------------------------------
 # CORS — required for HttpOnly cookie auth from a different origin
