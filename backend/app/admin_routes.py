@@ -232,6 +232,7 @@ def update_family(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
+    # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted families.
     fam = get_or_404(db, Family, fam_id, "Family not found")
     partial_update(fam, body)
     db.commit()
