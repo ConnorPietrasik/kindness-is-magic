@@ -335,7 +335,8 @@ def update_person(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonDetail:
-    per = get_active_or_404(db, Person, per_id, "Person not found")
+    # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted people.
+    per = get_or_404(db, Person, per_id, "Person not found")
     partial_update(per, body)
     db.commit()
     db.refresh(per)
