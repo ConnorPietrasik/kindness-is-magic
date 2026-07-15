@@ -22,6 +22,7 @@ from app.models import User, UserRole
 # Logging — structured JSON to stdout (Docker's logging driver captures it)
 # ---------------------------------------------------------------------------
 
+
 class JsonFormatter(logging.Formatter):
     """Emit one JSON object per log line to stdout.
 
@@ -66,6 +67,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Lifespan: seed orphan referrer + bootstrap admin on startup
 # ---------------------------------------------------------------------------
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:

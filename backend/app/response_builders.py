@@ -42,11 +42,7 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
 
 def build_referrer_detail(ref: Referrer, db: Session) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count."""
-    family_count = (
-        db.query(Family)
-        .filter(Family.referrer_id == ref.id, Family.is_deleted == False)
-        .count()
-    )
+    family_count = db.query(Family).filter(Family.referrer_id == ref.id, Family.is_deleted == False).count()
     return {
         "id": ref.id,
         "name": ref.name,
@@ -58,11 +54,7 @@ def build_referrer_detail(ref: Referrer, db: Session) -> dict:
 
 def build_family_detail(fam: Family, db: Session) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count."""
-    person_count = (
-        db.query(Person)
-        .filter(Person.family_id == fam.id, Person.is_deleted == False)
-        .count()
-    )
+    person_count = db.query(Person).filter(Person.family_id == fam.id, Person.is_deleted == False).count()
     return {
         "id": fam.id,
         "referrer_id": fam.referrer_id,

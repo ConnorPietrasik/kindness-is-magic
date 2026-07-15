@@ -84,12 +84,7 @@ def list_families(
     )
 
     # Single aggregation query instead of N+1 count() calls
-    counts = (
-        db.query(Person.family_id, func.count(Person.id))
-        .filter(Person.is_deleted == False)
-        .group_by(Person.family_id)
-        .all()
-    )
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.is_deleted == False).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
     return FamilyListResponse(
@@ -132,10 +127,14 @@ def create_family(
     referrer_id = user.referrer_id
 
     # Check family_limit not exceeded (exclude soft-deleted families)
-    current_count = db.query(Family).filter(
-        Family.referrer_id == referrer_id,
-        Family.is_deleted == False,
-    ).count()
+    current_count = (
+        db.query(Family)
+        .filter(
+            Family.referrer_id == referrer_id,
+            Family.is_deleted == False,
+        )
+        .count()
+    )
 
     ref = get_or_404(db, Referrer, referrer_id, "Referrer record not found")
 
@@ -194,9 +193,7 @@ def delete_family(
             detail="You do not have permission to access this resource",
         )
     # Soft-delete all persons in the family first to avoid orphans.
-    db.query(Person).filter(Person.family_id == fam_id).update(
-        {Person.is_deleted: True}, synchronize_session=False
-    )
+    db.query(Person).filter(Person.family_id == fam_id).update({Person.is_deleted: True}, synchronize_session=False)
     fam.is_deleted = True
     db.commit()
     logger.info("Referrer %s soft-deleted family '%s' (id=%s)", user.email, fam.family_name, fam_id)
@@ -220,9 +217,7 @@ def list_family_people(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access this resource",
         )
-    people = db.query(Person).filter(
-        Person.family_id == fid, Person.is_deleted == False
-    ).all()
+    people = db.query(Person).filter(Person.family_id == fid, Person.is_deleted == False).all()
     return PersonListResponse(
         people=[
             PersonSummary(

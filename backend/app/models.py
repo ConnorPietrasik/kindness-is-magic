@@ -21,6 +21,7 @@ from app.database import Base
 # Auth models
 # ---------------------------------------------------------------------------
 
+
 class UserRole(str, enum.Enum):
     admin = "admin"
     referrer = "referrer"
@@ -39,27 +40,15 @@ class User(Base):
         return value.strip().lower()
 
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(
-        SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False
-    )
-    referrer_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("referrer.id", ondelete="SET NULL"), nullable=True
-    )
-    family_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("family.id", ondelete="SET NULL"), nullable=True
-    )
+    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False)
+    referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="SET NULL"), nullable=True)
+    family_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("family.id", ondelete="SET NULL"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships to existing domain models
-    referrer_obj: Mapped["Referrer | None"] = relationship(
-        "Referrer", foreign_keys=[referrer_id], backref="users"
-    )
-    family_obj: Mapped["Family | None"] = relationship(
-        "Family", foreign_keys=[family_id], backref="users"
-    )
+    referrer_obj: Mapped["Referrer | None"] = relationship("Referrer", foreign_keys=[referrer_id], backref="users")
+    family_obj: Mapped["Family | None"] = relationship("Family", foreign_keys=[family_id], backref="users")
 
 
 class ReferrerInviteToken(Base):
@@ -72,15 +61,9 @@ class ReferrerInviteToken(Base):
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    redeemed_by_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
-    redeemed_by_referrer_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("referrer.id"), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    redeemed_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    redeemed_by_referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id"), nullable=True)
 
 
 class PasswordResetToken(Base):
@@ -93,17 +76,11 @@ class PasswordResetToken(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", backref="reset_tokens")
 
@@ -116,9 +93,7 @@ class Referrer(Base):
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    families: Mapped[list["Family"]] = relationship(
-        "Family", back_populates="referrer"
-    )
+    families: Mapped[list["Family"]] = relationship("Family", back_populates="referrer")
 
 
 class Family(Base):
@@ -147,9 +122,7 @@ class Family(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     referrer: Mapped["Referrer"] = relationship("Referrer", back_populates="families")
-    persons: Mapped[list["Person"]] = relationship(
-        "Person", back_populates="family", cascade="all, delete-orphan"
-    )
+    persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
 
 
 class Person(Base):
@@ -161,9 +134,7 @@ class Person(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    family_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("family.id"), nullable=False
-    )
+    family_id: Mapped[int] = mapped_column(Integer, ForeignKey("family.id"), nullable=False)
     given_name: Mapped[str] = mapped_column(String(40), nullable=False)
     title: Mapped[str | None] = mapped_column(String(40), nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=False)

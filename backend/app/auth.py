@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -18,14 +17,10 @@ from app.database import get_db
 # Configuration (from environment)
 # ---------------------------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
-REFRESH_SECRET_KEY = os.environ.get(
-    "REFRESH_SECRET_KEY", "dev-refresh-secret-key-change-me"
-)
+REFRESH_SECRET_KEY = os.environ.get("REFRESH_SECRET_KEY", "dev-refresh-secret-key-change-me")
 ALGORITHM = "HS256"
 
-ACCESS_TOKEN_EXPIRE_MINUTES = int(
-    os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
-)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 INVITE_EXPIRY_HOURS = int(os.environ.get("INVITE_EXPIRY_HOURS", "168"))
 
@@ -64,9 +59,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a short-lived JWT access token."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update(exp=expire)
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -159,8 +152,6 @@ def clear_auth_cookies(response):
 # ---------------------------------------------------------------------------
 # FastAPI dependencies
 # ---------------------------------------------------------------------------
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 async def get_current_user(

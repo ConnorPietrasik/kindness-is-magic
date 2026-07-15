@@ -90,9 +90,11 @@ def require_owner_or_admin(resource_id: int):
 # Shared person ownership guard
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PersonOwner:
     """Returned by require_person_owner so route handlers can reuse the loaded Person."""
+
     user: User
     person: "Person | None"  # noqa: F821  # None for admins; loaded Person for referrer/family
 
@@ -124,12 +126,7 @@ def require_person_owner(
         )
 
     # Use joinedload to get Family in the same query — avoids the separate Family lookup
-    per = (
-        db.query(Person)
-        .options(joinedload(Person.family))
-        .filter(Person.id == int(per_id))
-        .first()
-    )
+    per = db.query(Person).options(joinedload(Person.family)).filter(Person.id == int(per_id)).first()
     if per is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

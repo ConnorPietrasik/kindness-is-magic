@@ -56,9 +56,7 @@ def update_person(
 
     db.commit()
     db.refresh(per)
-    logger.info(
-        "%s updated person (id=%s)", owner.user.email, per_id
-    )
+    logger.info("%s updated person (id=%s)", owner.user.email, per_id)
     return PersonDetail.model_validate(per)
 
 
@@ -73,7 +71,5 @@ def delete_person(
         per = get_active_or_404(db, Person, per_id, "Person not found")
     per.is_deleted = True
     db.commit()
-    logger.info(
-        "%s soft-deleted person (id=%s)", owner.user.email, per_id
-    )
+    logger.info("%s soft-deleted person (id=%s)", owner.user.email, per_id)
     return Response(status_code=204)

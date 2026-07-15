@@ -171,16 +171,10 @@ def _find_referrer(db: Session, name: str) -> Referrer | None:
 
 
 def _find_family(db: Session, name: str) -> Family | None:
-    return (
-        db.query(Family)
-        .filter(Family.family_name == name, Family.is_deleted == False)
-        .first()
-    )
+    return db.query(Family).filter(Family.family_name == name, Family.is_deleted == False).first()
 
 
-def _find_person(
-    db: Session, family_id: int, given_name: str, age: int
-) -> Person | None:
+def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Person | None:
     return (
         db.query(Person)
         .filter(
@@ -222,11 +216,7 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
         return None
     try:
         fid = int(name_or_id)
-        fam = (
-            db.query(Family)
-            .filter(Family.id == fid, Family.is_deleted == False)
-            .first()
-        )
+        fam = db.query(Family).filter(Family.id == fid, Family.is_deleted == False).first()
         if fam:
             return fid
     except ValueError:
@@ -482,9 +472,7 @@ def _process_section(
                 entity.id,
             )
         )
-        setattr(
-            summary, summary_attr_created, getattr(summary, summary_attr_created) + 1
-        )
+        setattr(summary, summary_attr_created, getattr(summary, summary_attr_created) + 1)
 
 
 # ---------------------------------------------------------------------------
@@ -500,9 +488,7 @@ def _find_existing_family(db: Session, family_name: str, **_kw) -> Family | None
     return _find_family(db, family_name)
 
 
-def _find_existing_person(
-    db: Session, family_id: int, given_name: str, age: int, **_kw
-) -> Person | None:
+def _find_existing_person(db: Session, family_id: int, given_name: str, age: int, **_kw) -> Person | None:
     return _find_person(db, family_id, given_name, age)
 
 
@@ -615,16 +601,12 @@ def _process_users(
         try:
             email = validate_email(email)
         except ValueError:
-            summary.rows.append(
-                RowResult(row_num, "user", "error", "Invalid email format")
-            )
+            summary.rows.append(RowResult(row_num, "user", "error", "Invalid email format"))
             summary.users_errors += 1
             continue
 
         if not password:
-            summary.rows.append(
-                RowResult(row_num, "user", "error", "Missing 'password'")
-            )
+            summary.rows.append(RowResult(row_num, "user", "error", "Missing 'password'"))
             summary.users_errors += 1
             continue
         if not role_str:
@@ -676,9 +658,7 @@ def _process_users(
                 "Family users must not have a referrer_id": "Family users cannot have a referrer_name_or_id",
             }
             for err in role_errors:
-                summary.rows.append(
-                    RowResult(row_num, "user", "error", friendly.get(err, err))
-                )
+                summary.rows.append(RowResult(row_num, "user", "error", friendly.get(err, err)))
                 summary.users_errors += 1
             continue
 

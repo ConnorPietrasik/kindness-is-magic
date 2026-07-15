@@ -57,11 +57,7 @@ def list_referrers(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> ReferrerListResponse:
-    total = (
-        db.query(Referrer)
-        .filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
-        .count()
-    )
+    total = db.query(Referrer).filter(Referrer.id != Family.ORPHAN_REFERRER_ID).count()
     referrers = (
         db.query(Referrer)
         .filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
@@ -71,10 +67,7 @@ def list_referrers(
         .all()
     )
     return ReferrerListResponse(
-        referrers=[
-            ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit)
-            for r in referrers
-        ],
+        referrers=[ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit) for r in referrers],
         total=total,
         page=page,
         page_size=page_size,
@@ -171,22 +164,10 @@ def list_families(
     _admin: object = Depends(require_admin),
 ) -> FamilyListResponse:
     total = db.query(Family).filter(Family.is_deleted == False).count()
-    families = (
-        db.query(Family)
-        .filter(Family.is_deleted == False)
-        .order_by(Family.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    families = db.query(Family).filter(Family.is_deleted == False).order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Single aggregation query instead of N+1 count() calls
-    counts = (
-        db.query(Person.family_id, func.count(Person.id))
-        .filter(Person.is_deleted == False)
-        .group_by(Person.family_id)
-        .all()
-    )
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.is_deleted == False).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
     return FamilyListResponse(
@@ -267,9 +248,7 @@ def delete_family(
 ) -> Response:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
     # Soft-delete all persons in the family first to avoid orphans.
-    db.query(Person).filter(Person.family_id == fam_id).update(
-        {Person.is_deleted: True}, synchronize_session=False
-    )
+    db.query(Person).filter(Person.family_id == fam_id).update({Person.is_deleted: True}, synchronize_session=False)
     fam.is_deleted = True
     db.commit()
     logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
@@ -294,19 +273,15 @@ def list_people(
     _admin: object = Depends(require_admin),
 ) -> PersonListResponse:
     total = db.query(Person).filter(Person.is_deleted == False).count()
-    people = (
-        db.query(Person)
-        .filter(Person.is_deleted == False)
-        .order_by(Person.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    people = db.query(Person).filter(Person.is_deleted == False).order_by(Person.id).offset((page - 1) * page_size).limit(page_size).all()
     return PersonListResponse(
         people=[
             PersonSummary(
-                id=p.id, family_id=p.family_id, given_name=p.given_name,
-                age=p.age, is_deleted=p.is_deleted,
+                id=p.id,
+                family_id=p.family_id,
+                given_name=p.given_name,
+                age=p.age,
+                is_deleted=p.is_deleted,
             )
             for p in people
         ],
@@ -446,9 +421,13 @@ async def import_csv_data(
     logger.info(
         "Admin %s imported CSV — R:%d F:%d P:%d U:%d (errors: R:%d F:%d P:%d U:%d)",
         _admin.email,
-        summary.referrers_created, summary.families_created,
-        summary.people_created, summary.users_created,
-        summary.referrers_errors, summary.families_errors,
-        summary.people_errors, summary.users_errors,
+        summary.referrers_created,
+        summary.families_created,
+        summary.people_created,
+        summary.users_created,
+        summary.referrers_errors,
+        summary.families_errors,
+        summary.people_errors,
+        summary.users_errors,
     )
     return summary.to_dict()

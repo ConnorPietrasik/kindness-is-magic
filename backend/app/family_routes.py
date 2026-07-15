@@ -63,9 +63,7 @@ def list_people(
     user=Depends(require_family),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    people = db.query(Person).filter(
-        Person.family_id == user.family_id, Person.is_deleted == False
-    ).all()
+    people = db.query(Person).filter(Person.family_id == user.family_id, Person.is_deleted == False).all()
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -102,6 +100,9 @@ def create_person(
     db.refresh(per)
     logger.info(
         "Family user %s created person '%s' (id=%s) in family %s",
-        user.email, per.given_name, per.id, family_id,
+        user.email,
+        per.given_name,
+        per.id,
+        family_id,
     )
     return PersonDetail.model_validate(per)

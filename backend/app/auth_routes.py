@@ -58,9 +58,7 @@ async def register(
 ):
     """Create a new user. Admin-only."""
     # Validate role consistency
-    errors = validate_user_role_consistency(
-        data.role, data.referrer_id, data.family_id
-    )
+    errors = validate_user_role_consistency(data.role, data.referrer_id, data.family_id)
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
 
@@ -260,10 +258,14 @@ async def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
 @router.post("/reset-password")
 async def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     """Consume a reset token and set a new password."""
-    reset = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token == data.token,
-        PasswordResetToken.used.is_(False),
-    ).first()
+    reset = (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.token == data.token,
+            PasswordResetToken.used.is_(False),
+        )
+        .first()
+    )
 
     if not reset:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -331,11 +333,7 @@ async def register_referrer(
 ):
     """Public self-registration: redeem an invite code to create a Referrer + User."""
     # 1. Look up the invite token
-    invite = (
-        db.query(ReferrerInviteToken)
-        .filter(ReferrerInviteToken.code == data.code, ReferrerInviteToken.used.is_(False))
-        .first()
-    )
+    invite = db.query(ReferrerInviteToken).filter(ReferrerInviteToken.code == data.code, ReferrerInviteToken.used.is_(False)).first()
     if not invite:
         raise HTTPException(status_code=400, detail="Invalid or already-used invite code")
 
