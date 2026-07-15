@@ -4,9 +4,35 @@ Centralises logic that was duplicated across admin_routes, referrer_routes,
 and family_routes.
 """
 
-from sqlalchemy.orm import Session
+from typing import Type, TypeVar
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from app.models import Family, Person, Referrer
+
+T = TypeVar("T", bound=DeclarativeBase)
+
+
+# ---------------------------------------------------------------------------
+# Repository helpers
+# ---------------------------------------------------------------------------
+
+
+def get_or_404(db: Session, model: Type[T], id: int, detail: str = "Not found") -> T:
+    """Fetch a record by id or raise 404."""
+    obj = db.query(model).filter(model.id == id).first()
+    if obj is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+    return obj
+
+
+def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not found") -> T:
+    """Like get_or_404 but also rejects soft-deleted records."""
+    obj = get_or_404(db, model, id, detail)
+    if getattr(obj, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+    return obj
 
 
 # ---------------------------------------------------------------------------

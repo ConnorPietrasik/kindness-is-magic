@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Family, Person, Referrer
 from app.permissions import require_referrer
-from app.response_builders import build_family_detail, build_referrer_detail, partial_update
+from app.response_builders import (
+    build_family_detail,
+    build_referrer_detail,
+    get_active_or_404,
+    get_or_404,
+    partial_update,
+)
 from app.schemas import (
     FamilyCreateByReferrer,
     FamilyDetail,
@@ -40,9 +46,7 @@ def get_self(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:
-    ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer record not found")
+    ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -52,9 +56,7 @@ def update_self(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:
-    ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer record not found")
+    ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
     partial_update(ref, body)
     db.commit()
     db.refresh(ref)
@@ -112,11 +114,7 @@ def get_family(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
     if fam.referrer_id != user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -139,9 +137,7 @@ def create_family(
         Family.is_deleted == False,
     ).count()
 
-    ref = db.query(Referrer).filter(Referrer.id == referrer_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer record not found")
+    ref = get_or_404(db, Referrer, referrer_id, "Referrer record not found")
 
     if current_count >= ref.family_limit:
         raise HTTPException(
@@ -172,11 +168,7 @@ def update_family(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
     if fam.referrer_id != user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -195,11 +187,7 @@ def delete_family(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> Response:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
     if fam.referrer_id != user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -226,11 +214,7 @@ def list_family_people(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    fam = db.query(Family).filter(Family.id == fid).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fid, "Family not found")
     if fam.referrer_id != user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -260,9 +244,7 @@ def create_family_person(
     user=Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
-    fam = db.query(Family).filter(Family.id == fid).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_or_404(db, Family, fid, "Family not found")
     if fam.referrer_id != user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

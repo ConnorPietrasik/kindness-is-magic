@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Person
 from app.permissions import PersonOwner, require_person_owner
-from app.response_builders import partial_update
+from app.response_builders import get_active_or_404, partial_update
 from app.schemas import (
     PersonDetail,
     PersonUpdate,
@@ -37,11 +37,7 @@ def get_person(
     # For admins, person is None so we load it fresh.
     per = owner.person
     if per is None:
-        per = db.query(Person).filter(Person.id == per_id).first()
-        if per is None:
-            raise HTTPException(status_code=404, detail="Person not found")
-        if per.is_deleted:
-            raise HTTPException(status_code=404, detail="Person not found")
+        per = get_active_or_404(db, Person, per_id, "Person not found")
     return PersonDetail.model_validate(per)
 
 
@@ -54,11 +50,7 @@ def update_person(
 ) -> PersonDetail:
     per = owner.person
     if per is None:
-        per = db.query(Person).filter(Person.id == per_id).first()
-        if per is None:
-            raise HTTPException(status_code=404, detail="Person not found")
-        if per.is_deleted:
-            raise HTTPException(status_code=404, detail="Person not found")
+        per = get_active_or_404(db, Person, per_id, "Person not found")
 
     partial_update(per, body)
 
@@ -78,11 +70,7 @@ def delete_person(
 ) -> Response:
     per = owner.person
     if per is None:
-        per = db.query(Person).filter(Person.id == per_id).first()
-        if per is None:
-            raise HTTPException(status_code=404, detail="Person not found")
-        if per.is_deleted:
-            raise HTTPException(status_code=404, detail="Person not found")
+        per = get_active_or_404(db, Person, per_id, "Person not found")
     per.is_deleted = True
     db.commit()
     logger.info(

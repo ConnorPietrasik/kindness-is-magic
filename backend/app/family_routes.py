@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Family, Person
 from app.permissions import require_family
-from app.response_builders import build_family_detail, partial_update
+from app.response_builders import build_family_detail, get_active_or_404, partial_update
 from app.schemas import (
     FamilyDetail,
     FamilyUpdate,
@@ -33,11 +33,7 @@ def get_self(
     user=Depends(require_family),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == user.family_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family record not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family record not found")
+    fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
     return FamilyDetail(**build_family_detail(fam, db))
 
 
@@ -47,11 +43,7 @@ def update_self(
     user=Depends(require_family),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == user.family_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family record not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family record not found")
+    fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
 
     partial_update(fam, body)
 

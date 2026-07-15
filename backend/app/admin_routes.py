@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Family, Person, Referrer
 from app.permissions import require_admin
-from app.response_builders import build_family_detail, build_referrer_detail, partial_update
+from app.response_builders import (
+    build_family_detail,
+    build_referrer_detail,
+    get_active_or_404,
+    get_or_404,
+    partial_update,
+)
 from app.schemas import (
     FamilyCreate,
     FamilyDetail,
@@ -82,9 +88,7 @@ def get_referrer(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> ReferrerDetail:
-    ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer not found")
+    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -113,9 +117,7 @@ def update_referrer(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> ReferrerDetail:
-    ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer not found")
+    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     partial_update(ref, body)
     db.commit()
     db.refresh(ref)
@@ -131,9 +133,7 @@ def delete_referrer(
 ) -> Response:
     from app.models import Family, User
 
-    ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer not found")
+    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
 
     # Cascade families to orphan referrer (id=0)
     db.query(Family).filter(Family.referrer_id == ref_id).update(
@@ -215,11 +215,7 @@ def get_family(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
     return FamilyDetail(**build_family_detail(fam, db))
 
 
@@ -230,9 +226,7 @@ def create_family(
     _admin: object = Depends(require_admin),
 ) -> FamilyDetail:
     # Validate referrer exists
-    ref = db.query(Referrer).filter(Referrer.id == body.referrer_id).first()
-    if ref is None:
-        raise HTTPException(status_code=404, detail="Referrer not found")
+    get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
 
     fam = Family(
         referrer_id=body.referrer_id,
@@ -257,9 +251,7 @@ def update_family(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> FamilyDetail:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_or_404(db, Family, fam_id, "Family not found")
     partial_update(fam, body)
     db.commit()
     db.refresh(fam)
@@ -273,11 +265,7 @@ def delete_family(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> Response:
-    fam = db.query(Family).filter(Family.id == fam_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
-    if fam.is_deleted:
-        raise HTTPException(status_code=404, detail="Family not found")
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
     # Soft-delete all persons in the family first to avoid orphans.
     db.query(Person).filter(Person.family_id == fam_id).update(
         {Person.is_deleted: True}, synchronize_session=False
@@ -335,11 +323,7 @@ def get_person(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> PersonDetail:
-    per = db.query(Person).filter(Person.id == per_id).first()
-    if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
-    if per.is_deleted:
-        raise HTTPException(status_code=404, detail="Person not found")
+    per = get_active_or_404(db, Person, per_id, "Person not found")
     return PersonDetail.model_validate(per)
 
 
@@ -350,9 +334,7 @@ def create_person(
     _admin: object = Depends(require_admin),
 ) -> PersonDetail:
     # Validate family exists
-    fam = db.query(Family).filter(Family.id == body.family_id).first()
-    if fam is None:
-        raise HTTPException(status_code=404, detail="Family not found")
+    get_or_404(db, Family, body.family_id, "Family not found")
 
     per = Person(
         family_id=body.family_id,
@@ -377,11 +359,7 @@ def update_person(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> PersonDetail:
-    per = db.query(Person).filter(Person.id == per_id).first()
-    if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
-    if per.is_deleted:
-        raise HTTPException(status_code=404, detail="Person not found")
+    per = get_active_or_404(db, Person, per_id, "Person not found")
     partial_update(per, body)
     db.commit()
     db.refresh(per)
@@ -395,11 +373,7 @@ def delete_person(
     db: Session = Depends(get_db),
     _admin: object = Depends(require_admin),
 ) -> Response:
-    per = db.query(Person).filter(Person.id == per_id).first()
-    if per is None:
-        raise HTTPException(status_code=404, detail="Person not found")
-    if per.is_deleted:
-        raise HTTPException(status_code=404, detail="Person not found")
+    per = get_active_or_404(db, Person, per_id, "Person not found")
     per.is_deleted = True
     db.commit()
     logger.info("Admin %s soft-deleted person (id=%s)", _admin.email, per_id)
