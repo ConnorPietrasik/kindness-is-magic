@@ -148,7 +148,6 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
     from app import database
 
     # Patch the DB dependency at the module level
-    original_get_db = database.get_db
 
     def _override_get_db() -> Generator[Session, Any, None]:
         yield db

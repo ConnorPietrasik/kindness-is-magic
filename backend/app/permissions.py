@@ -1,7 +1,6 @@
 """Role-based access-control dependencies for FastAPI."""
 
 from dataclasses import dataclass
-from typing import Union
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import joinedload, Session
@@ -95,7 +94,7 @@ def require_owner_or_admin(resource_id: int):
 class PersonOwner:
     """Returned by require_person_owner so route handlers can reuse the loaded Person."""
     user: User
-    person: "Person | None"  # None for admins; loaded Person for referrer/family
+    person: "Person | None"  # noqa: F821  # None for admins; loaded Person for referrer/family
 
 
 def require_person_owner(

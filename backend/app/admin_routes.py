@@ -5,7 +5,7 @@ All endpoints are guarded with ``require_admin``.
 
 import logging
 import math
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 

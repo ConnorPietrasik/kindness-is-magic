@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Base,
     Family,
     Person,
     PasswordResetToken,

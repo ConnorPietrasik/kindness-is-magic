@@ -191,7 +191,6 @@ class TestAdminDeleteReferrer:
     def test_cascade_null_user_referrer_id(
         self, test_client: TestClient, admin_user, referrer_user, db: Session
     ):
-        from app.models import User
 
         _admin_login(test_client)
         ref_id = referrer_user.referrer_id

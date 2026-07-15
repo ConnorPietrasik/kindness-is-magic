@@ -31,6 +31,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass, field
+import dataclasses as _dc
 
 from sqlalchemy.orm import Session
 
@@ -53,8 +54,6 @@ class RowResult:
     message: str = ""        # human-readable detail
     db_id: int | None = None # primary key of the created/updated record
 
-
-import dataclasses as _dc
 
 def _row_result_to_dict(r: RowResult) -> dict:
     return _dc.asdict(r)

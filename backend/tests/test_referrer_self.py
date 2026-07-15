@@ -1,6 +1,5 @@
 """Tests for referrer self-service endpoints: /api/referrer/me, /api/referrer/families, /api/referrer/families/{fid}/people."""
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 

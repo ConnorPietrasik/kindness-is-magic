@@ -6,13 +6,12 @@ import sys
 from collections.abc import Generator
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.database import get_db

@@ -35,7 +35,7 @@ from app.schemas import (
     ReferrerSelfRegisterResponse,
     ReferrerSummary,
 )
-from app.user_validation import validate_email, validate_user_role_consistency
+from app.user_validation import validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
 

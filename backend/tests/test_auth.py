@@ -2,7 +2,6 @@
 
 from datetime import datetime, timezone
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -444,7 +443,6 @@ class TestResetPassword:
         self, test_client: TestClient, admin_user, db: Session
     ):
         from app.models import PasswordResetToken
-        from app.auth import get_password_hash
 
         # Create a reset token (simulating forgot-password flow)
         raw_token = "test-reset-token-12345"
@@ -488,7 +486,6 @@ class TestResetPassword:
         self, test_client: TestClient, admin_user, db: Session
     ):
         from app.models import PasswordResetToken
-        from app.auth import get_password_hash
 
         raw_token = "expired-token"
         reset = PasswordResetToken(
@@ -512,7 +509,6 @@ class TestResetPassword:
         self, test_client: TestClient, admin_user, db: Session
     ):
         from app.models import PasswordResetToken
-        from app.auth import get_password_hash
 
         raw_token = "short-pass-token"
         reset = PasswordResetToken(

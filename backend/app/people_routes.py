@@ -7,7 +7,7 @@ Ownership is enforced via ``require_person_owner()`` which checks:
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db

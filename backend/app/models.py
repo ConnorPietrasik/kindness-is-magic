@@ -9,7 +9,6 @@ from sqlalchemy import (
     Integer,
     SmallInteger,
     String,
-    Text,
     func,
     Enum as SAEnum,
 )

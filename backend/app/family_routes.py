@@ -4,7 +4,7 @@ All endpoints are guarded with ``require_family``.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db

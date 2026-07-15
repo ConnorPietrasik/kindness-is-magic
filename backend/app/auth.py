@@ -128,7 +128,6 @@ _SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
 
 def set_auth_cookies(response, access_token: str, refresh_token: str):
     """Set HttpOnly cookies for access and refresh tokens on a Response object."""
-    from fastapi.responses import Response
 
     response.set_cookie(
         key="access_token",
@@ -152,7 +151,6 @@ def set_auth_cookies(response, access_token: str, refresh_token: str):
 
 def clear_auth_cookies(response):
     """Clear the auth cookies on a Response object."""
-    from fastapi.responses import Response
 
     for cookie_name in ("access_token", "refresh_token"):
         response.delete_cookie(key=cookie_name, path="/")
@@ -197,4 +195,4 @@ async def get_current_user(
     return user
 
 
-Currentuser = Annotated["app.models.User", Depends(get_current_user)]
+Currentuser = Annotated["User", Depends(get_current_user)]  # noqa: F821

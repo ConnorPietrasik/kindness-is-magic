@@ -1,6 +1,5 @@
 """Tests for the admin CSV import endpoint and csv_import module."""
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -181,7 +180,7 @@ class TestCsvImportMinimal:
 
 class TestCsvImportFull:
     def test_creates_multiple_entities(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import User, Referrer, Family, Person
+        from app.models import User, Family, Person
 
         _admin_login(test_client)
         resp = _post_csv(test_client, CSV_FULL_OPTIONALS)

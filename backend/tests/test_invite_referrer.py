@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -317,7 +316,7 @@ class TestInviteRedemptionAtomicity:
         self, test_client: TestClient, admin_user, db: Session
     ):
         """If email already exists, no partial Referrer or User should be created."""
-        from app.models import Referrer, User, ReferrerInviteToken
+        from app.models import Referrer, User
 
         # Seed an existing user with the target email
         from app.auth import get_password_hash

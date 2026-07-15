@@ -3,7 +3,6 @@
 These endpoints are used by both referrers and family users with ownership checks.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 

@@ -1,16 +1,13 @@
 """Tests for auth utility functions (hashing, JWT, cookies)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import jwt
 import pytest
 
 from app.auth import (
     ALGORITHM,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_SECRET_KEY,
-    REFRESH_TOKEN_EXPIRE_DAYS,
-    SECRET_KEY,
     clear_auth_cookies,
     create_access_token,
     create_refresh_token,
