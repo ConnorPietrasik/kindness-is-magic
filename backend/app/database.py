@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://KindDB:testpassword@db:5432/kindness_is_magic",
+    "postgresql+psycopg://KindDB:testpassword@db:5432/kindness_is_magic",
 )
 
 engine = create_engine(DATABASE_URL)

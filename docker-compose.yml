@@ -43,7 +43,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
       db:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://KindDB:testpassword@test_db:5432/kindness_is_magic_test
+      DATABASE_URL: postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test
       SECRET_KEY: test-secret-key-do-not-use
       REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use
       COOKIE_SECURE: "false"

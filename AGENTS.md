@@ -13,6 +13,7 @@
 - Follow existing patterns before introducing new abstractions.
 - Prefer modifying existing modules over creating new ones.
 - Do not add dependencies without asking specifically.
+- When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
 
 ## Project Structure
 

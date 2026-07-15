@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ---------------------------------------------------------------------------
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://KindDB:testpassword@test_db:5432/kindness_is_magic_test",
+    "postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test",
 )
 
 engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
