@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, Referrer
+from app.models import Family, Person, Referrer, User
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
@@ -43,7 +43,7 @@ router = APIRouter(prefix="/api/referrer", tags=["referrer"])
 
 @router.get("/me")
 def get_self(
-    user=Depends(require_referrer),
+    user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:
     ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
@@ -53,7 +53,7 @@ def get_self(
 @router.patch("/me")
 def update_self(
     body: ReferrerSelfUpdate,
-    user=Depends(require_referrer),
+    user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:
     ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
@@ -71,7 +71,7 @@ def update_self(
 
 @router.get("/families")
 def list_families(
-    user=Depends(require_referrer),
+    user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> FamilyListResponse:
     families = (
@@ -115,7 +115,7 @@ def get_family(
 @router.post("/families", status_code=201)
 def create_family(
     body: FamilyCreateByReferrer,
-    user=Depends(require_referrer),
+    user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
     referrer_id = user.referrer_id

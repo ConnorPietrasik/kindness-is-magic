@@ -15,7 +15,7 @@
 
 - **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.is_deleted == False`) unless the endpoint explicitly needs deleted data. Deletion sets `is_deleted = True` rather than removing the row.
   - Never use `not Model.is_deleted` — that evaluates the SQLAlchemy Column in Python (always truthy). Use `Model.is_deleted == False` so SQLAlchemy generates SQL.
-- **Role-based access:** Four roles — `admin`, `referrer`, `family`, `person`. Auth middleware (`auth.py`) validates JWTs and attaches the user to the request. `permissions.py` provides ownership and admin-check dependencies.
+- **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth middleware (`auth.py`) validates JWTs and attaches the user to the request. `permissions.py` provides ownership and admin-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 
 ## Project Structure

@@ -6,8 +6,6 @@ import secrets
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
-
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -184,6 +182,3 @@ async def get_current_user(
         raise credentials_exception
 
     return user
-
-
-Currentuser = Annotated["User", Depends(get_current_user)]  # noqa: F821

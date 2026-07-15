@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person
+from app.models import Family, Person, User
 from app.permissions import require_family
 from app.response_builders import build_family_detail, get_active_or_404, partial_update
 from app.schemas import (
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/family", tags=["family"])
 
 @router.get("/me")
 def get_self(
-    user=Depends(require_family),
+    user: User = Depends(require_family),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
@@ -40,7 +40,7 @@ def get_self(
 @router.patch("/me")
 def update_self(
     body: FamilyUpdate,
-    user=Depends(require_family),
+    user: User = Depends(require_family),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
@@ -60,7 +60,7 @@ def update_self(
 
 @router.get("/people")
 def list_people(
-    user=Depends(require_family),
+    user: User = Depends(require_family),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
     people = db.query(Person).filter(Person.family_id == user.family_id, Person.is_deleted == False).all()
@@ -81,7 +81,7 @@ def list_people(
 @router.post("/people", status_code=201)
 def create_person(
     body: PersonCreateInFamily,
-    user=Depends(require_family),
+    user: User = Depends(require_family),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
     family_id = user.family_id

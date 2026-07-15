@@ -52,7 +52,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def register(
+def register(
     data: UserCreate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -105,7 +105,7 @@ async def register(
 
 @router.post("/login")
 @limiter.limit("5/minute")
-async def login(request: Request, data: UserLogin, response: Response, db: Session = Depends(get_db)):
+def login(request: Request, data: UserLogin, response: Response, db: Session = Depends(get_db)):
     """Authenticate and set HttpOnly cookies."""
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
@@ -138,7 +138,7 @@ async def login(request: Request, data: UserLogin, response: Response, db: Sessi
 
 
 @router.post("/logout")
-async def logout(response: Response, _user: User = Depends(get_current_user)):
+def logout(response: Response, _user: User = Depends(get_current_user)):
     """Clear auth cookies."""
     clear_auth_cookies(response)
     logger.info("User logged out: %s", _user.email)
@@ -152,7 +152,7 @@ async def logout(response: Response, _user: User = Depends(get_current_user)):
 
 @router.post("/refresh")
 @limiter.limit("30/minute")
-async def refresh(
+def refresh(
     request: Request,
     response: Response,
     refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
@@ -186,7 +186,7 @@ async def refresh(
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)):
+def me(user: User = Depends(get_current_user)):
     """Return the current authenticated user's profile."""
     return user
 
@@ -197,7 +197,7 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.put("/me/password")
-async def change_password(
+def change_password(
     data: ChangePassword,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -220,7 +220,7 @@ async def change_password(
 
 @router.post("/forgot-password")
 @limiter.limit("5/minute")
-async def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
+def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
     """Generate a password-reset token. In dev mode the token is logged."""
     user = db.query(User).filter(User.email == data.email).first()
 
@@ -262,7 +262,7 @@ async def forgot_password(request: Request, data: ForgotPassword, db: Session = 
 
 @router.post("/reset-password")
 @limiter.limit("5/minute")
-async def reset_password(request: Request, data: ResetPassword, db: Session = Depends(get_db)):
+def reset_password(request: Request, data: ResetPassword, db: Session = Depends(get_db)):
     """Consume a reset token and set a new password."""
     reset = (
         db.query(PasswordResetToken)
@@ -301,7 +301,7 @@ async def reset_password(request: Request, data: ResetPassword, db: Session = De
     response_model=ReferrerInviteResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def invite_referrer(
+def invite_referrer(
     data: ReferrerInviteCreate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -332,7 +332,7 @@ async def invite_referrer(
     response_model=ReferrerSelfRegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def register_referrer(
+def register_referrer(
     data: ReferrerSelfRegister,
     response: Response,
     db: Session = Depends(get_db),

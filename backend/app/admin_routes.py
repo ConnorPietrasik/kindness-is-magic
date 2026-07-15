@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, Referrer
+from app.models import Family, Person, Referrer, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_family_detail,
@@ -55,7 +55,7 @@ def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
     total = db.query(Referrer).filter(Referrer.id != Family.ORPHAN_REFERRER_ID).count()
     referrers = (
@@ -79,7 +79,7 @@ def list_referrers(
 def get_referrer(
     ref_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     return ReferrerDetail(**build_referrer_detail(ref, db))
@@ -89,7 +89,7 @@ def get_referrer(
 def create_referrer(
     body: ReferrerCreate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
     ref = Referrer(
         name=body.name,
@@ -108,7 +108,7 @@ def update_referrer(
     ref_id: int,
     body: ReferrerUpdate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     partial_update(ref, body)
@@ -122,7 +122,7 @@ def update_referrer(
 def delete_referrer(
     ref_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> Response:
     from app.models import Family, User
 
@@ -161,7 +161,7 @@ def list_families(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> FamilyListResponse:
     total = db.query(Family).filter(Family.is_deleted == False).count()
     families = db.query(Family).filter(Family.is_deleted == False).order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
@@ -194,7 +194,7 @@ def list_families(
 def get_family(
     fam_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
     return FamilyDetail(**build_family_detail(fam, db))
@@ -204,7 +204,7 @@ def get_family(
 def create_family(
     body: FamilyCreate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     # Validate referrer exists
     get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
@@ -230,7 +230,7 @@ def update_family(
     fam_id: int,
     body: FamilyUpdate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     fam = get_or_404(db, Family, fam_id, "Family not found")
     partial_update(fam, body)
@@ -244,7 +244,7 @@ def update_family(
 def delete_family(
     fam_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> Response:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
     # Soft-delete all persons in the family first to avoid orphans.
@@ -270,7 +270,7 @@ def list_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
     total = db.query(Person).filter(Person.is_deleted == False).count()
     people = db.query(Person).filter(Person.is_deleted == False).order_by(Person.id).offset((page - 1) * page_size).limit(page_size).all()
@@ -296,7 +296,7 @@ def list_people(
 def get_person(
     per_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> PersonDetail:
     per = get_active_or_404(db, Person, per_id, "Person not found")
     return PersonDetail.model_validate(per)
@@ -306,7 +306,7 @@ def get_person(
 def create_person(
     body: PersonCreate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> PersonDetail:
     # Validate family exists
     get_or_404(db, Family, body.family_id, "Family not found")
@@ -332,7 +332,7 @@ def update_person(
     per_id: int,
     body: PersonUpdate,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> PersonDetail:
     per = get_active_or_404(db, Person, per_id, "Person not found")
     partial_update(per, body)
@@ -346,7 +346,7 @@ def update_person(
 def delete_person(
     per_id: int,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> Response:
     per = get_active_or_404(db, Person, per_id, "Person not found")
     per.is_deleted = True
@@ -390,7 +390,7 @@ dad@example.com,Password123!,family,,The Smiths"""
 
 
 @csv_admin_router.get("/csv-sample")
-def get_csv_sample(_admin: object = Depends(require_admin)):
+def get_csv_sample(_admin: User = Depends(require_admin)):
     """Return a sample CSV template for admin reference."""
     return {"csv_template": csv_sample}
 
@@ -399,7 +399,7 @@ def get_csv_sample(_admin: object = Depends(require_admin)):
 async def import_csv_data(
     request: Request,
     db: Session = Depends(get_db),
-    _admin: object = Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> dict:
     """Import a CSV file (raw body) to bulk-create referrers, families, people, and users.
 
