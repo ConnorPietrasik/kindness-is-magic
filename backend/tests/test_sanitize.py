@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas import (
+    AdminReferrerUpdate,
     FamilyCreate,
     FamilyCreateByReferrer,
     FamilyUpdate,
@@ -12,7 +13,6 @@ from app.schemas import (
     PersonUpdate,
     ReferrerCreate,
     ReferrerSelfRegister,
-    ReferrerSelfUpdate,
     ReferrerUpdate,
 )
 from app.user_validation import sanitize_plain_text
@@ -78,13 +78,13 @@ class TestReferrerSchemasRejectHtml:
         with pytest.raises(ValidationError):
             ReferrerCreate(name=HTML_PAYLOAD, family_limit=5, phone_number="555-0001")
 
+    def test_admin_referrer_update(self):
+        with pytest.raises(ValidationError):
+            AdminReferrerUpdate(name=HTML_PAYLOAD)
+
     def test_referrer_update(self):
         with pytest.raises(ValidationError):
             ReferrerUpdate(name=HTML_PAYLOAD)
-
-    def test_referrer_self_update(self):
-        with pytest.raises(ValidationError):
-            ReferrerSelfUpdate(name=HTML_PAYLOAD)
 
     def test_referrer_self_register(self):
         with pytest.raises(ValidationError):

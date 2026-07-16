@@ -30,7 +30,7 @@ from app.schemas import (
     PersonListResponse,
     PersonSummary,
     ReferrerDetail,
-    ReferrerSelfUpdate,
+    ReferrerUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def get_self(
 
 @router.patch("/me")
 def update_self(
-    body: ReferrerSelfUpdate,
+    body: ReferrerUpdate,
     user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:

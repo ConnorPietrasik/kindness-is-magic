@@ -164,21 +164,6 @@ class ReferrerCreate(BaseModel):
 
 
 class ReferrerUpdate(BaseModel):
-    """Admin-only: full update including family_limit."""
-
-    name: Optional[str] = Field(None, min_length=1, max_length=60)
-    family_limit: Optional[int] = Field(None, ge=1, le=999)
-    phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
-
-    @field_validator("name")
-    @classmethod
-    def clean_name(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        return sanitize_plain_text(v)
-
-
-class ReferrerSelfUpdate(BaseModel):
     """Referrer self-service update — family_limit is not allowed."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=60)
@@ -190,6 +175,12 @@ class ReferrerSelfUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+
+class AdminReferrerUpdate(ReferrerUpdate):
+    """Admin-only: extends ReferrerUpdate with family_limit."""
+
+    family_limit: Optional[int] = Field(None, ge=1, le=999)
 
 
 class ReferrerDetail(BaseModel):
@@ -251,6 +242,13 @@ class FamilyUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+
+class AdminFamilyUpdate(FamilyUpdate):
+    """Admin-only: extends FamilyUpdate with referrer_id and is_deleted."""
+
+    referrer_id: Optional[int] = None
+    is_deleted: Optional[bool] = None
 
 
 class FamilyDetail(BaseModel):
@@ -329,6 +327,12 @@ class PersonUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+
+class AdminPersonUpdate(PersonUpdate):
+    """Admin-only: extends PersonUpdate with is_deleted."""
+
+    is_deleted: Optional[bool] = None
 
 
 class PersonDetail(BaseModel):

@@ -20,21 +20,21 @@ from app.response_builders import (
     partial_update,
 )
 from app.schemas import (
+    AdminFamilyUpdate,
+    AdminPersonUpdate,
+    AdminReferrerUpdate,
     FamilyCreate,
     FamilyDetail,
     FamilyListResponse,
     FamilySummary,
-    FamilyUpdate,
     PersonCreate,
     PersonDetail,
     PersonListResponse,
     PersonSummary,
-    PersonUpdate,
     ReferrerCreate,
     ReferrerDetail,
     ReferrerListResponse,
     ReferrerSummary,
-    ReferrerUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def create_referrer(
 @referrer_admin_router.patch("/{ref_id}")
 def update_referrer(
     ref_id: int,
-    body: ReferrerUpdate,
+    body: AdminReferrerUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
@@ -228,12 +228,15 @@ def create_family(
 @family_admin_router.patch("/{fam_id}")
 def update_family(
     fam_id: int,
-    body: FamilyUpdate,
+    body: AdminFamilyUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted families.
     fam = get_or_404(db, Family, fam_id, "Family not found")
+    # Validate referrer exists if referrer_id is being changed (id=0 is the orphan referrer)
+    if body.referrer_id is not None and body.referrer_id != Family.ORPHAN_REFERRER_ID:
+        get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
     partial_update(fam, body)
     db.commit()
     db.refresh(fam)
@@ -331,7 +334,7 @@ def create_person(
 @people_admin_router.patch("/{per_id}")
 def update_person(
     per_id: int,
-    body: PersonUpdate,
+    body: AdminPersonUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonDetail:

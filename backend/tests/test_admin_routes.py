@@ -362,6 +362,49 @@ class TestAdminUpdateFamily:
         assert body["family_name"] == "Updated Family"
         assert body["contact_name"] == "Contact Person"  # unchanged
 
+    def test_200_update_referrer_id(self, test_client: TestClient, admin_user, family_record, referrer_record):
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"referrer_id": referrer_record.id},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["referrer_id"] == referrer_record.id
+
+    def test_200_update_referrer_id_to_orphan(self, test_client: TestClient, admin_user, family_record):
+        _admin_login(test_client)
+        # Set to a real referrer first, then back to orphan (id=0)
+        from app.models import Family
+
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"referrer_id": Family.ORPHAN_REFERRER_ID},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["referrer_id"] == Family.ORPHAN_REFERRER_ID
+
+    def test_404_update_referrer_id_invalid(self, test_client: TestClient, admin_user, family_record):
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"referrer_id": 99999},
+        )
+        assert resp.status_code == 404
+
+    def test_200_restore_soft_deleted_family(self, test_client: TestClient, admin_user, family_record, db: Session):
+        _admin_login(test_client)
+        # Soft-delete the family
+        family_record.is_deleted = True
+        db.commit()
+        # Restore it via PATCH
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"is_deleted": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_deleted"] is False
+
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.patch(
@@ -575,6 +618,20 @@ class TestAdminUpdatePerson:
         assert body["fun_wish"] == "A board game"
         assert body["title"] == "Miss"
         assert body["note"] == "Updated note"
+
+    def test_200_restore_soft_deleted_person(self, test_client: TestClient, admin_user, family_with_people, db: Session):
+        _admin_login(test_client)
+        person = family_with_people["people"][0]
+        # Soft-delete the person
+        person.is_deleted = True
+        db.commit()
+        # Restore it via PATCH
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={"is_deleted": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_deleted"] is False
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
