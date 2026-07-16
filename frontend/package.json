@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
@@ -22,9 +23,12 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.2.1",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.1",
+    "typescript": "^7.0.2",
     "vite": "^5.2.0",
     "vitest": "^4.1.10"
   },

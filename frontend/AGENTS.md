@@ -2,7 +2,8 @@
 
 ## Stack
 
-- **React 18** with **JSX** (`.jsx` files, currently not TypeScript)
+- **React 18** with **TypeScript** (`.tsx` files, strict mode enabled)
+- **TypeScript** with `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`
 - **Vite 5** as the build tool
 - **Tailwind CSS v4** via `@tailwindcss/vite` plugin
 - **React Query** (`@tanstack/react-query`) for server state
@@ -12,10 +13,10 @@
 
 ## Frontend Rules
 
-- Use React Query for server state rather than custom fetching or component-level state.
-- Keep API calls in `src/lib/api.js`; do not call Axios directly from page components.
+- All remote server state must be managed by React Query. `useState` is only for local UI state.
+- Keep API calls in `src/lib/api.ts`; do not call Axios directly from page components.
 - Prefer reusing components from `src/components/` and `useCrudManager` over duplicating patterns.
-- Use Tailwind utility classes for styling. Do not add component-specific CSS files. Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or application-wide behavior. Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
+- Use Tailwind utility classes for styling. Do not add CSS modules, styled-components, or arbitrary CSS files. Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or application-wide behavior. Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
 
 ## React Query Rules
 
@@ -45,7 +46,7 @@
 
 ## API Proxy
 
-Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.js`). In production the backend sits behind the same origin. All API calls use relative paths — never hardcode absolute backend URLs in application code.
+Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`). In production the backend sits behind the same origin. All API calls use relative paths — never hardcode absolute backend URLs in application code.
 
 ## Authentication
 
@@ -58,16 +59,16 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.js`).
 
 - Functions are grouped by domain: auth, admin, referrer, family, shared.
 - Functions return `response.data`, not raw Axios response objects. **Exception:** `loginRequest` and `registerRequest` return the full axios response (AuthContext destructures `{ data }` from them — do not change this).
-- Extend `src/lib/api.js` rather than creating new fetch utilities.
+- Extend `src/lib/api.ts` rather than creating new fetch utilities.
 
 ## Error Handling
 
-- `formatApiError(error, fallback?)` in `src/lib/utils.js` extracts user-facing strings from Axios errors, checking `response.data.detail`, `.msg`, then full JSON, then `error.message`.
+- `formatApiError(error, fallback?)` in `src/lib/utils.ts` extracts user-facing strings from Axios errors, checking `response.data.detail`, `.msg`, then full JSON, then `error.message`.
 - `ErrorBox` and `MutationErrors` components render errors in the UI.
 
 ## Shared CRUD Hook
 
-`src/hooks/useCrudManager.js` encapsulates list/detail CRUD pages.
+`src/hooks/useCrudManager.ts` encapsulates list/detail CRUD pages.
 
 - Reuse it instead of duplicating CRUD state management.
 - It handles queries, mutations, invalidation, and common UI state (form visibility, editing id, delete confirmation).
@@ -92,16 +93,17 @@ Three roles: `admin`, `referrer`, `family`.
 
 ## Structure
 
-- `src/main.jsx` — Entry point. Providers stacked: `QueryClientProvider` → `BrowserRouter` → `AuthProvider` → `App`. QueryClient defaults: `retry: 1`, `staleTime: 5min`.
-- `src/App.jsx` — Router. All pages are **lazy-loaded** via `React.lazy()` with `<Suspense>` spinner fallback. New pages should follow this pattern.
+- `src/main.tsx` — Entry point. Providers stacked: `QueryClientProvider` → `BrowserRouter` → `AuthProvider` → `App`. QueryClient defaults: `retry: 1`, `staleTime: 5min`.
+- `src/App.tsx` — Router. All pages are **lazy-loaded** via `React.lazy()` with `<Suspense>` spinner fallback. New pages should follow this pattern.
 - `src/components/` — Reusable UI components. Use **named exports**, not default exports.
-- `src/lib/api.js` — Axios instance and all API functions. See [API Layer](#api-layer).
-- `src/lib/routes.js` — Route constants (`ROUTES`) and dynamic builders (`route`).
-- `src/lib/utils.js` — `humanize()` and `formatApiError()`.
-- `src/lib/csv.js` — Client-side CSV parsing and validation.
-- `src/hooks/useCrudManager.js` — Shared CRUD hook. See [Shared CRUD Hook](#shared-crud-hook).
-- `src/context/AuthContext.jsx` — Auth state via React Query. See [Authentication](#authentication).
-- Test files: `*.test.js` / `*.test.jsx` alongside source, or in `src/__tests__/`.
+- `src/types/` — Shared TypeScript types (`domain.ts`, `api.ts`, `auth.ts`, `csv.ts`, `index.ts`). Import from here rather than redefining shapes.
+- `src/lib/api.ts` — Axios instance and all API functions. See [API Layer](#api-layer).
+- `src/lib/routes.ts` — Route constants (`ROUTES`) and dynamic builders (`route`).
+- `src/lib/utils.ts` — `humanize()` and `formatApiError()`.
+- `src/lib/csv.ts` — Client-side CSV parsing and validation.
+- `src/hooks/useCrudManager.ts` — Shared CRUD hook. See [Shared CRUD Hook](#shared-crud-hook).
+- `src/context/AuthContext.tsx` — Auth state via React Query. See [Authentication](#authentication).
+- Test files: `*.test.ts` / `*.test.tsx` alongside source, or in `src/__tests__/`.
 
 ## Scripts
 
@@ -111,6 +113,7 @@ npm run build         # Production build → dist/
 npm run preview       # Preview production build locally
 npm run test          # Run Vitest test suite
 npm run test:coverage # Run tests with coverage (requires @vitest/coverage-v8)
+npm run typecheck     # TypeScript type check (tsc --noEmit)
 ```
 
-There is **no** `typecheck` or `lint` script — the project uses plain JavaScript, not TypeScript, and has no ESLint config.
+The project uses **TypeScript** with strict mode. Run `npm run typecheck` to verify types. There is no ESLint config.

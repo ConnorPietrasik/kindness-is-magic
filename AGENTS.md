@@ -6,6 +6,7 @@
 - **No Docker-in-Docker.** Do not attempt `docker compose` or `docker run`.
 - **No root/sudo access.** You cannot install system packages.
 - **Basic shell commands work:** `ls`, `grep`, `find`, `sed`, `awk`, etc.
+- **Shell sessions do not persist.** Each `bash` call is a separate invocation — `cd` does not carry over. Always use full paths or prefix commands with `cd /path && ...`.
 - **Git is available for inspection.** You can use `git diff`, `git log`, `git blame`, etc. However, do **not** commit or push changes.
 
 ## General Rules
@@ -18,4 +19,4 @@
 ## Project Structure
 
 - `backend/` — FastAPI + SQLAlchemy backend (Python). See `backend/AGENTS.md`.
-- `frontend/` — React + Vite frontend (JavaScript/JSX). See `frontend/AGENTS.md`.
+- `frontend/` — React + Vite frontend (TypeScript). See `frontend/AGENTS.md`.
