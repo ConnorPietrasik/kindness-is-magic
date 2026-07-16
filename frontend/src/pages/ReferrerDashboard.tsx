@@ -65,8 +65,8 @@ export default function ReferrerDashboard() {
   } = useCrudManager({
     rootKey: REFERRER_FAMILIES_KEY,
     listFn: listReferrerFamilies,
-    createFn: createReferrerFamily as (data: unknown) => Promise<FamilyDetail>,
-    updateFn: updateReferrerFamily as (id: number, data: unknown) => Promise<FamilyDetail>,
+    createFn: createReferrerFamily,
+    updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
     invalidationKeys: [REFERRER_FAMILIES_KEY, REFERRER_ME_KEY],
   });

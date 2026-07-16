@@ -17,7 +17,7 @@ import { useState } from "react";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface CrudManagerOptions<ListResponse, Item> {
+export interface CrudManagerOptions<ListResponse, Item, Payload = unknown> {
   /** Query key for the list (e.g. `['adminReferrers']`) */
   rootKey: string[];
   /** Fetches the full list response */
@@ -25,24 +25,24 @@ export interface CrudManagerOptions<ListResponse, Item> {
   /** Fetches a single item by id (optional, for edit-by-id) */
   detailFn?: (id: number) => Promise<Item>;
   /** Creates a new item */
-  createFn?: (data: unknown) => Promise<Item>;
+  createFn?: (data: Payload) => Promise<Item>;
   /** Updates an existing item */
-  updateFn?: (id: number, data: unknown) => Promise<Item>;
+  updateFn?: (id: number, data: Payload) => Promise<Item>;
   /** Deletes an item by id */
   deleteFn?: (id: number) => Promise<void>;
   /** Keys to invalidate after mutations (defaults to `[rootKey]`) */
   invalidationKeys?: (string | string[])[];
 }
 
-export interface CrudManagerReturn<ListResponse, Item> {
+export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
   // Query data
   listData: UseQueryResult<ListResponse>["data"];
   listLoading: boolean;
   detail: Item | null;
   detailLoading: boolean;
   // Mutations
-  createMut: UseMutationResult<Item, Error, unknown> | null;
-  updateMut: UseMutationResult<Item, Error, { id: number; data: unknown }> | null;
+  createMut: UseMutationResult<Item, Error, Payload> | null;
+  updateMut: UseMutationResult<Item, Error, { id: number; data: Payload }> | null;
   deleteMut: UseMutationResult<void, Error, number> | null;
   // UI state
   showForm: boolean;
@@ -60,7 +60,9 @@ export interface CrudManagerReturn<ListResponse, Item> {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useCrudManager<ListResponse, Item>(options: CrudManagerOptions<ListResponse, Item>): CrudManagerReturn<ListResponse, Item> {
+export function useCrudManager<ListResponse, Item, Payload = unknown>(
+  options: CrudManagerOptions<ListResponse, Item, Payload>
+): CrudManagerReturn<ListResponse, Item, Payload> {
   const { rootKey, listFn, detailFn, createFn, updateFn, deleteFn, invalidationKeys = [rootKey] } = options;
 
   const queryClient = useQueryClient();
@@ -88,7 +90,7 @@ export function useCrudManager<ListResponse, Item>(options: CrudManagerOptions<L
   /* ── Mutations ──────────────────────────────────────────── */
   const createMut = createFn
     ? useMutation({
-        mutationFn: createFn as (variables: unknown) => Promise<Item>,
+        mutationFn: createFn,
         onSuccess: () => {
           invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
           setShowForm(false);
@@ -98,7 +100,7 @@ export function useCrudManager<ListResponse, Item>(options: CrudManagerOptions<L
 
   const updateMut = updateFn
     ? useMutation({
-        mutationFn: ({ id, data }: { id: number; data: unknown }) => updateFn(id, data),
+        mutationFn: ({ id, data }: { id: number; data: Payload }) => updateFn(id, data),
         onSuccess: () => {
           invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
           if (detailFn) {

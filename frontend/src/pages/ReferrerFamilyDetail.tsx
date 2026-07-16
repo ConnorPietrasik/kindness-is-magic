@@ -30,7 +30,6 @@ import {
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import type { PersonDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -79,8 +78,8 @@ export default function ReferrerFamilyDetail() {
     rootKey: peopleKey,
     listFn: () => listReferrerFamilyPeople(famIdNum),
     detailFn: getPerson,
-    createFn: (data: unknown) => createReferrerFamilyPerson(famIdNum, data as Record<string, unknown>),
-    updateFn: updatePerson as (id: number, data: unknown) => Promise<PersonDetail>,
+    createFn: (data: Record<string, unknown>) => createReferrerFamilyPerson(famIdNum, data),
+    updateFn: updatePerson,
     deleteFn: deletePerson,
     invalidationKeys: [peopleKey, ["referrerFamily", famIdStr]],
   });

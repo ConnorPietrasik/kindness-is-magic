@@ -17,7 +17,6 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import type { PersonDetail } from "../types";
 
 const FAMILY_PEOPLE_KEY = ["familyPeople"];
 
@@ -45,8 +44,8 @@ export default function FamilyPeople() {
     rootKey: FAMILY_PEOPLE_KEY,
     listFn: listFamilyPeople,
     detailFn: getPerson,
-    createFn: createFamilyPerson as (data: unknown) => Promise<PersonDetail>,
-    updateFn: updatePerson as (id: number, data: unknown) => Promise<PersonDetail>,
+    createFn: createFamilyPerson,
+    updateFn: updatePerson,
     deleteFn: deletePerson,
   });
 

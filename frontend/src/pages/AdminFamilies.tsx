@@ -18,7 +18,6 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
-import type { FamilyDetail } from "../types";
 
 const FAMILY_KEYS = ["adminFamilies"];
 const REFERRER_KEYS = ["adminReferrers"];
@@ -47,8 +46,8 @@ export default function AdminFamilies() {
     rootKey: FAMILY_KEYS,
     listFn: adminListFamilies,
     detailFn: adminGetFamily,
-    createFn: adminCreateFamily as (data: unknown) => Promise<FamilyDetail>,
-    updateFn: adminUpdateFamily as (id: number, data: unknown) => Promise<FamilyDetail>,
+    createFn: adminCreateFamily,
+    updateFn: adminUpdateFamily,
     deleteFn: adminDeleteFamily,
   });
 

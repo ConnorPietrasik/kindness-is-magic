@@ -45,8 +45,8 @@ export default function AdminReferrers() {
     rootKey: REFERRER_KEYS,
     listFn: adminListReferrers,
     detailFn: adminGetReferrer,
-    createFn: adminCreateReferrer as (data: unknown) => Promise<ReferrerDetail>,
-    updateFn: adminUpdateReferrer as (id: number, data: unknown) => Promise<ReferrerDetail>,
+    createFn: adminCreateReferrer,
+    updateFn: adminUpdateReferrer,
     deleteFn: adminDeleteReferrer,
   });
 

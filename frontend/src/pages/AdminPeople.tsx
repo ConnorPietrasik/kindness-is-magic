@@ -18,7 +18,6 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreatePerson, adminDeletePerson, adminGetPerson, adminListFamilies, adminListPeople, adminUpdatePerson } from "../lib/api";
-import type { PersonDetail } from "../types";
 
 const PEOPLE_KEYS = ["adminPeople"];
 const FAMILY_KEYS = ["adminFamilies"];
@@ -47,8 +46,8 @@ export default function AdminPeople() {
     rootKey: PEOPLE_KEYS,
     listFn: adminListPeople,
     detailFn: adminGetPerson,
-    createFn: adminCreatePerson as (data: unknown) => Promise<PersonDetail>,
-    updateFn: adminUpdatePerson as (id: number, data: unknown) => Promise<PersonDetail>,
+    createFn: adminCreatePerson,
+    updateFn: adminUpdatePerson,
     deleteFn: adminDeletePerson,
   });
 
