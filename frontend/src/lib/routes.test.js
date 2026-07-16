@@ -1,0 +1,47 @@
+import { describe, it, expect } from 'vitest';
+import { ROUTES, route } from './routes';
+
+describe('ROUTES constants', () => {
+  it('has correct public routes', () => {
+    expect(ROUTES.LOGIN).toBe('/login');
+    expect(ROUTES.FORGOT_PASSWORD).toBe('/forgot-password');
+    expect(ROUTES.RESET_PASSWORD).toBe('/reset-password/:token');
+  });
+
+  it('has correct dashboard route', () => {
+    expect(ROUTES.DASHBOARD).toBe('/dashboard');
+  });
+
+  it('has correct admin routes', () => {
+    expect(ROUTES.REGISTER).toBe('/register');
+    expect(ROUTES.ADMIN_REFERRERS).toBe('/admin/referrers');
+    expect(ROUTES.ADMIN_FAMILIES).toBe('/admin/families');
+    expect(ROUTES.ADMIN_PEOPLE).toBe('/admin/people');
+    expect(ROUTES.ADMIN_CSV_UPLOAD).toBe('/admin/csv-upload');
+  });
+
+  it('has correct referrer routes', () => {
+    expect(ROUTES.REFERRER_DASHBOARD).toBe('/referrer/dashboard');
+    expect(ROUTES.REFERRER_FAMILY_DETAIL).toBe('/referrer/families/:id');
+  });
+
+  it('has correct family routes', () => {
+    expect(ROUTES.FAMILY_DASHBOARD).toBe('/family/dashboard');
+    expect(ROUTES.FAMILY_PEOPLE).toBe('/family/people');
+  });
+
+  it('has correct root route', () => {
+    expect(ROUTES.ROOT).toBe('/');
+  });
+});
+
+describe('route dynamic builders', () => {
+  it('builds reset-password path with token', () => {
+    expect(route.resetPassword('abc123')).toBe('/reset-password/abc123');
+  });
+
+  it('builds referrer family detail path with id', () => {
+    expect(route.referrerFamilyDetail(42)).toBe('/referrer/families/42');
+    expect(route.referrerFamilyDetail('family-7')).toBe('/referrer/families/family-7');
+  });
+});

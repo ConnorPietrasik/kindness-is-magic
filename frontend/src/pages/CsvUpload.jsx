@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminGetCsvSample, adminImportCsv } from '../lib/api';
+import { parseCsvSections, validateCsvForImport, isValidCsvFile } from '../lib/csv';
 import { HeaderBar, BackLink } from '../components/HeaderBar';
 import { Card } from '../components/Card';
 import Button from '../components/Button';
@@ -24,6 +25,7 @@ export default function CsvUpload() {
   const [showTemplate, setShowTemplate] = useState(false);
   const [template, setTemplate] = useState('');
   const [fetchingTemplate, setFetchingTemplate] = useState(false);
+  const [validation, setValidation] = useState(null);
 
   const importMut = useMutation({
     mutationFn: (text) => adminImportCsv(text),
@@ -38,12 +40,21 @@ export default function CsvUpload() {
 
   function handleFile(inputFile) {
     if (!inputFile) return;
-    if (!inputFile.name.toLowerCase().endsWith('.csv')) {
+    if (!isValidCsvFile(inputFile)) {
       alert('Please select a .csv file.');
       return;
     }
     setFile(inputFile);
     importMut.reset();
+    setValidation(null);
+
+    // Client-side validation: read and parse the CSV
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const sections = parseCsvSections(e.target.result);
+      setValidation(validateCsvForImport(sections));
+    };
+    reader.readAsText(inputFile);
   }
 
   function handleDrop(e) {
@@ -60,6 +71,11 @@ export default function CsvUpload() {
 
   function handleImport() {
     if (!file) return;
+    // Block upload if client-side validation found errors
+    if (validation && !validation.valid) {
+      alert('Please fix the CSV errors before importing.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       importMut.mutate(e.target.result);
@@ -181,17 +197,56 @@ export default function CsvUpload() {
           )}
         </div>
 
+        {/* Validation warnings */}
+        {validation && validation.warnings.length > 0 && (
+          <Card className="mb-4 border-amber-200 bg-amber-50">
+            <h3 className="mb-2 text-sm font-semibold text-amber-800">
+              {'\u26A0'} Warnings
+            </h3>
+            <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
+              {validation.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
         {/* Import button */}
         <div className="mb-6 flex justify-center">
           <Button
             onClick={handleImport}
-            disabled={!file || importMut.isPending}
+            disabled={!file || importMut.isPending || (validation && !validation.valid)}
             loading={importMut.isPending}
             className={!file ? 'opacity-50' : ''}
           >
             {importMut.isPending ? 'Importing\u2026' : 'Import CSV'}
           </Button>
         </div>
+
+        {/* Validation errors */}
+        {validation && !validation.valid && (
+          <ErrorBox
+            message={
+              validation.errors.map((e) => e).join('\n') ||
+              'CSV validation failed.'
+            }
+          />
+        )}
+
+        {/* Validation stats */}
+        {validation && validation.valid && validation.stats.sections > 0 && (
+          <Card className="mb-4">
+            <div className="flex gap-4 text-sm text-gray-600">
+              <span>{validation.stats.sections} section{validation.stats.sections !== 1 ? 's' : ''}</span>
+              <span>{validation.stats.totalRows} row{validation.stats.totalRows !== 1 ? 's' : ''}</span>
+              {validation.stats.unknownSections.length > 0 && (
+                <span className="text-amber-600">
+                  {validation.stats.unknownSections.length} unknown section(s)
+                </span>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Results */}
         {importMut.data && (
