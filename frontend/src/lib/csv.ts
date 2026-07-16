@@ -6,40 +6,21 @@
  * constraint checks, sanitisation) still happens server-side.
  */
 
-import type { CsvSections, CsvValidationResult } from '../types';
+import type { CsvSections, CsvValidationResult } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
 /* ------------------------------------------------------------------ */
 
 /** Section names the backend recognises (case-insensitive). */
-export const KNOWN_SECTIONS = ['referrers', 'families', 'people', 'users'] as const;
+export const KNOWN_SECTIONS = ["referrers", "families", "people", "users"] as const;
 
 /** Expected header columns per section (lowercase, trimmed). */
-export const EXPECTED_HEADERS: Record<
-  (typeof KNOWN_SECTIONS)[number],
-  readonly string[]
-> = {
-  referrers: ['name', 'family_limit', 'phone_number'],
-  families: [
-    'referrer_name',
-    'family_name',
-    'family_wish',
-    'contact_name',
-    'bio',
-    'address',
-    'phone_number',
-  ],
-  people: [
-    'family_name',
-    'given_name',
-    'age',
-    'practical_wish',
-    'fun_wish',
-    'title',
-    'note',
-  ],
-  users: ['email', 'password', 'role', 'referrer_name_or_id', 'family_name_or_id'],
+export const EXPECTED_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly string[]> = {
+  referrers: ["name", "family_limit", "phone_number"],
+  families: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number"],
+  people: ["family_name", "given_name", "age", "practical_wish", "fun_wish", "title", "note"],
+  users: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id"],
 };
 
 /** Regex that matches a section header line (e.g. `# referrers`). */
@@ -66,7 +47,7 @@ export function parseCsvSections(csvText: string): CsvSections {
 
   for (const line of lines) {
     // Skip blank lines
-    if (line.trim() === '') continue;
+    if (line.trim() === "") continue;
 
     // Check for section header
     const match = SECTION_RE.exec(line);
@@ -79,7 +60,7 @@ export function parseCsvSections(csvText: string): CsvSections {
     }
 
     // Skip comment lines that aren't section headers
-    if (line.trim().startsWith('#')) continue;
+    if (line.trim().startsWith("#")) continue;
 
     // Parse as CSV row (handle quoted fields)
     if (currentSection !== null) {
@@ -105,7 +86,7 @@ export function parseCsvSections(csvText: string): CsvSections {
  */
 export function parseCsvLine(line: string): string[] {
   const fields: string[] = [];
-  let current = '';
+  let current = "";
   let inQuotes = false;
   let i = 0;
 
@@ -128,9 +109,9 @@ export function parseCsvLine(line: string): string[] {
     } else {
       if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ',') {
+      } else if (ch === ",") {
         fields.push(current);
-        current = '';
+        current = "";
       } else {
         current += ch;
       }
@@ -167,7 +148,7 @@ export function validateCsvForImport(sections: CsvSections): CsvValidationResult
   const sectionNames = Object.keys(sections);
 
   if (sectionNames.length === 0) {
-    errors.push('No sections found. CSV must contain section headers like # referrers, # families, # people, # users.');
+    errors.push("No sections found. CSV must contain section headers like # referrers, # families, # people, # users.");
     return { valid: false, errors, warnings, stats };
   }
 
@@ -198,13 +179,13 @@ export function validateCsvForImport(sections: CsvSections): CsvValidationResult
     // Check for missing expected columns
     const missing = expected.filter((h) => !headers.includes(h));
     if (missing.length > 0) {
-      errors.push(`Section "${name}" is missing columns: ${missing.map((h) => `"${h}"`).join(', ')}.`);
+      errors.push(`Section "${name}" is missing columns: ${missing.map((h) => `"${h}"`).join(", ")}.`);
     }
 
     // Check for extra columns (warning only)
     const extra = headers.filter((h) => !expected.includes(h));
     if (extra.length > 0) {
-      warnings.push(`Section "${name}" has extra columns: ${extra.map((h) => `"${h}"`).join(', ')}.`);
+      warnings.push(`Section "${name}" has extra columns: ${extra.map((h) => `"${h}"`).join(", ")}.`);
     }
 
     // Count data rows
@@ -228,5 +209,5 @@ export function validateCsvForImport(sections: CsvSections): CsvValidationResult
  */
 export function isValidCsvFile(file: { name: string } | null | undefined): boolean {
   if (!file) return false;
-  return file.name.toLowerCase().endsWith('.csv');
+  return file.name.toLowerCase().endsWith(".csv");
 }

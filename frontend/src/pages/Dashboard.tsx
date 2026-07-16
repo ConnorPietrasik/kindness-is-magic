@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { changePasswordRequest } from '../lib/api';
-import { ROUTES } from '../lib/routes';
-import { HeaderBar, LogoutButton } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { ErrorBox } from '../components/ErrorBox';
-import { FormField } from '../components/FormField';
-import { Button } from '../components/Button';
-import { humanize } from '../lib/utils';
-import type { UserRole } from '../types';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ErrorBox } from "../components/ErrorBox";
+import { FormField } from "../components/FormField";
+import { HeaderBar, LogoutButton } from "../components/HeaderBar";
+import { useAuth } from "../context/AuthContext";
+import { changePasswordRequest } from "../lib/api";
+import { ROUTES } from "../lib/routes";
+import { humanize } from "../lib/utils";
+import type { UserRole } from "../types";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -21,19 +21,16 @@ export default function Dashboard() {
   };
 
   const roleColors: Record<UserRole, string> = {
-    admin: 'bg-red-600',
-    referrer: 'bg-blue-600',
-    family: 'bg-green-600',
+    admin: "bg-red-600",
+    referrer: "bg-blue-600",
+    family: "bg-green-600",
   };
 
-  const badgeClass = `${roleColors[user?.role as UserRole] ?? 'bg-gray-500'} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
+  const badgeClass = `${roleColors[user?.role as UserRole] ?? "bg-gray-500"} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        right={<LogoutButton onClick={handleLogout} />}
-      />
+      <HeaderBar title="Kindness is Magic" right={<LogoutButton onClick={handleLogout} />} />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Welcome card */}
@@ -41,7 +38,7 @@ export default function Dashboard() {
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Welcome back!</h2>
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-btn-start to-btn-end text-lg font-bold text-white">
-              {user?.email?.[0]?.toUpperCase() || '?'}
+              {user?.email?.[0]?.toUpperCase() || "?"}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -58,7 +55,7 @@ export default function Dashboard() {
 
         {/* Navigation cards */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {user?.role === 'admin' && (
+          {user?.role === "admin" && (
             <>
               <NavCard to={ROUTES.REGISTER} icon="👤" label="Register Users" desc="Create new accounts" />
               <NavCard to={ROUTES.ADMIN_REFERRERS} icon="👥" label="Manage Referrers" desc="Create, edit, delete referrers" />
@@ -68,11 +65,11 @@ export default function Dashboard() {
             </>
           )}
 
-          {user?.role === 'referrer' && (
+          {user?.role === "referrer" && (
             <NavCard to={ROUTES.REFERRER_DASHBOARD} icon="🏠" label="My Families" desc="Manage your families and members" />
           )}
 
-          {user?.role === 'family' && (
+          {user?.role === "family" && (
             <NavCard to={ROUTES.FAMILY_DASHBOARD} icon="✨" label="My Family" desc="View your profile and manage people" />
           )}
         </div>
@@ -111,50 +108,70 @@ function NavCard({ to, icon, label, desc }: NavCardProps) {
  * ChangePasswordSection — form to change the user's password.
  */
 function ChangePasswordSection() {
-  const [oldPass, setOldPass] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [message, setMessage] = useState('');
+  const [oldPass, setOldPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage('');
+    setMessage("");
 
     if (newPass !== confirmPass) {
-      setMessage('New passwords do not match.');
+      setMessage("New passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
       await changePasswordRequest(oldPass, newPass);
-      setMessage('Password updated successfully!');
-      setOldPass('');
-      setNewPass('');
-      setConfirmPass('');
+      setMessage("Password updated successfully!");
+      setOldPass("");
+      setNewPass("");
+      setConfirmPass("");
     } catch (err: unknown) {
-      setMessage(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Failed to change password.',
-      );
+      setMessage((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to change password.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isOk = message.toLowerCase().includes('success');
+  const isOk = message.toLowerCase().includes("success");
 
   return (
     <Card>
       <h2 className="mb-4 text-lg font-semibold text-gray-900">Change Password</h2>
-      {message && <ErrorBox variant={isOk ? 'success' : 'error'} message={message} className="mb-4" />}
+      {message && <ErrorBox variant={isOk ? "success" : "error"} message={message} className="mb-4" />}
       <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
-        <FormField label="Current password" type="password" fieldProps={{ value: oldPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value), required: true }} />
-        <FormField label="New password" type="password" fieldProps={{ value: newPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewPass(e.target.value), required: true, minLength: 8, placeholder: 'Min 8 characters' }} />
-        <FormField label="Confirm new password" type="password" fieldProps={{ value: confirmPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmPass(e.target.value), required: true, minLength: 8 }} />
+        <FormField
+          label="Current password"
+          type="password"
+          fieldProps={{ value: oldPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value), required: true }}
+        />
+        <FormField
+          label="New password"
+          type="password"
+          fieldProps={{
+            value: newPass,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewPass(e.target.value),
+            required: true,
+            minLength: 8,
+            placeholder: "Min 8 characters",
+          }}
+        />
+        <FormField
+          label="Confirm new password"
+          type="password"
+          fieldProps={{
+            value: confirmPass,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmPass(e.target.value),
+            required: true,
+            minLength: 8,
+          }}
+        />
         <Button type="submit" loading={loading}>
-          {loading ? 'Updating…' : 'Update Password'}
+          {loading ? "Updating…" : "Update Password"}
         </Button>
       </form>
     </Card>

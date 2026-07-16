@@ -10,17 +10,13 @@
  *  - checkAuth() — re-fetch /api/auth/me
  */
 
-import type { ReactNode } from 'react';
-import { createContext, useContext, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AuthContextValue, User } from '../types';
-import {
-  fetchCurrentUser,
-  loginRequest,
-  logoutRequest,
-} from '../lib/api';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { createContext, useCallback, useContext } from "react";
+import { fetchCurrentUser, loginRequest, logoutRequest } from "../lib/api";
+import type { AuthContextValue, User } from "../types";
 
-const AUTH_KEY = ['auth'] as const;
+const AUTH_KEY = ["auth"] as const;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -34,20 +30,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: AUTH_KEY,
     queryFn: fetchCurrentUser,
-    staleTime: Infinity,       // auth doesn't become stale on its own
+    staleTime: Infinity, // auth doesn't become stale on its own
     refetchOnWindowFocus: false,
-    retry: false,              // 401 → logged out, don't spin
+    retry: false, // 401 → logged out, don't spin
   });
 
   const checkAuth = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: AUTH_KEY });
   }, [queryClient]);
 
-  const login = useCallback(async (email: string, password: string): Promise<User> => {
-    const { data } = await loginRequest(email, password);
-    queryClient.setQueryData(AUTH_KEY, data.user);
-    return data.user;
-  }, [queryClient]);
+  const login = useCallback(
+    async (email: string, password: string): Promise<User> => {
+      const { data } = await loginRequest(email, password);
+      queryClient.setQueryData(AUTH_KEY, data.user);
+      return data.user;
+    },
+    [queryClient]
+  );
 
   const logout = useCallback(async (): Promise<void> => {
     try {
@@ -58,9 +57,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     queryClient.setQueryData(AUTH_KEY, null);
   }, [queryClient]);
 
-  const isAdmin = user?.role === 'admin';
-  const isReferrer = user?.role === 'referrer';
-  const isFamily = user?.role === 'family';
+  const isAdmin = user?.role === "admin";
+  const isReferrer = user?.role === "referrer";
+  const isFamily = user?.role === "family";
 
   return (
     <AuthContext.Provider
@@ -83,7 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return ctx;
 }

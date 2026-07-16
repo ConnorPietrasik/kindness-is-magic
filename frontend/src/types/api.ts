@@ -1,6 +1,6 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
-import type { FamilySummary, PersonSummary, ReferrerSummary } from './domain';
+import type { FamilySummary, PersonSummary, ReferrerSummary } from "./domain";
 
 // ---------------------------------------------------------------------------
 // Paginated list responses

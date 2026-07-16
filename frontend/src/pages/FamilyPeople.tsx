@@ -5,27 +5,21 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
-import {
-  listFamilyPeople,
-  createFamilyPerson,
-  getPerson,
-  updatePerson,
-  deletePerson,
-} from '../lib/api';
-import { ROUTES } from '../lib/routes';
-import { useCrudManager } from '../hooks/useCrudManager';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { Button } from '../components/Button';
-import { PageSpinner, Spinner } from '../components/Spinner';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MutationErrors } from '../components/MutationErrors';
-import { PersonForm } from '../components/PersonForm';
-import { defaultPersonForm } from '../components/defaults';
-import type { PersonDetail } from '../types';
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { defaultPersonForm } from "../components/defaults";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { MutationErrors } from "../components/MutationErrors";
+import { PersonForm } from "../components/PersonForm";
+import { PageSpinner, Spinner } from "../components/Spinner";
+import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useCrudManager } from "../hooks/useCrudManager";
+import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
+import { ROUTES } from "../lib/routes";
+import type { PersonDetail } from "../types";
 
-const FAMILY_PEOPLE_KEY = ['familyPeople'];
+const FAMILY_PEOPLE_KEY = ["familyPeople"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -71,19 +65,12 @@ export default function FamilyPeople() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink to={ROUTES.FAMILY_DASHBOARD} label="Family Dashboard" />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.FAMILY_DASHBOARD} label="Family Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
-            Manage People
-          </h2>
-          <Button onClick={openCreate}>
-            + Add Person
-          </Button>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Manage People</h2>
+          <Button onClick={openCreate}>+ Add Person</Button>
         </div>
 
         {/* Create form */}
@@ -125,9 +112,7 @@ export default function FamilyPeople() {
           {people.length === 0 ? (
             <TableBody>
               <Tr>
-                <Td className="!text-center !text-gray-400 py-12">
-                  No people yet. Add one to get started.
-                </Td>
+                <Td className="!text-center !text-gray-400 py-12">No people yet. Add one to get started.</Td>
               </Tr>
             </TableBody>
           ) : (
@@ -146,12 +131,7 @@ export default function FamilyPeople() {
                     <Td>{p.age}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => openEdit(p.id)}
-                          disabled={!!editingId}
-                        >
+                        <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(p.id)} disabled={!!editingId}>
                           Edit
                         </Button>
                         <Button

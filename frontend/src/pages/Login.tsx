@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { ROUTES } from '../lib/routes';
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { ROUTES } from "../lib/routes";
 
 export default function Login() {
   const { login } = useAuth();
@@ -10,24 +10,21 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Login failed. Check your credentials.',
-      );
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Login failed. Check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -39,11 +36,7 @@ export default function Login() {
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Kindness is Magic</h1>
         <h2 className="mb-6 text-center text-base text-gray-500 font-normal">Sign in</h2>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -81,7 +74,7 @@ export default function Login() {
             disabled={loading}
             className="mt-2 w-full rounded-lg bg-gradient-to-r from-btn-start to-btn-end py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 

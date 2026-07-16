@@ -1,6 +1,6 @@
-import { memo } from 'react';
-import { ErrorBox } from './ErrorBox';
-import { formatApiError } from '../lib/utils';
+import { memo } from "react";
+import { formatApiError } from "../lib/utils";
+import { ErrorBox } from "./ErrorBox";
 
 interface MutationError {
   error?: unknown;
@@ -16,7 +16,7 @@ interface MutationErrorsProps {
  * error, using the shared formatApiError() helper so all pages produce
  * consistent, user-friendly messages.
  */
-export const MutationErrors = memo(function MutationErrors({ mutations, fallback = 'Request failed.' }: MutationErrorsProps) {
+export const MutationErrors = memo(function MutationErrors({ mutations, fallback = "Request failed." }: MutationErrorsProps) {
   const errors = mutations.filter((m) => m.error);
 
   if (!errors.length) return null;

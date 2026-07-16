@@ -5,21 +5,21 @@
  * Family users can edit their own family info and navigate to people management.
  */
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFamilyMe, patchFamilyMe } from '../lib/api';
-import { ROUTES } from '../lib/routes';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Button } from '../components/Button';
-import { ErrorBox } from '../components/ErrorBox';
-import { PageSpinner } from '../components/Spinner';
-import { InfoRow } from '../components/InfoRow';
-import { FamilyForm } from '../components/FamilyForm';
-import { defaultFamilyForm } from '../components/defaults';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { defaultFamilyForm } from "../components/defaults";
+import { ErrorBox } from "../components/ErrorBox";
+import { FamilyForm } from "../components/FamilyForm";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { InfoRow } from "../components/InfoRow";
+import { PageSpinner } from "../components/Spinner";
+import { getFamilyMe, patchFamilyMe } from "../lib/api";
+import { ROUTES } from "../lib/routes";
 
-const FAMILY_ME_KEY = ['familyMe'];
+const FAMILY_ME_KEY = ["familyMe"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -50,26 +50,17 @@ export default function FamilyDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
-          Family Dashboard
-        </h2>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Dashboard</h2>
 
         {/* ── Family info card ──────────────────────────────── */}
         <Card className="mb-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-900">My Family Profile</h3>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              onClick={() => setShowEdit(!showEdit)}
-            >
-              {showEdit ? 'Cancel' : 'Edit'}
+            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEdit(!showEdit)}>
+              {showEdit ? "Cancel" : "Edit"}
             </Button>
           </div>
 
@@ -104,12 +95,8 @@ export default function FamilyDashboard() {
             className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
           >
             <span className="text-2xl">✨</span>
-            <span className="text-sm font-semibold text-gray-900 group-hover:text-btn-start">
-              Manage People
-            </span>
-            <span className="text-xs text-gray-400">
-              Add, edit, and delete family members and their wishes
-            </span>
+            <span className="text-sm font-semibold text-gray-900 group-hover:text-btn-start">Manage People</span>
+            <span className="text-xs text-gray-400">Add, edit, and delete family members and their wishes</span>
           </Link>
         </div>
 
@@ -119,7 +106,7 @@ export default function FamilyDashboard() {
             message={
               (updateSelfMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
               JSON.stringify((updateSelfMut.error as { response?: { data?: unknown } })?.response?.data) ||
-              'Request failed.'
+              "Request failed."
             }
           />
         )}

@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode } from "react";
 
 interface CardProps {
   className?: string;
@@ -8,8 +8,6 @@ interface CardProps {
 /**
  * Card — white rounded container with subtle shadow.
  */
-export const Card = memo(({ className = '', children }: CardProps) => (
-  <div className={`rounded-xl bg-white p-6 shadow-sm ${className}`}>
-    {children}
-  </div>
+export const Card = memo(({ className = "", children }: CardProps) => (
+  <div className={`rounded-xl bg-white p-6 shadow-sm ${className}`}>{children}</div>
 ));

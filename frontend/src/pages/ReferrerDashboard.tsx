@@ -6,34 +6,34 @@
  * Uses useCrudManager for family CRUD; self-edit stays inline.
  */
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
+import { FamilyForm } from "../components/FamilyForm";
+import { FormField } from "../components/FormField";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { InfoRow } from "../components/InfoRow";
+import { MutationErrors } from "../components/MutationErrors";
+import { PageSpinner } from "../components/Spinner";
+import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useCrudManager } from "../hooks/useCrudManager";
 import {
-  getReferrerMe,
-  patchReferrerMe,
-  listReferrerFamilies,
   createReferrerFamily,
-  updateReferrerFamily,
   deleteReferrerFamily,
-} from '../lib/api';
-import { ROUTES, route } from '../lib/routes';
-import { useCrudManager } from '../hooks/useCrudManager';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { FormField } from '../components/FormField';
-import { Button } from '../components/Button';
-import { PageSpinner } from '../components/Spinner';
-import { InfoRow } from '../components/InfoRow';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MutationErrors } from '../components/MutationErrors';
-import { FamilyForm } from '../components/FamilyForm';
-import { defaultReferrerForm, defaultFamilyForm } from '../components/defaults';
-import type { ReferrerDetail, FamilyDetail } from '../types';
+  getReferrerMe,
+  listReferrerFamilies,
+  patchReferrerMe,
+  updateReferrerFamily,
+} from "../lib/api";
+import { ROUTES, route } from "../lib/routes";
+import type { FamilyDetail, ReferrerDetail } from "../types";
 
-const REFERRER_ME_KEY = ['referrerMe'];
-const REFERRER_FAMILIES_KEY = ['referrerFamilies'];
+const REFERRER_ME_KEY = ["referrerMe"];
+const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -103,26 +103,17 @@ export default function ReferrerDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
-          Referrer Dashboard
-        </h2>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Referrer Dashboard</h2>
 
         {/* ── Referrer info card ──────────────────────────────── */}
         <Card className="mb-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-900">My Profile</h3>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              onClick={() => setShowEditSelf(!showEditSelf)}
-            >
-              {showEditSelf ? 'Cancel' : 'Edit'}
+            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEditSelf(!showEditSelf)}>
+              {showEditSelf ? "Cancel" : "Edit"}
             </Button>
           </div>
 
@@ -145,9 +136,7 @@ export default function ReferrerDashboard() {
         {/* ── Families ────────────────────────────────────────── */}
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-gray-900">My Families</h3>
-          {familyCount < familyLimit && (
-            <Button onClick={openCreate}>+ Add Family</Button>
-          )}
+          {familyCount < familyLimit && <Button onClick={openCreate}>+ Add Family</Button>}
         </div>
 
         {showForm && (
@@ -177,9 +166,7 @@ export default function ReferrerDashboard() {
           {families.length === 0 ? (
             <TableBody>
               <Tr>
-                <Td className="!text-center !text-gray-400 py-12">
-                  No families yet. Add one to get started.
-                </Td>
+                <Td className="!text-center !text-gray-400 py-12">No families yet. Add one to get started.</Td>
               </Tr>
             </TableBody>
           ) : (
@@ -197,7 +184,7 @@ export default function ReferrerDashboard() {
                   <Tr key={f.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
                     <Td className="font-medium text-gray-900">{f.family_name}</Td>
-                    <Td className="max-w-xs truncate">{f.family_wish ?? ''}</Td>
+                    <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
                     <Td>{f.contact_name}</Td>
                     <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
                     <Td>
@@ -208,12 +195,7 @@ export default function ReferrerDashboard() {
                         >
                           Manage
                         </Link>
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => openEdit(f.id)}
-                          disabled={!!editingId}
-                        >
+                        <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(f.id)} disabled={!!editingId}>
                           Edit
                         </Button>
                         <Button
@@ -252,7 +234,9 @@ export default function ReferrerDashboard() {
         />
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        <MutationErrors mutations={[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].filter((m): m is NonNullable<typeof m> => m != null)}
+        />
       </main>
     </div>
   );
@@ -288,9 +272,9 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
       <FormField
         label="Name"
         fieldProps={{
-          type: 'text',
+          type: "text",
           value: form.name,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update('name', e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
           required: true,
           maxLength: 60,
         }}
@@ -298,16 +282,16 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
       <FormField
         label="Phone"
         fieldProps={{
-          type: 'text',
+          type: "text",
           value: form.phone_number,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update('phone_number', e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
           required: true,
           maxLength: 20,
         }}
       />
       <div className="flex gap-3 pt-1">
         <Button type="submit" loading={loading} className="flex-1">
-          {loading ? 'Saving…' : 'Save'}
+          {loading ? "Saving…" : "Save"}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
           Cancel

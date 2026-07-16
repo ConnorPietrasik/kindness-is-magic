@@ -4,25 +4,25 @@
  */
 
 export const defaultPersonForm = {
-  given_name: '',
+  given_name: "",
   age: 0,
-  title: '',
-  practical_wish: '',
-  fun_wish: '',
-  note: '',
+  title: "",
+  practical_wish: "",
+  fun_wish: "",
+  note: "",
 } as const;
 
 export const defaultFamilyForm = {
-  family_name: '',
-  family_wish: '',
-  contact_name: '',
-  bio: '',
-  address: '',
-  phone_number: '',
+  family_name: "",
+  family_wish: "",
+  contact_name: "",
+  bio: "",
+  address: "",
+  phone_number: "",
 } as const;
 
 export const defaultReferrerForm = {
-  name: '',
+  name: "",
   family_limit: 1,
-  phone_number: '',
+  phone_number: "",
 } as const;

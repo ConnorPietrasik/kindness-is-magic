@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 /** Mirrors backend UserRole enum. */
-export type UserRole = 'admin' | 'referrer' | 'family';
+export type UserRole = "admin" | "referrer" | "family";
 
 /** Mirrors UserResponse — the shape returned by /api/auth/me. */
 export interface User {

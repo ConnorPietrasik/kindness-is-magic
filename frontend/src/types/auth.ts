@@ -1,6 +1,6 @@
 /** AuthContext value shape (derived from src/context/AuthContext.jsx) */
 
-import type { User } from './domain';
+import type { User } from "./domain";
 
 export interface AuthContextValue {
   user: User | null | undefined;

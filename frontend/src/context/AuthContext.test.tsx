@@ -1,10 +1,10 @@
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
-import type { AxiosResponse } from 'axios';
-import type { User } from '../types';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { AxiosResponse } from "axios";
+import { MemoryRouter } from "react-router-dom";
+import type { Mock } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "../types";
 
 // ---------------------------------------------------------------------------
 // Mock the API layer *before* importing AuthContext
@@ -13,21 +13,21 @@ let mockFetchCurrentUser: Mock<() => Promise<User | null>>;
 let mockLoginRequest: Mock<(email: string, password: string) => Promise<AxiosResponse<{ user: User }>>>;
 let mockLogoutRequest: Mock<() => Promise<void>>;
 
-vi.mock('../lib/api', () => ({
+vi.mock("../lib/api", () => ({
   fetchCurrentUser: vi.fn(),
   loginRequest: vi.fn(),
   logoutRequest: vi.fn(),
 }));
 
-import { AuthProvider, useAuth } from './AuthContext';
-import * as api from '../lib/api';
+import * as api from "../lib/api";
+import { AuthProvider, useAuth } from "./AuthContext";
 
 // Capture the mocked functions
 mockFetchCurrentUser = api.fetchCurrentUser as Mock<() => Promise<User | null>>;
 mockLoginRequest = api.loginRequest as Mock<(email: string, password: string) => Promise<AxiosResponse<{ user: User }>>>;
 mockLogoutRequest = api.logoutRequest as Mock<() => Promise<void>>;
 
-const AUTH_KEY = ['auth'] as const;
+const AUTH_KEY = ["auth"] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,7 +53,7 @@ function wrap() {
 interface MakeUserOptions {
   id?: number;
   email?: string;
-  role?: 'admin' | 'referrer' | 'family';
+  role?: "admin" | "referrer" | "family";
   referrer_id?: number | null;
   family_id?: number | null;
   is_active?: boolean;
@@ -62,12 +62,12 @@ interface MakeUserOptions {
 
 function makeUser({
   id = 1,
-  email = 'test@example.com',
-  role = 'admin',
+  email = "test@example.com",
+  role = "admin",
   referrer_id = null,
   family_id = null,
   is_active = true,
-  created_at = '2024-01-01T00:00:00',
+  created_at = "2024-01-01T00:00:00",
 }: MakeUserOptions = {}): User {
   return { id, email, role, referrer_id, family_id, is_active, created_at };
 }
@@ -75,7 +75,7 @@ function makeUser({
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-describe('AuthContext', () => {
+describe("AuthContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     if (queryClient) queryClient.clear();
@@ -83,7 +83,7 @@ describe('AuthContext', () => {
 
   /* ── Initial state ──────────────────────────────────────── */
 
-  it('starts with isLoading true and user undefined before fetch', () => {
+  it("starts with isLoading true and user undefined before fetch", () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -93,7 +93,7 @@ describe('AuthContext', () => {
     expect(result.current.user).toBeUndefined();
   });
 
-  it('resolves to user null when fetchCurrentUser returns null', async () => {
+  it("resolves to user null when fetchCurrentUser returns null", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -105,9 +105,9 @@ describe('AuthContext', () => {
     expect(result.current.user).toBeNull();
   });
 
-  it('resolves to user undefined on 401 (logged out)', async () => {
-    const error = Object.assign(new Error('Unauthorized'), {
-      response: { status: 401, data: { detail: 'Not authenticated' } },
+  it("resolves to user undefined on 401 (logged out)", async () => {
+    const error = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Not authenticated" } },
     });
     mockFetchCurrentUser.mockRejectedValueOnce(error);
 
@@ -123,8 +123,8 @@ describe('AuthContext', () => {
 
   /* ── Successful session fetch ───────────────────────────── */
 
-  it('populates user after successful fetchCurrentUser', async () => {
-    const user = makeUser({ role: 'admin' });
+  it("populates user after successful fetchCurrentUser", async () => {
+    const user = makeUser({ role: "admin" });
     mockFetchCurrentUser.mockResolvedValueOnce(user);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -137,8 +137,8 @@ describe('AuthContext', () => {
 
   /* ── Role booleans ──────────────────────────────────────── */
 
-  it('sets isAdmin true when role is admin', async () => {
-    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: 'admin' }));
+  it("sets isAdmin true when role is admin", async () => {
+    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: "admin" }));
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
 
@@ -149,8 +149,8 @@ describe('AuthContext', () => {
     });
   });
 
-  it('sets isReferrer true when role is referrer', async () => {
-    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: 'referrer' }));
+  it("sets isReferrer true when role is referrer", async () => {
+    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: "referrer" }));
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
 
@@ -161,8 +161,8 @@ describe('AuthContext', () => {
     });
   });
 
-  it('sets isFamily true when role is family', async () => {
-    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: 'family' }));
+  it("sets isFamily true when role is family", async () => {
+    mockFetchCurrentUser.mockResolvedValueOnce(makeUser({ role: "family" }));
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
 
@@ -173,7 +173,7 @@ describe('AuthContext', () => {
     });
   });
 
-  it('all role booleans are false when user is null', async () => {
+  it("all role booleans are false when user is null", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -189,10 +189,10 @@ describe('AuthContext', () => {
 
   /* ── login ──────────────────────────────────────────────── */
 
-  it('login calls loginRequest and sets user in query cache', async () => {
+  it("login calls loginRequest and sets user in query cache", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null); // initial check
 
-    const loginUser = makeUser({ role: 'admin' });
+    const loginUser = makeUser({ role: "admin" });
     mockLoginRequest.mockResolvedValueOnce({ data: { user: loginUser } } as never);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -203,10 +203,10 @@ describe('AuthContext', () => {
     });
 
     await act(async () => {
-      await result.current.login('admin@example.com', 'password');
+      await result.current.login("admin@example.com", "password");
     });
 
-    expect(mockLoginRequest).toHaveBeenCalledWith('admin@example.com', 'password');
+    expect(mockLoginRequest).toHaveBeenCalledWith("admin@example.com", "password");
     // setQueryData is sync but re-render may be batched — verify cache directly
     expect(queryClient?.getQueryData(AUTH_KEY)).toEqual(loginUser);
     // Also verify the component re-renders with the new user
@@ -216,10 +216,10 @@ describe('AuthContext', () => {
     expect(result.current.isAdmin).toBe(true);
   });
 
-  it('login returns the user object', async () => {
+  it("login returns the user object", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null);
 
-    const loginUser = makeUser({ role: 'referrer' });
+    const loginUser = makeUser({ role: "referrer" });
     mockLoginRequest.mockResolvedValueOnce({ data: { user: loginUser } } as never);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -230,7 +230,7 @@ describe('AuthContext', () => {
 
     let returnedUser: User | undefined;
     await act(async () => {
-      returnedUser = await result.current.login('ref@example.com', 'pass');
+      returnedUser = await result.current.login("ref@example.com", "pass");
     });
 
     expect(returnedUser).toEqual(loginUser);
@@ -238,8 +238,8 @@ describe('AuthContext', () => {
 
   /* ── logout ─────────────────────────────────────────────── */
 
-  it('logout calls logoutRequest and clears user', async () => {
-    const user = makeUser({ role: 'admin' });
+  it("logout calls logoutRequest and clears user", async () => {
+    const user = makeUser({ role: "admin" });
     mockFetchCurrentUser.mockResolvedValueOnce(user);
     mockLogoutRequest.mockResolvedValueOnce(undefined);
 
@@ -263,10 +263,10 @@ describe('AuthContext', () => {
     expect(result.current.isAdmin).toBe(false);
   });
 
-  it('logout clears user even if logoutRequest fails', async () => {
-    const user = makeUser({ role: 'admin' });
+  it("logout clears user even if logoutRequest fails", async () => {
+    const user = makeUser({ role: "admin" });
     mockFetchCurrentUser.mockResolvedValueOnce(user);
-    mockLogoutRequest.mockRejectedValueOnce(new Error('Network error'));
+    mockLogoutRequest.mockRejectedValueOnce(new Error("Network error"));
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
 
@@ -287,7 +287,7 @@ describe('AuthContext', () => {
 
   /* ── checkAuth ──────────────────────────────────────────── */
 
-  it('checkAuth invalidates the auth query triggering a refetch', async () => {
+  it("checkAuth invalidates the auth query triggering a refetch", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce(null);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -297,7 +297,7 @@ describe('AuthContext', () => {
     });
 
     // Mock the next fetchCurrentUser call (triggered by invalidation refetch)
-    const newUser = makeUser({ role: 'family' });
+    const newUser = makeUser({ role: "family" });
     mockFetchCurrentUser.mockResolvedValueOnce(newUser);
 
     await act(async () => {
@@ -310,8 +310,8 @@ describe('AuthContext', () => {
     expect(mockFetchCurrentUser.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('checkAuth on 401 retains previous user data (React Query keeps stale data on error)', async () => {
-    const user = makeUser({ role: 'admin' });
+  it("checkAuth on 401 retains previous user data (React Query keeps stale data on error)", async () => {
+    const user = makeUser({ role: "admin" });
     mockFetchCurrentUser.mockResolvedValueOnce(user);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
@@ -321,8 +321,8 @@ describe('AuthContext', () => {
     });
 
     // Simulate session expiring — next fetch returns 401
-    const error = Object.assign(new Error('Unauthorized'), {
-      response: { status: 401, data: { detail: 'Token expired' } },
+    const error = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Token expired" } },
     });
     mockFetchCurrentUser.mockRejectedValueOnce(error);
 

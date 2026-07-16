@@ -2,7 +2,7 @@
  * humanize — capitalise first letter of a string.
  */
 export function humanize(str: string | null | undefined): string {
-  if (!str) return '';
+  if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
@@ -16,15 +16,15 @@ export function humanize(str: string | null | undefined): string {
  *  4. error.message               (network / transport errors)
  *  5. fallback message
  */
-export function formatApiError(error: unknown, fallback = 'An error occurred'): string {
+export function formatApiError(error: unknown, fallback = "An error occurred"): string {
   if (!error) return fallback;
 
   const obj = error as Record<string, unknown>;
   const response = obj.response as { data?: Record<string, unknown> } | undefined;
   const data = response?.data;
   if (data) {
-    if (typeof data.detail === 'string') return data.detail;
-    if (typeof data.msg === 'string') return data.msg;
+    if (typeof data.detail === "string") return data.detail;
+    if (typeof data.msg === "string") return data.msg;
     try {
       return JSON.stringify(data);
     } catch {
@@ -32,6 +32,6 @@ export function formatApiError(error: unknown, fallback = 'An error occurred'): 
     }
   }
 
-  if (typeof obj.message === 'string') return obj.message;
+  if (typeof obj.message === "string") return obj.message;
   return fallback;
 }

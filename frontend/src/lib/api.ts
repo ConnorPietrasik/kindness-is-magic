@@ -8,24 +8,23 @@
  *   sets user=null and React Router navigates to /login (no hard redirect).
  */
 
-import type { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 import type {
-  User,
-  ReferrerListResponse,
-  ReferrerDetail,
-  FamilyListResponse,
   FamilyDetail,
+  FamilyListResponse,
+  PersonDetail,
   PersonListResponse,
   PersonSummary,
-  PersonDetail,
-} from '../types';
-
-import axios from 'axios';
+  ReferrerDetail,
+  ReferrerListResponse,
+  User,
+} from "../types";
 
 const api: AxiosInstance = axios.create({
-  baseURL: '',
+  baseURL: "",
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 // ---------------------------------------------------------------------------
@@ -37,9 +36,11 @@ async function refreshToken(): Promise<{ user: User }> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = api
-    .post('/api/auth/refresh')
+    .post("/api/auth/refresh")
     .then((res) => res.data as { user: User })
-    .finally(() => { refreshPromise = null; });
+    .finally(() => {
+      refreshPromise = null;
+    });
 
   return refreshPromise;
 }
@@ -58,12 +59,7 @@ api.interceptors.response.use(
     const originalRequest = error.config as ExtendedRequestConfig | undefined;
 
     // Only attempt refresh on 401, skip the refresh endpoint itself
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry &&
-      originalRequest.url !== '/api/auth/refresh'
-    ) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== "/api/auth/refresh") {
       originalRequest._retry = true;
 
       try {
@@ -77,47 +73,47 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
 export function fetchCurrentUser(): Promise<User> {
-  return api.get('/api/auth/me').then((res) => res.data);
+  return api.get("/api/auth/me").then((res) => res.data);
 }
 
 /** Returns full AxiosResponse — caller destructures `{ data }`. */
 export function loginRequest(email: string, password: string): Promise<AxiosResponse> {
-  return api.post('/api/auth/login', { email, password });
+  return api.post("/api/auth/login", { email, password });
 }
 
 export function logoutRequest(): Promise<void> {
-  return api.post('/api/auth/logout').then(() => undefined);
+  return api.post("/api/auth/logout").then(() => undefined);
 }
 
 /** Returns full AxiosResponse — caller destructures `{ data }`. */
 export function registerRequest(data: Record<string, unknown>): Promise<AxiosResponse> {
-  return api.post('/api/auth/register', data);
+  return api.post("/api/auth/register", data);
 }
 
 export function forgotPasswordRequest(email: string): Promise<unknown> {
-  return api.post('/api/auth/forgot-password', { email }).then((res) => res.data);
+  return api.post("/api/auth/forgot-password", { email }).then((res) => res.data);
 }
 
 export function resetPasswordRequest(token: string, new_password: string): Promise<unknown> {
-  return api.post('/api/auth/reset-password', { token, new_password }).then((res) => res.data);
+  return api.post("/api/auth/reset-password", { token, new_password }).then((res) => res.data);
 }
 
 export function changePasswordRequest(old_password: string, new_password: string): Promise<unknown> {
-  return api.put('/api/auth/me/password', { old_password, new_password }).then((res) => res.data);
+  return api.put("/api/auth/me/password", { old_password, new_password }).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — Referrers
 // ---------------------------------------------------------------------------
 export function adminListReferrers(): Promise<ReferrerListResponse> {
-  return api.get('/api/admin/referrers').then((res) => res.data);
+  return api.get("/api/admin/referrers").then((res) => res.data);
 }
 
 export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
@@ -125,7 +121,7 @@ export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
 }
 
 export function adminCreateReferrer(data: Record<string, unknown>): Promise<ReferrerDetail> {
-  return api.post('/api/admin/referrers', data).then((res) => res.data);
+  return api.post("/api/admin/referrers", data).then((res) => res.data);
 }
 
 export function adminUpdateReferrer(id: number, data: Record<string, unknown>): Promise<ReferrerDetail> {
@@ -140,7 +136,7 @@ export function adminDeleteReferrer(id: number): Promise<void> {
 // Admin — Families
 // ---------------------------------------------------------------------------
 export function adminListFamilies(): Promise<FamilyListResponse> {
-  return api.get('/api/admin/families').then((res) => res.data);
+  return api.get("/api/admin/families").then((res) => res.data);
 }
 
 export function adminGetFamily(id: number): Promise<FamilyDetail> {
@@ -148,7 +144,7 @@ export function adminGetFamily(id: number): Promise<FamilyDetail> {
 }
 
 export function adminCreateFamily(data: Record<string, unknown>): Promise<FamilyDetail> {
-  return api.post('/api/admin/families', data).then((res) => res.data);
+  return api.post("/api/admin/families", data).then((res) => res.data);
 }
 
 export function adminUpdateFamily(id: number, data: Record<string, unknown>): Promise<FamilyDetail> {
@@ -163,7 +159,7 @@ export function adminDeleteFamily(id: number): Promise<void> {
 // Admin — People
 // ---------------------------------------------------------------------------
 export function adminListPeople(): Promise<PersonListResponse> {
-  return api.get('/api/admin/people').then((res) => res.data);
+  return api.get("/api/admin/people").then((res) => res.data);
 }
 
 export function adminGetPerson(id: number): Promise<PersonDetail> {
@@ -171,7 +167,7 @@ export function adminGetPerson(id: number): Promise<PersonDetail> {
 }
 
 export function adminCreatePerson(data: Record<string, unknown>): Promise<PersonDetail> {
-  return api.post('/api/admin/people', data).then((res) => res.data);
+  return api.post("/api/admin/people", data).then((res) => res.data);
 }
 
 export function adminUpdatePerson(id: number, data: Record<string, unknown>): Promise<PersonDetail> {
@@ -190,38 +186,42 @@ export function adminListFamilyPeople(fid: number): Promise<PersonSummary[]> {
 // Admin — CSV Import
 // ---------------------------------------------------------------------------
 export function adminGetCsvSample(): Promise<string> {
-  return api.get('/api/admin/csv-sample').then((res) => res.data);
+  return api.get("/api/admin/csv-sample").then((res) => res.data);
 }
 
 export function adminImportCsv(fileOrText: File | string): Promise<unknown> {
   // Accept a File object or a plain string
   if (fileOrText instanceof File) {
-    return api.post('/api/admin/import-csv', fileOrText, {
-      headers: { 'Content-Type': 'text/csv' },
-    }).then((res) => res.data);
+    return api
+      .post("/api/admin/import-csv", fileOrText, {
+        headers: { "Content-Type": "text/csv" },
+      })
+      .then((res) => res.data);
   }
   // plain string
-  return api.post('/api/admin/import-csv', fileOrText, {
-    headers: { 'Content-Type': 'text/csv' },
-  }).then((res) => res.data);
+  return api
+    .post("/api/admin/import-csv", fileOrText, {
+      headers: { "Content-Type": "text/csv" },
+    })
+    .then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — Self
 // ---------------------------------------------------------------------------
 export function getReferrerMe(): Promise<ReferrerDetail> {
-  return api.get('/api/referrer/me').then((res) => res.data);
+  return api.get("/api/referrer/me").then((res) => res.data);
 }
 
 export function patchReferrerMe(data: Record<string, unknown>): Promise<ReferrerDetail> {
-  return api.patch('/api/referrer/me', data).then((res) => res.data);
+  return api.patch("/api/referrer/me", data).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — Families
 // ---------------------------------------------------------------------------
 export function listReferrerFamilies(): Promise<FamilyDetail[]> {
-  return api.get('/api/referrer/families').then((res) => res.data);
+  return api.get("/api/referrer/families").then((res) => res.data);
 }
 
 export function getReferrerFamily(id: number): Promise<FamilyDetail> {
@@ -229,7 +229,7 @@ export function getReferrerFamily(id: number): Promise<FamilyDetail> {
 }
 
 export function createReferrerFamily(data: Record<string, unknown>): Promise<FamilyDetail> {
-  return api.post('/api/referrer/families', data).then((res) => res.data);
+  return api.post("/api/referrer/families", data).then((res) => res.data);
 }
 
 export function updateReferrerFamily(id: number, data: Record<string, unknown>): Promise<FamilyDetail> {
@@ -255,22 +255,22 @@ export function createReferrerFamilyPerson(fid: number, data: Record<string, unk
 // Family — Self
 // ---------------------------------------------------------------------------
 export function getFamilyMe(): Promise<FamilyDetail> {
-  return api.get('/api/family/me').then((res) => res.data);
+  return api.get("/api/family/me").then((res) => res.data);
 }
 
 export function patchFamilyMe(data: Record<string, unknown>): Promise<FamilyDetail> {
-  return api.patch('/api/family/me', data).then((res) => res.data);
+  return api.patch("/api/family/me", data).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
 // Family — People
 // ---------------------------------------------------------------------------
 export function listFamilyPeople(): Promise<PersonDetail[]> {
-  return api.get('/api/family/people').then((res) => res.data);
+  return api.get("/api/family/people").then((res) => res.data);
 }
 
 export function createFamilyPerson(data: Record<string, unknown>): Promise<PersonDetail> {
-  return api.post('/api/family/people', data).then((res) => res.data);
+  return api.post("/api/family/people", data).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Mock } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useCrudManager } from './useCrudManager';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import type { Mock } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useCrudManager } from "./useCrudManager";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,9 +17,7 @@ function wrap(initialCache: [string | string[], unknown][] = []) {
   initialCache.forEach(([key, value]) => {
     queryClient.setQueryData(Array.isArray(key) ? key : [key], value);
   });
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  return ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
 interface MakeFnsOptions {
@@ -31,9 +29,9 @@ interface MakeFnsOptions {
 
 function makeFns({
   listData = { list: [{ id: 1 }, { id: 2 }] },
-  detailData = { id: 1, name: 'Existing' },
+  detailData = { id: 1, name: "Existing" },
   created = { id: 99 },
-  updated = { id: 1, name: 'Updated' },
+  updated = { id: 1, name: "Updated" },
 }: MakeFnsOptions = {}): {
   listFn: Mock<() => Promise<unknown>>;
   detailFn: Mock<(id: number) => Promise<unknown>>;
@@ -52,7 +50,7 @@ function makeFns({
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-describe('useCrudManager', () => {
+describe("useCrudManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     if (queryClient) queryClient.clear();
@@ -60,24 +58,18 @@ describe('useCrudManager', () => {
 
   /* ── Initial state ──────────────────────────────────────── */
 
-  it('starts with form hidden, no editing, no delete confirmation', () => {
+  it("starts with form hidden, no editing, no delete confirmation", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     expect(result.current.showForm).toBe(false);
     expect(result.current.editingId).toBeNull();
     expect(result.current.deleteConfirm).toBeNull();
   });
 
-  it('calls listFn on mount', async () => {
+  it("calls listFn on mount", async () => {
     const fns = makeFns();
-    renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     await act(async () => {
       await Promise.resolve();
@@ -86,12 +78,9 @@ describe('useCrudManager', () => {
     expect(fns.listFn).toHaveBeenCalledTimes(1);
   });
 
-  it('provides listData after list query resolves', async () => {
+  it("provides listData after list query resolves", async () => {
     const fns = makeFns({ listData: { list: [{ id: 1 }, { id: 2 }] } });
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     await act(async () => {
       await Promise.resolve();
@@ -101,12 +90,9 @@ describe('useCrudManager', () => {
     expect(result.current.listData).toEqual({ list: [{ id: 1 }, { id: 2 }] });
   });
 
-  it('detail is null when not editing', () => {
+  it("detail is null when not editing", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     expect(result.current.detail).toBeNull();
     expect(result.current.detailLoading).toBe(false);
@@ -114,12 +100,9 @@ describe('useCrudManager', () => {
 
   /* ── openCreate ─────────────────────────────────────────── */
 
-  it('openCreate shows the form with no editingId', () => {
+  it("openCreate shows the form with no editingId", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.openCreate();
@@ -131,12 +114,9 @@ describe('useCrudManager', () => {
 
   /* ── openEdit ───────────────────────────────────────────── */
 
-  it('openEdit sets editingId', () => {
+  it("openEdit sets editingId", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.openEdit(42);
@@ -145,12 +125,9 @@ describe('useCrudManager', () => {
     expect(result.current.editingId).toBe(42);
   });
 
-  it('fetches detail when editingId is set and detailFn is provided', async () => {
-    const fns = makeFns({ detailData: { id: 7, name: 'Detail Item' } });
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+  it("fetches detail when editingId is set and detailFn is provided", async () => {
+    const fns = makeFns({ detailData: { id: 7, name: "Detail Item" } });
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.openEdit(7);
@@ -161,33 +138,30 @@ describe('useCrudManager', () => {
 
     await waitFor(() => {
       expect(fns.detailFn).toHaveBeenCalledWith(7);
-      expect(result.current.detail).toEqual({ id: 7, name: 'Detail Item' });
+      expect(result.current.detail).toEqual({ id: 7, name: "Detail Item" });
       expect(result.current.detailLoading).toBe(false);
     });
   });
 
-  it('does not call detailFn when editingId is null', () => {
+  it("does not call detailFn when editingId is null", () => {
     const fns = makeFns();
-    renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     expect(fns.detailFn).not.toHaveBeenCalled();
   });
 
-  it('does not call detailFn when detailFn is not provided', () => {
+  it("does not call detailFn when detailFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
     const createFn = vi.fn().mockResolvedValue({ id: 1 });
     renderHook(
       () =>
         useCrudManager({
-          rootKey: ['test'],
+          rootKey: ["test"],
           listFn,
           createFn,
           detailFn: undefined,
         }),
-      { wrapper: wrap() },
+      { wrapper: wrap() }
     );
 
     // No detailFn means no detail query fires even if editingId is set
@@ -196,12 +170,9 @@ describe('useCrudManager', () => {
 
   /* ── cancelForm ─────────────────────────────────────────── */
 
-  it('cancelForm hides form and clears editingId', () => {
+  it("cancelForm hides form and clears editingId", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.openEdit(5);
@@ -218,12 +189,9 @@ describe('useCrudManager', () => {
 
   /* ── confirmDelete / cancelDelete ───────────────────────── */
 
-  it('confirmDelete sets deleteConfirm target', () => {
+  it("confirmDelete sets deleteConfirm target", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.confirmDelete(10);
@@ -232,12 +200,9 @@ describe('useCrudManager', () => {
     expect(result.current.deleteConfirm).toBe(10);
   });
 
-  it('cancelDelete clears deleteConfirm', () => {
+  it("cancelDelete clears deleteConfirm", () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.confirmDelete(10);
@@ -253,12 +218,9 @@ describe('useCrudManager', () => {
 
   /* ── Mutations — create ─────────────────────────────────── */
 
-  it('createMut calls createFn and closes form on success', async () => {
+  it("createMut calls createFn and closes form on success", async () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     // Show the form first
     act(() => {
@@ -267,26 +229,20 @@ describe('useCrudManager', () => {
     expect(result.current.showForm).toBe(true);
 
     await act(async () => {
-      result.current.createMut!.mutate({ name: 'New' });
+      result.current.createMut!.mutate({ name: "New" });
     });
 
     // React Query v5 passes (variables, context) to mutationFn
-    expect(fns.createFn).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'New' }),
-      expect.anything(),
-    );
+    expect(fns.createFn).toHaveBeenCalledWith(expect.objectContaining({ name: "New" }), expect.anything());
     // onSuccess callback closes the form
     expect(result.current.showForm).toBe(false);
   });
 
   /* ── Mutations — update ─────────────────────────────────── */
 
-  it('updateMut calls updateFn and clears editingId on success', async () => {
+  it("updateMut calls updateFn and clears editingId on success", async () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     act(() => {
       result.current.openEdit(3);
@@ -294,22 +250,19 @@ describe('useCrudManager', () => {
     expect(result.current.editingId).toBe(3);
 
     await act(async () => {
-      result.current.updateMut!.mutate({ id: 3, data: { name: 'Changed' } });
+      result.current.updateMut!.mutate({ id: 3, data: { name: "Changed" } });
     });
 
-    expect(fns.updateFn).toHaveBeenCalledWith(3, { name: 'Changed' });
+    expect(fns.updateFn).toHaveBeenCalledWith(3, { name: "Changed" });
     // onSuccess callback clears editingId
     expect(result.current.editingId).toBeNull();
   });
 
   /* ── Mutations — delete ─────────────────────────────────── */
 
-  it('deleteMut calls deleteFn on execute', async () => {
+  it("deleteMut calls deleteFn on execute", async () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     await act(async () => {
       result.current.deleteMut!.mutate(8);
@@ -321,12 +274,9 @@ describe('useCrudManager', () => {
 
   /* ── Query invalidation after mutations ─────────────────── */
 
-  it('invalidates rootKey after create', async () => {
+  it("invalidates rootKey after create", async () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     // Let list settle
     await act(async () => {
@@ -341,7 +291,7 @@ describe('useCrudManager', () => {
     });
 
     await act(async () => {
-      result.current.createMut!.mutate({ name: 'New' });
+      result.current.createMut!.mutate({ name: "New" });
       // Allow invalidation + refetch to complete
       await Promise.resolve();
       await Promise.resolve();
@@ -351,16 +301,16 @@ describe('useCrudManager', () => {
     expect(fns.listFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('invalidates custom invalidationKeys when provided', async () => {
+  it("invalidates custom invalidationKeys when provided", async () => {
     const fns = makeFns();
     const { result } = renderHook(
       () =>
         useCrudManager({
-          rootKey: ['primary'],
-          invalidationKeys: ['primary', ['secondary']],
+          rootKey: ["primary"],
+          invalidationKeys: ["primary", ["secondary"]],
           ...fns,
         }),
-      { wrapper: wrap() },
+      { wrapper: wrap() }
     );
 
     await act(async () => {
@@ -379,16 +329,13 @@ describe('useCrudManager', () => {
 
     // Both keys should have been invalidated (secondary refetched too if it existed)
     // We verify by checking the query cache state — both should be stale
-    const primaryState = queryClient.getQueryState(['primary']);
+    const primaryState = queryClient.getQueryState(["primary"]);
     expect(primaryState).toBeDefined();
   });
 
-  it('invalidates queries after update when detailFn is provided', async () => {
+  it("invalidates queries after update when detailFn is provided", async () => {
     const fns = makeFns();
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], ...fns }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
     // Let list settle
     await act(async () => {
@@ -407,13 +354,13 @@ describe('useCrudManager', () => {
 
     // Trigger update — onSuccess invalidates rootKey, triggering list refetch
     await act(async () => {
-      result.current.updateMut!.mutate({ id: 3, data: { name: 'Changed' } });
+      result.current.updateMut!.mutate({ id: 3, data: { name: "Changed" } });
       await Promise.resolve();
       await Promise.resolve();
     });
 
     // onSuccess: updateFn called, editingId cleared
-    expect(fns.updateFn).toHaveBeenCalledWith(3, { name: 'Changed' });
+    expect(fns.updateFn).toHaveBeenCalledWith(3, { name: "Changed" });
     expect(result.current.editingId).toBeNull();
 
     // Invalidation triggers at least one list refetch (call #2+)
@@ -422,32 +369,23 @@ describe('useCrudManager', () => {
 
   /* ── Optional functions — null mutations ────────────────── */
 
-  it('createMut is null when createFn is not provided', () => {
+  it("createMut is null when createFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], listFn }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
     expect(result.current.createMut).toBeNull();
   });
 
-  it('updateMut is null when updateFn is not provided', () => {
+  it("updateMut is null when updateFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], listFn }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
     expect(result.current.updateMut).toBeNull();
   });
 
-  it('deleteMut is null when deleteFn is not provided', () => {
+  it("deleteMut is null when deleteFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
-    const { result } = renderHook(
-      () => useCrudManager({ rootKey: ['test'], listFn }),
-      { wrapper: wrap() },
-    );
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
     expect(result.current.deleteMut).toBeNull();
   });

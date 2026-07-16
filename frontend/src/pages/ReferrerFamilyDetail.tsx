@@ -5,61 +5,60 @@
  * Uses useCrudManager for people CRUD; family edit stays inline.
  */
 
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
+import { FamilyForm } from "../components/FamilyForm";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { InfoRow } from "../components/InfoRow";
+import { MutationErrors } from "../components/MutationErrors";
+import { PersonForm } from "../components/PersonForm";
+import { PageSpinner, Spinner } from "../components/Spinner";
+import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useCrudManager } from "../hooks/useCrudManager";
 import {
-  getReferrerFamily,
-  updateReferrerFamily,
-  listReferrerFamilyPeople,
   createReferrerFamilyPerson,
-  getPerson,
-  updatePerson,
   deletePerson,
-} from '../lib/api';
-import { ROUTES } from '../lib/routes';
-import { useCrudManager } from '../hooks/useCrudManager';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { Button } from '../components/Button';
-import { PageSpinner, Spinner } from '../components/Spinner';
-import { InfoRow } from '../components/InfoRow';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MutationErrors } from '../components/MutationErrors';
-import { FamilyForm } from '../components/FamilyForm';
-import { PersonForm } from '../components/PersonForm';
-import { defaultFamilyForm, defaultPersonForm } from '../components/defaults';
-import type { PersonDetail } from '../types';
+  getPerson,
+  getReferrerFamily,
+  listReferrerFamilyPeople,
+  updatePerson,
+  updateReferrerFamily,
+} from "../lib/api";
+import { ROUTES } from "../lib/routes";
+import type { PersonDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function ReferrerFamilyDetail() {
   const { id: famId } = useParams<{ id: string }>();
-  const famIdNum = parseInt(famId!);
+  const famIdNum = parseInt(famId!, 10);
   const famIdStr = String(famIdNum);
   const queryClient = useQueryClient();
 
   // Family detail (not CRUD — single resource)
   const { data: family, isLoading: famLoading } = useQuery({
-    queryKey: ['referrerFamily', famIdStr],
+    queryKey: ["referrerFamily", famIdStr],
     queryFn: () => getReferrerFamily(famIdNum),
   });
 
   const updateFamMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
-      updateReferrerFamily(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) => updateReferrerFamily(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['referrerFamily', famIdStr] });
-      queryClient.invalidateQueries({ queryKey: ['referrerFamilies'] });
+      queryClient.invalidateQueries({ queryKey: ["referrerFamily", famIdStr] });
+      queryClient.invalidateQueries({ queryKey: ["referrerFamilies"] });
     },
   });
 
   const [showEditFamily, setShowEditFamily] = useState(false);
 
   // People CRUD via hook
-  const peopleKey = ['referrerFamilyPeople', famIdStr];
+  const peopleKey = ["referrerFamilyPeople", famIdStr];
   const {
     listData,
     listLoading: peopleLoading,
@@ -83,7 +82,7 @@ export default function ReferrerFamilyDetail() {
     createFn: (data: unknown) => createReferrerFamilyPerson(famIdNum, data as Record<string, unknown>),
     updateFn: updatePerson as (id: number, data: unknown) => Promise<PersonDetail>,
     deleteFn: deletePerson,
-    invalidationKeys: [peopleKey, ['referrerFamily', famIdStr]],
+    invalidationKeys: [peopleKey, ["referrerFamily", famIdStr]],
   });
 
   function handleUpdateFam(formData: Record<string, unknown>) {
@@ -105,35 +104,24 @@ export default function ReferrerFamilyDetail() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink to={ROUTES.REFERRER_DASHBOARD} label="My Families" />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.REFERRER_DASHBOARD} label="My Families" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
-          Family Detail
-        </h2>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Detail</h2>
 
         {/* ── Family info card ──────────────────────────────── */}
         <Card className="mb-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-gray-900">
-                {family ? family.family_name : '—'}
-              </h3>
+              <h3 className="text-base font-semibold text-gray-900">{family ? family.family_name : "—"}</h3>
               {family && (
                 <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
-                  {family.person_count ?? 0} person{(family.person_count ?? 0) !== 1 ? 's' : ''}
+                  {family.person_count ?? 0} person{(family.person_count ?? 0) !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              onClick={() => setShowEditFamily(!showEditFamily)}
-            >
-              {showEditFamily ? 'Cancel' : 'Edit'}
+            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEditFamily(!showEditFamily)}>
+              {showEditFamily ? "Cancel" : "Edit"}
             </Button>
           </div>
 
@@ -264,7 +252,9 @@ export default function ReferrerFamilyDetail() {
         />
 
         {/* ── Errors ────────────────────────────────────────── */}
-        <MutationErrors mutations={[updateFamMut, createPersonMut, updatePersonMut, deletePersonMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[updateFamMut, createPersonMut, updatePersonMut, deletePersonMut].filter((m): m is NonNullable<typeof m> => m != null)}
+        />
       </main>
     </div>
   );

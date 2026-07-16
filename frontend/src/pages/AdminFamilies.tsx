@@ -5,30 +5,23 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  adminListFamilies,
-  adminGetFamily,
-  adminCreateFamily,
-  adminUpdateFamily,
-  adminDeleteFamily,
-  adminListReferrers,
-} from '../lib/api';
-import { useCrudManager } from '../hooks/useCrudManager';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Button } from '../components/Button';
-import { PageSpinner, Spinner } from '../components/Spinner';
-import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MutationErrors } from '../components/MutationErrors';
-import { FamilyForm } from '../components/FamilyForm';
-import { defaultFamilyForm } from '../components/defaults';
-import type { FamilyDetail } from '../types';
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { defaultFamilyForm } from "../components/defaults";
+import { FamilyForm } from "../components/FamilyForm";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { MutationErrors } from "../components/MutationErrors";
+import { PageSpinner, Spinner } from "../components/Spinner";
+import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useCrudManager } from "../hooks/useCrudManager";
+import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
+import type { FamilyDetail } from "../types";
 
-const FAMILY_KEYS = ['adminFamilies'];
-const REFERRER_KEYS = ['adminReferrers'];
+const FAMILY_KEYS = ["adminFamilies"];
+const REFERRER_KEYS = ["adminReferrers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -88,18 +81,13 @@ export default function AdminFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
 
       <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
-          <Button onClick={openCreate}>
-            + Add Family
-          </Button>
+          <Button onClick={openCreate}>+ Add Family</Button>
         </div>
 
         {/* Create / Edit form */}
@@ -112,7 +100,7 @@ export default function AdminFamilies() {
 
         {(showForm || (editingId && detail)) && (
           <FamilyForm
-            title={editingId ? 'Edit Family' : 'Add Family'}
+            title={editingId ? "Edit Family" : "Add Family"}
             initial={editingId ? (detail ?? defaultFamilyForm) : defaultFamilyForm}
             isEdit={!!editingId}
             referrerMap={referrerMap}
@@ -146,14 +134,22 @@ export default function AdminFamilies() {
                   <Td>{referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}</Td>
                   <Td>
                     <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" className="px-3 py-1.5 text-xs"
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="px-3 py-1.5 text-xs"
                         onClick={() => openEdit(f.id)}
-                        disabled={!!editingId}>
+                        disabled={!!editingId}
+                      >
                         Edit
                       </Button>
-                      <Button variant="danger" size="sm" className="px-3 py-1.5 text-xs"
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        className="px-3 py-1.5 text-xs"
                         onClick={() => confirmDelete(f.id)}
-                        disabled={deleteMut?.isPending}>
+                        disabled={deleteMut?.isPending}
+                      >
                         Delete
                       </Button>
                     </div>

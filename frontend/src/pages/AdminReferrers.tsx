@@ -5,27 +5,21 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
-import { useState, useEffect } from 'react';
-import {
-  adminListReferrers,
-  adminGetReferrer,
-  adminCreateReferrer,
-  adminUpdateReferrer,
-  adminDeleteReferrer,
-} from '../lib/api';
-import { useCrudManager } from '../hooks/useCrudManager';
-import { HeaderBar, BackLink } from '../components/HeaderBar';
-import { Card } from '../components/Card';
-import { Button } from '../components/Button';
-import { FormField } from '../components/FormField';
-import { PageSpinner, Spinner } from '../components/Spinner';
-import { Table, TableHead, TableBody, Th, Tr, Td } from '../components/Table';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MutationErrors } from '../components/MutationErrors';
-import { defaultReferrerForm } from '../components/defaults';
-import type { ReferrerDetail } from '../types';
+import { useEffect, useState } from "react";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { defaultReferrerForm } from "../components/defaults";
+import { FormField } from "../components/FormField";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { MutationErrors } from "../components/MutationErrors";
+import { PageSpinner, Spinner } from "../components/Spinner";
+import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useCrudManager } from "../hooks/useCrudManager";
+import { adminCreateReferrer, adminDeleteReferrer, adminGetReferrer, adminListReferrers, adminUpdateReferrer } from "../lib/api";
+import type { ReferrerDetail } from "../types";
 
-const REFERRER_KEYS = ['adminReferrers'];
+const REFERRER_KEYS = ["adminReferrers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -71,18 +65,13 @@ export default function AdminReferrers() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        left={<BackLink />}
-      />
+      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
 
       <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
-          <Button onClick={openCreate}>
-            + Add Referrer
-          </Button>
+          <Button onClick={openCreate}>+ Add Referrer</Button>
         </div>
 
         {/* Create / Edit form */}
@@ -95,7 +84,7 @@ export default function AdminReferrers() {
 
         {(showForm || (editingId && detail)) && (
           <ReferrerForm
-            title={editingId ? 'Edit Referrer' : 'Add Referrer'}
+            title={editingId ? "Edit Referrer" : "Add Referrer"}
             initial={editingId ? (detail ?? defaultReferrerForm) : defaultReferrerForm}
             isEdit={!!editingId}
             onSubmit={editingId ? handleUpdate : handleCreate}
@@ -125,14 +114,22 @@ export default function AdminReferrers() {
                   <Td>{r.family_limit}</Td>
                   <Td>
                     <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" className="px-3 py-1.5 text-xs"
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="px-3 py-1.5 text-xs"
                         onClick={() => openEdit(r.id)}
-                        disabled={!!editingId}>
+                        disabled={!!editingId}
+                      >
                         Edit
                       </Button>
-                      <Button variant="danger" size="sm" className="px-3 py-1.5 text-xs"
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        className="px-3 py-1.5 text-xs"
                         onClick={() => confirmDelete(r.id)}
-                        disabled={deleteMut?.isPending}>
+                        disabled={deleteMut?.isPending}
+                      >
                         Delete
                       </Button>
                     </div>
@@ -193,16 +190,18 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
   return (
     <Card className="mb-6 border border-gray-200">
       <h3 className="mb-4 text-lg font-semibold text-violet-950">{title}</h3>
-      <form onSubmit={(e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit(form);
-      }}>
+      <form
+        onSubmit={(e: React.FormEvent) => {
+          e.preventDefault();
+          onSubmit(form);
+        }}
+      >
         <div className="flex flex-col gap-4 sm:flex-row">
           <FormField
             label="Name"
             fieldProps={{
               value: form.name,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update('name', e.target.value),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
               required: true,
               maxLength: 60,
             }}
@@ -212,7 +211,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
             type="number"
             fieldProps={{
               value: form.family_limit,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update('family_limit', parseInt(e.target.value) || 1),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_limit", parseInt(e.target.value, 10) || 1),
               required: true,
               min: 1,
               max: 999,
@@ -222,7 +221,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
             label="Phone"
             fieldProps={{
               value: form.phone_number,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update('phone_number', e.target.value),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
               required: true,
               maxLength: 20,
             }}
@@ -230,7 +229,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
         </div>
         <div className="mt-4 flex gap-2">
           <Button type="submit" loading={loading}>
-            {loading ? 'Saving…' : isEdit ? 'Update' : 'Create'}
+            {loading ? "Saving…" : isEdit ? "Update" : "Create"}
           </Button>
           <Button variant="secondary" type="button" onClick={onCancel}>
             Cancel

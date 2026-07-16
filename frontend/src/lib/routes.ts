@@ -7,30 +7,30 @@
  */
 export const ROUTES = {
   // ── Public ──────────────────────────────────────────────────
-  LOGIN: '/login',
-  FORGOT_PASSWORD: '/forgot-password',
-  RESET_PASSWORD: '/reset-password/:token',
+  LOGIN: "/login",
+  FORGOT_PASSWORD: "/forgot-password",
+  RESET_PASSWORD: "/reset-password/:token",
 
   // ── Dashboard (all authenticated roles) ────────────────────
-  DASHBOARD: '/dashboard',
+  DASHBOARD: "/dashboard",
 
   // ── Admin ──────────────────────────────────────────────────
-  REGISTER: '/register',
-  ADMIN_REFERRERS: '/admin/referrers',
-  ADMIN_FAMILIES: '/admin/families',
-  ADMIN_PEOPLE: '/admin/people',
-  ADMIN_CSV_UPLOAD: '/admin/csv-upload',
+  REGISTER: "/register",
+  ADMIN_REFERRERS: "/admin/referrers",
+  ADMIN_FAMILIES: "/admin/families",
+  ADMIN_PEOPLE: "/admin/people",
+  ADMIN_CSV_UPLOAD: "/admin/csv-upload",
 
   // ── Referrer self-service ─────────────────────────────────
-  REFERRER_DASHBOARD: '/referrer/dashboard',
-  REFERRER_FAMILY_DETAIL: '/referrer/families/:id',
+  REFERRER_DASHBOARD: "/referrer/dashboard",
+  REFERRER_FAMILY_DETAIL: "/referrer/families/:id",
 
   // ── Family self-service ───────────────────────────────────
-  FAMILY_DASHBOARD: '/family/dashboard',
-  FAMILY_PEOPLE: '/family/people',
+  FAMILY_DASHBOARD: "/family/dashboard",
+  FAMILY_PEOPLE: "/family/people",
 
   // ── Root ──────────────────────────────────────────────────
-  ROOT: '/',
+  ROOT: "/",
 } as const;
 
 /**

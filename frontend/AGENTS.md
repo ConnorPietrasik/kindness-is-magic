@@ -11,16 +11,20 @@
 - **React Router v6** for client-side routing
 - **Vitest** + **@testing-library/react** + **@testing-library/jest-dom** + **@testing-library/user-event** for unit/component tests
 
+## TypeScript
+
+- Never use `any`. Use `unknown` and narrow, or import the correct type from `src/types/`.
+- Explicitly type exported functions, hooks, and APIs. Infer local variable types when obvious.
+
 ## Frontend Rules
 
-- All remote server state must be managed by React Query. `useState` is only for local UI state.
+- All remote server state must be managed by React Query. `useState` is only for local UI state (not duplicated server data).
 - Keep API calls in `src/lib/api.ts`; do not call Axios directly from page components.
 - Prefer reusing components from `src/components/` and `useCrudManager` over duplicating patterns.
 - Use Tailwind utility classes for styling. Do not add CSS modules, styled-components, or arbitrary CSS files. Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or application-wide behavior. Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
 
 ## React Query Rules
 
-- Do not duplicate server state into `useState`. Let React Query own the data.
 - Use the hook's `isLoading`/`isError`/`data` instead of manual request flags.
 - Mutations must invalidate affected queries after success (see `useCrudManager` for the pattern).
 - Query keys should be stable arrays, passed as parameters or defined near their usage.
@@ -73,36 +77,31 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`)
 - Reuse it instead of duplicating CRUD state management.
 - It handles queries, mutations, invalidation, and common UI state (form visibility, editing id, delete confirmation).
 
+### Adding a New CRUD Page
+
+1. Add API functions to `src/lib/api.ts`
+2. Reuse `useCrudManager` for data fetching and mutations
+3. Reuse existing table/form components from `src/components/`
+4. Add route in `src/lib/routes.ts` and lazy-loaded page in `src/App.tsx`
+5. Add Vitest tests for new logic; Playwright tests if user workflow changes
+
 ## User Roles and Routes
 
 Three roles: `admin`, `referrer`, `family`.
 
 - **`ProtectedRoute`** component wraps routes with a `roles` array. Unauthenticated users are redirected to `/login`; wrong-role users to `/dashboard`.
 - Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
-- Route paths are centralised in `ROUTES` (e.g. `ROUTES.ADMIN_FAMILIES`). Dynamic paths use the `route` builder (e.g. `route.referrerFamilyDetail(id)`).
-
-### Route map
-
-| Role     | Routes                                                                 |
-|----------|------------------------------------------------------------------------|
-| Public   | `/login`, `/forgot-password`, `/reset-password/:token`                 |
-| All      | `/dashboard`                                                           |
-| Admin    | `/register`, `/admin/referrers`, `/admin/families`, `/admin/people`, `/admin/csv-upload` |
-| Referrer | `/referrer/dashboard`, `/referrer/families/:id`                        |
-| Family   | `/family/dashboard`, `/family/people`                                  |
+- Route paths are centralized in `src/lib/routes.ts`. Always use `ROUTES` constants and `route` helpers rather than hardcoded strings.
 
 ## Structure
 
-- `src/main.tsx` — Entry point. Providers stacked: `QueryClientProvider` → `BrowserRouter` → `AuthProvider` → `App`. QueryClient defaults: `retry: 1`, `staleTime: 5min`.
-- `src/App.tsx` — Router. All pages are **lazy-loaded** via `React.lazy()` with `<Suspense>` spinner fallback. New pages should follow this pattern.
-- `src/components/` — Reusable UI components. Use **named exports**, not default exports.
-- `src/types/` — Shared TypeScript types (`domain.ts`, `api.ts`, `auth.ts`, `csv.ts`, `index.ts`). Import from here rather than redefining shapes.
-- `src/lib/api.ts` — Axios instance and all API functions. See [API Layer](#api-layer).
-- `src/lib/routes.ts` — Route constants (`ROUTES`) and dynamic builders (`route`).
-- `src/lib/utils.ts` — `humanize()` and `formatApiError()`.
-- `src/lib/csv.ts` — Client-side CSV parsing and validation.
-- `src/hooks/useCrudManager.ts` — Shared CRUD hook. See [Shared CRUD Hook](#shared-crud-hook).
-- `src/context/AuthContext.tsx` — Auth state via React Query. See [Authentication](#authentication).
+- `src/main.tsx` — Entry point. Providers stacked: `QueryClientProvider` → `BrowserRouter` → `AuthProvider` → `App`.
+- `src/App.tsx` — Router. All pages are **lazy-loaded** via `React.lazy()` with `<Suspense>` spinner fallback.
+- `src/components/` — Reusable UI components. Use **named exports**.
+- `src/types/` — Shared TypeScript types. Import from here rather than redefining shapes.
+- `src/lib/api.ts` — Axios instance and all API functions.
+- `src/lib/routes.ts` — Route constants and dynamic builders.
+- `src/hooks/useCrudManager.ts` — Shared CRUD hook.
 - Test files: `*.test.ts` / `*.test.tsx` alongside source, or in `src/__tests__/`.
 
 ## Scripts
@@ -114,6 +113,26 @@ npm run preview       # Preview production build locally
 npm run test          # Run Vitest test suite
 npm run test:coverage # Run tests with coverage (requires @vitest/coverage-v8)
 npm run typecheck     # TypeScript type check (tsc --noEmit)
+npm run lint          # Biome lint and format check
+npm run lint:fix      # Biome lint and format (auto-fix)
+npm run format        # Biome format only
 ```
 
-The project uses **TypeScript** with strict mode. Run `npm run typecheck` to verify types. There is no ESLint config.
+## Linting and Formatting
+
+**Biome** (`@biomejs/biome`) handles linting and formatting. Config is in `biome.json`.
+
+- Double quotes, semicolons, 140 char line width, organize imports
+- Lint: `recommended` preset, see `biome.json` for overrides
+- Run `npm run lint` to check, `npm run lint:fix` to auto-fix
+- Biome formatting is authoritative. Do not manually reformat code against Biome's output.
+
+## Definition of Done
+
+Changes should:
+
+- compile (`npm run typecheck`)
+- pass lint with no errors or warnings (`npm run lint`)
+- pass tests (`npm run test`)
+- follow existing project patterns
+- avoid introducing duplicate abstractions

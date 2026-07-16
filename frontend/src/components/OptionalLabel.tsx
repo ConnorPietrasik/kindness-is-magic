@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo } from "react";
 
 interface OptionalLabelProps {
   text: string;
@@ -9,8 +9,8 @@ interface OptionalLabelProps {
  */
 export const OptionalLabel = memo(function OptionalLabel({ text }: OptionalLabelProps) {
   return (
-    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+    <span className="mb-1.5 block text-sm font-medium text-gray-700">
       {text} <span className="font-normal text-gray-400">(optional)</span>
-    </label>
+    </span>
   );
 });

@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
-import { memo, type ReactNode } from 'react';
-import { ROUTES } from '../lib/routes';
+import { memo, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { ROUTES } from "../lib/routes";
 
 interface HeaderBarProps {
   title: string;
@@ -29,6 +29,7 @@ interface LogoutButtonProps {
 export function LogoutButton({ onClick }: LogoutButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm text-white transition-colors hover:bg-white/25"
     >
@@ -45,7 +46,7 @@ interface BackLinkProps {
 /**
  * BackLink — arrow link back to the dashboard or a custom path.
  */
-export function BackLink({ to = ROUTES.DASHBOARD, label = 'Back' }: BackLinkProps) {
+export function BackLink({ to = ROUTES.DASHBOARD, label = "Back" }: BackLinkProps) {
   return (
     <Link to={to} className="text-sm text-white/80 transition-colors hover:text-white">
       ← {label}

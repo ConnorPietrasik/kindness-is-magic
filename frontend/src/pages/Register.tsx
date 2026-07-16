@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { registerRequest } from '../lib/api';
-import { ROUTES } from '../lib/routes';
-import type { UserRole } from '../types';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { registerRequest } from "../lib/api";
+import { ROUTES } from "../lib/routes";
+import type { UserRole } from "../types";
 
 const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'referrer', label: 'Referrer' },
-  { value: 'family', label: 'Family' },
+  { value: "referrer", label: "Referrer" },
+  { value: "family", label: "Family" },
 ];
 
 interface RegisterForm {
@@ -19,32 +19,31 @@ interface RegisterForm {
 }
 
 const emptyForm: RegisterForm = {
-  email: '',
-  password: '',
-  confirmPassword: '',
-  role: 'referrer',
-  referrer_id: '',
-  family_id: '',
+  email: "",
+  password: "",
+  confirmPassword: "",
+  role: "referrer",
+  referrer_id: "",
+  family_id: "",
 };
 
 export default function Register() {
   const [form, setForm] = useState<RegisterForm>(emptyForm);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const update = (key: keyof RegisterForm, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const update = (key: keyof RegisterForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const isReferrer = form.role === 'referrer';
+  const isReferrer = form.role === "referrer";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
+      setError("Passwords do not match.");
       return;
     }
 
@@ -54,18 +53,15 @@ export default function Register() {
         email: form.email,
         password: form.password,
         role: form.role,
-        referrer_id: isReferrer ? (form.referrer_id ? parseInt(form.referrer_id) : null) : null,
-        family_id: !isReferrer ? (form.family_id ? parseInt(form.family_id) : null) : null,
+        referrer_id: isReferrer ? (form.referrer_id ? parseInt(form.referrer_id, 10) : null) : null,
+        family_id: !isReferrer ? (form.family_id ? parseInt(form.family_id, 10) : null) : null,
       };
 
       await registerRequest(payload);
-      setSuccess('User created successfully!');
+      setSuccess("User created successfully!");
       setForm(emptyForm);
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Registration failed.',
-      );
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Registration failed.");
     } finally {
       setLoading(false);
     }
@@ -77,16 +73,8 @@ export default function Register() {
         <h1 className="mb-1 text-2xl font-bold text-brand-dark">Register User</h1>
         <p className="mb-6 text-sm text-gray-500">Create a new account (admin only)</p>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 rounded-lg bg-green-50 px-3 py-2.5 text-sm text-green-600">
-            {success}
-          </div>
-        )}
+        {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">{error}</div>}
+        {success && <div className="mb-4 rounded-lg bg-green-50 px-3 py-2.5 text-sm text-green-600">{success}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -97,7 +85,7 @@ export default function Register() {
               id="reg-email"
               type="email"
               value={form.email}
-              onChange={(e) => update('email', e.target.value)}
+              onChange={(e) => update("email", e.target.value)}
               required
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               placeholder="user@example.com"
@@ -112,7 +100,7 @@ export default function Register() {
               id="reg-password"
               type="password"
               value={form.password}
-              onChange={(e) => update('password', e.target.value)}
+              onChange={(e) => update("password", e.target.value)}
               required
               minLength={8}
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -128,7 +116,7 @@ export default function Register() {
               id="reg-confirm"
               type="password"
               value={form.confirmPassword}
-              onChange={(e) => update('confirmPassword', e.target.value)}
+              onChange={(e) => update("confirmPassword", e.target.value)}
               required
               minLength={8}
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -143,11 +131,13 @@ export default function Register() {
             <select
               id="reg-role"
               value={form.role}
-              onChange={(e) => update('role', e.target.value as UserRole)}
+              onChange={(e) => update("role", e.target.value as UserRole)}
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             >
               {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
               ))}
             </select>
           </div>
@@ -161,7 +151,7 @@ export default function Register() {
                 id="reg-referrer"
                 type="number"
                 value={form.referrer_id}
-                onChange={(e) => update('referrer_id', e.target.value)}
+                onChange={(e) => update("referrer_id", e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
                 placeholder="e.g. 1"
@@ -178,7 +168,7 @@ export default function Register() {
                 id="reg-family"
                 type="number"
                 value={form.family_id}
-                onChange={(e) => update('family_id', e.target.value)}
+                onChange={(e) => update("family_id", e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
                 placeholder="e.g. 1"
@@ -191,7 +181,7 @@ export default function Register() {
             disabled={loading}
             className="mt-2 w-full rounded-lg bg-gradient-to-r from-btn-start to-btn-end py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Creating…' : 'Create User'}
+            {loading ? "Creating…" : "Create User"}
           </button>
         </form>
 

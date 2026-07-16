@@ -1,6 +1,6 @@
-import { useId, type ReactNode } from 'react';
+import { type ReactNode, useId } from "react";
 
-type AsElement = 'input' | 'select' | 'textarea';
+type AsElement = "input" | "select" | "textarea";
 
 interface FormFieldProps {
   label?: string;
@@ -15,21 +15,13 @@ interface FormFieldProps {
 /**
  * FormField — label + input/select/textarea with consistent spacing.
  */
-export function FormField({
-  label,
-  htmlFor,
-  type = 'text',
-  as = 'input',
-  fieldProps = {},
-  className = '',
-  children,
-}: FormFieldProps) {
+export function FormField({ label, htmlFor, type = "text", as = "input", fieldProps = {}, className = "", children }: FormFieldProps) {
   const autoId = useId();
   const id = htmlFor ?? autoId;
   const Component = as;
-  const { className: extraClass = '', ...restProps } = fieldProps as Record<string, unknown>;
+  const { className: extraClass = "", ...restProps } = fieldProps as Record<string, unknown>;
   const baseInputClass =
-    'w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20';
+    "w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20";
 
   return (
     <div className={className}>
@@ -40,8 +32,8 @@ export function FormField({
       )}
       <Component
         id={id}
-        type={Component === 'input' ? type : undefined}
-        className={`${baseInputClass}${extraClass ? ` ${extraClass}` : ''}`}
+        type={Component === "input" ? type : undefined}
+        className={`${baseInputClass}${extraClass ? ` ${extraClass}` : ""}`}
         {...restProps}
       >
         {children}

@@ -9,9 +9,9 @@
  *  - UI state: showForm, editingId, deleteConfirm
  */
 
-import { useState } from 'react';
-import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +36,7 @@ export interface CrudManagerOptions<ListResponse, Item> {
 
 export interface CrudManagerReturn<ListResponse, Item> {
   // Query data
-  listData: UseQueryResult<ListResponse>['data'];
+  listData: UseQueryResult<ListResponse>["data"];
   listLoading: boolean;
   detail: Item | null;
   detailLoading: boolean;
@@ -60,18 +60,8 @@ export interface CrudManagerReturn<ListResponse, Item> {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useCrudManager<ListResponse, Item>(
-  options: CrudManagerOptions<ListResponse, Item>,
-): CrudManagerReturn<ListResponse, Item> {
-  const {
-    rootKey,
-    listFn,
-    detailFn,
-    createFn,
-    updateFn,
-    deleteFn,
-    invalidationKeys = [rootKey],
-  } = options;
+export function useCrudManager<ListResponse, Item>(options: CrudManagerOptions<ListResponse, Item>): CrudManagerReturn<ListResponse, Item> {
+  const { rootKey, listFn, detailFn, createFn, updateFn, deleteFn, invalidationKeys = [rootKey] } = options;
 
   const queryClient = useQueryClient();
 
@@ -88,8 +78,8 @@ export function useCrudManager<ListResponse, Item>(
 
   /* ── Detail query (for edit-by-id) ──────────────────────── */
   const detailQuery = useQuery({
-    queryKey: [...rootKey, 'detail', editingId],
-    queryFn: () => (editingId != null ? detailFn!(editingId) : Promise.reject(new Error('No editingId'))),
+    queryKey: [...rootKey, "detail", editingId],
+    queryFn: () => (editingId != null ? detailFn!(editingId) : Promise.reject(new Error("No editingId"))),
     enabled: editingId != null && detailFn != null,
   });
   const detail: Item | null = detailQuery.data ?? null;
@@ -100,9 +90,7 @@ export function useCrudManager<ListResponse, Item>(
     ? useMutation({
         mutationFn: createFn as (variables: unknown) => Promise<Item>,
         onSuccess: () => {
-          invalidationKeys.forEach((k) =>
-            queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }),
-          );
+          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
           setShowForm(false);
         },
       })
@@ -112,11 +100,9 @@ export function useCrudManager<ListResponse, Item>(
     ? useMutation({
         mutationFn: ({ id, data }: { id: number; data: unknown }) => updateFn(id, data),
         onSuccess: () => {
-          invalidationKeys.forEach((k) =>
-            queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }),
-          );
+          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
           if (detailFn) {
-            queryClient.invalidateQueries({ queryKey: [...rootKey, 'detail'] });
+            queryClient.invalidateQueries({ queryKey: [...rootKey, "detail"] });
           }
           setEditingId(null);
         },
@@ -127,9 +113,7 @@ export function useCrudManager<ListResponse, Item>(
     ? useMutation({
         mutationFn: deleteFn as (variables: number) => Promise<void>,
         onSuccess: () => {
-          invalidationKeys.forEach((k) =>
-            queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }),
-          );
+          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
         },
       })
     : null;
