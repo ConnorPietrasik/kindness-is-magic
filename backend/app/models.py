@@ -106,13 +106,11 @@ class Family(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ORPHAN_REFERRER_ID = 0
 
-    referrer_id: Mapped[int] = mapped_column(
+    referrer_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey("referrer.id", ondelete="SET DEFAULT"),
-        server_default=str(ORPHAN_REFERRER_ID),
-        nullable=False,
+        ForeignKey("referrer.id", ondelete="SET NULL"),
+        nullable=True,
     )
     family_name: Mapped[str] = mapped_column(String(40), nullable=False)
     bio: Mapped[str | None] = mapped_column(String(400), nullable=True)
@@ -122,7 +120,7 @@ class Family(Base):
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
-    referrer: Mapped["Referrer"] = relationship("Referrer", back_populates="families")
+    referrer: Mapped["Referrer | None"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
 
 

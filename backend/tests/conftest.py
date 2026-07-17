@@ -87,28 +87,10 @@ def _env_isolation(monkeypatch: pytest.MonkeyPatch):
 def _setup_test_schema() -> Generator[None, None, None]:
     """Create all tables and seed required data once at the start of the test
     session, then tear everything down at the end."""
-    from app.models import Base, Referrer, Family
+    from app.models import Base
     from app import models  # noqa: F401 — register all model metadata
 
     Base.metadata.create_all(bind=engine)
-
-    # Seed the orphan referrer that Family rows depend on (FK default = id 0)
-    session = TestingSessionLocal()
-    try:
-        session.add(
-            Referrer(
-                id=Family.ORPHAN_REFERRER_ID,
-                name="Orphan",
-                family_limit=0,
-                phone_number="000-0000",
-            )
-        )
-        session.commit()
-        # Advance the sequence so next auto-generated id doesn't collide
-        session.execute(text("SELECT setval('referrer_id_seq', 1, true)"))
-        session.commit()
-    finally:
-        session.close()
 
     yield
 
@@ -223,7 +205,6 @@ def family_record(db: Session):
     from app.models import Family
 
     f = Family(
-        referrer_id=Family.ORPHAN_REFERRER_ID,
         family_name="TestFamily",
         family_wish="World peace",
         contact_name="Contact Person",

@@ -319,7 +319,7 @@ FAMILY_FIELDS: list[FieldDef] = _build_fields(
     Family,
     csv_name_map={"referrer_id": "referrer_name"},
     fk_resolvers={"referrer_id": _resolve_ref_id},
-    optional={"bio", "address", "phone_number"},
+    optional={"bio", "address", "phone_number", "referrer_id"},
 )
 
 PERSON_FIELDS: list[FieldDef] = _build_fields(
@@ -502,7 +502,7 @@ def _referrer_kwargs(resolved: dict) -> dict:
 
 def _family_kwargs(resolved: dict) -> dict:
     return {
-        "referrer_id": resolved["referrer_id"],
+        "referrer_id": resolved.get("referrer_id"),
         "family_name": resolved["family_name"],
         "family_wish": resolved["family_wish"],
         "contact_name": resolved["contact_name"],

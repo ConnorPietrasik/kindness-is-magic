@@ -14,6 +14,14 @@ from app.models import Family, Person, Referrer
 T = TypeVar("T", bound=DeclarativeBase)
 
 
+def _is_clear_sentinel(value) -> bool:
+    """Check for the 0 sentinel meaning 'clear this FK to None'.
+
+    Referrer IDs are SERIAL starting at 1, so 0 is never a valid id.
+    """
+    return value == 0
+
+
 # ---------------------------------------------------------------------------
 # Repository helpers
 # ---------------------------------------------------------------------------
@@ -80,6 +88,7 @@ def partial_update(obj, schema_model):
 
     Fields omitted by the client are excluded (via ``exclude_unset``).
     Fields sent as ``null`` are ignored (no change).
+    Fields sent as ``0`` on nullable FK columns clear the value (set to ``None``).
     Fields sent as ``""`` on nullable string columns clear the value (set to ``None``).
     """
     update_data = schema_model.model_dump(exclude_unset=True)
@@ -87,6 +96,8 @@ def partial_update(obj, schema_model):
     for field, value in update_data.items():
         if value is None:
             continue  # null means "don't change"
+        if _is_clear_sentinel(value) and field in columns and columns[field].nullable:
+            value = None  # -1 sentinel means "clear FK"
         if isinstance(value, str) and value == "" and field in columns and columns[field].nullable:
             value = None  # "" on nullable field means "clear"
         setattr(obj, field, value)

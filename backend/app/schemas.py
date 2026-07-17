@@ -209,7 +209,7 @@ class ReferrerListResponse(BaseModel):
 
 
 class FamilyCreate(BaseModel):
-    referrer_id: int
+    referrer_id: int | None = None
     family_name: str = Field(..., min_length=1, max_length=40)
     family_wish: str = Field(..., min_length=1, max_length=400)
     contact_name: str = Field(..., min_length=1, max_length=40)
@@ -247,14 +247,17 @@ class FamilyUpdate(BaseModel):
 
 
 class AdminFamilyUpdate(FamilyUpdate):
-    """Admin-only: extends FamilyUpdate with referrer_id."""
+    """Admin-only: extends FamilyUpdate with referrer_id.
+
+    Send ``0`` to unassign a referrer (set referrer_id to NULL).
+    """
 
     referrer_id: Optional[int] = None
 
 
 class FamilyDetail(BaseModel):
     id: int
-    referrer_id: int
+    referrer_id: int | None
     family_name: str
     bio: Optional[str]
     address: Optional[str]
@@ -272,7 +275,7 @@ class FamilySummary(BaseModel):
     family_name: str
     family_wish: str
     contact_name: str
-    referrer_id: int
+    referrer_id: int | None
     deleted_at: datetime | None
     person_count: int = 0
 

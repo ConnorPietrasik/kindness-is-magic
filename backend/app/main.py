@@ -66,40 +66,18 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: seed orphan referrer + bootstrap admin on startup
+# Lifespan: seed bootstrap admin on startup
 # ---------------------------------------------------------------------------
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:
-    """Seed bootstrap admin user and orphan referrer on startup."""
+    """Seed bootstrap admin user on startup."""
     from sqlalchemy.exc import ProgrammingError, OperationalError
 
     db = None
     try:
         db = next(get_db())
-
-        # -----------------------------------------------------------------
-        # Orphan referrer (id=0) — required by Family.referrer_id FK default
-        # -----------------------------------------------------------------
-        from app.models import Family, Referrer
-        from sqlalchemy import text
-
-        orphan = db.query(Referrer).filter(Referrer.id == Family.ORPHAN_REFERRER_ID).first()
-        if not orphan:
-            db.add(
-                Referrer(
-                    id=Family.ORPHAN_REFERRER_ID,
-                    name="Orphan",
-                    family_limit=999,
-                    phone_number="",
-                )
-            )
-            db.commit()
-            # Advance the sequence so next auto-generated id doesn't collide
-            db.execute(text("SELECT setval('referrer_id_seq', 1, true)"))
-            db.commit()
-            logger.info("Orphan referrer seeded.")
 
         # -----------------------------------------------------------------
         # Bootstrap admin user (only if env vars are set)

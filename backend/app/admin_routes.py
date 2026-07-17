@@ -59,7 +59,7 @@ def list_referrers(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
-    query = db.query(Referrer).filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
+    query = db.query(Referrer)
     if not include_deleted:
         query = query.filter(Referrer.deleted_at.is_(None))
     total = query.count()
@@ -212,8 +212,9 @@ def create_family(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
-    # Validate referrer exists
-    get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
+    # Validate referrer exists if provided
+    if body.referrer_id is not None:
+        get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
 
     fam = Family(
         referrer_id=body.referrer_id,
@@ -240,8 +241,8 @@ def update_family(
 ) -> FamilyDetail:
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted families.
     fam = get_or_404(db, Family, fam_id, "Family not found")
-    # Validate referrer exists if referrer_id is being changed (id=0 is the orphan referrer)
-    if body.referrer_id is not None and body.referrer_id != Family.ORPHAN_REFERRER_ID:
+    # Validate referrer exists if referrer_id is being changed (0 means clear to NULL)
+    if body.referrer_id is not None and body.referrer_id != 0:
         get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
     partial_update(fam, body)
     db.commit()

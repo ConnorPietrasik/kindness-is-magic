@@ -267,7 +267,6 @@ class TestAdminListFamilies:
         # Create 4 families
         for i in range(4):
             f = Family(
-                referrer_id=Family.ORPHAN_REFERRER_ID,
                 family_name=f"Family {i}",
                 family_wish="Wish",
                 contact_name="Contact",
@@ -395,17 +394,17 @@ class TestAdminUpdateFamily:
         body = resp.json()
         assert body["referrer_id"] == referrer_record.id
 
-    def test_200_update_referrer_id_to_orphan(self, test_client: TestClient, admin_user, family_record):
+    def test_200_update_referrer_id_to_null(self, test_client: TestClient, admin_user, family_record, referrer_record, db: Session):
         _admin_login(test_client)
-        # Set to a real referrer first, then back to orphan (id=0)
-        from app.models import Family
-
+        # Set to a real referrer first, then clear with 0 sentinel
+        family_record.referrer_id = referrer_record.id
+        db.commit()
         resp = test_client.patch(
             f"/api/admin/families/{family_record.id}",
-            json={"referrer_id": Family.ORPHAN_REFERRER_ID},
+            json={"referrer_id": 0},
         )
         assert resp.status_code == 200
-        assert resp.json()["referrer_id"] == Family.ORPHAN_REFERRER_ID
+        assert resp.json()["referrer_id"] is None
 
     def test_404_update_referrer_id_invalid(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)

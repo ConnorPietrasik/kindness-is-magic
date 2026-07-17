@@ -87,7 +87,6 @@ class TestReferrer:
 class TestFamily:
     def test_create_family(self, db: Session):
         f = Family(
-            referrer_id=Family.ORPHAN_REFERRER_ID,
             family_name="The Smiths",
             family_wish="A new roof",
             contact_name="John Smith",
@@ -97,17 +96,7 @@ class TestFamily:
         db.refresh(f)
         assert f.id is not None
         assert f.family_name == "The Smiths"
-
-    def test_family_orphan_default_referrer(self, db: Session):
-        f = Family(
-            family_name="DefaultFamily",
-            family_wish="Peace",
-            contact_name="Contact",
-        )
-        db.add(f)
-        db.commit()
-        db.refresh(f)
-        assert f.referrer_id == Family.ORPHAN_REFERRER_ID
+        assert f.referrer_id is None
 
 
 class TestPerson:
