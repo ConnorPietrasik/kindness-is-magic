@@ -80,6 +80,54 @@ export interface PersonSummary {
   is_deleted: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Payload types — all fields optional (create = all present, update = partial)
+// ---------------------------------------------------------------------------
+
+/** Payload for creating or updating a referrer. `family_limit` is admin-only. */
+export interface ReferrerPayload {
+  name?: string;
+  phone_number?: string;
+  family_limit?: number;
+}
+
+/** Payload for creating or updating a family. `referrer_id` and `is_deleted` are admin-only. */
+export interface FamilyPayload {
+  referrer_id?: number;
+  family_name?: string;
+  bio?: string | null;
+  address?: string | null;
+  phone_number?: string | null;
+  family_wish?: string;
+  contact_name?: string;
+  is_deleted?: boolean;
+}
+
+/** Payload for creating or updating a person. `family_id` and `is_deleted` are admin-only. */
+export interface PersonPayload {
+  family_id?: number;
+  given_name?: string;
+  title?: string | null;
+  age?: number;
+  practical_wish?: string;
+  fun_wish?: string;
+  note?: string | null;
+  is_deleted?: boolean;
+}
+
+/** Payload for user registration. */
+export interface RegisterPayload {
+  email?: string;
+  password?: string;
+  role?: string;
+  referrer_id?: number | null;
+  family_id?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Person
+// ---------------------------------------------------------------------------
+
 /** Mirrors PersonDetail. */
 export interface PersonDetail {
   id: number;

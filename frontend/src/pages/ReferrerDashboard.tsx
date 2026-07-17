@@ -30,7 +30,7 @@ import {
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
-import type { FamilyDetail, ReferrerDetail } from "../types";
+import type { FamilyDetail, FamilyPayload, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_ME_KEY = ["referrerMe"];
 const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
@@ -82,15 +82,15 @@ export default function ReferrerDashboard() {
 
   const [showEditSelf, setShowEditSelf] = useState(false);
 
-  function handleUpdateSelf(formData: Record<string, unknown>) {
+  function handleUpdateSelf(formData: ReferrerPayload) {
     updateSelfMut.mutate(formData);
   }
 
-  function handleCreateFam(formData: Record<string, unknown>) {
+  function handleCreateFam(formData: FamilyPayload) {
     createFamMut?.mutate(formData);
   }
 
-  function handleUpdateFam(formData: Record<string, unknown>) {
+  function handleUpdateFam(formData: FamilyPayload) {
     if (!editingId) return;
     updateFamMut?.mutate({ id: editingId, data: formData });
   }
@@ -247,13 +247,13 @@ export default function ReferrerDashboard() {
 /* ------------------------------------------------------------------ */
 interface ReferrerSelfFormProps {
   initial: Partial<ReferrerDetail>;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: ReferrerPayload) => void;
   onCancel: () => void;
   loading: boolean;
 }
 
 function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelfFormProps) {
-  const [form, setForm] = useState<Record<string, unknown>>(() => ({ ...initial }));
+  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
 
   useEffect(() => {
     setForm({ ...initial });

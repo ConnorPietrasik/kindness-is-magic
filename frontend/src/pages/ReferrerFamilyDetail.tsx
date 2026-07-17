@@ -30,6 +30,7 @@ import {
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES } from "../lib/routes";
+import type { FamilyPayload, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -47,7 +48,7 @@ export default function ReferrerFamilyDetail() {
   });
 
   const updateFamMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) => updateReferrerFamily(id, data),
+    mutationFn: ({ id, data }: { id: number; data: FamilyPayload }) => updateReferrerFamily(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["referrerFamily", famIdStr] });
       queryClient.invalidateQueries({ queryKey: ["referrerFamilies"] });
@@ -78,21 +79,21 @@ export default function ReferrerFamilyDetail() {
     rootKey: peopleKey,
     listFn: () => listReferrerFamilyPeople(famIdNum),
     detailFn: getPerson,
-    createFn: (data: Record<string, unknown>) => createReferrerFamilyPerson(famIdNum, data),
+    createFn: (data: PersonPayload) => createReferrerFamilyPerson(famIdNum, data),
     updateFn: updatePerson,
     deleteFn: deletePerson,
     invalidationKeys: [peopleKey, ["referrerFamily", famIdStr]],
   });
 
-  function handleUpdateFam(formData: Record<string, unknown>) {
+  function handleUpdateFam(formData: FamilyPayload) {
     updateFamMut.mutate({ id: famIdNum, data: formData });
   }
 
-  function handleCreatePerson(formData: Record<string, unknown>) {
+  function handleCreatePerson(formData: PersonPayload) {
     createPersonMut?.mutate(formData);
   }
 
-  function handleUpdatePerson(formData: Record<string, unknown>) {
+  function handleUpdatePerson(formData: PersonPayload) {
     if (!editingPersonId) return;
     updatePersonMut?.mutate({ id: editingPersonId, data: formData });
   }

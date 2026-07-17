@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatApiError, humanize } from "./utils";
+import { formatApiError, humanize, normalizePayload } from "./utils";
 
 describe("humanize", () => {
   it("capitalises first letter of a string", () => {
@@ -14,6 +14,53 @@ describe("humanize", () => {
     expect(humanize("")).toBe("");
     expect(humanize(null)).toBe("");
     expect(humanize(undefined)).toBe("");
+  });
+});
+
+describe("normalizePayload", () => {
+  it("converts empty strings to null on nullable fields", () => {
+    const input = { family_name: "Smith", bio: "", address: "", phone_number: "" };
+    const result = normalizePayload(input);
+    expect(result.bio).toBeNull();
+    expect(result.address).toBeNull();
+    expect(result.phone_number).toBeNull();
+    expect(result.family_name).toBe("Smith");
+  });
+
+  it("leaves non-empty strings untouched", () => {
+    const input = { bio: "Hello", address: "123 Main", title: "Dr" };
+    const result = normalizePayload(input);
+    expect(result.bio).toBe("Hello");
+    expect(result.address).toBe("123 Main");
+    expect(result.title).toBe("Dr");
+  });
+
+  it("leaves null values as-is", () => {
+    const input = { bio: null, note: null };
+    const result = normalizePayload(input);
+    expect(result.bio).toBeNull();
+    expect(result.note).toBeNull();
+  });
+
+  it("ignores non-nullable fields with empty strings", () => {
+    const input = { family_name: "", given_name: "", name: "" };
+    const result = normalizePayload(input);
+    expect(result.family_name).toBe("");
+    expect(result.given_name).toBe("");
+    expect(result.name).toBe("");
+  });
+
+  it("returns a new object (does not mutate input)", () => {
+    const input = { bio: "", note: "" };
+    normalizePayload(input);
+    expect(input.bio).toBe("");
+    expect(input.note).toBe("");
+  });
+
+  it("handles objects without any nullable fields", () => {
+    const input = { name: "Test", family_limit: 5 };
+    const result = normalizePayload(input);
+    expect(result).toEqual({ name: "Test", family_limit: 5 });
   });
 });
 

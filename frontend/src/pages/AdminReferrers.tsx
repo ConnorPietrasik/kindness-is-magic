@@ -17,7 +17,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreateReferrer, adminDeleteReferrer, adminGetReferrer, adminListReferrers, adminUpdateReferrer } from "../lib/api";
-import type { ReferrerDetail } from "../types";
+import type { ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
 
@@ -50,11 +50,11 @@ export default function AdminReferrers() {
     deleteFn: adminDeleteReferrer,
   });
 
-  function handleCreate(formData: Record<string, unknown>) {
+  function handleCreate(formData: ReferrerPayload) {
     createMut?.mutate(formData);
   }
 
-  function handleUpdate(formData: Record<string, unknown>) {
+  function handleUpdate(formData: ReferrerPayload) {
     if (!editingId) return;
     updateMut?.mutate({ id: editingId, data: formData });
   }
@@ -173,13 +173,13 @@ interface ReferrerFormProps {
   title: string;
   initial: Partial<ReferrerDetail>;
   isEdit: boolean;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: ReferrerPayload) => void;
   onCancel: () => void;
   loading: boolean;
 }
 
 function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: ReferrerFormProps) {
-  const [form, setForm] = useState<Record<string, unknown>>(() => ({ ...initial }));
+  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
 
   useEffect(() => {
     setForm({ ...initial });

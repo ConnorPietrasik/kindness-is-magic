@@ -13,13 +13,18 @@ import axios from "axios";
 import type {
   FamilyDetail,
   FamilyListResponse,
+  FamilyPayload,
   PersonDetail,
   PersonListResponse,
+  PersonPayload,
   PersonSummary,
   ReferrerDetail,
   ReferrerListResponse,
+  ReferrerPayload,
+  RegisterPayload,
   User,
 } from "../types";
+import { normalizePayload } from "./utils";
 
 const api: AxiosInstance = axios.create({
   baseURL: "",
@@ -49,6 +54,16 @@ async function refreshToken(): Promise<{ user: User }> {
 interface ExtendedRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Request interceptor — normalise empty strings to null on nullable fields
+// ---------------------------------------------------------------------------
+api.interceptors.request.use((config) => {
+  if ((config.method === "post" || config.method === "patch") && config.data && typeof config.data === "object") {
+    config.data = normalizePayload(config.data as Record<string, unknown>);
+  }
+  return config;
+});
 
 // ---------------------------------------------------------------------------
 // Response interceptor — retry on 401 after token refresh
@@ -93,7 +108,7 @@ export function logoutRequest(): Promise<void> {
 }
 
 /** Returns full AxiosResponse — caller destructures `{ data }`. */
-export function registerRequest(data: Record<string, unknown>): Promise<AxiosResponse> {
+export function registerRequest(data: RegisterPayload): Promise<AxiosResponse> {
   return api.post("/api/auth/register", data);
 }
 
@@ -120,11 +135,11 @@ export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
   return api.get(`/api/admin/referrers/${id}`).then((res) => res.data);
 }
 
-export function adminCreateReferrer(data: Record<string, unknown>): Promise<ReferrerDetail> {
+export function adminCreateReferrer(data: ReferrerPayload): Promise<ReferrerDetail> {
   return api.post("/api/admin/referrers", data).then((res) => res.data);
 }
 
-export function adminUpdateReferrer(id: number, data: Record<string, unknown>): Promise<ReferrerDetail> {
+export function adminUpdateReferrer(id: number, data: ReferrerPayload): Promise<ReferrerDetail> {
   return api.patch(`/api/admin/referrers/${id}`, data).then((res) => res.data);
 }
 
@@ -143,11 +158,11 @@ export function adminGetFamily(id: number): Promise<FamilyDetail> {
   return api.get(`/api/admin/families/${id}`).then((res) => res.data);
 }
 
-export function adminCreateFamily(data: Record<string, unknown>): Promise<FamilyDetail> {
+export function adminCreateFamily(data: FamilyPayload): Promise<FamilyDetail> {
   return api.post("/api/admin/families", data).then((res) => res.data);
 }
 
-export function adminUpdateFamily(id: number, data: Record<string, unknown>): Promise<FamilyDetail> {
+export function adminUpdateFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
   return api.patch(`/api/admin/families/${id}`, data).then((res) => res.data);
 }
 
@@ -166,11 +181,11 @@ export function adminGetPerson(id: number): Promise<PersonDetail> {
   return api.get(`/api/admin/people/${id}`).then((res) => res.data);
 }
 
-export function adminCreatePerson(data: Record<string, unknown>): Promise<PersonDetail> {
+export function adminCreatePerson(data: PersonPayload): Promise<PersonDetail> {
   return api.post("/api/admin/people", data).then((res) => res.data);
 }
 
-export function adminUpdatePerson(id: number, data: Record<string, unknown>): Promise<PersonDetail> {
+export function adminUpdatePerson(id: number, data: PersonPayload): Promise<PersonDetail> {
   return api.patch(`/api/admin/people/${id}`, data).then((res) => res.data);
 }
 
@@ -213,7 +228,7 @@ export function getReferrerMe(): Promise<ReferrerDetail> {
   return api.get("/api/referrer/me").then((res) => res.data);
 }
 
-export function patchReferrerMe(data: Record<string, unknown>): Promise<ReferrerDetail> {
+export function patchReferrerMe(data: ReferrerPayload): Promise<ReferrerDetail> {
   return api.patch("/api/referrer/me", data).then((res) => res.data);
 }
 
@@ -228,11 +243,11 @@ export function getReferrerFamily(id: number): Promise<FamilyDetail> {
   return api.get(`/api/referrer/families/${id}`).then((res) => res.data);
 }
 
-export function createReferrerFamily(data: Record<string, unknown>): Promise<FamilyDetail> {
+export function createReferrerFamily(data: FamilyPayload): Promise<FamilyDetail> {
   return api.post("/api/referrer/families", data).then((res) => res.data);
 }
 
-export function updateReferrerFamily(id: number, data: Record<string, unknown>): Promise<FamilyDetail> {
+export function updateReferrerFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
   return api.patch(`/api/referrer/families/${id}`, data).then((res) => res.data);
 }
 
@@ -247,7 +262,7 @@ export function listReferrerFamilyPeople(fid: number): Promise<PersonDetail[]> {
   return api.get(`/api/referrer/families/${fid}/people`).then((res) => res.data);
 }
 
-export function createReferrerFamilyPerson(fid: number, data: Record<string, unknown>): Promise<PersonDetail> {
+export function createReferrerFamilyPerson(fid: number, data: PersonPayload): Promise<PersonDetail> {
   return api.post(`/api/referrer/families/${fid}/people`, data).then((res) => res.data);
 }
 
@@ -258,7 +273,7 @@ export function getFamilyMe(): Promise<FamilyDetail> {
   return api.get("/api/family/me").then((res) => res.data);
 }
 
-export function patchFamilyMe(data: Record<string, unknown>): Promise<FamilyDetail> {
+export function patchFamilyMe(data: FamilyPayload): Promise<FamilyDetail> {
   return api.patch("/api/family/me", data).then((res) => res.data);
 }
 
@@ -269,7 +284,7 @@ export function listFamilyPeople(): Promise<PersonDetail[]> {
   return api.get("/api/family/people").then((res) => res.data);
 }
 
-export function createFamilyPerson(data: Record<string, unknown>): Promise<PersonDetail> {
+export function createFamilyPerson(data: PersonPayload): Promise<PersonDetail> {
   return api.post("/api/family/people", data).then((res) => res.data);
 }
 
@@ -280,7 +295,7 @@ export function getPerson(id: number): Promise<PersonDetail> {
   return api.get(`/api/people/${id}`).then((res) => res.data);
 }
 
-export function updatePerson(id: number, data: Record<string, unknown>): Promise<PersonDetail> {
+export function updatePerson(id: number, data: PersonPayload): Promise<PersonDetail> {
   return api.patch(`/api/people/${id}`, data).then((res) => res.data);
 }
 

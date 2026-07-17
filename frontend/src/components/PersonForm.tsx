@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PersonDetail } from "../types/domain";
+import type { PersonDetail, PersonPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { defaultPersonForm } from "./defaults";
@@ -13,7 +13,7 @@ interface PersonFormProps {
   isEdit?: boolean;
   familyMap?: Record<number, string>;
   familyOptionsLoading?: boolean;
-  onSubmit: (formData: Record<string, unknown>) => void;
+  onSubmit: (formData: PersonPayload) => void;
   onCancel: () => void;
   loading?: boolean;
 }

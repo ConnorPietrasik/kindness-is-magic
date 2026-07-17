@@ -18,6 +18,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
+import type { FamilyPayload } from "../types";
 
 const FAMILY_KEYS = ["adminFamilies"];
 const REFERRER_KEYS = ["adminReferrers"];
@@ -65,11 +66,11 @@ export default function AdminFamilies() {
     return map;
   }, [referrerData]);
 
-  function handleCreate(formData: Record<string, unknown>) {
+  function handleCreate(formData: FamilyPayload) {
     createMut?.mutate(formData);
   }
 
-  function handleUpdate(formData: Record<string, unknown>) {
+  function handleUpdate(formData: FamilyPayload) {
     if (!editingId) return;
     updateMut?.mutate({ id: editingId, data: formData });
   }

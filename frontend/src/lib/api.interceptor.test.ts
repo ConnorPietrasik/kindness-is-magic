@@ -12,6 +12,9 @@ interface MockAxiosInstance extends Mock {
   patch: Mock;
   delete: Mock;
   interceptors: {
+    request: {
+      use: Mock;
+    };
     response: {
       use: Mock;
     };
@@ -32,6 +35,9 @@ describe("response interceptor — 401 token refresh", () => {
     mockApi.patch = vi.fn();
     mockApi.delete = vi.fn();
     mockApi.interceptors = {
+      request: {
+        use: vi.fn(),
+      },
       response: {
         use: vi.fn((_fulfilled: unknown, rejected: (error: unknown) => Promise<unknown>) => {
           rejectedHandler = rejected;

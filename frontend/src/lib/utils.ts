@@ -1,4 +1,27 @@
 /**
+ * NULLABLE_STRING_FIELDS — fields that the backend stores as `NULL` when empty.
+ * The frontend forms use `""` for controlled inputs; this set normalises `""` → `null`
+ * before the payload hits the wire.
+ */
+const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "phone_number", "title", "note"]);
+
+/**
+ * normalizePayload — convert empty strings to `null` on known nullable fields.
+ *
+ * This keeps DB values semantically clean (`null` = no value) and matches
+ * the TypeScript `string | null` types on the payload interfaces.
+ */
+export function normalizePayload<T extends Record<string, unknown>>(data: T): T {
+  const copy = { ...data } as Record<string, unknown>;
+  for (const key of NULLABLE_STRING_FIELDS) {
+    if (key in copy && copy[key] === "") {
+      copy[key] = null;
+    }
+  }
+  return copy as T;
+}
+
+/**
  * humanize — capitalise first letter of a string.
  */
 export function humanize(str: string | null | undefined): string {

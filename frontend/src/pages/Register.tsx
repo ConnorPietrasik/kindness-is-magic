@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { registerRequest } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import type { UserRole } from "../types";
+import type { RegisterPayload, UserRole } from "../types";
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "referrer", label: "Referrer" },
@@ -49,7 +49,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const payload = {
+      const payload: RegisterPayload = {
         email: form.email,
         password: form.password,
         role: form.role,

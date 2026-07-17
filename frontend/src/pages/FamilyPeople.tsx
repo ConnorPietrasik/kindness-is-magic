@@ -17,6 +17,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { ROUTES } from "../lib/routes";
+import type { PersonPayload } from "../types";
 
 const FAMILY_PEOPLE_KEY = ["familyPeople"];
 
@@ -49,11 +50,11 @@ export default function FamilyPeople() {
     deleteFn: deletePerson,
   });
 
-  function handleCreate(formData: Record<string, unknown>) {
+  function handleCreate(formData: PersonPayload) {
     createMut?.mutate(formData);
   }
 
-  function handleUpdate(formData: Record<string, unknown>) {
+  function handleUpdate(formData: PersonPayload) {
     if (!editingId) return;
     updateMut?.mutate({ id: editingId, data: formData });
   }

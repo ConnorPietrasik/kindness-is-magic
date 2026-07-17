@@ -14,11 +14,15 @@ export type {
 } from "./csv";
 export type {
   FamilyDetail,
+  FamilyPayload,
   FamilySummary,
   PersonDetail,
+  PersonPayload,
   PersonSummary,
   ReferrerDetail,
+  ReferrerPayload,
   ReferrerSummary,
+  RegisterPayload,
   User,
   UserRole,
 } from "./domain";

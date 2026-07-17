@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FamilyDetail } from "../types/domain";
+import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { defaultFamilyForm } from "./defaults";
@@ -14,7 +14,7 @@ interface FamilyFormProps {
   referrerMap?: Record<number, string>;
   referrerOptionsLoading?: boolean;
   showOptionalFields?: boolean;
-  onSubmit: (formData: Record<string, unknown>) => void;
+  onSubmit: (formData: FamilyPayload) => void;
   onCancel: () => void;
   loading?: boolean;
 }

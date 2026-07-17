@@ -18,6 +18,7 @@ import { InfoRow } from "../components/InfoRow";
 import { PageSpinner } from "../components/Spinner";
 import { getFamilyMe, patchFamilyMe } from "../lib/api";
 import { ROUTES } from "../lib/routes";
+import type { FamilyPayload } from "../types";
 
 const FAMILY_ME_KEY = ["familyMe"];
 
@@ -42,7 +43,7 @@ export default function FamilyDashboard() {
 
   const [showEdit, setShowEdit] = useState(false);
 
-  function handleUpdateSelf(formData: Record<string, unknown>) {
+  function handleUpdateSelf(formData: FamilyPayload) {
     updateSelfMut.mutate(formData);
   }
 

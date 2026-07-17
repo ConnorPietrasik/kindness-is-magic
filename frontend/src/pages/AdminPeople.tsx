@@ -18,6 +18,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreatePerson, adminDeletePerson, adminGetPerson, adminListFamilies, adminListPeople, adminUpdatePerson } from "../lib/api";
+import type { PersonPayload } from "../types";
 
 const PEOPLE_KEYS = ["adminPeople"];
 const FAMILY_KEYS = ["adminFamilies"];
@@ -65,11 +66,11 @@ export default function AdminPeople() {
     return map;
   }, [familyData]);
 
-  function handleCreate(formData: Record<string, unknown>) {
+  function handleCreate(formData: PersonPayload) {
     createMut?.mutate(formData);
   }
 
-  function handleUpdate(formData: Record<string, unknown>) {
+  function handleUpdate(formData: PersonPayload) {
     if (!editingId) return;
     updateMut?.mutate({ id: editingId, data: formData });
   }
