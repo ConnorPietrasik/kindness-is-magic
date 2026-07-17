@@ -421,7 +421,7 @@ class TestReferrerDeleteFamily:
 
         family = referrer_with_full_tree["family"]
         person = referrer_with_full_tree["person"]
-        assert person.is_deleted is False
+        assert person.deleted_at is None
 
         _tree_referrer_login(test_client)
         resp = test_client.delete(f"/api/referrer/families/{family.id}")
@@ -431,7 +431,7 @@ class TestReferrerDeleteFamily:
         pid = person.id
         db.expunge(person)
         refreshed = db.get(Person, pid)
-        assert refreshed.is_deleted is True
+        assert refreshed.deleted_at is not None
 
 
 # =========================================================================

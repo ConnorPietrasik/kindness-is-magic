@@ -30,7 +30,7 @@ def get_or_404(db: Session, model: Type[T], id: int, detail: str = "Not found") 
 def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not found") -> T:
     """Like get_or_404 but also rejects soft-deleted records."""
     obj = get_or_404(db, model, id, detail)
-    if getattr(obj, "is_deleted", False):
+    if getattr(obj, "deleted_at", None) is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
     return obj
 
@@ -42,19 +42,20 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
 
 def build_referrer_detail(ref: Referrer, db: Session) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count."""
-    family_count = db.query(Family).filter(Family.referrer_id == ref.id, Family.is_deleted == False).count()
+    family_count = db.query(Family).filter(Family.referrer_id == ref.id, Family.deleted_at.is_(None)).count()
     return {
         "id": ref.id,
         "name": ref.name,
         "family_limit": ref.family_limit,
         "phone_number": ref.phone_number,
         "family_count": family_count,
+        "deleted_at": ref.deleted_at,
     }
 
 
 def build_family_detail(fam: Family, db: Session) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count."""
-    person_count = db.query(Person).filter(Person.family_id == fam.id, Person.is_deleted == False).count()
+    person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
     return {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
@@ -64,7 +65,7 @@ def build_family_detail(fam: Family, db: Session) -> dict:
         "phone_number": fam.phone_number,
         "family_wish": fam.family_wish,
         "contact_name": fam.contact_name,
-        "is_deleted": fam.is_deleted,
+        "deleted_at": fam.deleted_at,
         "person_count": person_count,
     }
 

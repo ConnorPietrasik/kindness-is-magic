@@ -71,7 +71,7 @@ def register(
     # Validate foreign key references exist
     if data.family_id is not None:
         fam = db.query(Family).filter(Family.id == data.family_id).first()
-        if not fam or fam.is_deleted:
+        if not fam or fam.deleted_at is not None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Family with id={data.family_id} not found",

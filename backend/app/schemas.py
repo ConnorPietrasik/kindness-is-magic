@@ -136,6 +136,7 @@ class ReferrerSummary(BaseModel):
     id: int
     name: str
     family_limit: int
+    deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -189,6 +190,7 @@ class ReferrerDetail(BaseModel):
     family_limit: int
     phone_number: str
     family_count: int
+    deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -245,10 +247,9 @@ class FamilyUpdate(BaseModel):
 
 
 class AdminFamilyUpdate(FamilyUpdate):
-    """Admin-only: extends FamilyUpdate with referrer_id and is_deleted."""
+    """Admin-only: extends FamilyUpdate with referrer_id."""
 
     referrer_id: Optional[int] = None
-    is_deleted: Optional[bool] = None
 
 
 class FamilyDetail(BaseModel):
@@ -260,7 +261,7 @@ class FamilyDetail(BaseModel):
     phone_number: Optional[str]
     family_wish: str
     contact_name: str
-    is_deleted: bool
+    deleted_at: datetime | None
     person_count: int
 
     model_config = {"from_attributes": True}
@@ -272,7 +273,7 @@ class FamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     referrer_id: int
-    is_deleted: bool
+    deleted_at: datetime | None
     person_count: int = 0
 
     model_config = {"from_attributes": True}
@@ -329,12 +330,6 @@ class PersonUpdate(BaseModel):
         return sanitize_plain_text(v)
 
 
-class AdminPersonUpdate(PersonUpdate):
-    """Admin-only: extends PersonUpdate with is_deleted."""
-
-    is_deleted: Optional[bool] = None
-
-
 class PersonDetail(BaseModel):
     id: int
     family_id: int
@@ -344,7 +339,7 @@ class PersonDetail(BaseModel):
     practical_wish: str
     fun_wish: str
     note: Optional[str]
-    is_deleted: bool
+    deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -354,7 +349,7 @@ class PersonSummary(BaseModel):
     family_id: int
     given_name: str
     age: int
-    is_deleted: bool
+    deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
 

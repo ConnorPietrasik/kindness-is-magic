@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=60), nullable=False),
         sa.Column("family_limit", sa.SmallInteger(), nullable=False),
         sa.Column("phone_number", sa.String(length=20), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_referrer_id"), "referrer", ["id"], unique=False)
@@ -45,12 +46,12 @@ def upgrade() -> None:
         sa.Column("phone_number", sa.String(length=20), nullable=True),
         sa.Column("family_wish", sa.String(length=400), nullable=False),
         sa.Column("contact_name", sa.String(length=40), nullable=False),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["referrer_id"], ["referrer.id"], ondelete="SET DEFAULT"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_family_id"), "family", ["id"], unique=False)
-    op.create_index("ix_family_referrer_id_is_deleted", "family", ["referrer_id", "is_deleted"])
+    op.create_index("ix_family_referrer_id_deleted_at", "family", ["referrer_id", "deleted_at"])
 
     op.create_table(
         "person",
@@ -62,7 +63,7 @@ def upgrade() -> None:
         sa.Column("practical_wish", sa.String(length=400), nullable=False),
         sa.Column("fun_wish", sa.String(length=400), nullable=False),
         sa.Column("note", sa.String(length=400), nullable=True),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["family_id"],
             ["family.id"],
@@ -70,7 +71,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_person_id"), "person", ["id"], unique=False)
-    op.create_index("ix_person_family_id_is_deleted", "person", ["family_id", "is_deleted"])
+    op.create_index("ix_person_family_id_deleted_at", "person", ["family_id", "deleted_at"])
 
     op.create_table(
         "users",
@@ -137,10 +138,10 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
-    op.drop_index("ix_person_family_id_is_deleted", table_name="person")
+    op.drop_index("ix_person_family_id_deleted_at", table_name="person")
     op.drop_index(op.f("ix_person_id"), table_name="person")
     op.drop_table("person")
-    op.drop_index("ix_family_referrer_id_is_deleted", table_name="family")
+    op.drop_index("ix_family_referrer_id_deleted_at", table_name="family")
     op.drop_index(op.f("ix_family_id"), table_name="family")
     op.drop_table("family")
     op.drop_index(op.f("ix_referrer_id"), table_name="referrer")

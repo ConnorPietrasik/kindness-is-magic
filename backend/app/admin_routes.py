@@ -5,6 +5,7 @@ All endpoints are guarded with ``require_admin``.
 
 import logging
 import math
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,7 +22,6 @@ from app.response_builders import (
 )
 from app.schemas import (
     AdminFamilyUpdate,
-    AdminPersonUpdate,
     AdminReferrerUpdate,
     FamilyCreate,
     FamilyDetail,
@@ -31,6 +31,7 @@ from app.schemas import (
     PersonDetail,
     PersonListResponse,
     PersonSummary,
+    PersonUpdate,
     ReferrerCreate,
     ReferrerDetail,
     ReferrerListResponse,
@@ -54,20 +55,17 @@ referrer_admin_router = APIRouter(
 def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    include_deleted: bool = Query(False),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
-    total = db.query(Referrer).filter(Referrer.id != Family.ORPHAN_REFERRER_ID).count()
-    referrers = (
-        db.query(Referrer)
-        .filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
-        .order_by(Referrer.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    query = db.query(Referrer).filter(Referrer.id != Family.ORPHAN_REFERRER_ID)
+    if not include_deleted:
+        query = query.filter(Referrer.deleted_at.is_(None))
+    total = query.count()
+    referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
     return ReferrerListResponse(
-        referrers=[ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit) for r in referrers],
+        referrers=[ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit, deleted_at=r.deleted_at) for r in referrers],
         total=total,
         page=page,
         page_size=page_size,
@@ -81,7 +79,7 @@ def get_referrer(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
-    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
+    ref = get_active_or_404(db, Referrer, ref_id, "Referrer not found")
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -118,31 +116,32 @@ def update_referrer(
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
+@referrer_admin_router.post("/{ref_id}/restore", status_code=200)
+def restore_referrer(
+    ref_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> ReferrerDetail:
+    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
+    if ref.deleted_at is None:
+        raise HTTPException(status_code=400, detail="Referrer is not deleted")
+    ref.deleted_at = None
+    db.commit()
+    db.refresh(ref)
+    logger.info("Admin %s restored referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    return ReferrerDetail(**build_referrer_detail(ref, db))
+
+
 @referrer_admin_router.delete("/{ref_id}", status_code=204)
 def delete_referrer(
     ref_id: int,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> Response:
-    from app.models import Family, User
-
-    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
-
-    # Cascade families to orphan referrer (id=0)
-    db.query(Family).filter(Family.referrer_id == ref_id).update(
-        {Family.referrer_id: Family.ORPHAN_REFERRER_ID},
-        synchronize_session=False,
-    )
-
-    # Null out users.referrer_id
-    db.query(User).filter(User.referrer_id == ref_id).update(
-        {User.referrer_id: None},
-        synchronize_session=False,
-    )
-
-    db.delete(ref)
+    ref = get_active_or_404(db, Referrer, ref_id, "Referrer not found")
+    ref.deleted_at = datetime.now(timezone.utc)
     db.commit()
-    logger.info("Admin %s deleted referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    logger.info("Admin %s soft-deleted referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
     return Response(status_code=204)
 
 
@@ -167,14 +166,14 @@ def list_families(
 ) -> FamilyListResponse:
     query = db.query(Family)
     if not include_deleted:
-        query = query.filter(Family.is_deleted == False)
+        query = query.filter(Family.deleted_at.is_(None))
     if referrer_id is not None:
         query = query.filter(Family.referrer_id == referrer_id)
     total = query.count()
     families = query.order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Single aggregation query instead of N+1 count() calls
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.is_deleted == False).group_by(Person.family_id).all()
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
     return FamilyListResponse(
@@ -185,7 +184,7 @@ def list_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
-                is_deleted=f.is_deleted,
+                deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
             for f in families
@@ -251,6 +250,24 @@ def update_family(
     return FamilyDetail(**build_family_detail(fam, db))
 
 
+@family_admin_router.post("/{fam_id}/restore", status_code=200)
+def restore_family(
+    fam_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> FamilyDetail:
+    fam = get_or_404(db, Family, fam_id, "Family not found")
+    if fam.deleted_at is None:
+        raise HTTPException(status_code=400, detail="Family is not deleted")
+    # Restore the family and all its soft-deleted people
+    fam.deleted_at = None
+    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: None}, synchronize_session=False)
+    db.commit()
+    db.refresh(fam)
+    logger.info("Admin %s restored family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
+
+
 @family_admin_router.delete("/{fam_id}", status_code=204)
 def delete_family(
     fam_id: int,
@@ -259,8 +276,9 @@ def delete_family(
 ) -> Response:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
     # Soft-delete all persons in the family first to avoid orphans.
-    db.query(Person).filter(Person.family_id == fam_id).update({Person.is_deleted: True}, synchronize_session=False)
-    fam.is_deleted = True
+    now = datetime.now(timezone.utc)
+    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
+    fam.deleted_at = now
     db.commit()
     logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
     return Response(status_code=204)
@@ -287,7 +305,7 @@ def list_people(
 ) -> PersonListResponse:
     query = db.query(Person)
     if not include_deleted:
-        query = query.filter(Person.is_deleted == False)
+        query = query.filter(Person.deleted_at.is_(None))
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)
     total = query.count()
@@ -299,7 +317,7 @@ def list_people(
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
-                is_deleted=p.is_deleted,
+                deleted_at=p.deleted_at,
             )
             for p in people
         ],
@@ -348,7 +366,7 @@ def create_person(
 @people_admin_router.patch("/{per_id}")
 def update_person(
     per_id: int,
-    body: AdminPersonUpdate,
+    body: PersonUpdate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonDetail:
@@ -361,6 +379,22 @@ def update_person(
     return PersonDetail.model_validate(per)
 
 
+@people_admin_router.post("/{per_id}/restore", status_code=200)
+def restore_person(
+    per_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> PersonDetail:
+    per = get_or_404(db, Person, per_id, "Person not found")
+    if per.deleted_at is None:
+        raise HTTPException(status_code=400, detail="Person is not deleted")
+    per.deleted_at = None
+    db.commit()
+    db.refresh(per)
+    logger.info("Admin %s restored person (id=%s)", _admin.email, per_id)
+    return PersonDetail.model_validate(per)
+
+
 @people_admin_router.delete("/{per_id}", status_code=204)
 def delete_person(
     per_id: int,
@@ -368,7 +402,7 @@ def delete_person(
     _admin: User = Depends(require_admin),
 ) -> Response:
     per = get_active_or_404(db, Person, per_id, "Person not found")
-    per.is_deleted = True
+    per.deleted_at = datetime.now(timezone.utc)
     db.commit()
     logger.info("Admin %s soft-deleted person (id=%s)", _admin.email, per_id)
     return Response(status_code=204)

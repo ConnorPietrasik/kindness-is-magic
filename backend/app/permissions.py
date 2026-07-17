@@ -121,7 +121,7 @@ def require_family_owner(
         )
 
     fam = db.query(Family).filter(Family.id == int(fam_id)).first()
-    if fam is None or fam.is_deleted:
+    if fam is None or fam.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Family not found",
@@ -182,14 +182,14 @@ def require_person_owner(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Person not found",
         )
-    if per.is_deleted:
+    if per.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Person not found",
         )
 
     if current_user.role == UserRole.referrer:
-        if per.family and not per.family.is_deleted and per.family.referrer_id == current_user.referrer_id:
+        if per.family and per.family.deleted_at is None and per.family.referrer_id == current_user.referrer_id:
             return PersonOwner(user=current_user, person=per)
 
     elif current_user.role == UserRole.family:

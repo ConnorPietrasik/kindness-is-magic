@@ -7,6 +7,7 @@ Ownership is enforced via ``require_person_owner()`` which checks:
 """
 
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
@@ -69,7 +70,7 @@ def delete_person(
     per = owner.person
     if per is None:
         per = get_active_or_404(db, Person, per_id, "Person not found")
-    per.is_deleted = True
+    per.deleted_at = datetime.now(timezone.utc)
     db.commit()
     logger.info("%s soft-deleted person (id=%s)", owner.user.email, per_id)
     return Response(status_code=204)

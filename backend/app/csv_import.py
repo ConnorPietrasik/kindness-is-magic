@@ -167,11 +167,11 @@ def _rows_to_dicts(
 
 
 def _find_referrer(db: Session, name: str) -> Referrer | None:
-    return db.query(Referrer).filter(Referrer.name == name).first()
+    return db.query(Referrer).filter(Referrer.name == name, Referrer.deleted_at.is_(None)).first()
 
 
 def _find_family(db: Session, name: str) -> Family | None:
-    return db.query(Family).filter(Family.family_name == name, Family.is_deleted == False).first()
+    return db.query(Family).filter(Family.family_name == name, Family.deleted_at.is_(None)).first()
 
 
 def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Person | None:
@@ -181,7 +181,7 @@ def _find_person(db: Session, family_id: int, given_name: str, age: int) -> Pers
             Person.family_id == family_id,
             Person.given_name == given_name,
             Person.age == age,
-            Person.is_deleted == False,
+            Person.deleted_at.is_(None),
         )
         .first()
     )
@@ -198,7 +198,7 @@ def _resolve_ref_id(name_or_id: str, db: Session) -> int | None:
     # Try integer ID
     try:
         ref_id = int(name_or_id)
-        ref = db.query(Referrer).filter(Referrer.id == ref_id).first()
+        ref = db.query(Referrer).filter(Referrer.id == ref_id, Referrer.deleted_at.is_(None)).first()
         if ref:
             return ref_id
     except ValueError:
@@ -216,7 +216,7 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
         return None
     try:
         fid = int(name_or_id)
-        fam = db.query(Family).filter(Family.id == fid, Family.is_deleted == False).first()
+        fam = db.query(Family).filter(Family.id == fid, Family.deleted_at.is_(None)).first()
         if fam:
             return fid
     except ValueError:
@@ -249,7 +249,7 @@ class FieldDef:
 # ---------------------------------------------------------------------------
 
 # Columns that are managed by the framework, never imported from CSV
-_SKIP_COLUMNS = {"id", "is_deleted", "created_at"}
+_SKIP_COLUMNS = {"id", "deleted_at", "created_at"}
 
 
 def _build_fields(
@@ -263,7 +263,7 @@ def _build_fields(
 ) -> list[FieldDef]:
     """Build a list of FieldDefs by introspecting *model* columns.
 
-    System columns (``id``, ``is_deleted``, ``created_at``) are always
+    System columns (``id``, ``deleted_at``, ``created_at``) are always
     skipped.  Additional columns can be excluded via ``skip``.
 
     Parameters

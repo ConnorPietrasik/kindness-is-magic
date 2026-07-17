@@ -49,12 +49,6 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 - Commit mutations explicitly in the route handler (e.g. `db.commit()`).
 - Do not call `commit()` in helper functions unless they own the transaction.
 
-## Migrations
-
-- Any model change in `models.py` needs a matching Alembic migration in `alembic/versions/`. Use `alembic revision --autogenerate -m "description"` to generate.
-- Never edit existing migrations. Create a new one instead.
-- Do not delete migrations to fix failures.
-
 ## Authorization Rules
 
 - Never trust role or ownership information from request bodies. Always use the authenticated user from JWT dependencies.

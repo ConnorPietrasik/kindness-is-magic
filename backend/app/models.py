@@ -92,6 +92,7 @@ class Referrer(Base):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     families: Mapped[list["Family"]] = relationship("Family", back_populates="referrer")
 
@@ -99,9 +100,9 @@ class Referrer(Base):
 class Family(Base):
     __tablename__ = "family"
     __table_args__ = (
-        # Queries always filter (referrer_id, is_deleted) together —
+        # Queries always filter (referrer_id, deleted_at) together —
         # e.g. referrer list_families, family_limit check, build_referrer_detail.
-        Index("ix_family_referrer_id_is_deleted", "referrer_id", "is_deleted"),
+        Index("ix_family_referrer_id_deleted_at", "referrer_id", "deleted_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -119,7 +120,7 @@ class Family(Base):
     phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     referrer: Mapped["Referrer"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
@@ -128,9 +129,9 @@ class Family(Base):
 class Person(Base):
     __tablename__ = "person"
     __table_args__ = (
-        # Queries always filter (family_id, is_deleted) together —
+        # Queries always filter (family_id, deleted_at) together —
         # e.g. build_family_detail, list_family_people, list_people.
-        Index("ix_person_family_id_is_deleted", "family_id", "is_deleted"),
+        Index("ix_person_family_id_deleted_at", "family_id", "deleted_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -141,6 +142,6 @@ class Person(Base):
     practical_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     fun_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     note: Mapped[str] = mapped_column(String(400), nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")

@@ -1,5 +1,7 @@
 """Tests for admin CRUD endpoints: referrers, families, people."""
 
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -166,7 +168,7 @@ class TestAdminDeleteReferrer:
         resp = test_client.delete(f"/api/admin/referrers/{referrer_record.id}")
         assert resp.status_code == 204
 
-    def test_cascade_families_to_orphan(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
+    def test_soft_delete_does_not_reassign_families(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         from app.models import Family
 
         _admin_login(test_client)
@@ -181,14 +183,16 @@ class TestAdminDeleteReferrer:
         resp = test_client.delete(f"/api/admin/referrers/{ref.id}")
         assert resp.status_code == 204
 
-        # After delete, families should point to orphan (id=1)
-        db.commit()  # flush any pending
+        # Referrer is soft-deleted
+        db.refresh(ref)
+        assert ref.deleted_at is not None
+
+        # Families keep their referrer_id (no cascade reassignment)
         for fid in [f.id for f in families]:
             f = db.get(Family, fid)
-            assert f.referrer_id == Family.ORPHAN_REFERRER_ID
+            assert f.referrer_id == ref.id
 
-    def test_cascade_null_user_referrer_id(self, test_client: TestClient, admin_user, referrer_user, db: Session):
-
+    def test_soft_delete_does_not_null_user_referrer_id(self, test_client: TestClient, admin_user, referrer_user, db: Session):
         _admin_login(test_client)
         ref_id = referrer_user.referrer_id
 
@@ -199,10 +203,29 @@ class TestAdminDeleteReferrer:
         resp = test_client.delete(f"/api/admin/referrers/{ref_id}")
         assert resp.status_code == 204
 
-        # After delete, user.referrer_id should be NULL
-        db.commit()
+        # User keeps their referrer_id (no cascade nulling)
         db.refresh(referrer_user)
-        assert referrer_user.referrer_id is None
+        assert referrer_user.referrer_id == ref_id
+
+    def test_200_restore_soft_deleted_referrer(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        _admin_login(test_client)
+        # Soft-delete the referrer
+        referrer_record.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        # Restore it via POST /restore
+        resp = test_client.post(f"/api/admin/referrers/{referrer_record.id}/restore")
+        assert resp.status_code == 200
+        assert resp.json()["deleted_at"] is None
+
+    def test_400_restore_referrer_not_deleted(self, test_client: TestClient, admin_user, referrer_record):
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{referrer_record.id}/restore")
+        assert resp.status_code == 400
+
+    def test_404_restore_referrer_not_found(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/referrers/99999/restore")
+        assert resp.status_code == 404
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -395,15 +418,46 @@ class TestAdminUpdateFamily:
     def test_200_restore_soft_deleted_family(self, test_client: TestClient, admin_user, family_record, db: Session):
         _admin_login(test_client)
         # Soft-delete the family
-        family_record.is_deleted = True
+        family_record.deleted_at = datetime.now(timezone.utc)
         db.commit()
-        # Restore it via PATCH
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"is_deleted": False},
-        )
+        # Restore it via POST /restore
+        resp = test_client.post(f"/api/admin/families/{family_record.id}/restore")
         assert resp.status_code == 200
-        assert resp.json()["is_deleted"] is False
+        assert resp.json()["deleted_at"] is None
+
+    def test_200_restore_family_cascades_to_people(self, test_client: TestClient, admin_user, family_with_people, db: Session):
+        _admin_login(test_client)
+        family = family_with_people["family"]
+        people = family_with_people["people"]
+        # Soft-delete the family (which also soft-deletes its people)
+        now = datetime.now(timezone.utc)
+        for p in people:
+            p.deleted_at = now
+        family.deleted_at = now
+        db.commit()
+        assert family.deleted_at is not None
+        assert all(p.deleted_at is not None for p in people)
+        # Restore the family — should cascade to people
+        resp = test_client.post(f"/api/admin/families/{family.id}/restore")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["deleted_at"] is None
+        assert body["person_count"] == len(people)
+        # Verify people are also restored in DB
+        from app.models import Person
+
+        restored = db.query(Person).filter(Person.family_id == family.id).all()
+        assert all(p.deleted_at is None for p in restored)
+
+    def test_400_restore_family_not_deleted(self, test_client: TestClient, admin_user, family_record):
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/families/{family_record.id}/restore")
+        assert resp.status_code == 400
+
+    def test_404_restore_family_not_found(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/families/99999/restore")
+        assert resp.status_code == 404
 
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_record):
         """Sending null for a nullable field should leave it unchanged."""
@@ -471,21 +525,21 @@ class TestAdminDeleteFamily:
 
         # Persons start live
         for p in people:
-            assert p.is_deleted is False
+            assert p.deleted_at is None
 
         _admin_login(test_client)
         resp = test_client.delete(f"/api/admin/families/{family.id}")
         assert resp.status_code == 204
 
         # Family is soft-deleted
-        assert family.is_deleted is True
+        assert family.deleted_at is not None
 
         # All persons in that family are also soft-deleted
         for p in people:
             pid = p.id
             db.expunge(p)
             refreshed = db.get(Person, pid)
-            assert refreshed.is_deleted is True
+            assert refreshed.deleted_at is not None
 
 
 # =========================================================================
@@ -659,15 +713,23 @@ class TestAdminUpdatePerson:
         _admin_login(test_client)
         person = family_with_people["people"][0]
         # Soft-delete the person
-        person.is_deleted = True
+        person.deleted_at = datetime.now(timezone.utc)
         db.commit()
-        # Restore it via PATCH
-        resp = test_client.patch(
-            f"/api/admin/people/{person.id}",
-            json={"is_deleted": False},
-        )
+        # Restore it via POST /restore
+        resp = test_client.post(f"/api/admin/people/{person.id}/restore")
         assert resp.status_code == 200
-        assert resp.json()["is_deleted"] is False
+        assert resp.json()["deleted_at"] is None
+
+    def test_400_restore_person_not_deleted(self, test_client: TestClient, admin_user, family_with_people):
+        _admin_login(test_client)
+        person = family_with_people["people"][0]
+        resp = test_client.post(f"/api/admin/people/{person.id}/restore")
+        assert resp.status_code == 400
+
+    def test_404_restore_person_not_found(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/people/99999/restore")
+        assert resp.status_code == 404
 
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
         """Sending null for a nullable field should leave it unchanged."""

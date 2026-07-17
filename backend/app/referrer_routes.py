@@ -6,6 +6,7 @@ ownership of the target family in a single dependency.
 """
 
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -78,13 +79,13 @@ def list_families(
         db.query(Family)
         .filter(
             Family.referrer_id == user.referrer_id,
-            Family.is_deleted == False,
+            Family.deleted_at.is_(None),
         )
         .all()
     )
 
     # Single aggregation query instead of N+1 count() calls
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.is_deleted == False).group_by(Person.family_id).all()
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
     return FamilyListResponse(
@@ -95,7 +96,7 @@ def list_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
-                is_deleted=f.is_deleted,
+                deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
             for f in families
@@ -125,7 +126,7 @@ def create_family(
         db.query(Family)
         .filter(
             Family.referrer_id == referrer_id,
-            Family.is_deleted == False,
+            Family.deleted_at.is_(None),
         )
         .count()
     )
@@ -176,8 +177,9 @@ def delete_family(
 ) -> Response:
     fam = owner.family
     # Soft-delete all persons in the family first to avoid orphans.
-    db.query(Person).filter(Person.family_id == fam_id).update({Person.is_deleted: True}, synchronize_session=False)
-    fam.is_deleted = True
+    now = datetime.now(timezone.utc)
+    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
+    fam.deleted_at = now
     db.commit()
     logger.info("Referrer %s soft-deleted family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
     return Response(status_code=204)
@@ -194,7 +196,7 @@ def list_family_people(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    people = db.query(Person).filter(Person.family_id == fid, Person.is_deleted == False).all()
+    people = db.query(Person).filter(Person.family_id == fid, Person.deleted_at.is_(None)).all()
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -202,7 +204,7 @@ def list_family_people(
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
-                is_deleted=p.is_deleted,
+                deleted_at=p.deleted_at,
             )
             for p in people
         ]
