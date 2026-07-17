@@ -2,6 +2,7 @@
 
 export type {
   FamilyListResponse,
+  PaginationParams,
   PersonListResponse,
   ReferrerListResponse,
 } from "./api";

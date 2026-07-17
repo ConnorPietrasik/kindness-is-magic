@@ -82,12 +82,10 @@ describe("useCrudManager", () => {
     const fns = makeFns({ listData: { list: [{ id: 1 }, { id: 2 }] } });
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
 
-    await act(async () => {
-      await Promise.resolve();
+    await waitFor(() => {
+      expect(result.current.listLoading).toBe(false);
+      expect(result.current.listData).toEqual({ list: [{ id: 1 }, { id: 2 }] });
     });
-
-    expect(result.current.listLoading).toBe(false);
-    expect(result.current.listData).toEqual({ list: [{ id: 1 }, { id: 2 }] });
   });
 
   it("detail is null when not editing", () => {

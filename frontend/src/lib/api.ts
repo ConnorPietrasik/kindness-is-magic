@@ -14,6 +14,7 @@ import type {
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
+  PaginationParams,
   PersonDetail,
   PersonListResponse,
   PersonPayload,
@@ -117,7 +118,8 @@ export function changePasswordRequest(old_password: string, new_password: string
 // ---------------------------------------------------------------------------
 // Admin — Referrers
 // ---------------------------------------------------------------------------
-export function adminListReferrers(): Promise<ReferrerListResponse> {
+export function adminListReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
+  if (params) return api.get("/api/admin/referrers", { params }).then((res) => res.data);
   return api.get("/api/admin/referrers").then((res) => res.data);
 }
 
@@ -140,7 +142,8 @@ export function adminDeleteReferrer(id: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
-export function adminListFamilies(): Promise<FamilyListResponse> {
+export function adminListFamilies(params?: PaginationParams): Promise<FamilyListResponse> {
+  if (params) return api.get("/api/admin/families", { params }).then((res) => res.data);
   return api.get("/api/admin/families").then((res) => res.data);
 }
 
@@ -163,7 +166,8 @@ export function adminDeleteFamily(id: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
-export function adminListPeople(): Promise<PersonListResponse> {
+export function adminListPeople(params?: PaginationParams): Promise<PersonListResponse> {
+  if (params) return api.get("/api/admin/people", { params }).then((res) => res.data);
   return api.get("/api/admin/people").then((res) => res.data);
 }
 

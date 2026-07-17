@@ -17,11 +17,13 @@ import { useState } from "react";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface CrudManagerOptions<ListResponse, Item, Payload = unknown> {
+export interface CrudManagerOptions<ListResponse, Item, Payload = unknown, ListParams = Record<string, unknown>> {
   /** Query key for the list (e.g. `['adminReferrers']`) */
   rootKey: string[];
-  /** Fetches the full list response */
-  listFn: () => Promise<ListResponse>;
+  /** Fetches the full list response. Receives `listParams` if provided. */
+  listFn: (params?: ListParams) => Promise<ListResponse>;
+  /** Optional params passed to `listFn` and included in the query key for cache separation. */
+  listParams?: ListParams;
   /** Fetches a single item by id (optional, for edit-by-id) */
   detailFn?: (id: number) => Promise<Item>;
   /** Creates a new item */
@@ -60,17 +62,18 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useCrudManager<ListResponse, Item, Payload = unknown>(
-  options: CrudManagerOptions<ListResponse, Item, Payload>
+export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams = Record<string, unknown>>(
+  options: CrudManagerOptions<ListResponse, Item, Payload, ListParams>
 ): CrudManagerReturn<ListResponse, Item, Payload> {
-  const { rootKey, listFn, detailFn, createFn, updateFn, deleteFn, invalidationKeys = [rootKey] } = options;
+  const { rootKey, listFn, listParams, detailFn, createFn, updateFn, deleteFn, invalidationKeys = [rootKey] } = options;
 
   const queryClient = useQueryClient();
 
   /* ── List query ─────────────────────────────────────────── */
+  const listQueryKey = listParams != null ? [...rootKey, listParams] : rootKey;
   const { data: listData, isLoading: listLoading } = useQuery({
-    queryKey: rootKey,
-    queryFn: listFn,
+    queryKey: listQueryKey,
+    queryFn: () => listFn(listParams),
   });
 
   /* ── UI state ───────────────────────────────────────────── */

@@ -5,7 +5,7 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -13,9 +13,11 @@ import { defaultReferrerForm } from "../components/defaults";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
+import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { adminCreateReferrer, adminDeleteReferrer, adminGetReferrer, adminListReferrers, adminUpdateReferrer } from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { ReferrerDetail, ReferrerPayload } from "../types";
@@ -26,6 +28,8 @@ const REFERRER_KEYS = ["adminReferrers"];
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
+  const pagination = usePagination();
+
   const {
     listData,
     listLoading,
@@ -45,11 +49,17 @@ export default function AdminReferrers() {
   } = useCrudManager({
     rootKey: REFERRER_KEYS,
     listFn: adminListReferrers,
+    listParams: pagination.params,
     detailFn: adminGetReferrer,
     createFn: adminCreateReferrer,
     updateFn: adminUpdateReferrer,
     deleteFn: adminDeleteReferrer,
   });
+
+  const pageInfo = useMemo(
+    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
+    [listData?.total, pagination.page, pagination.pageSize]
+  );
 
   function handleCreate(formData: ReferrerPayload) {
     createMut?.mutate(formData);
@@ -159,6 +169,16 @@ export default function AdminReferrers() {
           }}
           onCancel={cancelDelete}
           loading={deleteMut?.isPending}
+        />
+
+        {/* Pagination */}
+        <Pagination
+          page={pagination.page}
+          totalPages={pageInfo.totalPages}
+          total={listData?.total ?? 0}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.setPageSize}
         />
 
         {/* Errors */}

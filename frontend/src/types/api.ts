@@ -3,6 +3,17 @@
 import type { FamilySummary, PersonSummary, ReferrerSummary } from "./domain";
 
 // ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+/** Query params sent to paginated list endpoints. */
+export interface PaginationParams {
+  page: number;
+  page_size: number;
+  include_deleted?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Paginated list responses
 // ---------------------------------------------------------------------------
 

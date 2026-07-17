@@ -6,7 +6,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -14,12 +14,14 @@ import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
+import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload } from "../types";
+import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 
 const FAMILY_KEYS = ["adminFamilies"];
 const REFERRER_KEYS = ["adminReferrers"];
@@ -28,6 +30,15 @@ const REFERRER_KEYS = ["adminReferrers"];
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminFamilies() {
+  const pagination = usePagination();
+  const [includeDeleted, setIncludeDeleted] = useState(false);
+
+  // Merge pagination params with include_deleted for cache separation
+  const listParams = useMemo<PaginationParams>(
+    () => ({ ...pagination.params, include_deleted: includeDeleted }),
+    [pagination.params, includeDeleted]
+  );
+
   const {
     listData,
     listLoading,
@@ -47,16 +58,22 @@ export default function AdminFamilies() {
   } = useCrudManager({
     rootKey: FAMILY_KEYS,
     listFn: adminListFamilies,
+    listParams,
     detailFn: adminGetFamily,
     createFn: adminCreateFamily,
     updateFn: adminUpdateFamily,
     deleteFn: adminDeleteFamily,
   });
 
+  const pageInfo = useMemo(
+    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
+    [listData?.total, pagination.page, pagination.pageSize]
+  );
+
   // Referrers lookup (for dropdown + display)
   const { data: referrerData, isLoading: referrersLoading } = useQuery({
     queryKey: REFERRER_KEYS,
-    queryFn: adminListReferrers,
+    queryFn: () => adminListReferrers(),
   });
 
   const referrerMap = useMemo((): Record<number, string> => {
@@ -89,7 +106,18 @@ export default function AdminFamilies() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
-          <Button onClick={openCreate}>+ Add Family</Button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={includeDeleted}
+                onChange={(e) => setIncludeDeleted(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+              />
+              Show deleted
+            </label>
+            <Button onClick={openCreate}>+ Add Family</Button>
+          </div>
         </div>
 
         {/* Create / Edit form */}
@@ -107,6 +135,7 @@ export default function AdminFamilies() {
             isEdit={!!editingId}
             referrerMap={referrerMap}
             referrerOptionsLoading={referrersLoading}
+            showDeletedToggle
             onSubmit={editingId ? handleUpdate : handleCreate}
             onCancel={cancelForm}
             loading={createMut?.isPending || updateMut?.isPending}
@@ -125,15 +154,25 @@ export default function AdminFamilies() {
               <Th>Family Name</Th>
               <Th>Contact</Th>
               <Th>Referrer</Th>
+              {includeDeleted && <Th>Deleted</Th>}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
               {families.map((f) => (
                 <Tr key={f.id}>
                   <Td>{f.id}</Td>
-                  <Td>{f.family_name}</Td>
+                  <Td className={f.is_deleted ? "text-gray-400" : ""}>{f.family_name}</Td>
                   <Td>{f.contact_name}</Td>
                   <Td>{referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}</Td>
+                  {includeDeleted && (
+                    <Td>
+                      {f.is_deleted ? (
+                        <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+                      ) : (
+                        <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                      )}
+                    </Td>
+                  )}
                   <Td>
                     <div className="flex gap-2">
                       <Button
@@ -178,6 +217,16 @@ export default function AdminFamilies() {
           }}
           onCancel={cancelDelete}
           loading={deleteMut?.isPending}
+        />
+
+        {/* Pagination */}
+        <Pagination
+          page={pagination.page}
+          totalPages={pageInfo.totalPages}
+          total={listData?.total ?? 0}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.setPageSize}
         />
 
         {/* Errors */}
