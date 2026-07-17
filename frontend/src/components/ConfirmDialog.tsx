@@ -1,4 +1,5 @@
 import { memo, type ReactNode } from "react";
+import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
 
 interface ConfirmDialogProps {
@@ -8,10 +9,18 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  confirmLabel?: ReactNode;
+  loadingLabel?: ReactNode;
+  confirmVariant?: ButtonVariant;
 }
 
 /**
- * ConfirmDialog — modal confirmation dialog for destructive actions.
+ * ConfirmDialog — modal confirmation dialog for destructive actions
+ * (and other actions that need explicit user confirmation).
+ *
+ * @param confirmLabel  Label on the confirm button (default: "Yes, delete")
+ * @param loadingLabel  Label while the mutation is in-flight (default: "Deleting…")
+ * @param confirmVariant  Button variant (default: "danger")
  */
 export const ConfirmDialog = memo(function ConfirmDialog({
   open,
@@ -20,6 +29,9 @@ export const ConfirmDialog = memo(function ConfirmDialog({
   onConfirm,
   onCancel,
   loading = false,
+  confirmLabel = "Yes, delete",
+  loadingLabel = "Deleting…",
+  confirmVariant = "danger",
 }: ConfirmDialogProps) {
   if (!open) return null;
 
@@ -31,8 +43,8 @@ export const ConfirmDialog = memo(function ConfirmDialog({
           {description && <span className="block text-xs text-gray-500">{description}</span>}
         </p>
         <div className="flex gap-3">
-          <Button variant="danger" className="flex-1" onClick={onConfirm} loading={loading}>
-            {loading ? "Deleting…" : "Yes, delete"}
+          <Button variant={confirmVariant} className="flex-1" onClick={onConfirm} loading={loading}>
+            {loading ? loadingLabel : confirmLabel}
           </Button>
           <Button variant="secondary" className="flex-1" onClick={onCancel}>
             Cancel

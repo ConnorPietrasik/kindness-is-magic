@@ -32,6 +32,8 @@ export interface CrudManagerOptions<ListResponse, Item, Payload = unknown, ListP
   updateFn?: (id: number, data: Payload) => Promise<Item>;
   /** Deletes an item by id */
   deleteFn?: (id: number) => Promise<void>;
+  /** Restores a soft-deleted item by id (optional) */
+  restoreFn?: (id: number) => Promise<Item>;
   /** Keys to invalidate after mutations (defaults to `[rootKey]`) */
   invalidationKeys?: (string | string[])[];
 }
@@ -46,6 +48,7 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
   createMut: UseMutationResult<Item, Error, Payload> | null;
   updateMut: UseMutationResult<Item, Error, { id: number; data: Payload }> | null;
   deleteMut: UseMutationResult<void, Error, number> | null;
+  restoreMut: UseMutationResult<Item, Error, number> | null;
   // UI state
   showForm: boolean;
   editingId: number | null;
@@ -65,7 +68,7 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
 export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams = Record<string, unknown>>(
   options: CrudManagerOptions<ListResponse, Item, Payload, ListParams>
 ): CrudManagerReturn<ListResponse, Item, Payload> {
-  const { rootKey, listFn, listParams, detailFn, createFn, updateFn, deleteFn, invalidationKeys = [rootKey] } = options;
+  const { rootKey, listFn, listParams, detailFn, createFn, updateFn, deleteFn, restoreFn, invalidationKeys = [rootKey] } = options;
 
   const queryClient = useQueryClient();
 
@@ -123,6 +126,15 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
       })
     : null;
 
+  const restoreMut = restoreFn
+    ? useMutation({
+        mutationFn: restoreFn as (variables: number) => Promise<Item>,
+        onSuccess: () => {
+          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+        },
+      })
+    : null;
+
   /* ── Actions ────────────────────────────────────────────── */
   function openCreate() {
     setEditingId(null);
@@ -156,6 +168,7 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
     createMut,
     updateMut,
     deleteMut,
+    restoreMut,
     // UI state
     showForm,
     editingId,

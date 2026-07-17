@@ -19,7 +19,15 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
+import {
+  adminCreateFamily,
+  adminDeleteFamily,
+  adminGetFamily,
+  adminListFamilies,
+  adminListReferrers,
+  adminRestoreFamily,
+  adminUpdateFamily,
+} from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 
@@ -32,6 +40,7 @@ const REFERRER_KEYS = ["adminReferrers"];
 export default function AdminFamilies() {
   const pagination = usePagination();
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
 
   // Merge pagination params with include_deleted for cache separation
   const listParams = useMemo<PaginationParams>(
@@ -47,6 +56,7 @@ export default function AdminFamilies() {
     createMut,
     updateMut,
     deleteMut,
+    restoreMut,
     showForm,
     editingId,
     deleteConfirm,
@@ -63,6 +73,7 @@ export default function AdminFamilies() {
     createFn: adminCreateFamily,
     updateFn: adminUpdateFamily,
     deleteFn: adminDeleteFamily,
+    restoreFn: adminRestoreFamily,
   });
 
   const pageInfo = useMemo(
@@ -135,7 +146,6 @@ export default function AdminFamilies() {
             isEdit={!!editingId}
             referrerMap={referrerMap}
             referrerOptionsLoading={referrersLoading}
-            showDeletedToggle
             onSubmit={editingId ? handleUpdate : handleCreate}
             onCancel={cancelForm}
             loading={createMut?.isPending || updateMut?.isPending}
@@ -184,15 +194,27 @@ export default function AdminFamilies() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => confirmDelete(f.id)}
-                        disabled={deleteMut?.isPending}
-                      >
-                        Delete
-                      </Button>
+                      {f.deleted_at != null ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setRestoreConfirm(f.id)}
+                          disabled={restoreMut?.isPending}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => confirmDelete(f.id)}
+                          disabled={deleteMut?.isPending}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -209,6 +231,7 @@ export default function AdminFamilies() {
               Delete family <strong>#{deleteConfirm}</strong>?
             </>
           }
+          description="This will also soft-delete all people in the family."
           onConfirm={() => {
             if (deleteConfirm != null) {
               deleteMut?.mutate(deleteConfirm);
@@ -217,6 +240,28 @@ export default function AdminFamilies() {
           }}
           onCancel={cancelDelete}
           loading={deleteMut?.isPending}
+        />
+
+        {/* Restore confirmation */}
+        <ConfirmDialog
+          open={restoreConfirm !== null}
+          title={
+            <>
+              Restore family <strong>#{restoreConfirm}</strong>?
+            </>
+          }
+          description="This will also restore all people in the family."
+          onConfirm={() => {
+            if (restoreConfirm != null) {
+              restoreMut?.mutate(restoreConfirm);
+              setRestoreConfirm(null);
+            }
+          }}
+          onCancel={() => setRestoreConfirm(null)}
+          loading={restoreMut?.isPending}
+          confirmLabel="Yes, restore"
+          loadingLabel="Restoring…"
+          confirmVariant="secondary"
         />
 
         {/* Pagination */}
@@ -230,7 +275,7 @@ export default function AdminFamilies() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
       </main>
     </div>
   );

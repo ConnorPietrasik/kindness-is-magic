@@ -19,7 +19,15 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminCreatePerson, adminDeletePerson, adminGetPerson, adminListFamilies, adminListPeople, adminUpdatePerson } from "../lib/api";
+import {
+  adminCreatePerson,
+  adminDeletePerson,
+  adminGetPerson,
+  adminListFamilies,
+  adminListPeople,
+  adminRestorePerson,
+  adminUpdatePerson,
+} from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, PersonDetail, PersonPayload } from "../types";
 
@@ -32,6 +40,7 @@ const FAMILY_KEYS = ["adminFamilies"];
 export default function AdminPeople() {
   const pagination = usePagination();
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
 
   // Merge pagination params with include_deleted for cache separation
   const listParams = useMemo<PaginationParams>(
@@ -47,6 +56,7 @@ export default function AdminPeople() {
     createMut,
     updateMut,
     deleteMut,
+    restoreMut,
     showForm,
     editingId,
     deleteConfirm,
@@ -63,6 +73,7 @@ export default function AdminPeople() {
     createFn: adminCreatePerson,
     updateFn: adminUpdatePerson,
     deleteFn: adminDeletePerson,
+    restoreFn: adminRestorePerson,
   });
 
   const pageInfo = useMemo(
@@ -135,7 +146,6 @@ export default function AdminPeople() {
             isEdit={!!editingId}
             familyMap={familyMap}
             familyOptionsLoading={familiesLoading}
-            showDeletedToggle
             onSubmit={editingId ? handleUpdate : handleCreate}
             onCancel={cancelForm}
             loading={createMut?.isPending || updateMut?.isPending}
@@ -184,15 +194,27 @@ export default function AdminPeople() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => confirmDelete(p.id)}
-                        disabled={deleteMut?.isPending}
-                      >
-                        Delete
-                      </Button>
+                      {p.deleted_at != null ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setRestoreConfirm(p.id)}
+                          disabled={restoreMut?.isPending}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => confirmDelete(p.id)}
+                          disabled={deleteMut?.isPending}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -219,6 +241,27 @@ export default function AdminPeople() {
           loading={deleteMut?.isPending}
         />
 
+        {/* Restore confirmation */}
+        <ConfirmDialog
+          open={restoreConfirm !== null}
+          title={
+            <>
+              Restore person <strong>#{restoreConfirm}</strong>?
+            </>
+          }
+          onConfirm={() => {
+            if (restoreConfirm != null) {
+              restoreMut?.mutate(restoreConfirm);
+              setRestoreConfirm(null);
+            }
+          }}
+          onCancel={() => setRestoreConfirm(null)}
+          loading={restoreMut?.isPending}
+          confirmLabel="Yes, restore"
+          loadingLabel="Restoring…"
+          confirmVariant="secondary"
+        />
+
         {/* Pagination */}
         <Pagination
           page={pagination.page}
@@ -230,7 +273,7 @@ export default function AdminPeople() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
       </main>
     </div>
   );

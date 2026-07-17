@@ -18,7 +18,14 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminCreateReferrer, adminDeleteReferrer, adminGetReferrer, adminListReferrers, adminUpdateReferrer } from "../lib/api";
+import {
+  adminCreateReferrer,
+  adminDeleteReferrer,
+  adminGetReferrer,
+  adminListReferrers,
+  adminRestoreReferrer,
+  adminUpdateReferrer,
+} from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
@@ -30,6 +37,7 @@ const REFERRER_KEYS = ["adminReferrers"];
 export default function AdminReferrers() {
   const pagination = usePagination();
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
 
   // Merge pagination params with include_deleted for cache separation
   const listParams = useMemo<PaginationParams>(
@@ -45,6 +53,7 @@ export default function AdminReferrers() {
     createMut,
     updateMut,
     deleteMut,
+    restoreMut,
     showForm,
     editingId,
     deleteConfirm,
@@ -61,6 +70,7 @@ export default function AdminReferrers() {
     createFn: adminCreateReferrer,
     updateFn: adminUpdateReferrer,
     deleteFn: adminDeleteReferrer,
+    restoreFn: adminRestoreReferrer,
   });
 
   const pageInfo = useMemo(
@@ -163,15 +173,27 @@ export default function AdminReferrers() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => confirmDelete(r.id)}
-                        disabled={deleteMut?.isPending}
-                      >
-                        Delete
-                      </Button>
+                      {r.deleted_at != null ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setRestoreConfirm(r.id)}
+                          disabled={restoreMut?.isPending}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => confirmDelete(r.id)}
+                          disabled={deleteMut?.isPending}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -199,6 +221,27 @@ export default function AdminReferrers() {
           loading={deleteMut?.isPending}
         />
 
+        {/* Restore confirmation */}
+        <ConfirmDialog
+          open={restoreConfirm !== null}
+          title={
+            <>
+              Restore referrer <strong>#{restoreConfirm}</strong>?
+            </>
+          }
+          onConfirm={() => {
+            if (restoreConfirm != null) {
+              restoreMut?.mutate(restoreConfirm);
+              setRestoreConfirm(null);
+            }
+          }}
+          onCancel={() => setRestoreConfirm(null)}
+          loading={restoreMut?.isPending}
+          confirmLabel="Yes, restore"
+          loadingLabel="Restoring…"
+          confirmVariant="secondary"
+        />
+
         {/* Pagination */}
         <Pagination
           page={pagination.page}
@@ -210,7 +253,7 @@ export default function AdminReferrers() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
       </main>
     </div>
   );
@@ -230,7 +273,6 @@ interface ReferrerFormProps {
 
 function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: ReferrerFormProps) {
   const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
-  const [pendingDelete, setPendingDelete] = useState(false);
 
   useEffect(() => {
     setForm({ ...initial });
@@ -238,103 +280,59 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
 
-  const originalIsDeleted = useMemo(() => (initial as ReferrerDetail).deleted_at != null, [initial]);
-
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-
-      // Check if user is soft-deleting
-      if (isEdit && form.deleted_at != null && !originalIsDeleted) {
-        setPendingDelete(true);
-        return;
-      }
-
       onSubmit(form);
     },
-    [form, isEdit, onSubmit, originalIsDeleted]
+    [form, onSubmit]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    setPendingDelete(false);
-    onSubmit(form);
-  }, [form, onSubmit]);
-
   return (
-    <>
-      <Card className="mb-6 border border-gray-200">
-        <h3 className="mb-4 text-lg font-semibold text-violet-950">{title}</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <FormField
-              label="Name"
-              fieldProps={{
-                value: form.name,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
-                required: true,
-                maxLength: 60,
-              }}
-            />
-            <FormField
-              label="Family Limit"
-              type="number"
-              fieldProps={{
-                value: form.family_limit,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_limit", parseInt(e.target.value, 10) || 1),
-                required: true,
-                min: 1,
-                max: 999,
-              }}
-            />
-            <FormField
-              label="Phone"
-              fieldProps={{
-                value: form.phone_number,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-                required: true,
-                maxLength: 20,
-              }}
-            />
-          </div>
+    <Card className="mb-6 border border-gray-200">
+      <h3 className="mb-4 text-lg font-semibold text-violet-950">{title}</h3>
+      <form onSubmit={handleSubmit}>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <FormField
+            label="Name"
+            fieldProps={{
+              value: form.name,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
+              required: true,
+              maxLength: 60,
+            }}
+          />
+          <FormField
+            label="Family Limit"
+            type="number"
+            fieldProps={{
+              value: form.family_limit,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_limit", parseInt(e.target.value, 10) || 1),
+              required: true,
+              min: 1,
+              max: 999,
+            }}
+          />
+          <FormField
+            label="Phone"
+            fieldProps={{
+              value: form.phone_number,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
+              required: true,
+              maxLength: 20,
+            }}
+          />
+        </div>
 
-          {/* Soft-delete toggle (admin edit only) */}
-          {isEdit && (
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="referrer_deleted_at"
-                checked={form.deleted_at != null}
-                onChange={(e) => update("deleted_at", e.target.checked ? new Date().toISOString() : null)}
-                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-              />
-              <label htmlFor="referrer_deleted_at" className="text-sm font-medium text-gray-700">
-                {form.deleted_at != null ? "Mark as deleted" : "Soft-deleted"}
-                {form.deleted_at != null && !originalIsDeleted && (
-                  <span className="ml-1 text-xs text-red-600">(requires confirmation)</span>
-                )}
-              </label>
-            </div>
-          )}
-
-          <div className="mt-4 flex gap-2">
-            <Button type="submit" loading={loading}>
-              {loading ? "Saving…" : isEdit ? "Update" : "Create"}
-            </Button>
-            <Button variant="secondary" type="button" onClick={onCancel}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Confirmation dialog when soft-deleting */}
-      <ConfirmDialog
-        open={pendingDelete}
-        title="Soft-delete this referrer?"
-        description="Families will be reassigned to orphan. Linked users will be detached. The action can be reversed by unchecking 'Soft-deleted'."
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setPendingDelete(false)}
-      />
-    </>
+        <div className="mt-4 flex gap-2">
+          <Button type="submit" loading={loading}>
+            {loading ? "Saving…" : isEdit ? "Update" : "Create"}
+          </Button>
+          <Button variant="secondary" type="button" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

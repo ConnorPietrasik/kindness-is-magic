@@ -139,6 +139,10 @@ export function adminDeleteReferrer(id: number): Promise<void> {
   return api.delete(`/api/admin/referrers/${id}`).then(() => undefined);
 }
 
+export function adminRestoreReferrer(id: number): Promise<ReferrerDetail> {
+  return api.post(`/api/admin/referrers/${id}/restore`).then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
@@ -163,6 +167,10 @@ export function adminDeleteFamily(id: number): Promise<void> {
   return api.delete(`/api/admin/families/${id}`).then(() => undefined);
 }
 
+export function adminRestoreFamily(id: number): Promise<FamilyDetail> {
+  return api.post(`/api/admin/families/${id}/restore`).then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
@@ -185,6 +193,10 @@ export function adminUpdatePerson(id: number, data: PersonPayload): Promise<Pers
 
 export function adminDeletePerson(id: number): Promise<void> {
   return api.delete(`/api/admin/people/${id}`).then(() => undefined);
+}
+
+export function adminRestorePerson(id: number): Promise<PersonDetail> {
+  return api.post(`/api/admin/people/${id}/restore`).then((res) => res.data);
 }
 
 export function adminListFamilyPeople(fid: number): Promise<PersonSummary[]> {

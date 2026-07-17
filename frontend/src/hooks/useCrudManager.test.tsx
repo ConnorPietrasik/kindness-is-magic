@@ -32,19 +32,22 @@ function makeFns({
   detailData = { id: 1, name: "Existing" },
   created = { id: 99 },
   updated = { id: 1, name: "Updated" },
-}: MakeFnsOptions = {}): {
+  restored = { id: 1, name: "Existing", deleted_at: null },
+}: MakeFnsOptions & { restored?: Record<string, unknown> } = {}): {
   listFn: Mock<() => Promise<unknown>>;
   detailFn: Mock<(id: number) => Promise<unknown>>;
   createFn: Mock<(data: unknown) => Promise<unknown>>;
   updateFn: Mock<(id: number, data: unknown) => Promise<unknown>>;
   deleteFn: Mock<(id: number) => Promise<void>>;
+  restoreFn: Mock<(id: number) => Promise<unknown>>;
 } {
   const listFn = vi.fn().mockResolvedValue(listData);
   const detailFn = vi.fn().mockImplementation((id: number) => Promise.resolve({ ...detailData, id }));
   const createFn = vi.fn().mockResolvedValue(created);
   const updateFn = vi.fn().mockResolvedValue(updated);
   const deleteFn = vi.fn().mockResolvedValue(undefined);
-  return { listFn, detailFn, createFn, updateFn, deleteFn };
+  const restoreFn = vi.fn().mockResolvedValue(restored);
+  return { listFn, detailFn, createFn, updateFn, deleteFn, restoreFn };
 }
 
 // ---------------------------------------------------------------------------
@@ -386,5 +389,49 @@ describe("useCrudManager", () => {
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
     expect(result.current.deleteMut).toBeNull();
+  });
+
+  it("restoreMut is null when restoreFn is not provided", () => {
+    const listFn = vi.fn().mockResolvedValue({ list: [] });
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
+
+    expect(result.current.restoreMut).toBeNull();
+  });
+
+  /* ── Mutations — restore ────────────────────────────────── */
+
+  it("restoreMut calls restoreFn on execute", async () => {
+    const fns = makeFns();
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns, restoreFn: fns.restoreFn }), { wrapper: wrap() });
+
+    await act(async () => {
+      result.current.restoreMut!.mutate(5);
+    });
+
+    // React Query v5 passes (variables, context) to mutationFn
+    expect(fns.restoreFn).toHaveBeenCalledWith(5, expect.anything());
+  });
+
+  it("restoreMut invalidates rootKey on success", async () => {
+    const fns = makeFns();
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns, restoreFn: fns.restoreFn }), { wrapper: wrap() });
+
+    // Let list settle
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fns.listFn).toHaveBeenCalledTimes(1);
+
+    // Mark listFn to return new data on next call
+    fns.listFn.mockResolvedValueOnce({ list: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+
+    await act(async () => {
+      result.current.restoreMut!.mutate(5);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Invalidation triggers at least one list refetch (call #2+)
+    expect(fns.listFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
