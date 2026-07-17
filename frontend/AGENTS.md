@@ -2,13 +2,13 @@
 
 ## Stack
 
-- **React 18** with **TypeScript** (`.tsx` files, strict mode enabled)
+- **React 19** with **TypeScript** (`.tsx` files, strict mode enabled)
 - **TypeScript** with `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`
-- **Vite 5** as the build tool
+- **Vite** as the build tool
 - **Tailwind CSS v4** via `@tailwindcss/vite` plugin
 - **React Query** (`@tanstack/react-query`) for server state
 - **Axios** for HTTP requests
-- **React Router v6** for client-side routing
+- **React Router v7** for client-side routing
 - **Vitest** + **@testing-library/react** + **@testing-library/jest-dom** + **@testing-library/user-event** for unit/component tests
 
 ## TypeScript
@@ -95,28 +95,15 @@ Three roles: `admin`, `referrer`, `family`.
 
 ## Structure
 
-- `src/main.tsx` — Entry point. Providers stacked: `QueryClientProvider` → `BrowserRouter` → `AuthProvider` → `App`.
-- `src/App.tsx` — Router. All pages are **lazy-loaded** via `React.lazy()` with `<Suspense>` spinner fallback.
+Only entries that encode conventions are listed here. The full directory tree is discoverable — these are the locations that matter because they carry rules.
+
 - `src/components/` — Reusable UI components. Use **named exports**.
 - `src/types/` — Shared TypeScript types. Import from here rather than redefining shapes.
-- `src/lib/api.ts` — Axios instance and all API functions.
-- `src/lib/routes.ts` — Route constants and dynamic builders.
-- `src/hooks/useCrudManager.ts` — Shared CRUD hook.
+- `src/lib/api.ts` — Axios instance and all API functions. Do not call Axios directly from page components.
+- `src/lib/routes.ts` — Route constants and dynamic builders. Always use `ROUTES` constants rather than hardcoded strings.
+- `src/hooks/useCrudManager.ts` — Shared CRUD hook. Reuse it instead of duplicating CRUD state management.
+- Pages in `src/pages/` are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
 - Test files: `*.test.ts` / `*.test.tsx` alongside source, or in `src/__tests__/`.
-
-## Scripts
-
-```bash
-npm run dev           # Start dev server (port 3000, proxies /api to backend:8000)
-npm run build         # Production build → dist/
-npm run preview       # Preview production build locally
-npm run test          # Run Vitest test suite
-npm run test:coverage # Run tests with coverage (requires @vitest/coverage-v8)
-npm run typecheck     # TypeScript type check (tsc --noEmit)
-npm run lint          # Biome lint and format check
-npm run lint:fix      # Biome lint and format (auto-fix)
-npm run format        # Biome format only
-```
 
 ## Linting and Formatting
 
