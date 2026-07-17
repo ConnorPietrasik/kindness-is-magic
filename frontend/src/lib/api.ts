@@ -56,16 +56,6 @@ interface ExtendedRequestConfig extends InternalAxiosRequestConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Request interceptor — normalise empty strings to null on nullable fields
-// ---------------------------------------------------------------------------
-api.interceptors.request.use((config) => {
-  if ((config.method === "post" || config.method === "patch") && config.data && typeof config.data === "object") {
-    config.data = normalizePayload(config.data as Record<string, unknown>);
-  }
-  return config;
-});
-
-// ---------------------------------------------------------------------------
 // Response interceptor — retry on 401 after token refresh
 // ---------------------------------------------------------------------------
 api.interceptors.response.use(
@@ -136,7 +126,7 @@ export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
 }
 
 export function adminCreateReferrer(data: ReferrerPayload): Promise<ReferrerDetail> {
-  return api.post("/api/admin/referrers", data).then((res) => res.data);
+  return api.post("/api/admin/referrers", normalizePayload(data)).then((res) => res.data);
 }
 
 export function adminUpdateReferrer(id: number, data: ReferrerPayload): Promise<ReferrerDetail> {
@@ -159,7 +149,7 @@ export function adminGetFamily(id: number): Promise<FamilyDetail> {
 }
 
 export function adminCreateFamily(data: FamilyPayload): Promise<FamilyDetail> {
-  return api.post("/api/admin/families", data).then((res) => res.data);
+  return api.post("/api/admin/families", normalizePayload(data)).then((res) => res.data);
 }
 
 export function adminUpdateFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
@@ -182,7 +172,7 @@ export function adminGetPerson(id: number): Promise<PersonDetail> {
 }
 
 export function adminCreatePerson(data: PersonPayload): Promise<PersonDetail> {
-  return api.post("/api/admin/people", data).then((res) => res.data);
+  return api.post("/api/admin/people", normalizePayload(data)).then((res) => res.data);
 }
 
 export function adminUpdatePerson(id: number, data: PersonPayload): Promise<PersonDetail> {
@@ -235,7 +225,7 @@ export function patchReferrerMe(data: ReferrerPayload): Promise<ReferrerDetail> 
 // ---------------------------------------------------------------------------
 // Referrer — Families
 // ---------------------------------------------------------------------------
-export function listReferrerFamilies(): Promise<FamilyDetail[]> {
+export function listReferrerFamilies(): Promise<FamilyListResponse> {
   return api.get("/api/referrer/families").then((res) => res.data);
 }
 
@@ -244,7 +234,7 @@ export function getReferrerFamily(id: number): Promise<FamilyDetail> {
 }
 
 export function createReferrerFamily(data: FamilyPayload): Promise<FamilyDetail> {
-  return api.post("/api/referrer/families", data).then((res) => res.data);
+  return api.post("/api/referrer/families", normalizePayload(data)).then((res) => res.data);
 }
 
 export function updateReferrerFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
@@ -258,12 +248,12 @@ export function deleteReferrerFamily(id: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Referrer — People within a family
 // ---------------------------------------------------------------------------
-export function listReferrerFamilyPeople(fid: number): Promise<PersonDetail[]> {
+export function listReferrerFamilyPeople(fid: number): Promise<PersonListResponse> {
   return api.get(`/api/referrer/families/${fid}/people`).then((res) => res.data);
 }
 
 export function createReferrerFamilyPerson(fid: number, data: PersonPayload): Promise<PersonDetail> {
-  return api.post(`/api/referrer/families/${fid}/people`, data).then((res) => res.data);
+  return api.post(`/api/referrer/families/${fid}/people`, normalizePayload(data)).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,12 +270,12 @@ export function patchFamilyMe(data: FamilyPayload): Promise<FamilyDetail> {
 // ---------------------------------------------------------------------------
 // Family — People
 // ---------------------------------------------------------------------------
-export function listFamilyPeople(): Promise<PersonDetail[]> {
+export function listFamilyPeople(): Promise<PersonListResponse> {
   return api.get("/api/family/people").then((res) => res.data);
 }
 
 export function createFamilyPerson(data: PersonPayload): Promise<PersonDetail> {
-  return api.post("/api/family/people", data).then((res) => res.data);
+  return api.post("/api/family/people", normalizePayload(data)).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

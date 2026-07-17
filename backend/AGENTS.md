@@ -61,7 +61,6 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 
 ## API Conventions
 
-- Self-service list endpoints (`/api/referrer/families`, `/api/family/people`) intentionally omit pagination. Referrers are bounded by `family_limit` and families have small person counts, so unbounded lists are acceptable here.
 - Keep route handlers thin. Reuse existing helpers and response builders.
 - Match existing HTTP status codes and response formats. Do not introduce new ones without discussion.
 - Do not suppress Ruff errors unless there is a documented reason.

@@ -18,7 +18,8 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreateFamily, adminDeleteFamily, adminGetFamily, adminListFamilies, adminListReferrers, adminUpdateFamily } from "../lib/api";
-import type { FamilyPayload } from "../types";
+import { normalizeUpdatePayload } from "../lib/utils";
+import type { FamilyDetail, FamilyPayload } from "../types";
 
 const FAMILY_KEYS = ["adminFamilies"];
 const REFERRER_KEYS = ["adminReferrers"];
@@ -72,7 +73,8 @@ export default function AdminFamilies() {
 
   function handleUpdate(formData: FamilyPayload) {
     if (!editingId) return;
-    updateMut?.mutate({ id: editingId, data: formData });
+    const payload = normalizeUpdatePayload(formData, detail as FamilyDetail);
+    updateMut?.mutate({ id: editingId, data: payload as FamilyPayload });
   }
 
   if (listLoading) return <PageSpinner />;

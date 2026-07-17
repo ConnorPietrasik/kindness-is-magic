@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatApiError, humanize, normalizePayload } from "./utils";
+import { formatApiError, humanize, normalizePayload, normalizeUpdatePayload } from "./utils";
 
 describe("humanize", () => {
   it("capitalises first letter of a string", () => {
@@ -61,6 +61,67 @@ describe("normalizePayload", () => {
     const input = { name: "Test", family_limit: 5 };
     const result = normalizePayload(input);
     expect(result).toEqual({ name: "Test", family_limit: 5 });
+  });
+});
+
+describe("normalizeUpdatePayload", () => {
+  it("sends empty string for a cleared nullable field", () => {
+    const original = { family_name: "Smith", bio: "Hello world", address: "123 Main" };
+    const form = { family_name: "Smith", bio: "", address: "" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.bio).toBe("");
+    expect(result.address).toBe("");
+    expect(result.family_name).toBeUndefined(); // unchanged
+  });
+
+  it("omits unchanged nullable fields that were originally null", () => {
+    const original = { family_name: "Smith", bio: null as string | null, address: null as string | null };
+    const form = { family_name: "Smith", bio: "", address: "" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.bio).toBeUndefined();
+    expect(result.address).toBeUndefined();
+    expect(result.family_name).toBeUndefined();
+  });
+
+  it("includes changed non-nullable fields", () => {
+    const original = { family_name: "Smith", contact_name: "John" };
+    const form = { family_name: "Jones", contact_name: "John" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.family_name).toBe("Jones");
+    expect(result.contact_name).toBeUndefined();
+  });
+
+  it("handles mixed scenarios", () => {
+    const original = { family_name: "Smith", bio: "Old bio", address: null as string | null, phone_number: "555" };
+    const form = { family_name: "Smith", bio: "", address: "", phone_number: "555-1234" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.family_name).toBeUndefined(); // unchanged
+    expect(result.bio).toBe(""); // cleared
+    expect(result.address).toBeUndefined(); // was null, still empty
+    expect(result.phone_number).toBe("555-1234"); // changed
+  });
+
+  it("returns empty object when nothing changed", () => {
+    const original = { name: "Test", bio: "Hello" };
+    const form = { name: "Test", bio: "Hello" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result).toEqual({});
+  });
+
+  it("handles numeric fields", () => {
+    const original = { age: 10, family_limit: 5 };
+    const form = { age: 12, family_limit: 5 };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.age).toBe(12);
+    expect(result.family_limit).toBeUndefined();
+  });
+
+  it("omits fields not present in formData", () => {
+    const original = { name: "Test", bio: "Hello" };
+    const form = { name: "Test", bio: "" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.name).toBeUndefined();
+    expect(result.bio).toBe("");
   });
 });
 

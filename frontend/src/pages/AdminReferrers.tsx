@@ -17,6 +17,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { adminCreateReferrer, adminDeleteReferrer, adminGetReferrer, adminListReferrers, adminUpdateReferrer } from "../lib/api";
+import { normalizeUpdatePayload } from "../lib/utils";
 import type { ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
@@ -56,7 +57,8 @@ export default function AdminReferrers() {
 
   function handleUpdate(formData: ReferrerPayload) {
     if (!editingId) return;
-    updateMut?.mutate({ id: editingId, data: formData });
+    const payload = normalizeUpdatePayload(formData, detail as ReferrerDetail);
+    updateMut?.mutate({ id: editingId, data: payload as ReferrerPayload });
   }
 
   if (listLoading) return <PageSpinner />;

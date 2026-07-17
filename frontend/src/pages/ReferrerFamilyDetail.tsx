@@ -30,7 +30,8 @@ import {
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import type { FamilyPayload, PersonPayload } from "../types";
+import { normalizeUpdatePayload } from "../lib/utils";
+import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -86,7 +87,8 @@ export default function ReferrerFamilyDetail() {
   });
 
   function handleUpdateFam(formData: FamilyPayload) {
-    updateFamMut.mutate({ id: famIdNum, data: formData });
+    const payload = normalizeUpdatePayload(formData, family as FamilyDetail);
+    updateFamMut.mutate({ id: famIdNum, data: payload as FamilyPayload });
   }
 
   function handleCreatePerson(formData: PersonPayload) {
@@ -95,12 +97,13 @@ export default function ReferrerFamilyDetail() {
 
   function handleUpdatePerson(formData: PersonPayload) {
     if (!editingPersonId) return;
-    updatePersonMut?.mutate({ id: editingPersonId, data: formData });
+    const payload = normalizeUpdatePayload(formData, personDetail as PersonDetail);
+    updatePersonMut?.mutate({ id: editingPersonId, data: payload as PersonPayload });
   }
 
   if (famLoading || peopleLoading) return <PageSpinner />;
 
-  const people = listData ?? [];
+  const people = listData?.people ?? [];
 
   return (
     <div className="min-h-screen bg-slate-50">

@@ -18,19 +18,21 @@ import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
-import { PageSpinner } from "../components/Spinner";
+import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import {
   createReferrerFamily,
   deleteReferrerFamily,
+  getReferrerFamily,
   getReferrerMe,
   listReferrerFamilies,
   patchReferrerMe,
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
-import type { FamilyDetail, FamilyPayload, ReferrerDetail, ReferrerPayload } from "../types";
+import { normalizeUpdatePayload } from "../lib/utils";
+import type { FamilyPayload, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_ME_KEY = ["referrerMe"];
 const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
@@ -47,10 +49,12 @@ export default function ReferrerDashboard() {
     queryFn: getReferrerMe,
   });
 
-  // Family CRUD via hook (no detailFn — data sourced from list)
+  // Family CRUD via hook (detailFn fetches full record for editing)
   const {
     listData,
     listLoading: famLoading,
+    detail,
+    detailLoading,
     createMut: createFamMut,
     updateMut: updateFamMut,
     deleteMut: deleteFamMut,
@@ -65,6 +69,7 @@ export default function ReferrerDashboard() {
   } = useCrudManager({
     rootKey: REFERRER_FAMILIES_KEY,
     listFn: listReferrerFamilies,
+    detailFn: getReferrerFamily,
     createFn: createReferrerFamily,
     updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
@@ -83,7 +88,8 @@ export default function ReferrerDashboard() {
   const [showEditSelf, setShowEditSelf] = useState(false);
 
   function handleUpdateSelf(formData: ReferrerPayload) {
-    updateSelfMut.mutate(formData);
+    const payload = normalizeUpdatePayload(formData, referrerInfo as ReferrerDetail);
+    updateSelfMut.mutate(payload as ReferrerPayload);
   }
 
   function handleCreateFam(formData: FamilyPayload) {
@@ -91,13 +97,14 @@ export default function ReferrerDashboard() {
   }
 
   function handleUpdateFam(formData: FamilyPayload) {
-    if (!editingId) return;
-    updateFamMut?.mutate({ id: editingId, data: formData });
+    if (!editingId || !detail) return;
+    const payload = normalizeUpdatePayload(formData, detail);
+    updateFamMut?.mutate({ id: editingId, data: payload as FamilyPayload });
   }
 
   if (infoLoading || famLoading) return <PageSpinner />;
 
-  const families: FamilyDetail[] = listData ?? [];
+  const families = listData?.families ?? [];
   const familyLimit = referrerInfo?.family_limit ?? 0;
   const familyCount = referrerInfo?.family_count ?? 0;
 
@@ -151,10 +158,17 @@ export default function ReferrerDashboard() {
           />
         )}
 
-        {editingId && (
+        {editingId && detailLoading && (
+          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-gray-400">
+            <Spinner size="sm" />
+            <span className="text-sm">Loading…</span>
+          </Card>
+        )}
+
+        {editingId && detail && (
           <FamilyForm
             title="Edit Family"
-            initial={families.find((f) => f.id === editingId) || defaultFamilyForm}
+            initial={detail}
             isEdit={true}
             onSubmit={handleUpdateFam}
             onCancel={cancelForm}

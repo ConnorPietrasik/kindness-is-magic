@@ -1,24 +1,52 @@
 /**
  * NULLABLE_STRING_FIELDS — fields that the backend stores as `NULL` when empty.
- * The frontend forms use `""` for controlled inputs; this set normalises `""` → `null`
- * before the payload hits the wire.
+ * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
 const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "phone_number", "title", "note"]);
 
 /**
  * normalizePayload — convert empty strings to `null` on known nullable fields.
  *
- * This keeps DB values semantically clean (`null` = no value) and matches
+ * Used for **create** operations where there is no original record to compare
+ * against. Keeps DB values semantically clean (`null` = no value) and matches
  * the TypeScript `string | null` types on the payload interfaces.
  */
-export function normalizePayload<T extends Record<string, unknown>>(data: T): T {
-  const copy = { ...data } as Record<string, unknown>;
+export function normalizePayload<T>(data: T): T {
+  const copy = { ...(data as Record<string, unknown>) } as Record<string, unknown>;
   for (const key of NULLABLE_STRING_FIELDS) {
     if (key in copy && copy[key] === "") {
       copy[key] = null;
     }
   }
   return copy as T;
+}
+
+/**
+ * normalizeUpdatePayload — build a patch payload from form data compared to
+ * the original record.
+ *
+ * - Cleared field (original had data, form is `""`)  → send `""` (backend clears to NULL)
+ * - Unchanged field                                  → omit from payload (backend skips)
+ * - Changed field                                    → send new value
+ *
+ * Treats `null` and `""` as equivalent for comparison since forms always
+ * render nullable fields as controlled inputs with `""` defaults.
+ */
+export function normalizeUpdatePayload<T>(formData: T, original: T): Partial<T> {
+  const result: Record<string, unknown> = {};
+  const formRecord = formData as Record<string, unknown>;
+  const origRecord = original as Record<string, unknown>;
+  for (const key of Object.keys(formRecord)) {
+    const formValue = formRecord[key];
+    const originalValue = origRecord[key];
+    // Treat null ≡ "" for comparison (forms render null as "")
+    const originalStr = originalValue ?? "";
+    if (originalStr === formValue) {
+      continue; // unchanged — omit
+    }
+    result[key] = formValue;
+  }
+  return result as Partial<T>;
 }
 
 /**

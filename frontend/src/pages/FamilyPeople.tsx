@@ -17,7 +17,8 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import type { PersonPayload } from "../types";
+import { normalizeUpdatePayload } from "../lib/utils";
+import type { PersonDetail, PersonPayload } from "../types";
 
 const FAMILY_PEOPLE_KEY = ["familyPeople"];
 
@@ -56,12 +57,13 @@ export default function FamilyPeople() {
 
   function handleUpdate(formData: PersonPayload) {
     if (!editingId) return;
-    updateMut?.mutate({ id: editingId, data: formData });
+    const payload = normalizeUpdatePayload(formData, detail as PersonDetail);
+    updateMut?.mutate({ id: editingId, data: payload as PersonPayload });
   }
 
   if (listLoading) return <PageSpinner />;
 
-  const people = listData ?? [];
+  const people = listData?.people ?? [];
 
   return (
     <div className="min-h-screen bg-slate-50">
