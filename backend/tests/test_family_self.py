@@ -138,6 +138,42 @@ class TestFamilyUpdateSelf:
         )
         assert resp.status_code == 404
 
+    def test_200_null_unchanges_nullable_field(self, test_client: TestClient, family_user, family_record):
+        """Sending null for a nullable field should leave it unchanged."""
+        family_record.bio = "Some bio"
+        family_record.address = "123 Main St"
+        family_record.phone_number = "555-1234"
+        family_record._sa_instance_state.session.commit()
+
+        _family_login(test_client)
+        resp = test_client.patch(
+            "/api/family/me",
+            json={"bio": None},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["bio"] == "Some bio"  # unchanged
+        assert body["address"] == "123 Main St"  # unchanged
+        assert body["phone_number"] == "555-1234"  # unchanged
+
+    def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, family_user, family_record):
+        """Sending '' for a nullable field should clear it to None."""
+        family_record.bio = "Some bio"
+        family_record.address = "123 Main St"
+        family_record.phone_number = "555-1234"
+        family_record._sa_instance_state.session.commit()
+
+        _family_login(test_client)
+        resp = test_client.patch(
+            "/api/family/me",
+            json={"bio": "", "address": "", "phone_number": ""},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["bio"] is None  # cleared
+        assert body["address"] is None  # cleared
+        assert body["phone_number"] is None  # cleared
+
     def test_401_unauthenticated(self, test_client: TestClient, family_user):
         resp = test_client.patch("/api/family/me", json={"family_name": "Nope"})
         assert resp.status_code == 401

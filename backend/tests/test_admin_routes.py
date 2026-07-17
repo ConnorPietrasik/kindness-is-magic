@@ -405,6 +405,42 @@ class TestAdminUpdateFamily:
         assert resp.status_code == 200
         assert resp.json()["is_deleted"] is False
 
+    def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_record):
+        """Sending null for a nullable field should leave it unchanged."""
+        family_record.bio = "Some bio"
+        family_record.address = "123 Main St"
+        family_record.phone_number = "555-1234"
+        family_record._sa_instance_state.session.commit()
+
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"bio": None},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["bio"] == "Some bio"  # unchanged
+        assert body["address"] == "123 Main St"  # unchanged
+        assert body["phone_number"] == "555-1234"  # unchanged
+
+    def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, admin_user, family_record):
+        """Sending '' for a nullable field should clear it to None."""
+        family_record.bio = "Some bio"
+        family_record.address = "123 Main St"
+        family_record.phone_number = "555-1234"
+        family_record._sa_instance_state.session.commit()
+
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"bio": "", "address": "", "phone_number": ""},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["bio"] is None  # cleared
+        assert body["address"] is None  # cleared
+        assert body["phone_number"] is None  # cleared
+
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.patch(
@@ -632,6 +668,40 @@ class TestAdminUpdatePerson:
         )
         assert resp.status_code == 200
         assert resp.json()["is_deleted"] is False
+
+    def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
+        """Sending null for a nullable field should leave it unchanged."""
+        person = family_with_people["people"][0]
+        person.title = "Dr."
+        person.note = "Important note"
+        person._sa_instance_state.session.commit()
+
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={"title": None},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["title"] == "Dr."  # unchanged
+        assert body["note"] == "Important note"  # unchanged
+
+    def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
+        """Sending '' for a nullable field should clear it to None."""
+        person = family_with_people["people"][0]
+        person.title = "Dr."
+        person.note = "Important note"
+        person._sa_instance_state.session.commit()
+
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={"title": "", "note": ""},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["title"] is None  # cleared
+        assert body["note"] is None  # cleared
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)

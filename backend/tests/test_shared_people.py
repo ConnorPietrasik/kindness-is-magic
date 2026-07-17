@@ -222,6 +222,40 @@ class TestPersonUpdateShared:
         )
         assert resp.status_code == 403
 
+    def test_200_null_unchanges_nullable_field(self, test_client: TestClient, family_user, family_with_people):
+        """Sending null for a nullable field should leave it unchanged."""
+        person = family_with_people["people"][0]
+        person.title = "Dr."
+        person.note = "Important note"
+        person._sa_instance_state.session.commit()
+
+        _family_login(test_client)
+        resp = test_client.patch(
+            f"/api/people/{person.id}",
+            json={"title": None},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["title"] == "Dr."  # unchanged
+        assert body["note"] == "Important note"  # unchanged
+
+    def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, family_user, family_with_people):
+        """Sending '' for a nullable field should clear it to None."""
+        person = family_with_people["people"][0]
+        person.title = "Dr."
+        person.note = "Important note"
+        person._sa_instance_state.session.commit()
+
+        _family_login(test_client)
+        resp = test_client.patch(
+            f"/api/people/{person.id}",
+            json={"title": "", "note": ""},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["title"] is None  # cleared
+        assert body["note"] is None  # cleared
+
     def test_422_bad_data(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         person = referrer_with_full_tree["person"]

@@ -78,9 +78,14 @@ def partial_update(obj, schema_model):
     """Apply all explicitly-set fields from a Pydantic model to a SQLAlchemy object.
 
     Fields omitted by the client are excluded (via ``exclude_unset``).
-    Fields sent as ``null`` are applied as ``None``, allowing nullable
-    columns to be intentionally cleared.
+    Fields sent as ``null`` are ignored (no change).
+    Fields sent as ``""`` on nullable string columns clear the value (set to ``None``).
     """
     update_data = schema_model.model_dump(exclude_unset=True)
+    columns = obj.__table__.columns
     for field, value in update_data.items():
+        if value is None:
+            continue  # null means "don't change"
+        if isinstance(value, str) and value == "" and field in columns and columns[field].nullable:
+            value = None  # "" on nullable field means "clear"
         setattr(obj, field, value)
