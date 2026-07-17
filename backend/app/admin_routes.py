@@ -160,11 +160,18 @@ family_admin_router = APIRouter(
 def list_families(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    include_deleted: bool = Query(False),
+    referrer_id: int | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyListResponse:
-    total = db.query(Family).filter(Family.is_deleted == False).count()
-    families = db.query(Family).filter(Family.is_deleted == False).order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
+    query = db.query(Family)
+    if not include_deleted:
+        query = query.filter(Family.is_deleted == False)
+    if referrer_id is not None:
+        query = query.filter(Family.referrer_id == referrer_id)
+    total = query.count()
+    families = query.order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Single aggregation query instead of N+1 count() calls
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.is_deleted == False).group_by(Person.family_id).all()
@@ -273,11 +280,18 @@ people_admin_router = APIRouter(
 def list_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    include_deleted: bool = Query(False),
+    family_id: int | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
-    total = db.query(Person).filter(Person.is_deleted == False).count()
-    people = db.query(Person).filter(Person.is_deleted == False).order_by(Person.id).offset((page - 1) * page_size).limit(page_size).all()
+    query = db.query(Person)
+    if not include_deleted:
+        query = query.filter(Person.is_deleted == False)
+    if family_id is not None:
+        query = query.filter(Person.family_id == family_id)
+    total = query.count()
+    people = query.order_by(Person.id).offset((page - 1) * page_size).limit(page_size).all()
     return PersonListResponse(
         people=[
             PersonSummary(
