@@ -14,7 +14,7 @@ interface PersonFormProps {
   isEdit?: boolean;
   familyMap?: Record<number, string>;
   familyOptionsLoading?: boolean;
-  /** When true the form shows an `is_deleted` toggle (admin-only). */
+  /** When true the form shows a soft-delete toggle (admin-only). */
   showDeletedToggle?: boolean;
   onSubmit: (formData: PersonPayload) => void;
   onCancel: () => void;
@@ -26,7 +26,7 @@ interface PersonFormProps {
  *
  * Admin-only features (gated by props):
  * - `familyMap` — shows a family selector on create.
- * - `showDeletedToggle` — shows an is_deleted checkbox that triggers a
+ * - `showDeletedToggle` — shows a soft-delete checkbox that triggers a
  *   confirmation dialog before the mutation fires.
  */
 export function PersonForm({
@@ -47,13 +47,13 @@ export function PersonForm({
     setForm({ ...defaultPersonForm, ...initial });
   }, [initial]);
 
-  const update = (key: string, val: string | number | boolean) => setForm((prev) => ({ ...prev, [key]: val }));
+  const update = (key: string, val: string | number | boolean | null) => setForm((prev) => ({ ...prev, [key]: val }));
 
   // Only shown on admin create when familyMap is provided
   const familyOptions = familyMap ? Object.entries(familyMap) : [];
   const hasFamilyMap = !!familyMap;
 
-  const originalIsDeleted = useMemo(() => initial?.is_deleted ?? false, [initial]);
+  const originalIsDeleted = useMemo(() => initial?.deleted_at != null, [initial]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -61,7 +61,7 @@ export function PersonForm({
       const formData = form as unknown as PersonPayload;
 
       // Check if user is soft-deleting
-      if (showDeletedToggle && formData.is_deleted && !originalIsDeleted) {
+      if (showDeletedToggle && formData.deleted_at != null && !originalIsDeleted) {
         setPendingDelete(true);
         return;
       }
@@ -194,19 +194,19 @@ export function PersonForm({
               />
             </div>
 
-            {/* is_deleted toggle (admin edit only) */}
+            {/* Soft-delete toggle (admin edit only) */}
             {showDeletedToggle && isEdit && (
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="person_is_deleted"
-                  checked={(form.is_deleted as boolean) ?? false}
-                  onChange={(e) => update("is_deleted", e.target.checked)}
+                  id="person_deleted_at"
+                  checked={form.deleted_at != null}
+                  onChange={(e) => update("deleted_at", e.target.checked ? new Date().toISOString() : null)}
                   className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                 />
-                <label htmlFor="person_is_deleted" className="text-sm font-medium text-gray-700">
-                  {((form.is_deleted as boolean) ?? false) ? "Mark as deleted" : "Soft-deleted"}
-                  {((form.is_deleted as boolean) ?? false) && !originalIsDeleted && (
+                <label htmlFor="person_deleted_at" className="text-sm font-medium text-gray-700">
+                  {form.deleted_at != null ? "Mark as deleted" : "Soft-deleted"}
+                  {form.deleted_at != null && !originalIsDeleted && (
                     <span className="ml-1 text-xs text-red-600">(requires confirmation)</span>
                   )}
                 </label>

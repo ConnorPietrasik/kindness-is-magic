@@ -161,12 +161,12 @@ export default function AdminPeople() {
               {people.map((p) => (
                 <Tr key={p.id}>
                   <Td>{p.id}</Td>
-                  <Td className={p.is_deleted ? "text-gray-400" : ""}>{p.given_name}</Td>
+                  <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
                   <Td>{p.age}</Td>
                   <Td>{familyMap[p.family_id] || `ID ${p.family_id}`}</Td>
                   {includeDeleted && (
                     <Td>
-                      {p.is_deleted ? (
+                      {p.deleted_at != null ? (
                         <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
                       ) : (
                         <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>

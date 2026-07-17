@@ -15,7 +15,7 @@ interface FamilyFormProps {
   referrerMap?: Record<number, string>;
   referrerOptionsLoading?: boolean;
   showOptionalFields?: boolean;
-  /** When true the form shows an `is_deleted` toggle (admin-only). */
+  /** When true the form shows a soft-delete toggle (admin-only). */
   showDeletedToggle?: boolean;
   onSubmit: (formData: FamilyPayload) => void;
   onCancel: () => void;
@@ -27,7 +27,7 @@ interface FamilyFormProps {
  *
  * Admin-only features (gated by props):
  * - `referrerMap` — shows a referrer selector on both create and edit.
- * - `showDeletedToggle` — shows an is_deleted checkbox that triggers a
+ * - `showDeletedToggle` — shows a soft-delete checkbox that triggers a
  *   confirmation dialog before the mutation fires.
  */
 export function FamilyForm({
@@ -49,15 +49,15 @@ export function FamilyForm({
     setForm({ ...defaultFamilyForm, ...initial });
   }, [initial]);
 
-  const update = (key: string, val: string | number | boolean) => setForm((prev) => ({ ...prev, [key]: val }));
+  const update = (key: string, val: string | number | boolean | null) => setForm((prev) => ({ ...prev, [key]: val }));
 
   // Referrer select options
   const referrerOptions = referrerMap ? Object.entries(referrerMap) : [];
   const hasReferrerMap = !!referrerMap;
 
-  // When the user toggles is_deleted to true, we gate the submit behind a
+  // When the user toggles deleted_at to non-null, we gate the submit behind a
   // confirmation dialog so soft-deleting is never accidental.
-  const originalIsDeleted = useMemo(() => initial?.is_deleted ?? false, [initial]);
+  const originalIsDeleted = useMemo(() => initial?.deleted_at != null, [initial]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -65,7 +65,7 @@ export function FamilyForm({
       const formData = form as unknown as FamilyPayload;
 
       // Check if user is soft-deleting (was not deleted, now is)
-      if (showDeletedToggle && formData.is_deleted && !originalIsDeleted) {
+      if (showDeletedToggle && formData.deleted_at != null && !originalIsDeleted) {
         setPendingDelete(true);
         return;
       }
@@ -98,12 +98,15 @@ export function FamilyForm({
                 label={isEdit ? "Referrer" : "Referrer"}
                 as="select"
                 fieldProps={{
-                  value: (form as Record<string, unknown>).referrer_id || "",
+                  value: isEdit
+                    ? String((form as Record<string, unknown>).referrer_id ?? 0)
+                    : String((form as Record<string, unknown>).referrer_id) || "",
                   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("referrer_id", parseInt(e.target.value, 10)),
                   required: true,
                 }}
               >
                 {!isEdit && <option value="">Select referrer…</option>}
+                {isEdit && <option value="0">Unassign referrer</option>}
                 {referrerOptions.map(([id, name]) => (
                   <option key={id} value={id}>
                     {name} (ID {id})
@@ -182,19 +185,19 @@ export function FamilyForm({
               </>
             )}
 
-            {/* is_deleted toggle (admin edit only) */}
+            {/* Soft-delete toggle (admin edit only) */}
             {showDeletedToggle && isEdit && (
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="is_deleted"
-                  checked={(form.is_deleted as boolean) ?? false}
-                  onChange={(e) => update("is_deleted", e.target.checked)}
+                  id="deleted_at"
+                  checked={form.deleted_at != null}
+                  onChange={(e) => update("deleted_at", e.target.checked ? new Date().toISOString() : null)}
                   className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                 />
-                <label htmlFor="is_deleted" className="text-sm font-medium text-gray-700">
-                  {((form.is_deleted as boolean) ?? false) ? "Mark as deleted" : "Soft-deleted"}
-                  {((form.is_deleted as boolean) ?? false) && !originalIsDeleted && (
+                <label htmlFor="deleted_at" className="text-sm font-medium text-gray-700">
+                  {form.deleted_at != null ? "Mark as deleted" : "Soft-deleted"}
+                  {form.deleted_at != null && !originalIsDeleted && (
                     <span className="ml-1 text-xs text-red-600">(requires confirmation)</span>
                   )}
                 </label>

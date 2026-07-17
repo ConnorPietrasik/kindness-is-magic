@@ -1,8 +1,5 @@
-Add admin referrer_id edit ability (already implemented backend)
-Add admin pagination for the list views (already implemented backend)
 Add admin page to invite referrers (already implemented backend)
 Add more admin views - sort by wishes, sort families by size, etc
-Add admin is_deleted = false ability somewhere (patch allows it backend)
 Add some sort of "purchased" checkbox for each wish, maybe a date or a field to enter a receipt? Need to verify specifics of that
 Add family wish-lists - Family ID, family_name, family_wish, then each person name, age, practical_wish, fun_wish, maybe note depending on space
 Add ability for referrers to invite families with their limit. Each referrer has their own code and then they have to approve each family that signs up using it (they aren't counted toward the limit until approved)

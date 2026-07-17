@@ -13,7 +13,7 @@ const mockFamilyDetail: FamilyDetail = {
   phone_number: null,
   family_wish: "A warm blanket",
   contact_name: "Mom Smith",
-  is_deleted: false,
+  deleted_at: null,
   person_count: 3,
 };
 
@@ -67,28 +67,55 @@ describe("FamilyForm", () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ referrer_id: 3 }));
   });
 
+  it("shows 'Unassign referrer' option on edit mode", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+
+    expect(screen.getByText("Unassign referrer")).toBeInTheDocument();
+  });
+
+  it("selects 'Unassign referrer' when referrer_id is null", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail, referrer_id: null }} />);
+
+    const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
+    expect(select.value).toBe("0");
+  });
+
+  it("sends referrer_id=0 when unassigning referrer", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />);
+
+    const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
+    await user.selectOptions(select, "0");
+
+    await user.click(screen.getByText("Update"));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ referrer_id: 0 }));
+  });
+
   it("does not show 'Select referrer…' placeholder on edit", () => {
     render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
 
     expect(screen.queryByText("Select referrer…")).not.toBeInTheDocument();
   });
 
-  /* ── is_deleted toggle ──────────────────────────────────── */
+  /* ── deleted_at toggle ──────────────────────────────────── */
 
-  it("does not show is_deleted toggle when showDeletedToggle is false", () => {
+  it("does not show deleted_at toggle when showDeletedToggle is false", () => {
     render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showDeletedToggle={false} />);
 
     expect(screen.queryByLabelText(/soft-deleted/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Mark as deleted/i)).not.toBeInTheDocument();
   });
 
-  it("does not show is_deleted toggle on create mode", () => {
+  it("does not show deleted_at toggle on create mode", () => {
     render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} showDeletedToggle={true} />);
 
     expect(screen.queryByLabelText(/soft-deleted/i)).not.toBeInTheDocument();
   });
 
-  it("shows unchecked is_deleted toggle for active family", () => {
+  it("shows unchecked deleted_at toggle for active family", () => {
     render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showDeletedToggle={true} />);
 
     const checkbox = screen.getByLabelText("Soft-deleted");
@@ -96,13 +123,13 @@ describe("FamilyForm", () => {
     expect(checkbox).not.toBeChecked();
   });
 
-  it("shows checked is_deleted toggle for deleted family", () => {
+  it("shows checked deleted_at toggle for deleted family", () => {
     render(
       <FamilyForm
         {...defaultProps}
         title="Edit Family"
         isEdit={true}
-        initial={{ ...mockFamilyDetail, is_deleted: true }}
+        initial={{ ...mockFamilyDetail, deleted_at: "2025-01-01T00:00:00Z" }}
         showDeletedToggle={true}
       />
     );
@@ -112,9 +139,9 @@ describe("FamilyForm", () => {
     expect(checkbox).toBeChecked();
   });
 
-  /* ── is_deleted confirmation dialog ─────────────────────── */
+  /* ── deleted_at confirmation dialog ─────────────────────── */
 
-  it("shows confirmation dialog when toggling is_deleted to true and submitting", async () => {
+  it("shows confirmation dialog when toggling deleted_at and submitting", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -143,7 +170,7 @@ describe("FamilyForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("calls onSubmit with is_deleted=true after confirming soft-delete", async () => {
+  it("calls onSubmit with deleted_at set after confirming soft-delete", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -170,7 +197,7 @@ describe("FamilyForm", () => {
     // Confirm the dialog
     await user.click(screen.getByText("Yes, delete"));
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ is_deleted: true }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
   });
 
   it("does not submit when cancelling soft-delete confirmation", async () => {
@@ -206,7 +233,7 @@ describe("FamilyForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("submits without confirmation when unchecking is_deleted (restore)", async () => {
+  it("submits without confirmation when unchecking deleted_at (restore)", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -215,7 +242,7 @@ describe("FamilyForm", () => {
         {...defaultProps}
         title="Edit Family"
         isEdit={true}
-        initial={{ ...mockFamilyDetail, is_deleted: true }}
+        initial={{ ...mockFamilyDetail, deleted_at: "2025-01-01T00:00:00Z" }}
         showDeletedToggle={true}
         onSubmit={onSubmit}
       />
@@ -227,11 +254,11 @@ describe("FamilyForm", () => {
     await user.click(screen.getByText("Update"));
 
     // No confirmation dialog — restoring is safe
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ is_deleted: false }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: null }));
     expect(screen.queryByText("Soft-delete this family?")).not.toBeInTheDocument();
   });
 
-  it("submits without confirmation for normal updates (no is_deleted change)", async () => {
+  it("submits without confirmation for normal updates (no deleted_at change)", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 

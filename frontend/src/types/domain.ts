@@ -27,6 +27,7 @@ export interface ReferrerSummary {
   id: number;
   name: string;
   family_limit: number;
+  deleted_at: string | null;
 }
 
 /** Mirrors ReferrerDetail (includes computed family_count). */
@@ -36,6 +37,7 @@ export interface ReferrerDetail {
   family_limit: number;
   phone_number: string;
   family_count: number;
+  deleted_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,22 +50,22 @@ export interface FamilySummary {
   family_name: string;
   family_wish: string;
   contact_name: string;
-  referrer_id: number;
-  is_deleted: boolean;
+  referrer_id: number | null;
+  deleted_at: string | null;
   person_count: number;
 }
 
 /** Mirrors FamilyDetail (includes computed person_count). */
 export interface FamilyDetail {
   id: number;
-  referrer_id: number;
+  referrer_id: number | null;
   family_name: string;
   bio: string | null;
   address: string | null;
   phone_number: string | null;
   family_wish: string;
   contact_name: string;
-  is_deleted: boolean;
+  deleted_at: string | null;
   person_count: number;
 }
 
@@ -77,33 +79,34 @@ export interface PersonSummary {
   family_id: number;
   given_name: string;
   age: number;
-  is_deleted: boolean;
+  deleted_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
 // Payload types — all fields optional (create = all present, update = partial)
 // ---------------------------------------------------------------------------
 
-/** Payload for creating or updating a referrer. `family_limit` is admin-only. */
+/** Payload for creating or updating a referrer. `family_limit` and `deleted_at` are admin-only. */
 export interface ReferrerPayload {
   name?: string;
   phone_number?: string;
   family_limit?: number;
+  deleted_at?: string | null;
 }
 
-/** Payload for creating or updating a family. `referrer_id` and `is_deleted` are admin-only. */
+/** Payload for creating or updating a family. `referrer_id` and `deleted_at` are admin-only. */
 export interface FamilyPayload {
-  referrer_id?: number;
+  referrer_id?: number | null;
   family_name?: string;
   bio?: string | null;
   address?: string | null;
   phone_number?: string | null;
   family_wish?: string;
   contact_name?: string;
-  is_deleted?: boolean;
+  deleted_at?: string | null;
 }
 
-/** Payload for creating or updating a person. `family_id` and `is_deleted` are admin-only. */
+/** Payload for creating or updating a person. `family_id` and `deleted_at` are admin-only. */
 export interface PersonPayload {
   family_id?: number;
   given_name?: string;
@@ -112,7 +115,7 @@ export interface PersonPayload {
   practical_wish?: string;
   fun_wish?: string;
   note?: string | null;
-  is_deleted?: boolean;
+  deleted_at?: string | null;
 }
 
 /** Payload for user registration. */
@@ -138,5 +141,5 @@ export interface PersonDetail {
   practical_wish: string;
   fun_wish: string;
   note: string | null;
-  is_deleted: boolean;
+  deleted_at: string | null;
 }

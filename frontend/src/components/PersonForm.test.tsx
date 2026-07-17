@@ -13,7 +13,7 @@ const mockPersonDetail: PersonDetail = {
   practical_wish: "A backpack",
   fun_wish: "A doll",
   note: null,
-  is_deleted: false,
+  deleted_at: null,
 };
 
 const familyMap: Record<number, string> = {
@@ -51,21 +51,21 @@ describe("PersonForm", () => {
     expect(screen.queryByText("Select family…")).not.toBeInTheDocument();
   });
 
-  /* ── is_deleted toggle ──────────────────────────────────── */
+  /* ── deleted_at toggle ──────────────────────────────────── */
 
-  it("does not show is_deleted toggle when showDeletedToggle is false", () => {
+  it("does not show deleted_at toggle when showDeletedToggle is false", () => {
     render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockPersonDetail} showDeletedToggle={false} />);
 
     expect(screen.queryByLabelText(/soft-deleted/i)).not.toBeInTheDocument();
   });
 
-  it("does not show is_deleted toggle on create mode", () => {
+  it("does not show deleted_at toggle on create mode", () => {
     render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{}} showDeletedToggle={true} />);
 
     expect(screen.queryByLabelText(/soft-deleted/i)).not.toBeInTheDocument();
   });
 
-  it("shows unchecked is_deleted toggle for active person", () => {
+  it("shows unchecked deleted_at toggle for active person", () => {
     render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockPersonDetail} showDeletedToggle={true} />);
 
     const checkbox = screen.getByLabelText("Soft-deleted");
@@ -73,13 +73,13 @@ describe("PersonForm", () => {
     expect(checkbox).not.toBeChecked();
   });
 
-  it("shows checked is_deleted toggle for deleted person", () => {
+  it("shows checked deleted_at toggle for deleted person", () => {
     render(
       <PersonForm
         {...defaultProps}
         title="Edit Person"
         isEdit={true}
-        initial={{ ...mockPersonDetail, is_deleted: true }}
+        initial={{ ...mockPersonDetail, deleted_at: "2025-01-01T00:00:00Z" }}
         showDeletedToggle={true}
       />
     );
@@ -89,9 +89,9 @@ describe("PersonForm", () => {
     expect(checkbox).toBeChecked();
   });
 
-  /* ── is_deleted confirmation dialog ─────────────────────── */
+  /* ── deleted_at confirmation dialog ─────────────────────── */
 
-  it("shows confirmation dialog when toggling is_deleted to true and submitting", async () => {
+  it("shows confirmation dialog when toggling deleted_at and submitting", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -120,7 +120,7 @@ describe("PersonForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("calls onSubmit with is_deleted=true after confirming soft-delete", async () => {
+  it("calls onSubmit with deleted_at set after confirming soft-delete", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -147,7 +147,7 @@ describe("PersonForm", () => {
     // Confirm the dialog
     await user.click(screen.getByText("Yes, delete"));
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ is_deleted: true }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
   });
 
   it("does not submit when cancelling soft-delete confirmation", async () => {
@@ -183,7 +183,7 @@ describe("PersonForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("submits without confirmation when unchecking is_deleted (restore)", async () => {
+  it("submits without confirmation when unchecking deleted_at (restore)", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
@@ -192,7 +192,7 @@ describe("PersonForm", () => {
         {...defaultProps}
         title="Edit Person"
         isEdit={true}
-        initial={{ ...mockPersonDetail, is_deleted: true }}
+        initial={{ ...mockPersonDetail, deleted_at: "2025-01-01T00:00:00Z" }}
         showDeletedToggle={true}
         onSubmit={onSubmit}
       />
@@ -204,7 +204,7 @@ describe("PersonForm", () => {
     await user.click(screen.getByText("Update"));
 
     // No confirmation dialog — restoring is safe
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ is_deleted: false }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: null }));
     expect(screen.queryByText("Soft-delete this person?")).not.toBeInTheDocument();
   });
 

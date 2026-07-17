@@ -161,12 +161,12 @@ export default function AdminFamilies() {
               {families.map((f) => (
                 <Tr key={f.id}>
                   <Td>{f.id}</Td>
-                  <Td className={f.is_deleted ? "text-gray-400" : ""}>{f.family_name}</Td>
+                  <Td className={f.deleted_at != null ? "text-gray-400" : ""}>{f.family_name}</Td>
                   <Td>{f.contact_name}</Td>
-                  <Td>{referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}</Td>
+                  <Td>{f.referrer_id != null ? referrerMap[f.referrer_id] || `ID ${f.referrer_id}` : "—"}</Td>
                   {includeDeleted && (
                     <Td>
-                      {f.is_deleted ? (
+                      {f.deleted_at != null ? (
                         <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
                       ) : (
                         <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
