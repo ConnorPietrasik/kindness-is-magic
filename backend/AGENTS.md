@@ -5,6 +5,7 @@
 - **FastAPI** + **SQLAlchemy 2.0** (declarative models) + **Alembic** for migrations
 - **PyJWT** for auth (access tokens + refresh tokens), **bcrypt** for password hashing
 - **psycopg** (v3) for Postgres
+- **slowapi** for rate limiting
 
 ## Runtime
 
@@ -38,6 +39,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `family_routes.py` | Family self-service endpoints |
 | `people_routes.py` | Shared person endpoints |
 | `csv_import.py` | Bulk CSV import (referrers/families/people/users) |
+| `rate_limit.py` | Rate limiter configuration (`slowapi`) |
 
 Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibling to `app/`).
 
