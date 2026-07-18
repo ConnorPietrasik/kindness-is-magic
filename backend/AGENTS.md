@@ -14,9 +14,8 @@
 
 ## Key Patterns
 
-- **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.is_deleted == False`) unless the endpoint explicitly needs deleted data. Deletion sets `is_deleted = True` rather than removing the row.
-  - Never use `not Model.is_deleted` — that evaluates the SQLAlchemy Column in Python (always truthy). Use `Model.is_deleted == False` so SQLAlchemy generates SQL.
-- **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth middleware (`auth.py`) validates JWTs and attaches the user to the request. `permissions.py` provides ownership and admin-check dependencies.
+- **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.deleted_at.is_(None)`) unless the endpoint explicitly needs deleted data. Deletion sets `deleted_at` to the current timestamp (`datetime.now(timezone.utc)`) rather than removing the row. For plain Python checks (e.g. in conditionals on already-loaded objects), use `is None` / `is not None`.
+- **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides ownership and admin-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 
 ## Project Structure
@@ -99,4 +98,4 @@ After making code changes:
 
 - Use `ruff check .` and `ruff format --check .` to validate code quality. You can also use `python3 -c "import ..."` to verify imports and basic logic.
 
-- **Do not enable Ruff E712**. SQLAlchemy comparisons intentionally use `== False` because they generate SQL expressions.
+

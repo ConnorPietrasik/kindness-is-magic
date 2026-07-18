@@ -5,7 +5,7 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -25,6 +25,7 @@ import {
   adminGetPerson,
   adminListFamilies,
   adminListPeople,
+  adminRestoreFamily,
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
@@ -41,6 +42,7 @@ export default function AdminPeople() {
   const pagination = usePagination();
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
+  const [pendingFamilyRestore, setPendingFamilyRestore] = useState<{ personId: number; familyId: number } | null>(null);
 
   // Merge pagination params with include_deleted for cache separation
   const listParams = useMemo<PaginationParams>(
@@ -56,7 +58,6 @@ export default function AdminPeople() {
     createMut,
     updateMut,
     deleteMut,
-    restoreMut,
     showForm,
     editingId,
     deleteConfirm,
@@ -73,7 +74,34 @@ export default function AdminPeople() {
     createFn: adminCreatePerson,
     updateFn: adminUpdatePerson,
     deleteFn: adminDeletePerson,
-    restoreFn: adminRestorePerson,
+  });
+
+  const queryClient = useQueryClient();
+
+  const personRestoreMut = useMutation({
+    mutationFn: (id: number) => adminRestorePerson(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
+    },
+    onError: (error) => {
+      const data = (error as { response?: { data?: Record<string, unknown> } })?.response?.data;
+      if (data?.detail === "family_deleted" && restoreConfirm != null) {
+        const person = listData?.people?.find((p) => p.id === restoreConfirm);
+        if (person?.family_id != null) {
+          setRestoreConfirm(null);
+          setPendingFamilyRestore({ personId: restoreConfirm, familyId: person.family_id });
+          return;
+        }
+      }
+    },
+  });
+
+  const familyRestoreMut = useMutation({
+    mutationFn: (id: number) => adminRestoreFamily(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
+      queryClient.invalidateQueries({ queryKey: FAMILY_KEYS });
+    },
   });
 
   const pageInfo = useMemo(
@@ -200,7 +228,7 @@ export default function AdminPeople() {
                           size="sm"
                           className="px-3 py-1.5 text-xs"
                           onClick={() => setRestoreConfirm(p.id)}
-                          disabled={restoreMut?.isPending}
+                          disabled={personRestoreMut.isPending || familyRestoreMut.isPending}
                         >
                           Restore
                         </Button>
@@ -251,13 +279,33 @@ export default function AdminPeople() {
           }
           onConfirm={() => {
             if (restoreConfirm != null) {
-              restoreMut?.mutate(restoreConfirm);
-              setRestoreConfirm(null);
+              personRestoreMut.mutate(restoreConfirm, {
+                onSuccess: () => setRestoreConfirm(null),
+              });
             }
           }}
           onCancel={() => setRestoreConfirm(null)}
-          loading={restoreMut?.isPending}
+          loading={personRestoreMut.isPending}
           confirmLabel="Yes, restore"
+          loadingLabel="Restoring…"
+          confirmVariant="secondary"
+        />
+
+        {/* Family-deleted restore confirmation */}
+        <ConfirmDialog
+          open={pendingFamilyRestore !== null}
+          title="Family is deleted"
+          description="This person's family is deleted. Restore the whole family and all its people?"
+          onConfirm={() => {
+            if (pendingFamilyRestore != null) {
+              familyRestoreMut.mutate(pendingFamilyRestore.familyId, {
+                onSuccess: () => setPendingFamilyRestore(null),
+              });
+            }
+          }}
+          onCancel={() => setPendingFamilyRestore(null)}
+          loading={familyRestoreMut.isPending}
+          confirmLabel="Yes, restore family"
           loadingLabel="Restoring…"
           confirmVariant="secondary"
         />
@@ -273,7 +321,11 @@ export default function AdminPeople() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[createMut, updateMut, deleteMut, personRestoreMut, familyRestoreMut].filter(
+            (m): m is NonNullable<typeof m> => m != null
+          )}
+        />
       </main>
     </div>
   );

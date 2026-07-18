@@ -730,6 +730,22 @@ class TestAdminUpdatePerson:
         resp = test_client.post("/api/admin/people/99999/restore")
         assert resp.status_code == 404
 
+    def test_400_restore_person_family_deleted(self, test_client: TestClient, admin_user, family_with_people, db: Session):
+        """Restoring a person should fail when its family is soft-deleted."""
+        from app.models import Person
+
+        _admin_login(test_client)
+        family = family_with_people["family"]
+        person = family_with_people["people"][0]
+        # Soft-delete the family (cascade-deletes its people)
+        now = datetime.now(timezone.utc)
+        db.query(Person).filter(Person.family_id == family.id).update({Person.deleted_at: now}, synchronize_session=False)
+        family.deleted_at = now
+        db.commit()
+        resp = test_client.post(f"/api/admin/people/{person.id}/restore")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "family_deleted"
+
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
         """Sending null for a nullable field should leave it unchanged."""
         person = family_with_people["people"][0]

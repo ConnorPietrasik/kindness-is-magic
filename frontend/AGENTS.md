@@ -28,6 +28,7 @@
 - Use the hook's `isLoading`/`isError`/`data` instead of manual request flags.
 - Mutations must invalidate affected queries after success (see `useCrudManager` for the pattern).
 - Query keys should be stable arrays, passed as parameters or defined near their usage.
+- **Cascade invalidation:** when a mutation affects multiple resources, invalidate all affected query keys (e.g. family delete/restore also invalidates the people list).
 
 ## Testing
 
