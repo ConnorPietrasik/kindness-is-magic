@@ -128,6 +128,38 @@ export interface RegisterPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Referrer Invite
+// ---------------------------------------------------------------------------
+
+/** Payload for admin creating an invite token. */
+export interface ReferrerInviteCreatePayload {
+  family_limit: number;
+}
+
+/** Response when admin creates an invite. Mirrors ReferrerInviteResponse. */
+export interface ReferrerInviteResponse {
+  code: string;
+  family_limit: number;
+  expires_at: string;
+  created_at: string;
+}
+
+/** Payload for public referrer self-registration via invite. */
+export interface ReferrerSelfRegisterPayload {
+  code: string;
+  name: string;
+  email: string;
+  phone_number: string;
+  password: string;
+}
+
+/** Response when a referrer self-registers via invite. */
+export interface ReferrerSelfRegisterResponse {
+  user: User;
+  referrer: ReferrerSummary;
+}
+
+// ---------------------------------------------------------------------------
 // Person
 // ---------------------------------------------------------------------------
 

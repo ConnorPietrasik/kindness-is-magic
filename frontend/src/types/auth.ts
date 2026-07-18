@@ -7,6 +7,7 @@ export interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
+  setUser: (user: User) => void;
   checkAuth: () => void;
   isAdmin: boolean;
   isReferrer: boolean;

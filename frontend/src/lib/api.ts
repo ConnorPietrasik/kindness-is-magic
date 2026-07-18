@@ -19,8 +19,12 @@ import type {
   PersonListResponse,
   PersonPayload,
   ReferrerDetail,
+  ReferrerInviteCreatePayload,
+  ReferrerInviteResponse,
   ReferrerListResponse,
   ReferrerPayload,
+  ReferrerSelfRegisterPayload,
+  ReferrerSelfRegisterResponse,
   RegisterPayload,
   User,
 } from "../types";
@@ -112,6 +116,20 @@ export function resetPasswordRequest(token: string, new_password: string): Promi
 
 export function changePasswordRequest(old_password: string, new_password: string): Promise<unknown> {
   return api.put("/api/auth/me/password", { old_password, new_password }).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Auth — Referrer Invite
+// ---------------------------------------------------------------------------
+
+/** Admin creates an invite token for a referrer to self-register. */
+export function createReferrerInvite(data: ReferrerInviteCreatePayload): Promise<ReferrerInviteResponse> {
+  return api.post("/api/auth/invite-referrer", data).then((res) => res.data);
+}
+
+/** Public: redeem an invite code to register as a referrer (auto-logs in). */
+export function registerReferrerViaInvite(data: ReferrerSelfRegisterPayload): Promise<ReferrerSelfRegisterResponse> {
+  return api.post("/api/auth/register-referrer", data).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

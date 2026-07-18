@@ -62,6 +62,12 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_FAMILIES} icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
               <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />
               <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
+              <NavCard
+                to={ROUTES.ADMIN_INVITE_REFERRER}
+                icon="💌"
+                label="Invite Referrers"
+                desc="Generate invite codes for self-registration"
+              />
             </>
           )}
 

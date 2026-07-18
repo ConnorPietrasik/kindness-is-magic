@@ -23,6 +23,8 @@ const ReferrerDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() =
 const ReferrerFamilyDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilyDetail"));
 const FamilyDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyDashboard"));
 const FamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyPeople"));
+const AdminInviteReferrer: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminInviteReferrer"));
+const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerSelfRegister"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -68,6 +70,7 @@ export default function App() {
         <Route path={ROUTES.LOGIN} element={<Login />} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
+        <Route path={ROUTES.REFERRER_SELF_REGISTER} element={<ReferrerSelfRegister />} />
 
         {/* ── Authenticated routes ───────────────────────────────── */}
         <Route
@@ -133,6 +136,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
               <CsvUpload />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_INVITE_REFERRER}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminInviteReferrer />
             </ProtectedRoute>
           }
         />

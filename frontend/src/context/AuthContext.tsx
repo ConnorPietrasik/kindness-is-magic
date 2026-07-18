@@ -57,6 +57,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     queryClient.setQueryData(AUTH_KEY, null);
   }, [queryClient]);
 
+  const setUser = useCallback(
+    (updatedUser: User): void => {
+      queryClient.setQueryData(AUTH_KEY, updatedUser);
+    },
+    [queryClient]
+  );
+
   const isAdmin = user?.role === "admin";
   const isReferrer = user?.role === "referrer";
   const isFamily = user?.role === "family";
@@ -68,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading,
         login,
         logout,
+        setUser,
         checkAuth,
         isAdmin,
         isReferrer,

@@ -83,6 +83,11 @@ export default function Login() {
             Forgot your password?
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm">
+          <Link to={ROUTES.REFERRER_SELF_REGISTER} className="text-btn-start hover:underline">
+            Referrer self-registration
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ export const ROUTES = {
   LOGIN: "/login",
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password/:token",
+  REFERRER_SELF_REGISTER: "/register-referrer",
 
   // ── Dashboard (all authenticated roles) ────────────────────
   DASHBOARD: "/dashboard",
@@ -18,6 +19,7 @@ export const ROUTES = {
   REGISTER: "/register",
   ADMIN_REFERRERS: "/admin/referrers",
   ADMIN_REFERRER_FAMILIES: "/admin/referrers/:id/families",
+  ADMIN_INVITE_REFERRER: "/admin/invite-referrer",
   ADMIN_FAMILIES: "/admin/families",
   ADMIN_FAMILY_PEOPLE: "/admin/families/:id/people",
   ADMIN_PEOPLE: "/admin/people",
