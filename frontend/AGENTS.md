@@ -73,15 +73,16 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`)
 
 ## Shared CRUD Hook
 
-`src/hooks/useCrudManager.ts` encapsulates list/detail CRUD pages.
+`src/hooks/useCrudManager.ts` encapsulates list/detail CRUD pages. Reuse it instead of duplicating CRUD state management.
 
-- Reuse it instead of duplicating CRUD state management.
-- It handles queries, mutations, invalidation, and common UI state (form visibility, editing id, delete confirmation).
+## HierarchicalManage Component
+
+`src/components/HierarchicalManage.tsx` wraps `useCrudManager` for parent-detail + child-CRUD pages (e.g. referrer → families → people). Use it instead of manually composing parent queries + child CRUD. See `ReferrerFamilyDetail` for the pattern.
 
 ### Adding a New CRUD Page
 
 1. Add API functions to `src/lib/api.ts`
-2. Reuse `useCrudManager` for data fetching and mutations
+2. Reuse `useCrudManager` (flat lists) or `HierarchicalManage` (parent + children)
 3. Reuse existing table/form components from `src/components/`
 4. Add route in `src/lib/routes.ts` and lazy-loaded page in `src/App.tsx`
 5. Add Vitest tests for new logic; Playwright tests if user workflow changes
@@ -103,6 +104,7 @@ Only entries that encode conventions are listed here. The full directory tree is
 - `src/lib/api.ts` — Axios instance and all API functions. Do not call Axios directly from page components.
 - `src/lib/routes.ts` — Route constants and dynamic builders. Always use `ROUTES` constants rather than hardcoded strings.
 - `src/hooks/useCrudManager.ts` — Shared CRUD hook. Reuse it instead of duplicating CRUD state management.
+- `src/components/HierarchicalManage.tsx` — Shared parent-detail + child-CRUD wrapper. Use for hierarchical admin views (e.g. referrer → families → people).
 - Pages in `src/pages/` are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
 - Test files: `*.test.ts` / `*.test.tsx` alongside source, or in `src/__tests__/`.
 

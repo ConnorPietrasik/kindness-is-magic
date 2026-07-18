@@ -14,7 +14,9 @@ const ForgotPassword: LazyExoticComponent<ComponentType<unknown>> = lazy(() => i
 const ResetPassword: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ResetPassword"));
 const Dashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Dashboard"));
 const AdminReferrers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminReferrers"));
+const AdminReferrerFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminReferrerFamilies"));
 const AdminFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminFamilies"));
+const AdminFamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminFamilyPeople"));
 const AdminPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminPeople"));
 const CsvUpload: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/CsvUpload"));
 const ReferrerDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerDashboard"));
@@ -95,10 +97,26 @@ export default function App() {
           }
         />
         <Route
+          path={ROUTES.ADMIN_REFERRER_FAMILIES}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminReferrerFamilies />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path={ROUTES.ADMIN_FAMILIES}
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
               <AdminFamilies />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_FAMILY_PEOPLE}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminFamilyPeople />
             </ProtectedRoute>
           }
         />

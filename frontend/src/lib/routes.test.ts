@@ -15,7 +15,9 @@ describe("ROUTES constants", () => {
   it("has correct admin routes", () => {
     expect(ROUTES.REGISTER).toBe("/register");
     expect(ROUTES.ADMIN_REFERRERS).toBe("/admin/referrers");
+    expect(ROUTES.ADMIN_REFERRER_FAMILIES).toBe("/admin/referrers/:id/families");
     expect(ROUTES.ADMIN_FAMILIES).toBe("/admin/families");
+    expect(ROUTES.ADMIN_FAMILY_PEOPLE).toBe("/admin/families/:id/people");
     expect(ROUTES.ADMIN_PEOPLE).toBe("/admin/people");
     expect(ROUTES.ADMIN_CSV_UPLOAD).toBe("/admin/csv-upload");
   });
@@ -43,5 +45,15 @@ describe("route dynamic builders", () => {
   it("builds referrer family detail path with id", () => {
     expect(route.referrerFamilyDetail(42)).toBe("/referrer/families/42");
     expect(route.referrerFamilyDetail("family-7")).toBe("/referrer/families/family-7");
+  });
+
+  it("builds admin referrer families path with id", () => {
+    expect(route.adminReferrerFamilies(5)).toBe("/admin/referrers/5/families");
+    expect(route.adminReferrerFamilies("ref-3")).toBe("/admin/referrers/ref-3/families");
+  });
+
+  it("builds admin family people path with id", () => {
+    expect(route.adminFamilyPeople(12)).toBe("/admin/families/12/people");
+    expect(route.adminFamilyPeople("fam-7")).toBe("/admin/families/fam-7/people");
   });
 });

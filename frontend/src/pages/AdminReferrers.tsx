@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -26,6 +27,7 @@ import {
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
+import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
@@ -164,6 +166,12 @@ export default function AdminReferrers() {
                   )}
                   <Td>
                     <div className="flex gap-2">
+                      <Link
+                        to={route.adminReferrerFamilies(r.id)}
+                        className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                      >
+                        Manage
+                      </Link>
                       <Button
                         variant="secondary"
                         size="sm"

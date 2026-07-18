@@ -170,6 +170,11 @@ export function adminRestoreFamily(id: number): Promise<FamilyDetail> {
   return api.post(`/api/admin/families/${id}/restore`).then((res) => res.data);
 }
 
+export function adminListReferrerFamilies(rid: number, params?: PaginationParams): Promise<FamilyListResponse> {
+  if (params) return api.get("/api/admin/families", { params: { ...params, referrer_id: rid } }).then((res) => res.data);
+  return api.get("/api/admin/families", { params: { referrer_id: rid } }).then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
@@ -198,7 +203,8 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
   return api.post(`/api/admin/people/${id}/restore`).then((res) => res.data);
 }
 
-export function adminListFamilyPeople(fid: number): Promise<PersonListResponse> {
+export function adminListFamilyPeople(fid: number, params?: PaginationParams): Promise<PersonListResponse> {
+  if (params) return api.get("/api/admin/people", { params: { ...params, family_id: fid } }).then((res) => res.data);
   return api.get("/api/admin/people", { params: { family_id: fid } }).then((res) => res.data);
 }
 

@@ -17,7 +17,9 @@ export const ROUTES = {
   // ── Admin ──────────────────────────────────────────────────
   REGISTER: "/register",
   ADMIN_REFERRERS: "/admin/referrers",
+  ADMIN_REFERRER_FAMILIES: "/admin/referrers/:id/families",
   ADMIN_FAMILIES: "/admin/families",
+  ADMIN_FAMILY_PEOPLE: "/admin/families/:id/people",
   ADMIN_PEOPLE: "/admin/people",
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
 
@@ -40,4 +42,6 @@ export const ROUTES = {
 export const route = {
   resetPassword: (token: string) => `/reset-password/${token}`,
   referrerFamilyDetail: (id: number | string) => `/referrer/families/${id}`,
+  adminReferrerFamilies: (id: number | string) => `/admin/referrers/${id}/families`,
+  adminFamilyPeople: (id: number | string) => `/admin/families/${id}/people`,
 };

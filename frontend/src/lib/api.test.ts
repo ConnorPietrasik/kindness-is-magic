@@ -241,6 +241,28 @@ describe("admin people API functions", () => {
     await apiModule.adminListFamilyPeople(5);
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people", { params: { family_id: 5 } });
   });
+
+  it("adminListFamilyPeople with pagination — merges params with family_id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { people: [{ id: 1 }], total: 1, page: 1, page_size: 50, total_pages: 1 } });
+    await apiModule.adminListFamilyPeople(5, { page: 2, page_size: 25, include_deleted: true });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people", {
+      params: { page: 2, page_size: 25, include_deleted: true, family_id: 5 },
+    });
+  });
+
+  it("adminListReferrerFamilies — GET /api/admin/families?referrer_id=rid", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { families: [{ id: 1 }], total: 1, page: 1, page_size: 50, total_pages: 1 } });
+    await apiModule.adminListReferrerFamilies(3);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families", { params: { referrer_id: 3 } });
+  });
+
+  it("adminListReferrerFamilies with pagination — merges params with referrer_id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { families: [{ id: 1 }], total: 1, page: 1, page_size: 50, total_pages: 1 } });
+    await apiModule.adminListReferrerFamilies(3, { page: 2, page_size: 10 });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families", {
+      params: { page: 2, page_size: 10, referrer_id: 3 },
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
