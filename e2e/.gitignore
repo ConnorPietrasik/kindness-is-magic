@@ -1,0 +1,9 @@
+# Generated at runtime by globalSetup
+storage/*.json
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+
+# Node modules
+node_modules/

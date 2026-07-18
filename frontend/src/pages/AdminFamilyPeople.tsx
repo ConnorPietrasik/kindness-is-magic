@@ -110,6 +110,7 @@ export default function AdminFamilyPeople() {
           childQueryKey={peopleKey}
           childListFn={() => adminListFamilyPeople(famIdNum)}
           childDetailFn={getPerson}
+          childCreateNormaliseFn={(formData) => ({ ...formData, family_id: famIdNum }) as PersonPayload}
           childCreateApi={(data) => adminCreatePerson(data)}
           childUpdateApi={adminUpdatePerson}
           childDeleteApi={adminDeletePerson}

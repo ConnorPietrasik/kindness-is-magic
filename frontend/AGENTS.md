@@ -59,6 +59,7 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`)
 - Axios `withCredentials: true` sends cookies with every request.
 - On `401`, the Axios interceptor attempts a silent refresh via `POST /api/auth/refresh` with thundering-herd protection (single in-flight refresh, pending 401s retry afterward).
 - If refresh fails, the interceptor rejects — `AuthContext` sets `user=null` and React Router navigates to `/login` (no hard redirect).
+- `AuthContext` exposes `setUser(user)` for endpoints that auto-log the user in (e.g. referrer self-registration via invite).
 
 ## API Layer
 

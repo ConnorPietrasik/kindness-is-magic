@@ -25,3 +25,4 @@
 
 - `backend/` — FastAPI + SQLAlchemy backend (Python). See `backend/AGENTS.md`.
 - `frontend/` — React + Vite frontend (TypeScript). See `frontend/AGENTS.md`.
+- `e2e/` — Playwright end-to-end tests. See `e2e/AGENTS.md`.

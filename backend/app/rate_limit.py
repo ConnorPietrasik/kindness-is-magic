@@ -1,13 +1,23 @@
 """Rate limiter configuration — shared to avoid circular imports."""
 
+import os
+
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 
 def _rate_limit_key(request):
-    """Return None for test clients so tests aren't rate-limited."""
+    """Return None to skip rate-limiting in test/dev environments.
+
+    Pytest httpx clients report 'testclient'.  In Docker dev stacks the
+    requests come from internal container IPs (not localhost), so we also
+    disable rate-limiting when COOKIE_SECURE is not 'true' (i.e. non-production).
+    """
     addr = get_remote_address(request)
     if addr == "testclient":
+        return None
+    # Skip rate-limiting in non-production (dev + e2e test) environments
+    if os.environ.get("COOKIE_SECURE", "").lower() != "true":
         return None
     return addr
 
