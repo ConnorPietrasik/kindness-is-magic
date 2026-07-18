@@ -236,10 +236,10 @@ describe("admin people API functions", () => {
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/people/2");
   });
 
-  it("adminListFamilyPeople — GET /api/admin/families/:fid/people", async () => {
-    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
+  it("adminListFamilyPeople — GET /api/admin/people?family_id=fid", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { people: [{ id: 1 }], total: 1, page: 1, page_size: 50, total_pages: 1 } });
     await apiModule.adminListFamilyPeople(5);
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/5/people");
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people", { params: { family_id: 5 } });
   });
 });
 

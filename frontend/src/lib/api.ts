@@ -18,7 +18,6 @@ import type {
   PersonDetail,
   PersonListResponse,
   PersonPayload,
-  PersonSummary,
   ReferrerDetail,
   ReferrerListResponse,
   ReferrerPayload,
@@ -199,8 +198,8 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
   return api.post(`/api/admin/people/${id}/restore`).then((res) => res.data);
 }
 
-export function adminListFamilyPeople(fid: number): Promise<PersonSummary[]> {
-  return api.get(`/api/admin/families/${fid}/people`).then((res) => res.data);
+export function adminListFamilyPeople(fid: number): Promise<PersonListResponse> {
+  return api.get("/api/admin/people", { params: { family_id: fid } }).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
