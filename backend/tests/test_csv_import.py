@@ -456,3 +456,73 @@ Dedup Fam3,Alice,12,Coat,Game,,
         body = resp.json()
         assert body["summary"]["people"]["created"] == 2
         assert body["summary"]["people"]["skipped"] == 0
+
+
+# =========================================================================
+#  CSV import - display_name defaults
+# =========================================================================
+
+
+class TestCsvImportDisplayName:
+    def test_admin_user_gets_kindness_fairy(self, test_client: TestClient, admin_user, db: Session):
+        """Admin users imported via CSV get display_name='Kindness Fairy'."""
+        from app.models import User
+
+        csv_data = """# users
+email,password,role,referrer_name_or_id,family_name_or_id
+csv_admin@test.com,Password123!,admin,,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["users"]["created"] == 1
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "csv_admin@test.com").first()
+        assert user.display_name == "Kindness Fairy"
+
+    def test_referrer_user_gets_referrer_name(self, test_client: TestClient, admin_user, db: Session):
+        """Referrer users imported via CSV get display_name from referrer name."""
+        from app.models import User
+
+        csv_data = """# referrers
+name,family_limit,phone_number
+Csv Ref,5,555-0001
+
+# users
+email,password,role,referrer_name_or_id,family_name_or_id
+csv_ref@test.com,Password123!,referrer,Csv Ref,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["users"]["created"] == 1
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "csv_ref@test.com").first()
+        assert user.display_name == "Csv Ref"
+
+    def test_family_user_no_display_name_default(self, test_client: TestClient, admin_user, db: Session):
+        """Family users imported via CSV get no display_name default."""
+        from app.models import User
+
+        csv_data = """# referrers
+name,family_limit,phone_number
+Fam Ref,5,555-0001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Fam Ref,Fam Csv,Wish,Contact,,,
+
+# users
+email,password,role,referrer_name_or_id,family_name_or_id
+csv_fam@test.com,Password123!,family,,Fam Csv
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["users"]["created"] == 1
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "csv_fam@test.com").first()
+        assert user.display_name is None

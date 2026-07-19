@@ -12,8 +12,23 @@ cd "$SCRIPT_DIR"
 # Convenience: `./run-compose.sh test` runs tests and cleans up after.
 if [ "$1" = "test" ]; then
   shift
+  sudo docker compose --profile test down -v --remove-orphans 2>/dev/null
   sudo docker compose --profile test run --rm test "$@"
-  sudo docker compose --profile test down -v
+  sudo docker compose --profile test down -v --remove-orphans
+  exit $?
+fi
+
+# Convenience: `./run-compose.sh testdb` starts test_db attached (with logs),
+# and tears everything down when you Ctrl+C or it exits.
+if [ "$1" = "testdb" ]; then
+  shift
+  sudo docker compose --profile test down -v --remove-orphans 2>/dev/null
+  cleanup() {
+    sudo docker rm -f kindness-is-magic-test_db-1 2>/dev/null || true
+    sudo docker network rm kindness-is-magic_kindnet 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM
+  sudo docker compose --profile test up test_db "$@"
   exit $?
 fi
 

@@ -20,6 +20,7 @@ class UserCreate(BaseModel):
     email: str
     password: str = Field(..., min_length=8)
     role: UserRole
+    display_name: Optional[str] = Field(None, max_length=40)
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
 
@@ -119,6 +120,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     role: UserRole
+    display_name: Optional[str] = None
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
     is_active: bool

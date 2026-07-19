@@ -133,6 +133,50 @@ class TestInviteReferrerCreate:
         assert body["email_sent"] is False
         assert body["email_send_reason"] == "smtp_error"
 
+    def test_invite_email_uses_inviter_name(self, test_client: TestClient, admin_user, db):
+        """Invite email is built with the inviter's name."""
+        from unittest.mock import patch
+
+        admin_user.display_name = "Jane Admin"
+        db.commit()
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured_from_name = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_from_name["value"] = _kw.get("from_name")
+            return "<html></html>"
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "newref@example.com"},
+            )
+        assert resp.status_code == 201
+        assert captured_from_name["value"] == "Jane Admin"
+
+    def test_invite_email_defaults_to_kindness_fairy(self, test_client: TestClient, admin_user):
+        """Admin with no display_name defaults to 'Kindness Fairy' in invite."""
+        from unittest.mock import patch
+
+        assert admin_user.display_name is None
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured_from_name = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_from_name["value"] = _kw.get("from_name")
+            return "<html></html>"
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "newref@example.com"},
+            )
+        assert resp.status_code == 201
+        assert captured_from_name["value"] == "Kindness Fairy"
+
 
 # ---------------------------------------------------------------------------
 # TestReferrerSelfRegister — POST /api/auth/register-referrer

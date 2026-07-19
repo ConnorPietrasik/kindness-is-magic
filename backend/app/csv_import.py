@@ -662,10 +662,21 @@ def _process_users(
                 summary.users_errors += 1
             continue
 
+        # Resolve display_name: CSV value takes precedence, then role-based default
+        display_name: str | None = rec.get("display_name", "").strip() or None
+        if display_name is None:
+            if role == UserRole.admin:
+                display_name = "Kindness Fairy"
+            elif role == UserRole.referrer and referrer_id:
+                ref = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+                if ref:
+                    display_name = ref.name
+
         user = User(
             email=email,
             hashed_password=get_password_hash(password),
             role=role,
+            display_name=display_name,
             referrer_id=referrer_id,
             family_id=family_id,
             is_active=True,

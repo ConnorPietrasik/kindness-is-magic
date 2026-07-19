@@ -42,16 +42,16 @@ The Lee Family,Ethan,8,Backpack,Card games like Uno,son,
 The Lee Family,Grace,4,Coat and boots,Magnetic drawing board,daughter,
 
 # users
-email,password,role,referrer_name_or_id,family_name_or_id
-sarah.chen@example.com,Password123!,referrer,Sarah Chen,
-marcus.johnson@example.com,Password123!,referrer,Marcus Johnson,
-aisha.patel@example.com,Password123!,referrer,Aisha Patel,
-david.okonkwo@example.com,Password123!,referrer,David Okonkwo,
-emily.williams@example.com,Password123!,family,,The Williams Family
-luis.rodriguez@example.com,Password123!,family,,The Rodriguez Family
-tasha.thompson@example.com,Password123!,family,,The Thompson Family
-hyun.kim@example.com,Password123!,family,,The Kim Family
-carlos.garcia@example.com,Password123!,family,,The Garcia Family
-tran.nguyen@example.com,Password123!,family,,The Nguyen Family
-chidinma.okafor@example.com,Password123!,family,,The Okafor Family
-jane.lee@example.com,Password123!,family,,The Lee Family
+email,password,role,referrer_name_or_id,family_name_or_id,display_name
+sarah.chen@example.com,Password123!,referrer,Sarah Chen,,SARAH THE TESTER
+marcus.johnson@example.com,Password123!,referrer,Marcus Johnson,,
+aisha.patel@example.com,Password123!,referrer,Aisha Patel,,Aisha
+david.okonkwo@example.com,Password123!,referrer,David Okonkwo,,Dave
+emily.williams@example.com,Password123!,family,,The Williams Family,
+luis.rodriguez@example.com,Password123!,family,,The Rodriguez Family,
+tasha.thompson@example.com,Password123!,family,,The Thompson Family,
+hyun.kim@example.com,Password123!,family,,The Kim Family,
+carlos.garcia@example.com,Password123!,family,,The Garcia Family,
+tran.nguyen@example.com,Password123!,family,,The Nguyen Family,
+chidinma.okafor@example.com,Password123!,family,,The Okafor Family,
+jane.lee@example.com,Password123!,family,,The Lee Family,

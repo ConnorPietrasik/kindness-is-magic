@@ -47,6 +47,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
+def _resolve_display_name(role: UserRole, referrer_name: str | None = None) -> str | None:
+    """Return the default display_name for a user based on role.
+
+    * admin → "Kindness Fairy"
+    * referrer → referrer's name (if provided)
+    * family → None
+    """
+    if role == UserRole.admin:
+        return "Kindness Fairy"
+    if role == UserRole.referrer and referrer_name:
+        return referrer_name
+    return None
+
+
+def _get_inviter_name(user: User, db: Session) -> str | None:
+    """Derive the sender name for invite emails from the authenticated user."""
+    if user.display_name:
+        return user.display_name
+    if user.role == UserRole.admin:
+        return "Kindness Fairy"
+    if user.role == UserRole.referrer and user.referrer_id:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
+        if ref:
+            return ref.name
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Unsubscribe (public, no auth)
 # ---------------------------------------------------------------------------
@@ -125,10 +153,21 @@ def register(
                 detail=f"Referrer with id={data.referrer_id} not found",
             )
 
+    # Resolve display_name: use provided value or apply role-based default
+    display_name = data.display_name
+    if display_name is None:
+        referrer_name = None
+        if data.referrer_id is not None:
+            ref = db.query(Referrer).filter(Referrer.id == data.referrer_id).first()
+            if ref:
+                referrer_name = ref.name
+        display_name = _resolve_display_name(data.role, referrer_name)
+
     user = User(
         email=data.email,
         hashed_password=get_password_hash(data.password),
         role=data.role,
+        display_name=display_name,
         referrer_id=data.referrer_id,
         family_id=data.family_id,
     )
@@ -377,10 +416,12 @@ def invite_referrer(
     email_sent: bool | None = None
     email_send_reason: str | None = None
     if data.email:
+        inviter_name = _get_inviter_name(_admin, db)
         html_body = build_invite_email(
             code=code,
             family_limit=data.family_limit,
             expires_at=expires_at,
+            from_name=inviter_name,
         )
         result = send_email(
             to=data.email,
@@ -443,6 +484,7 @@ def register_referrer(
         email=data.email,
         hashed_password=get_password_hash(data.password),
         role=UserRole.referrer,
+        display_name=data.name,
         referrer_id=referrer.id,
         is_active=True,
     )

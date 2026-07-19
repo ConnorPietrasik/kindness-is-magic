@@ -155,15 +155,22 @@ def build_invite_email(
     code: str,
     family_limit: int,
     expires_at: datetime,
+    from_name: str | None = None,
     unsubscribe_url: str | None = None,
 ) -> str:
     """Build the HTML body for a referrer invite email."""
     expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
     base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
-    return f"""<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>
-<p>We'd love your help connecting families in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
+    from_line = (
+        f"<p>You've been invited by <strong>{from_name}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
+        if from_name
+        else "<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
+    )
+    family_word = "family" if family_limit == 1 else "families"
+    return f"""{from_line}
+<p>We'd love your help connecting {family_word} in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
-<p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> famil{"y" if family_limit == 1 else "ies"} with the kindness they need most.</p>
+<p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most.</p>
 <p>This invite expires on <strong>{expires_str}</strong>.</p>
 <p style="text-align:center;"><a href="{base}/register-referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
 <p style="margin-top:16px;">Thank you for being part of something wonderful. Together, we can make kindness magical.</p>"""

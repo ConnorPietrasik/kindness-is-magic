@@ -1,8 +1,12 @@
 Add more admin views - sort by wishes, sort families by size, etc
-Add some sort of "purchased" checkbox for each wish, maybe a date or a field to enter a receipt? Need to verify specifics of that
 Add family wish-lists - Family ID, family_name, family_wish, then each person name, age, practical_wish, fun_wish, maybe note depending on space
 Add ability for referrers to invite families with their limit. Each referrer has their own code and then they have to approve each family that signs up using it (they aren't counted toward the limit until approved)
 Add donor users - able to see families, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
-Approval process for referrers to approve their families' wishes and maybe additional admin approval
 More detailed audit logs
 Automated database backups
+
+Things that need clarification:
+Add a way for admins to create other admins? Or maybe like a sub-admin...
+Add some sort of "purchased" marker for each gift. Maybe a date and purchased_by?
+Clarify if admins should have to approve referrers that they invited
+Approval process for referrers to approve their families' wishes and maybe additional admin approval

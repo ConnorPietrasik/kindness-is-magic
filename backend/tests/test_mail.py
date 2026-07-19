@@ -201,6 +201,29 @@ class TestEmailTemplates:
         assert "family." in html
         assert "families" not in html
 
+    def test_invite_email_with_from_name(self):
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-NAMED",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            from_name="Jane Smith",
+        )
+        assert "Jane Smith" in html
+        assert "invited by" in html
+
+    def test_invite_email_without_from_name(self):
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-GENERIC",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+        )
+        assert "invited by" not in html
+        assert "You're invited" in html
+
     def test_password_reset_email_contains_link(self):
         from app.mail import build_password_reset_email
 

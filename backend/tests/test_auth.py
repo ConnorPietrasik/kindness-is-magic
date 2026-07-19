@@ -686,3 +686,87 @@ class TestAuthCookies:
         test_client.post("/api/auth/logout")
         resp = test_client.get("/api/auth/me")
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Display name
+# ---------------------------------------------------------------------------
+
+
+class TestDisplayName:
+    def test_register_admin_defaults_to_kindness_fairy(self, test_client: TestClient, admin_user, db: Session):
+        """Admin users created via register get display_name='Kindness Fairy'."""
+        from app.models import User
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "newadmin@test.com",
+                "password": "NewAdminPass1!",
+                "role": "admin",
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["display_name"] == "Kindness Fairy"
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "newadmin@test.com").first()
+        assert user.display_name == "Kindness Fairy"
+
+    def test_register_referrer_defaults_to_referrer_name(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Referrer users created via register get display_name from referrer name."""
+        from app.models import User
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "newref@test.com",
+                "password": "NewRefPass1!",
+                "role": "referrer",
+                "referrer_id": referrer_record.id,
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["display_name"] == referrer_record.name
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "newref@test.com").first()
+        assert user.display_name == referrer_record.name
+
+    def test_register_explicit_display_name(self, test_client: TestClient, admin_user, db: Session):
+        """Explicit display_name overrides the default."""
+        from app.models import User
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "custom@test.com",
+                "password": "CustomPass1!",
+                "role": "admin",
+                "display_name": "Custom Name",
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["display_name"] == "Custom Name"
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "custom@test.com").first()
+        assert user.display_name == "Custom Name"
+
+    def test_register_family_no_display_name_default(self, test_client: TestClient, admin_user, family_record):
+        """Family users get no display_name default."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "newfam@test.com",
+                "password": "NewFamPass1!",
+                "role": "family",
+                "family_id": family_record.id,
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["display_name"] is None

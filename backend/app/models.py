@@ -40,6 +40,7 @@ class User(Base):
         return value.strip().lower()
 
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False)
     referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="SET NULL"), nullable=True)
     family_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("family.id", ondelete="SET NULL"), nullable=True)
