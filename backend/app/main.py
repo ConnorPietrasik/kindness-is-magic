@@ -141,9 +141,12 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 # ---------------------------------------------------------------------------
 # CORS — required for HttpOnly cookie auth from a different origin
 # ---------------------------------------------------------------------------
+_cors_origins = [os.environ.get("APP_BASE_URL", "http://localhost:3000")]
+if os.environ.get("DEBUG", "false").lower() == "true":
+    _cors_origins.extend(["http://localhost", "http://localhost:3000"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:3000"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
