@@ -124,7 +124,7 @@ services:
     networks:
       - kindnet
     command: >
-      sh -c "pip install -r requirements-test.txt && pytest --tb=short -v"
+      sh -c "pip install -r requirements-test.txt && pytest -n auto --tb=short -v"
 
 volumes:
   kindness_is_magic:

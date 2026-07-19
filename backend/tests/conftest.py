@@ -36,7 +36,36 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test",
 )
 
+def _get_worker_schema():
+    """Return a per-worker schema name when running under xdist, else None."""
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+    if worker_id:
+        return f"test_{worker_id}"
+    return None
+
+
+_engine_schema = _get_worker_schema()
+
 engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+
+# Use event listener to set search_path on every connection so xdist
+# workers each operate on their own schema and don't collide on unique
+# constraints.
+if _engine_schema:
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _set_search_path(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute(f'SET search_path TO "{_engine_schema}"')
+        cursor.close()
+
+    # Pre-create the schema so the first connection doesn't fail
+    with engine.connect() as conn:
+        conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{_engine_schema}"'))
+        conn.commit()
+
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -91,7 +120,11 @@ def _env_isolation(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture(scope="session")
 def _setup_test_schema() -> Generator[None, None, None]:
     """Create all tables and seed required data once at the start of the test
-    session, then tear everything down at the end."""
+    session, then tear everything down at the end.
+
+    When running under xdist, each worker gets its own schema (set via
+    search_path) so parallel tests don't collide on unique constraints.
+    """
     from app.models import Base
     from app import models  # noqa: F401 — register all model metadata
 
@@ -100,6 +133,11 @@ def _setup_test_schema() -> Generator[None, None, None]:
     yield
 
     Base.metadata.drop_all(bind=engine)
+    # Drop the per-worker schema if we created one
+    if _engine_schema:
+        with engine.connect() as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{_engine_schema}" CASCADE'))
+            conn.commit()
 
 
 @pytest.fixture()
@@ -131,9 +169,15 @@ def db(_setup_test_schema: None) -> Generator[Session, Any, None]:
 
 @pytest.fixture()
 def test_client(db: Session) -> Generator[Any, Any, None]:
-    """Yield a synchronous TestClient bound to the Postgres test DB."""
+    """Yield a synchronous TestClient bound to the Postgres test DB.
+
+    Patches both database.get_db (used by route handlers) and
+    SessionLocal (used directly by mail.py) so that all database
+    access goes through the test session.
+    """
     from app.main import app
     from app import database
+    import app.mail as mail_module
 
     # Patch the DB dependency at the module level
 
@@ -142,12 +186,25 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
 
     app.dependency_overrides[database.get_db] = _override_get_db
 
+    # Patch SessionLocal in both database.py and mail.py (mail imports
+    # its own copy at module level).
+    _original_db_session_local = database.SessionLocal
+    _original_mail_session_local = mail_module.SessionLocal
+
+    def _test_session_local(**kwargs):
+        return db
+
+    database.SessionLocal = _test_session_local  # type: ignore[assignment]
+    mail_module.SessionLocal = _test_session_local  # type: ignore[assignment]
+
     from fastapi.testclient import TestClient
 
     with TestClient(app) as client:
         yield client
 
     app.dependency_overrides.clear()
+    database.SessionLocal = _original_db_session_local  # type: ignore[assignment]
+    mail_module.SessionLocal = _original_mail_session_local  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
