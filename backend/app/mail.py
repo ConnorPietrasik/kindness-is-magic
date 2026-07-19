@@ -130,7 +130,7 @@ def send_email(
 # HTML wrappers
 # ---------------------------------------------------------------------------
 
-_BRAND_COLOR = "#4a6741"  # muted green
+_BRAND_COLOR = "#4c1d95"  # brand-dark (matches frontend palette)
 
 
 def _wrap_email(body_html: str, unsubscribe_url: str | None) -> str:
@@ -143,7 +143,7 @@ def _wrap_email(body_html: str, unsubscribe_url: str | None) -> str:
     if unsubscribe_url:
         footer = f"""<div style="font-family:Arial,sans-serif;padding:16px 24px;text-align:center;font-size:12px;color:#999999;border-top:1px solid #eeeeee;">\n  If you no longer wish to receive these emails, <a href="{unsubscribe_url}" style="color:#999999;">click here to unsubscribe</a>.\n</div>"""
 
-    return f"""<html><body style="margin:0;padding:0;background-color:#f9f9f9;">\n<table style="max-width:600px;margin:0 auto;background-color:#ffffff;width:100%%;border-collapse:collapse;" cellpadding="0" cellspacing="0">\n<tr><td>\n{header}\n{content}\n{footer}\n</td></tr>\n</table>\n</body></html>"""
+    return f"""<html><body style="margin:0;padding:0;background-color:#f9f9f9;">\n<table style="max-width:600px;margin:0 auto;background-color:#ffffff;width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">\n<tr><td>\n{header}\n{content}\n{footer}\n</td></tr>\n</table>\n</body></html>"""
 
 
 # ---------------------------------------------------------------------------
@@ -160,12 +160,13 @@ def build_invite_email(
     """Build the HTML body for a referrer invite email."""
     expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
     base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
-    return f"""<p>You've been invited to join <strong>Kindness Is Magic</strong> as a referrer.</p>
-<p>Use the invite code below to create your account:</p>
+    return f"""<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>
+<p>We'd love your help connecting families in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
-<p>Your referrer account will allow up to <strong>{family_limit}</strong> famil{"y" if family_limit == 1 else "ies"}.</p>
-<p>This invite code expires on <strong>{expires_str}</strong>.</p>
-<p style="text-align:center;"><a href="{base}/register-referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Register Now</a></p>"""
+<p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> famil{"y" if family_limit == 1 else "ies"} with the kindness they need most.</p>
+<p>This invite expires on <strong>{expires_str}</strong>.</p>
+<p style="text-align:center;"><a href="{base}/register-referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
+<p style="margin-top:16px;">Thank you for being part of something wonderful. Together, we can make kindness magical.</p>"""
 
 
 def build_password_reset_email(reset_link: str) -> str:
