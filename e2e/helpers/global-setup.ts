@@ -8,6 +8,7 @@
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
 import { seedDatabaseViaApi } from "./api";
+import { getAdminEmail, getAdminPassword } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
   const browser = await chromium.launch();
@@ -38,8 +39,8 @@ async function globalSetup(_config: FullConfig): Promise<void> {
 
     /* 3. Generate storageState files for each role */
     await saveStorageState(browser, "admin", {
-      email: "connor@kindnessismagic.love",
-      password: "NoHaxPlz69420",
+      email: getAdminEmail(),
+      password: getAdminPassword(),
     });
     await saveStorageState(browser, "referrer", {
       email: "sarah.chen@example.com",

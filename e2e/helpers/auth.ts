@@ -1,12 +1,13 @@
 import type { Page } from "@playwright/test";
+import { getAdminEmail, getAdminPassword } from "./env";
 
 /**
  * Shared test credentials from .env + demo_import.csv.
  */
 export const CREDENTIALS = {
   admin: {
-    email: "connor@kindnessismagic.love",
-    password: "NoHaxPlz69420",
+    email: getAdminEmail(),
+    password: getAdminPassword(),
   },
   referrer: {
     email: "sarah.chen@example.com",

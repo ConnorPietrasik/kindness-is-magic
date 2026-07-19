@@ -2,6 +2,7 @@ import type { APIRequestContext } from "@playwright/test";
 import fs from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getAdminEmail, getAdminPassword } from "./env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,8 +24,8 @@ export async function seedDatabaseViaApi(request: APIRequestContext): Promise<vo
   // 1. Login as admin to get auth cookies
   await request.post("/api/auth/login", {
     data: {
-      email: "connor@kindnessismagic.love",
-      password: "NoHaxPlz69420",
+      email: getAdminEmail(),
+      password: getAdminPassword(),
     },
   });
 
