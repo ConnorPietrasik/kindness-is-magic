@@ -76,7 +76,7 @@ def _env_isolation(monkeypatch: pytest.MonkeyPatch):
     """Strip env vars that would leak real credentials / production DB."""
     monkeypatch.delenv("ADMIN_EMAIL", raising=False)
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
-    monkeypatch.setenv("COOKIE_SECURE", "false")
+    monkeypatch.setenv("DEBUG", "true")
     # Ensure our test DATABASE_URL and secrets are set
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-do-not-use")

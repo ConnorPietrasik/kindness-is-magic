@@ -113,19 +113,20 @@ def decode_refresh_token(token: str) -> dict:
 # Cookie helpers
 # ---------------------------------------------------------------------------
 
-# Detect production (HTTPS) vs development (HTTP) via an env var
-_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
-
-
 def set_auth_cookies(response, access_token: str, refresh_token: str):
-    """Set HttpOnly cookies for access and refresh tokens on a Response object."""
+    """Set HttpOnly cookies for access and refresh tokens on a Response object.
+
+    Reads DEBUG from os.environ at call time so test monkeypatching works
+    regardless of when the app modules were first imported.
+    """
+    _debug = os.environ.get("DEBUG", "false").lower() == "true"
 
     response.set_cookie(
         key="access_token",
         value=access_token,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
-        secure=_SECURE,
+        secure=not _debug,
         samesite="lax",
         path="/",
     )
@@ -134,7 +135,7 @@ def set_auth_cookies(response, access_token: str, refresh_token: str):
         value=refresh_token,
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         httponly=True,
-        secure=_SECURE,
+        secure=not _debug,
         samesite="lax",
         path="/",
     )

@@ -62,7 +62,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 
 ## Config
 
-See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `COOKIE_SECURE`, invite expiry.
+See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `DEBUG`, invite expiry.
 
 ## Running Tests
 

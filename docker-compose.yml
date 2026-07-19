@@ -115,7 +115,7 @@ services:
       DATABASE_URL: postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test
       SECRET_KEY: test-secret-key-do-not-use
       REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use
-      COOKIE_SECURE: "false"
+      DEBUG: "true"
     depends_on:
       test_db:
         condition: service_healthy
