@@ -113,8 +113,8 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test
-      SECRET_KEY: test-secret-key-do-not-use
-      REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use
+      SECRET_KEY: test-secret-key-do-not-use-in-production-aaaabbbbccccdddd
+      REFRESH_SECRET_KEY: test-refresh-secret-key-do-not-use-in-production-aaaabbbbccccdddd
       DEBUG: "true"
     depends_on:
       test_db:

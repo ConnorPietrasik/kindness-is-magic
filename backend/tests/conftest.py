@@ -84,8 +84,8 @@ def _env_isolation(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DEBUG", "true")
     # Ensure our test DATABASE_URL and secrets are set
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key-do-not-use")
-    monkeypatch.setenv("REFRESH_SECRET_KEY", "test-refresh-secret-key-do-not-use")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-do-not-use-in-production-aaaabbbbccccdddd")
+    monkeypatch.setenv("REFRESH_SECRET_KEY", "test-refresh-secret-key-do-not-use-in-production-aaaabbbbccccdddd")
 
 
 @pytest.fixture(scope="session")

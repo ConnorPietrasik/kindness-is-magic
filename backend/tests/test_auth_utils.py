@@ -85,6 +85,7 @@ class TestAccessToken:
             decode_access_token("eyJhbGciOiJIUzI1NiJ9.tampered.bad")
         assert exc_info.value.status_code == 401
 
+    @pytest.mark.filterwarnings("ignore:The HMAC key is \\d+ bytes long")
     def test_token_signed_with_wrong_key_raises(self):
         from fastapi import HTTPException
 

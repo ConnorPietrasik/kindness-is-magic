@@ -1,9 +1,9 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
+fastapi==0.139.2
+uvicorn[standard]==0.51.0
 psycopg[binary]
-sqlalchemy==2.0.27
-alembic==1.13.1
-PyJWT==2.8.0
-bcrypt==4.1.2
-slowapi==0.1.9
-fastapi-mail==1.4.2
+sqlalchemy==2.0.51
+alembic==1.18.5
+PyJWT==2.13.0
+bcrypt==5.0.0
+slowapi==0.1.10
+fastapi-mail==1.6.5

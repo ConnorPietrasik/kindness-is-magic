@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 import jwt
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -325,6 +326,7 @@ class TestUnsubscribeEndpoint:
         resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
         assert resp.status_code == 200
 
+    @pytest.mark.filterwarnings("ignore:The HMAC key is \\d+ bytes long")
     def test_unsubscribe_tampered_token_rejected(self, test_client: TestClient):
         """A token signed with a different key should be rejected."""
         bad_token = jwt.encode({"email": "hacker@example.com"}, "wrong-secret", algorithm=ALGORITHM)
