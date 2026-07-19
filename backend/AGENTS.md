@@ -79,7 +79,7 @@ Before running tests, verify the DB is reachable:
 
 If that fails, ask the user to start the test DB. Once it's up, run tests via the persistent venv at `/dockerx/.venv`. Save output to a temp file so you can inspect it without rerunning:
 ```bash
-cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://KindDB:testpassword@localhost:5433/kindness_is_magic_test" /dockerx/.venv/bin/pytest -q --tb=short > /tmp/test-output.txt 2>&1
+cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://KindDB:testpassword@localhost:5433/kindness_is_magic_test" /dockerx/.venv/bin/pytest -n auto -q --tb=short > /tmp/test-output.txt 2>&1
 ```
 
 Then read the summary with `tail -5 /tmp/test-output.txt`. If there are failures, read more of the file to inspect tracebacks.
@@ -95,7 +95,7 @@ After making code changes:
 
 ## Validation
 
-- Tests in `tests/` use **pytest** + **httpx** (async test client). See "Running Tests" above.
+- Tests in `tests/` use **pytest** + **httpx** + **pytest-xdist**. See "Running Tests" above.
 
 - Use `ruff check .` and `ruff format --check .` to validate code quality. You can also use `python3 -c "import ..."` to verify imports and basic logic.
 

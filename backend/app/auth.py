@@ -14,8 +14,8 @@ from app.database import get_db
 # ---------------------------------------------------------------------------
 # Configuration (from environment)
 # ---------------------------------------------------------------------------
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
-REFRESH_SECRET_KEY = os.environ.get("REFRESH_SECRET_KEY", "dev-refresh-secret-key-change-me")
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me-in-production-aaaabbbbccccdddd")
+REFRESH_SECRET_KEY = os.environ.get("REFRESH_SECRET_KEY", "dev-refresh-secret-key-change-me-in-production-aaaabbbbccccdddd")
 ALGORITHM = "HS256"
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
