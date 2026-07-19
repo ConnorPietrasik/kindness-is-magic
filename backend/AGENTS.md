@@ -33,6 +33,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `permissions.py` | Role-check and ownership-check dependencies |
 | `response_builders.py` | Response dict construction |
 | `user_validation.py` | Shared user registration validation logic |
+| `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
 | `admin_routes.py` | Admin CRUD for referrers, families, people |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
@@ -62,7 +63,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 
 ## Config
 
-See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `DEBUG`, invite expiry.
+See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `DEBUG`, invite expiry, SMTP mail settings, `APP_BASE_URL`.
 
 ## Running Tests
 

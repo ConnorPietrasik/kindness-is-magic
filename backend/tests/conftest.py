@@ -24,6 +24,11 @@ from sqlalchemy.orm import Session, sessionmaker
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ---------------------------------------------------------------------------
+# Suppress email sending in tests (set before any app imports)
+# ---------------------------------------------------------------------------
+os.environ.setdefault("SUPPRESS_SEND", "1")
+
+# ---------------------------------------------------------------------------
 # Postgres test engine (connects to the test_db docker service)
 # ---------------------------------------------------------------------------
 TEST_DATABASE_URL = os.environ.get(

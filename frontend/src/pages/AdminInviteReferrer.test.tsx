@@ -11,6 +11,17 @@ const mockInvite: ReferrerInviteResponse = {
   family_limit: 10,
   expires_at: "2025-01-15T12:00:00Z",
   created_at: "2025-01-14T12:00:00Z",
+  email_sent: null,
+  email_send_reason: null,
+};
+
+const mockInviteWithEmail: ReferrerInviteResponse = {
+  code: "KMG-B8Y0Q3",
+  family_limit: 10,
+  expires_at: "2025-01-15T12:00:00Z",
+  created_at: "2025-01-14T12:00:00Z",
+  email_sent: true,
+  email_send_reason: null,
 };
 
 const wrap = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -21,9 +32,10 @@ describe("AdminInviteReferrer", () => {
     cleanup();
   });
 
-  it("renders the form with family limit field", () => {
+  it("renders the form with family limit and email fields", () => {
     wrap(<AdminInviteReferrer />);
     expect(screen.getByLabelText("Family Limit")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email (optional)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate Invite Code" })).toBeInTheDocument();
   });
 
@@ -49,8 +61,52 @@ describe("AdminInviteReferrer", () => {
       expect(screen.getByText("KMG-A7X9P2")).toBeInTheDocument();
     });
 
-    expect(api.createReferrerInvite).toHaveBeenCalledWith({ family_limit: 10 });
+    expect(api.createReferrerInvite).toHaveBeenCalledWith({ family_limit: 10, email: null });
     expect(screen.getByText("Invite Code Generated")).toBeInTheDocument();
+  });
+
+  it("sends email when email field is provided", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "createReferrerInvite").mockResolvedValue(mockInviteWithEmail);
+    const { container } = wrap(<AdminInviteReferrer />);
+
+    await user.type(screen.getByLabelText("Family Limit"), "10");
+    await user.type(screen.getByLabelText("Email (optional)"), "newref@example.com");
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() => {
+      expect(screen.getByText("KMG-B8Y0Q3")).toBeInTheDocument();
+    });
+
+    expect(api.createReferrerInvite).toHaveBeenCalledWith({
+      family_limit: 10,
+      email: "newref@example.com",
+    });
+    expect(screen.getByText("Email sent successfully.")).toBeInTheDocument();
+  });
+
+  it("shows email failure message when email send fails", async () => {
+    const user = userEvent.setup();
+    const mockFailInvite: ReferrerInviteResponse = {
+      code: "KMG-C9Z1R4",
+      family_limit: 5,
+      expires_at: "2025-01-15T12:00:00Z",
+      created_at: "2025-01-14T12:00:00Z",
+      email_sent: false,
+      email_send_reason: "smtp_error",
+    };
+    vi.spyOn(api, "createReferrerInvite").mockResolvedValue(mockFailInvite);
+    const { container } = wrap(<AdminInviteReferrer />);
+
+    await user.type(screen.getByLabelText("Family Limit"), "5");
+    await user.type(screen.getByLabelText("Email (optional)"), "fail@example.com");
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() => {
+      expect(screen.getByText("KMG-C9Z1R4")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Email not sent: smtp_error")).toBeInTheDocument();
   });
 
   it("shows error message when API call fails", async () => {

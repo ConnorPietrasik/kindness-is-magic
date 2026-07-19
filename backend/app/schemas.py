@@ -70,6 +70,14 @@ class ReferrerInviteCreate(BaseModel):
     """Admin: create an invite token."""
 
     family_limit: int = Field(..., ge=1, le=999)
+    email: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return validate_email(v)
 
 
 class ReferrerSelfRegister(BaseModel):
@@ -126,6 +134,8 @@ class ReferrerInviteResponse(BaseModel):
     family_limit: int
     expires_at: datetime
     created_at: datetime
+    email_sent: bool | None = None
+    email_send_reason: str | None = None
 
     model_config = {"from_attributes": True}
 

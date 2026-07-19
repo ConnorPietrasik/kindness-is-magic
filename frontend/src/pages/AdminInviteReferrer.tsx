@@ -12,6 +12,7 @@ import type { ReferrerInviteResponse } from "../types";
 
 export default function AdminInviteReferrer() {
   const [familyLimit, setFamilyLimit] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
@@ -29,7 +30,10 @@ export default function AdminInviteReferrer() {
 
     setLoading(true);
     try {
-      const result = await createReferrerInvite({ family_limit: limit });
+      const result = await createReferrerInvite({
+        family_limit: limit,
+        email: email.trim() || null,
+      });
       setInvite(result);
     } catch (err: unknown) {
       setError(formatApiError(err, "Failed to create invite."));
@@ -72,6 +76,15 @@ export default function AdminInviteReferrer() {
                 placeholder: "e.g. 10",
               }}
             />
+            <FormField
+              label="Email (optional)"
+              type="email"
+              fieldProps={{
+                value: email,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
+                placeholder: "referrer@example.com",
+              }}
+            />
             <Button type="submit" loading={loading}>
               {loading ? "Generating…" : "Generate Invite Code"}
             </Button>
@@ -99,6 +112,18 @@ export default function AdminInviteReferrer() {
                 <div className="text-lg font-semibold text-gray-900">{formatDate(invite.expires_at)}</div>
               </div>
             </div>
+
+            {invite.email_sent !== null && (
+              <div
+                className={`mt-3 rounded-lg p-3 shadow-sm ${
+                  invite.email_sent ? "bg-green-50 text-green-800" : "bg-yellow-50 text-yellow-800"
+                }`}
+              >
+                <div className="text-sm font-medium">
+                  {invite.email_sent ? "Email sent successfully." : `Email not sent: ${invite.email_send_reason ?? "unknown error"}`}
+                </div>
+              </div>
+            )}
           </Card>
         )}
 

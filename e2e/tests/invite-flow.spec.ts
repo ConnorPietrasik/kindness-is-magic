@@ -63,6 +63,36 @@ test.describe("Invite and self-registration", () => {
     await guestContext.close();
   });
 
+  test("admin generates invite with email and sees send confirmation", async ({ browser }) => {
+    const adminContext = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage = await adminContext.newPage();
+    await adminPage.goto("/admin/invite-referrer");
+    await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
+
+    /* Fill family limit, email, and generate */
+    await adminPage.getByLabel("Family Limit").fill("3");
+    await adminPage.getByLabel("Email (optional)").fill(`e2e-email-invite-${SUFFIX}@example.com`);
+    await adminPage.getByRole("button", { name: "Generate Invite Code" }).click();
+
+    /* Wait for invite code display */
+    const inviteCodeBox = adminPage.getByText("Invite Code Generated");
+    await expect(inviteCodeBox).toBeVisible({ timeout: 10_000 });
+
+    /* Verify the invite code is displayed */
+    const codeElement = adminPage.locator("div.font-mono.font-bold");
+    const inviteCode = (await codeElement.textContent())!.trim();
+    expect(inviteCode).toMatch(/^KMG-/);
+
+    /* Verify email sent confirmation is shown (SUPPRESS_SEND=1 in test env) */
+    await expect(adminPage.getByText("Email sent successfully.")).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await adminContext.close();
+  });
+
   test("used invite code is rejected", async ({ browser }) => {
     /* First, generate a fresh invite code as admin */
     const adminContext = await browser.newContext({

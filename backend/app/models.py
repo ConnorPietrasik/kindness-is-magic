@@ -143,3 +143,12 @@ class Person(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
+
+
+class EmailPreference(Base):
+    """Unsubscribe blocklist — rows created when a user clicks an unsubscribe link."""
+
+    __tablename__ = "email_preferences"
+
+    email: Mapped[str] = mapped_column(String(120), primary_key=True, index=True)
+    unsubscribed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

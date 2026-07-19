@@ -1,14 +1,18 @@
 """Authentication routes: /api/auth/*"""
 
 import logging
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
     INVITE_EXPIRY_HOURS,
+    SECRET_KEY,
+    ALGORITHM,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
@@ -20,7 +24,7 @@ from app.auth import (
     get_current_user,
 )
 from app.database import get_db
-from app.models import User, UserRole, PasswordResetToken, Referrer, Family, ReferrerInviteToken
+from app.models import User, UserRole, PasswordResetToken, Referrer, Family, ReferrerInviteToken, EmailPreference
 from app.permissions import require_admin
 from app.schemas import (
     UserCreate,
@@ -35,12 +39,50 @@ from app.schemas import (
     ReferrerSelfRegisterResponse,
     ReferrerSummary,
 )
+from app.mail import send_email, build_invite_email, build_password_reset_email
 from app.rate_limit import limiter
 from app.user_validation import validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# ---------------------------------------------------------------------------
+# Unsubscribe (public, no auth)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/unsubscribe")
+@limiter.limit("5/minute")
+def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
+    """Unsubscribe an email address from marketing emails.
+
+    No authentication required. Rate-limited to 5/minute.
+    Accepts a signed JWT token (no expiry) embedding the email.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+
+    email: str | None = payload.get("email")
+    if not email or not isinstance(email, str):
+        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+
+    email_lower = email.strip().lower()
+    now = datetime.now(timezone.utc)
+
+    # Upsert: insert or update unsubscribed_at
+    existing = db.query(EmailPreference).filter(EmailPreference.email == email_lower).first()
+    if existing:
+        existing.unsubscribed_at = now
+    else:
+        db.add(EmailPreference(email=email_lower, unsubscribed_at=now))
+    db.commit()
+
+    logger.info("Email unsubscribed: %s", email_lower)
+    return {"message": f"Email {email_lower} has been unsubscribed."}
+
 
 # ---------------------------------------------------------------------------
 # Register (admin-only)
@@ -221,7 +263,7 @@ def change_password(
 @router.post("/forgot-password")
 @limiter.limit("5/minute")
 def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
-    """Generate a password-reset token. In dev mode the token is logged."""
+    """Generate a password-reset token and send a reset email."""
     user = db.query(User).filter(User.email == data.email).first()
 
     # Always return 200 to avoid email enumeration
@@ -245,12 +287,22 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
     db.add(reset)
     db.commit()
 
-    # In production this would send an email with the token
-    logger.warning(
-        "[DEV] Password reset token for %s: %s",
-        user.email,
-        raw_token,
+    # Send password reset email (exempt from unsubscribe block)
+    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    reset_link = f"{base}/reset-password?token={raw_token}"
+    html_body = build_password_reset_email(reset_link)
+    result = send_email(
+        to=user.email,
+        subject="Reset your Kindness Is Magic password",
+        html_body=html_body,
+        exempt_unsubscribe=True,
+        include_unsubscribe_link=False,
     )
+
+    if result["sent"]:
+        logger.info("Password reset email sent: user_id=%s email=%s", user.id, user.email)
+    else:
+        logger.error("Password reset email failed: user_id=%s email=%s", user.id, user.email)
 
     return {"message": "If the email exists, a reset link has been sent"}
 
@@ -308,10 +360,11 @@ def invite_referrer(
 ):
     """Admin creates a one-time invite code for a referrer to self-register."""
     code = generate_invite_code()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)
     invite = ReferrerInviteToken(
         code=code,
         family_limit=data.family_limit,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS),
+        expires_at=expires_at,
         used=False,
     )
     db.add(invite)
@@ -319,7 +372,32 @@ def invite_referrer(
     db.refresh(invite)
 
     logger.info("Invite token created: %s (family_limit=%d)", code, data.family_limit)
-    return invite
+
+    # Send invite email if email address provided
+    email_sent: bool | None = None
+    email_send_reason: str | None = None
+    if data.email:
+        html_body = build_invite_email(
+            code=code,
+            family_limit=data.family_limit,
+            expires_at=expires_at,
+        )
+        result = send_email(
+            to=data.email,
+            subject="You're invited to join Kindness Is Magic",
+            html_body=html_body,
+        )
+        email_sent = result["sent"]
+        email_send_reason = result["reason"]
+
+    return {
+        "code": invite.code,
+        "family_limit": invite.family_limit,
+        "expires_at": invite.expires_at,
+        "created_at": invite.created_at,
+        "email_sent": email_sent,
+        "email_send_reason": email_send_reason,
+    }
 
 
 # ---------------------------------------------------------------------------

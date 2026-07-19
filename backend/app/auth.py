@@ -113,6 +113,7 @@ def decode_refresh_token(token: str) -> dict:
 # Cookie helpers
 # ---------------------------------------------------------------------------
 
+
 def set_auth_cookies(response, access_token: str, refresh_token: str):
     """Set HttpOnly cookies for access and refresh tokens on a Response object.
 

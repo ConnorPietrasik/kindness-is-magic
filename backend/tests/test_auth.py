@@ -419,6 +419,82 @@ class TestForgotPassword:
         )
         assert resp.status_code == 422
 
+    def test_forgot_password_sends_email(self, test_client: TestClient, admin_user):
+        """Password reset email is sent for a valid user (suppressed in tests)."""
+        from unittest.mock import patch
+
+        captured = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured["called"] = True
+            captured["to"] = _kw.get("to") or _args[0]
+            captured["exempt"] = _kw.get("exempt_unsubscribe", False)
+            captured["include_unsub_link"] = _kw.get("include_unsubscribe_link", True)
+            return {"sent": True, "reason": None}
+
+        with patch("app.auth_routes.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/auth/forgot-password",
+                json={"email": "admin@test.com"},
+            )
+        assert resp.status_code == 200
+        assert captured.get("called") is True
+        assert captured["to"] == "admin@test.com"
+        assert captured["exempt"] is True
+        assert captured["include_unsub_link"] is False
+
+    def test_forgot_password_no_email_for_unknown_user(self, test_client: TestClient):
+        """No email is sent for unknown users (endpoint still returns 200)."""
+        from unittest.mock import patch
+
+        send_email_mock = patch("app.auth_routes.send_email", return_value={"sent": True, "reason": None})
+        with send_email_mock as mock_fn:
+            resp = test_client.post(
+                "/api/auth/forgot-password",
+                json={"email": "nobody@example.com"},
+            )
+        assert resp.status_code == 200
+        mock_fn.assert_not_called()
+
+    def test_forgot_password_unsubscribe_exempt(self, test_client: TestClient, admin_user, db: Session):
+        """Unsubscribed users still receive password reset emails."""
+        from unittest.mock import patch
+        from app.models import EmailPreference
+        from datetime import datetime as dt, timezone as tz
+
+        # Mark the user as unsubscribed
+        pref = EmailPreference(
+            email="admin@test.com",
+            unsubscribed_at=dt.now(tz.utc),
+        )
+        db.add(pref)
+        db.commit()
+
+        captured = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured["called"] = True
+            return {"sent": True, "reason": None}
+
+        with patch("app.auth_routes.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/auth/forgot-password",
+                json={"email": "admin@test.com"},
+            )
+        assert resp.status_code == 200
+        assert captured.get("called") is True
+
+    def test_forgot_password_mail_failure_does_not_break_endpoint(self, test_client: TestClient, admin_user):
+        """SMTP failure does not break the endpoint; still returns 200."""
+        from unittest.mock import patch
+
+        with patch("app.auth_routes.send_email", return_value={"sent": False, "reason": "smtp_error"}):
+            resp = test_client.post(
+                "/api/auth/forgot-password",
+                json={"email": "admin@test.com"},
+            )
+        assert resp.status_code == 200
+
 
 class TestResetPassword:
     def test_reset_password_success(self, test_client: TestClient, admin_user, db: Session):

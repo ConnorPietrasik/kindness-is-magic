@@ -80,6 +80,59 @@ class TestInviteReferrerCreate:
         code = resp.json()["code"]
         assert re.match(r"^KMG-[A-Z0-9_-]{6}$", code)
 
+    def test_invite_with_email(self, test_client: TestClient, admin_user):
+        """Invite with email sends (suppressed) and returns email_sent=true."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email": "newref@example.com"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["code"].startswith("KMG-")
+        assert body["email_sent"] is True
+        assert body["email_send_reason"] is None
+
+    def test_invite_without_email(self, test_client: TestClient, admin_user):
+        """Invite without email skips send; email_sent and reason are null."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["email_sent"] is None
+        assert body["email_send_reason"] is None
+
+    def test_invite_email_invalid_format(self, test_client: TestClient, admin_user):
+        """Invalid email format in request body returns 422."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email": "not-an-email"},
+        )
+        assert resp.status_code == 422
+
+    def test_invite_email_failure_still_returns_201(self, test_client: TestClient, admin_user):
+        """SMTP failure does not break the endpoint; email_sent=false."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": False, "reason": "smtp_error"}
+
+        with patch("app.auth_routes.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "fail@example.com"},
+            )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["email_sent"] is False
+        assert body["email_send_reason"] == "smtp_error"
+
 
 # ---------------------------------------------------------------------------
 # TestReferrerSelfRegister — POST /api/auth/register-referrer
