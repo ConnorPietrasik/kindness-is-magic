@@ -21,8 +21,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate(from, { replace: true });
+      const user = await login(email, password);
+      // Families skip the main dashboard and go straight to their role dashboard
+      if (user.role === "family") {
+        navigate(ROUTES.FAMILY_DASHBOARD, { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err: unknown) {
       setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Login failed. Check your credentials.");
     } finally {

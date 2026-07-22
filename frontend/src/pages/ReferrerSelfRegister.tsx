@@ -62,7 +62,7 @@ export default function ReferrerSelfRegister() {
 
       // Backend auto-logs the user in via cookies. Update auth context and redirect.
       setUser(result.user);
-      navigate(ROUTES.REFERRER_DASHBOARD, { replace: true });
+      navigate(ROUTES.DASHBOARD, { replace: true });
     } catch (err: unknown) {
       setError(formatApiError(err, "Registration failed. Check your invite code and try again."));
     } finally {

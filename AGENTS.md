@@ -15,6 +15,7 @@
 - Prefer modifying existing modules over creating new ones.
 - Do not add dependencies without asking specifically.
 - When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
+- **No backward compatibility needed.** The app is not yet deployed.
 
 ## Planning
 

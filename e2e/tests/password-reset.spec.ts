@@ -78,8 +78,8 @@ test.describe("Password reset", () => {
     await page.getByLabel("Password").fill(originalPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    /* Should login successfully — all roles land on /dashboard first */
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
-    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
+    /* Should login successfully — family users land on /family/dashboard */
+    await expect(page).toHaveURL(/\/family\/dashboard/, { timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Family Dashboard" })).toBeVisible();
   });
 });

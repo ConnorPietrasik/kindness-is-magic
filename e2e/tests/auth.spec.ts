@@ -16,11 +16,12 @@ test.describe("Authentication", () => {
   test("login with valid referrer credentials redirects to dashboard", async ({ page }) => {
     await loginAsReferrer(page);
     await expect(page).toHaveURL(/\/dashboard/);
+    /* Referrers now land on the main /dashboard */
   });
 
-  test("login with valid family credentials redirects to dashboard", async ({ page }) => {
+  test("login with valid family credentials redirects to family dashboard", async ({ page }) => {
     await loginAsFamily(page);
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/family\/dashboard/);
   });
 
   test("login with invalid credentials shows error", async ({ page }) => {
@@ -65,7 +66,7 @@ test.describe("Authentication", () => {
     await loginAsFamily(page);
 
     /* Try to access referrer route — client-side redirect to /dashboard */
-    await page.goto("/referrer/dashboard");
+    await page.goto("/referrer/families");
     await page.waitForTimeout(2000); // wait for React Router redirect
     await expect(page).toHaveURL(/\/dashboard/);
   });
@@ -77,12 +78,12 @@ test.describe("Authentication", () => {
     await expect(page).toHaveURL(/\/dashboard/);
   });
 
-  test("root redirect sends referrer to referrer dashboard", async ({ page }) => {
+  test("root redirect sends referrer to main dashboard", async ({ page }) => {
     await loginAsReferrer(page);
     await page.goto("/");
-    await expect(page).toHaveURL(/\/referrer\/dashboard/);
-    /* DashboardRedirect sends referrers to /referrer/dashboard */
-    await expect(page.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/dashboard/);
+    /* DashboardRedirect now sends referrers to /dashboard */
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible({ timeout: 10_000 });
   });
 
   test("root redirect sends family to family dashboard", async ({ page }) => {
@@ -112,8 +113,8 @@ test.describe("Authentication", () => {
     await page.goto("/register-family");
     await expect(page.getByText("You're already logged in")).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Go to Dashboard" }).click();
-    await expect(page).toHaveURL(/\/referrer\/dashboard/);
-    await expect(page.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible({ timeout: 10_000 });
   });
 
   test("Already Logged In page — Log Out redirects to login", async ({ page }) => {

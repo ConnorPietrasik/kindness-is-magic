@@ -34,7 +34,7 @@ test.describe("Invite and self-registration", () => {
     const inviteCode = await codeElement.textContent();
     expect(inviteCode).toBeTruthy();
     const trimmedCode = inviteCode!.trim();
-    expect(trimmedCode).toMatch(/^KMG-/);
+    expect(trimmedCode).toMatch(/^KRI-/);
 
     /* ── Step 2: Fresh unauthenticated context — referrer self-registers ── */
     const guestContext = await browser.newContext();
@@ -54,9 +54,9 @@ test.describe("Invite and self-registration", () => {
 
     await guestPage.getByRole("button", { name: "Create Account" }).click();
 
-    /* Should auto-login and redirect to referrer dashboard */
-    await expect(guestPage).toHaveURL(/\/referrer\/dashboard/, { timeout: 10_000 });
-    await expect(guestPage.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible();
+    /* Should auto-login and redirect to main dashboard */
+    await expect(guestPage).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+    await expect(guestPage.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
     await expect(guestPage.getByText("E2E Invite Referrer")).toBeVisible();
 
     await adminContext.close();
@@ -83,7 +83,7 @@ test.describe("Invite and self-registration", () => {
     /* Verify the invite code is displayed */
     const codeElement = adminPage.locator("div.font-mono.font-bold");
     const inviteCode = (await codeElement.textContent())!.trim();
-    expect(inviteCode).toMatch(/^KMG-/);
+    expect(inviteCode).toMatch(/^KRI-/);
 
     /* Verify email sent confirmation is shown (SUPPRESS_SEND=1 in test env) */
     await expect(adminPage.getByText("Email sent successfully.")).toBeVisible({
@@ -122,8 +122,8 @@ test.describe("Invite and self-registration", () => {
     await page1.getByLabel("Confirm Password").fill("Password123!");
     await page1.getByRole("button", { name: "Create Account" }).click();
 
-    /* Should succeed */
-    await expect(page1).toHaveURL(/\/referrer\/dashboard/, { timeout: 10_000 });
+    /* Should succeed — auto-login redirects to main dashboard */
+    await expect(page1).toHaveURL(/\/dashboard/, { timeout: 10_000 });
     await guestContext1.close();
 
     /* Try to reuse the same code */

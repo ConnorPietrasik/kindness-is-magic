@@ -27,7 +27,7 @@ export const ROUTES = {
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
 
   // ── Referrer self-service ─────────────────────────────────
-  REFERRER_DASHBOARD: "/referrer/dashboard",
+  REFERRER_FAMILIES: "/referrer/families",
   REFERRER_FAMILY_DETAIL: "/referrer/families/:id",
   REFERRER_PENDING_FAMILIES: "/referrer/pending-families",
 

@@ -95,7 +95,7 @@ test.describe("Family self-service", () => {
   });
 
   test("family cannot access referrer routes", async ({ page }) => {
-    await page.goto("/referrer/dashboard");
+    await page.goto("/referrer/families");
     await expect(page).toHaveURL(/\/dashboard/);
   });
 });

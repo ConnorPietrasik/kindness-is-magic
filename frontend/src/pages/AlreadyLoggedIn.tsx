@@ -14,14 +14,7 @@ import { humanize } from "../lib/utils";
 export default function AlreadyLoggedIn() {
   const { user, logout } = useAuth();
 
-  const dashboardPath =
-    user?.role === "admin"
-      ? ROUTES.DASHBOARD
-      : user?.role === "referrer"
-        ? ROUTES.REFERRER_DASHBOARD
-        : user?.role === "family"
-          ? ROUTES.FAMILY_DASHBOARD
-          : ROUTES.ROOT;
+  const dashboardPath = user?.role === "family" ? ROUTES.FAMILY_DASHBOARD : ROUTES.DASHBOARD; // admin and referrer both use main dashboard
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">

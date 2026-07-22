@@ -23,8 +23,9 @@ describe("ROUTES constants", () => {
   });
 
   it("has correct referrer routes", () => {
-    expect(ROUTES.REFERRER_DASHBOARD).toBe("/referrer/dashboard");
+    expect(ROUTES.REFERRER_FAMILIES).toBe("/referrer/families");
     expect(ROUTES.REFERRER_FAMILY_DETAIL).toBe("/referrer/families/:id");
+    expect(ROUTES.REFERRER_PENDING_FAMILIES).toBe("/referrer/pending-families");
   });
 
   it("has correct family routes", () => {

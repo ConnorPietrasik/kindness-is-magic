@@ -20,7 +20,7 @@ const AdminFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => im
 const AdminFamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminFamilyPeople"));
 const AdminPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminPeople"));
 const CsvUpload: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/CsvUpload"));
-const ReferrerDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerDashboard"));
+const ReferrerFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilies"));
 const ReferrerFamilyDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilyDetail"));
 const FamilyDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyDashboard"));
 const FamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyPeople"));
@@ -44,7 +44,7 @@ function DashboardRedirect() {
     return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
   if (user?.role === "referrer") {
-    return <Navigate to={ROUTES.REFERRER_DASHBOARD} replace />;
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
   if (user?.role === "family") {
     return <Navigate to={ROUTES.FAMILY_DASHBOARD} replace />;
@@ -189,10 +189,10 @@ export default function App() {
 
         {/* ── Referrer self-service ────────────────────────────── */}
         <Route
-          path={ROUTES.REFERRER_DASHBOARD}
+          path={ROUTES.REFERRER_FAMILIES}
           element={
             <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerDashboard />
+              <ReferrerFamilies />
             </ProtectedRoute>
           }
         />

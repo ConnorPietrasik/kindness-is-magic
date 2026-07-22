@@ -1,4 +1,4 @@
-Add display_name changing ability for referrers and admins
+Add display_name changing ability for referrers and admins. Also fix the CSV import page about it.
 Admin CRUD for users
 Add more admin views - sort by wishes, sort families by size, etc
 Add family wish-lists - Family ID, family_name, family_wish, then each person name, age, practical_wish, fun_wish, maybe note depending on space

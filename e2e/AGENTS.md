@@ -2,15 +2,21 @@
 
 ## Running
 
-Save output to a temp file:
+E2E tests require the full stack. Check it first:
+
+```bash
+curl -sf http://localhost/login > /dev/null 2>&1 && echo "up" || echo "down"
+```
+
+If the stack is down, **ask the user to bring it up** before proceeding.
+
+Run and capture output:
 
 ```bash
 cd /dockerx/kindness-is-magic/e2e && npx playwright test > /tmp/e2e-test-output.txt 2>&1
 ```
 
 Check the exit code. `tail -1` the file for the summary; on failure, read it for tracebacks.
-
-Requires the full stack running.
 
 ## Architecture
 

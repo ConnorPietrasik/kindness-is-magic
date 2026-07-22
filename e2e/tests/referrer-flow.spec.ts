@@ -16,12 +16,9 @@ test.describe("Referrer self-service", () => {
     if (testData.personId) await deletePersonViaApi(request, testData.personId);
   });
 
-  test("referrer dashboard loads with CSV-seeded families", async ({ page }) => {
-    await page.goto("/referrer/dashboard");
-    await expect(page.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible();
-
-    /* My Profile card should show Sarah Chen's info */
-    await expect(page.getByText("Sarah Chen")).toBeVisible();
+  test("referrer families page loads with CSV-seeded families", async ({ page }) => {
+    await page.goto("/referrer/families");
+    await expect(page.getByRole("heading", { name: "My Families" })).toBeVisible();
 
     /* Families table should show The Williams Family and The Rodriguez Family */
     await expect(page.getByRole("table")).toContainText("The Williams Family", {
@@ -31,8 +28,8 @@ test.describe("Referrer self-service", () => {
   });
 
   test("referrer views family detail with people", async ({ page }) => {
-    await page.goto("/referrer/dashboard");
-    await expect(page.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible();
+    await page.goto("/referrer/families");
+    await expect(page.getByRole("heading", { name: "My Families" })).toBeVisible();
 
     /* Click Manage on The Williams Family row */
     const williamsRow = page.getByRole("row").filter({ hasText: "The Williams Family" });
@@ -52,8 +49,8 @@ test.describe("Referrer self-service", () => {
   });
 
   test("referrer adds a person to a family", async ({ page }) => {
-    /* Navigate to The Williams Family detail — find it from the dashboard */
-    await page.goto("/referrer/dashboard");
+    /* Navigate to The Williams Family detail — find it from the families page */
+    await page.goto("/referrer/families");
     const williamsRow = page.getByRole("row").filter({ hasText: "The Williams Family" });
     const manageLink = williamsRow.getByRole("link", { name: "Manage" });
     await manageLink.click();

@@ -1,22 +1,19 @@
 /**
- * Referrer Dashboard
+ * Referrer Families — approved families CRUD page.
  *
- * Shows the referrer's own info, family list with actions,
- * and a card linking to manage each family's people.
- * Uses useCrudManager for family CRUD; self-edit stays inline.
+ * Extracted from the old ReferrerDashboard. Shows the families table
+ * with Manage / Edit / Delete actions, plus the inline add/edit forms.
+ * Also shows a pending approvals alert when there are pending families.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
+import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
-import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
-import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
@@ -28,24 +25,18 @@ import {
   getReferrerMe,
   listPendingFamilies,
   listReferrerFamilies,
-  patchReferrerMe,
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyPayload, ReferrerDetail, ReferrerPayload } from "../types";
+import type { FamilyPayload } from "../types";
 
 const REFERRER_ME_KEY = ["referrerMe"];
 const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
 const PENDING_FAMILIES_KEY = ["pendingFamilies"];
 
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
-export default function ReferrerDashboard() {
-  const queryClient = useQueryClient();
-
-  // Referrer self-info
+export default function ReferrerFamilies() {
+  // Referrer self-info (for family limit)
   const { data: referrerInfo, isLoading: infoLoading } = useQuery({
     queryKey: REFERRER_ME_KEY,
     queryFn: getReferrerMe,
@@ -84,22 +75,6 @@ export default function ReferrerDashboard() {
     invalidationKeys: [REFERRER_FAMILIES_KEY, REFERRER_ME_KEY],
   });
 
-  // Self-edit mutation (not part of CRUD pattern)
-  const updateSelfMut = useMutation({
-    mutationFn: patchReferrerMe,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REFERRER_ME_KEY });
-      setShowEditSelf(false);
-    },
-  });
-
-  const [showEditSelf, setShowEditSelf] = useState(false);
-
-  function handleUpdateSelf(formData: ReferrerPayload) {
-    const payload = normalizeUpdatePayload(formData, referrerInfo as ReferrerDetail);
-    updateSelfMut.mutate(payload as ReferrerPayload);
-  }
-
   function handleCreateFam(formData: FamilyPayload) {
     createFamMut?.mutate(formData);
   }
@@ -121,33 +96,7 @@ export default function ReferrerDashboard() {
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Referrer Dashboard</h2>
-
-        {/* ── Referrer info card ──────────────────────────────── */}
-        <Card className="mb-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-gray-900">My Profile</h3>
-            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEditSelf(!showEditSelf)}>
-              {showEditSelf ? "Cancel" : "Edit"}
-            </Button>
-          </div>
-
-          {showEditSelf ? (
-            <ReferrerSelfForm
-              initial={referrerInfo ?? defaultReferrerForm}
-              onSubmit={handleUpdateSelf}
-              onCancel={() => setShowEditSelf(false)}
-              loading={updateSelfMut.isPending}
-            />
-          ) : (
-            <div className="space-y-0">
-              <InfoRow label="Name" value={referrerInfo?.name} truncate={false} />
-              <InfoRow label="Phone" value={referrerInfo?.phone_number} truncate={false} />
-              <InfoRow label="Family Invite Code" value={referrerInfo?.family_invite_code ?? "Generating…"} truncate={false} />
-              <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast truncate={false} />
-            </div>
-          )}
-        </Card>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">My Families</h2>
 
         {/* ── Pending families alert ──────────────────────────── */}
         {pendingFamilies && pendingFamilies.length > 0 && (
@@ -161,7 +110,7 @@ export default function ReferrerDashboard() {
 
         {/* ── Families ────────────────────────────────────────── */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-900">My Families</h3>
+          <h3 className="text-base font-semibold text-gray-900">Approved Families</h3>
           {familyCount < familyLimit && <Button onClick={openCreate}>+ Add Family</Button>}
         </div>
 
@@ -267,69 +216,8 @@ export default function ReferrerDashboard() {
         />
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        <MutationErrors
-          mutations={[updateSelfMut, createFamMut, updateFamMut, deleteFamMut].filter((m): m is NonNullable<typeof m> => m != null)}
-        />
+        <MutationErrors mutations={[createFamMut, updateFamMut, deleteFamMut].filter((m): m is NonNullable<typeof m> => m != null)} />
       </main>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* ReferrerSelfForm (inline — not shared per spec)                    */
-/* ------------------------------------------------------------------ */
-interface ReferrerSelfFormProps {
-  initial: Partial<ReferrerDetail>;
-  onSubmit: (data: ReferrerPayload) => void;
-  onCancel: () => void;
-  loading: boolean;
-}
-
-function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelfFormProps) {
-  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
-
-  useEffect(() => {
-    setForm({ ...initial });
-  }, [initial]);
-
-  const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
-
-  return (
-    <form
-      onSubmit={(e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit(form);
-      }}
-      className="mx-auto max-w-sm space-y-3"
-    >
-      <FormField
-        label="Name"
-        fieldProps={{
-          type: "text",
-          value: form.name,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
-          required: true,
-          maxLength: 60,
-        }}
-      />
-      <FormField
-        label="Phone"
-        fieldProps={{
-          type: "text",
-          value: form.phone_number,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-          required: true,
-          maxLength: 20,
-        }}
-      />
-      <div className="flex gap-3 pt-1">
-        <Button type="submit" loading={loading} className="flex-1">
-          {loading ? "Saving…" : "Save"}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
-          Cancel
-        </Button>
-      </div>
-    </form>
   );
 }

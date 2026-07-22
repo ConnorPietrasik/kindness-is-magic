@@ -22,8 +22,8 @@ export const CREDENTIALS = {
 /**
  * Navigate to /login, fill credentials, click Sign in, and assert redirect.
  *
- * All roles land on /dashboard first (Login component uses ROUTES.DASHBOARD).
- * The Dashboard page then shows role-specific nav cards.
+ * Admins and referrers land on /dashboard.
+ * Families are redirected straight to /family/dashboard.
  *
  * @param page  Playwright page
  * @param creds Credentials object with email + password
@@ -38,9 +38,8 @@ export async function loginAs(
   await page.getByLabel("Password").fill(creds.password);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  /* All roles redirect to /dashboard first. Wait for the welcome card. */
+  /* Wait for any dashboard URL (main or role-specific). Role-specific wrappers add their own assertions. */
   await page.waitForURL(/\/dashboard/);
-  await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
 }
 
 /**
@@ -61,8 +60,8 @@ export async function loginAsReferrer(page: Page): Promise<void> {
 
 export async function loginAsFamily(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.family);
-  /* { exact: true } avoids strict-mode collision with "Family ID: N" / "My Family" */
-  await expect(page.getByText("Family", { exact: true })).toBeVisible();
+  /* Families land on /family/dashboard which has "Family Dashboard" heading */
+  await expect(page.getByRole("heading", { name: "Family Dashboard" })).toBeVisible();
 }
 
 /**
