@@ -9,7 +9,7 @@ from typing import Type, TypeVar
 from fastapi import HTTPException, status
 from sqlalchemy.orm import DeclarativeBase, Session
 
-from app.models import Family, Person, Referrer
+from app.models import Family, FamilyApprovalStatus, Person, Referrer
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -49,13 +49,25 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
 
 
 def build_referrer_detail(ref: Referrer, db: Session) -> dict:
-    """Build a dict suitable for ReferrerDetail, including family_count."""
-    family_count = db.query(Family).filter(Family.referrer_id == ref.id, Family.deleted_at.is_(None)).count()
+    """Build a dict suitable for ReferrerDetail, including family_count.
+
+    Only *approved*, non-deleted families count toward the family count.
+    """
+    family_count = (
+        db.query(Family)
+        .filter(
+            Family.referrer_id == ref.id,
+            Family.deleted_at.is_(None),
+            Family.approval_status == FamilyApprovalStatus.approved,
+        )
+        .count()
+    )
     return {
         "id": ref.id,
         "name": ref.name,
         "family_limit": ref.family_limit,
         "phone_number": ref.phone_number,
+        "family_invite_code": ref.family_invite_code,
         "family_count": family_count,
         "deleted_at": ref.deleted_at,
     }
@@ -73,6 +85,7 @@ def build_family_detail(fam: Family, db: Session) -> dict:
         "phone_number": fam.phone_number,
         "family_wish": fam.family_wish,
         "contact_name": fam.contact_name,
+        "approval_status": fam.approval_status,
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
     }

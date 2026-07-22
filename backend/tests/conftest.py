@@ -36,6 +36,7 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+psycopg://KindDB:testpassword@test_db:5432/kindness_is_magic_test",
 )
 
+
 def _get_worker_schema():
     """Return a per-worker schema name when running under xdist, else None."""
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
@@ -264,12 +265,13 @@ def referrer_user(db: Session, referrer_record):
 @pytest.fixture()
 def family_record(db: Session):
     """Create a Family row."""
-    from app.models import Family
+    from app.models import Family, FamilyApprovalStatus
 
     f = Family(
         family_name="TestFamily",
         family_wish="World peace",
         contact_name="Contact Person",
+        approval_status=FamilyApprovalStatus.approved,
     )
     db.add(f)
     db.commit()
@@ -314,19 +316,21 @@ def login_as(client: Any, email: str, password: str) -> dict:
 @pytest.fixture()
 def referrer_with_families(db: Session, referrer_record):
     """Create a Referrer with 1-2 Family rows."""
-    from app.models import Family
+    from app.models import Family, FamilyApprovalStatus
 
     f1 = Family(
         referrer_id=referrer_record.id,
         family_name="Smith Family",
         family_wish="A new roof",
         contact_name="Jane Smith",
+        approval_status=FamilyApprovalStatus.approved,
     )
     f2 = Family(
         referrer_id=referrer_record.id,
         family_name="Jones Family",
         family_wish="Warm clothes",
         contact_name="Bob Jones",
+        approval_status=FamilyApprovalStatus.approved,
     )
     db.add_all([f1, f2])
     db.commit()
@@ -372,7 +376,7 @@ def referrer_with_full_tree(db: Session):
 
     Returns a dict with keys: referrer, family, person, user.
     """
-    from app.models import Referrer, Family, Person, User, UserRole
+    from app.models import FamilyApprovalStatus, Family, Person, Referrer, User, UserRole
     from app.auth import get_password_hash
 
     ref = Referrer(name="Tree Referrer", family_limit=5, phone_number="555-1000")
@@ -385,6 +389,7 @@ def referrer_with_full_tree(db: Session):
         family_name="Tree Family",
         family_wish="A new home",
         contact_name="Tree Contact",
+        approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)
     db.commit()
@@ -449,7 +454,7 @@ def another_family(db: Session, referrer_record):
 
     Returns a dict with keys: family, user.
     """
-    from app.models import Family, User, UserRole
+    from app.models import Family, FamilyApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
     fam = Family(
@@ -457,6 +462,7 @@ def another_family(db: Session, referrer_record):
         family_name="Another Family",
         family_wish="A computer",
         contact_name="Another Contact",
+        approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)
     db.commit()

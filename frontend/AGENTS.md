@@ -93,6 +93,7 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`)
 Three roles: `admin`, `referrer`, `family`.
 
 - **`ProtectedRoute`** component wraps routes with a `roles` array. Unauthenticated users are redirected to `/login`; wrong-role users to `/dashboard`.
+- **`PublicRoute`** wraps public pages (login, registration). Authenticated users see an "Already Logged In" page instead of a silent redirect.
 - Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
 - Route paths are centralized in `src/lib/routes.ts`. Always use `ROUTES` constants and `route` helpers rather than hardcoded strings.
 

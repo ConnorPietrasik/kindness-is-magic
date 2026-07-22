@@ -14,7 +14,10 @@ import type {
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
+  FamilySelfRegisterPayload,
+  FamilySelfRegisterResponse,
   PaginationParams,
+  PendingFamilySummary,
   PersonDetail,
   PersonListResponse,
   PersonPayload,
@@ -130,6 +133,11 @@ export function createReferrerInvite(data: ReferrerInviteCreatePayload): Promise
 /** Public: redeem an invite code to register as a referrer (auto-logs in). */
 export function registerReferrerViaInvite(data: ReferrerSelfRegisterPayload): Promise<ReferrerSelfRegisterResponse> {
   return api.post("/api/auth/register-referrer", data).then((res) => res.data);
+}
+
+/** Public: redeem an invite code to register as a family (auto-logs in). */
+export function registerFamilyViaInvite(data: FamilySelfRegisterPayload): Promise<FamilySelfRegisterResponse> {
+  return api.post("/api/auth/register-family", data).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +301,21 @@ export function listReferrerFamilyPeople(fid: number): Promise<PersonListRespons
 
 export function createReferrerFamilyPerson(fid: number, data: PersonPayload): Promise<PersonDetail> {
   return api.post(`/api/referrer/families/${fid}/people`, normalizePayload(data)).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Referrer — Pending Families (invite approvals)
+// ---------------------------------------------------------------------------
+export function listPendingFamilies(): Promise<PendingFamilySummary[]> {
+  return api.get("/api/referrer/pending-families").then((res) => res.data);
+}
+
+export function approveFamily(id: number): Promise<FamilyDetail> {
+  return api.post(`/api/referrer/families/${id}/approve`).then((res) => res.data);
+}
+
+export function rejectFamily(id: number): Promise<FamilyDetail> {
+  return api.post(`/api/referrer/families/${id}/reject`).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

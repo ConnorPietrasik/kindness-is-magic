@@ -17,14 +17,16 @@ from app.auth import (
     create_refresh_token,
     decode_refresh_token,
     generate_invite_code,
+    generate_unique_family_invite_code,
     get_password_hash,
     verify_password,
     clear_auth_cookies,
     set_auth_cookies,
     get_current_user,
 )
+from app.mail import send_email, build_invite_email, build_password_reset_email, build_family_pending_email
 from app.database import get_db
-from app.models import User, UserRole, PasswordResetToken, Referrer, Family, ReferrerInviteToken, EmailPreference
+from app.models import User, UserRole, PasswordResetToken, Referrer, Family, FamilyApprovalStatus, ReferrerInviteToken, EmailPreference
 from app.permissions import require_admin
 from app.schemas import (
     UserCreate,
@@ -38,8 +40,10 @@ from app.schemas import (
     ReferrerSelfRegister,
     ReferrerSelfRegisterResponse,
     ReferrerSummary,
+    FamilySelfRegister,
+    FamilySelfRegisterResponse,
+    FamilySummary,
 )
-from app.mail import send_email, build_invite_email, build_password_reset_email
 from app.rate_limit import limiter
 from app.user_validation import validate_user_role_consistency
 
@@ -476,6 +480,7 @@ def register_referrer(
         name=data.name,
         phone_number=data.phone_number,
         family_limit=invite.family_limit,
+        family_invite_code=generate_unique_family_invite_code(db),
     )
     db.add(referrer)
     db.flush()  # Get referrer.id
@@ -507,4 +512,91 @@ def register_referrer(
     return ReferrerSelfRegisterResponse(
         user=UserResponse.model_validate(user),
         referrer=ReferrerSummary.model_validate(referrer),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Register family (public, via family invite code)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/register-family",
+    response_model=FamilySelfRegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_family(
+    data: FamilySelfRegister,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Public self-registration: family registers via a referrer's family invite code."""
+    # 1. Look up referrer by family_invite_code
+    referrer = db.query(Referrer).filter(Referrer.family_invite_code == data.code).first()
+    if not referrer:
+        raise HTTPException(status_code=400, detail="Invalid invite code")
+
+    # 2. Check for duplicate email
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    # 3. Atomic creation inside the session transaction
+    family = Family(
+        referrer_id=referrer.id,
+        family_name=data.family_name,
+        family_wish=data.family_wish,
+        contact_name=data.contact_name,
+        bio=data.bio,
+        address=data.address,
+        phone_number=data.phone_number,
+        approval_status=FamilyApprovalStatus.pending,
+    )
+    db.add(family)
+    db.flush()  # Get family.id
+
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        role=UserRole.family,
+        family_id=family.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()  # Get user.id
+
+    db.commit()
+
+    # 4. Issue auth cookies (auto-login)
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info("Family self-registered via invite: %s (referrer_id=%s)", data.email, referrer.id)
+
+    # 5. Send notification email to referrer
+    referrer_user = db.query(User).filter(User.referrer_id == referrer.id).first()
+    if referrer_user:
+        display_name = referrer_user.display_name or referrer.name
+        html_body = build_family_pending_email(data.family_name, display_name)
+        send_email(
+            to=referrer_user.email,
+            subject=f"New family awaiting approval — {data.family_name}",
+            html_body=html_body,
+        )
+
+    # 6. Build response
+    person_count = 0  # No persons yet
+    return FamilySelfRegisterResponse(
+        user=UserResponse.model_validate(user),
+        family=FamilySummary(
+            id=family.id,
+            family_name=family.family_name,
+            family_wish=family.family_wish,
+            contact_name=family.contact_name,
+            referrer_id=family.referrer_id,
+            approval_status=family.approval_status,
+            deleted_at=family.deleted_at,
+            person_count=person_count,
+        ),
     )

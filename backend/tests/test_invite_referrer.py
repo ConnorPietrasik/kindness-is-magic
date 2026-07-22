@@ -23,7 +23,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["code"].startswith("KMG-")
+        assert body["code"].startswith("KRI-")
         assert body["family_limit"] == 10
         assert "expires_at" in body
         assert "created_at" in body
@@ -68,7 +68,7 @@ class TestInviteReferrerCreate:
         assert resp.status_code == 422
 
     def test_code_format(self, test_client: TestClient, admin_user):
-        """Code should be KMG-<6 uppercase alphanumeric chars>."""
+        """Code should be KRI-<6 uppercase alphanumeric chars>."""
         import re
 
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -78,7 +78,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 201
         code = resp.json()["code"]
-        assert re.match(r"^KMG-[A-Z0-9_-]{6}$", code)
+        assert re.match(r"^KRI-[A-Z0-9_-]{6}$", code)
 
     def test_invite_with_email(self, test_client: TestClient, admin_user):
         """Invite with email sends (suppressed) and returns email_sent=true."""
@@ -89,7 +89,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["code"].startswith("KMG-")
+        assert body["code"].startswith("KRI-")
         assert body["email_sent"] is True
         assert body["email_send_reason"] is None
 
@@ -239,7 +239,7 @@ class TestReferrerSelfRegister:
         resp = test_client.post(
             "/api/auth/register-referrer",
             json={
-                "code": "KMG-INVALID",
+                "code": "KRI-INVALID",
                 "name": "Nobody",
                 "email": "nobody@test.com",
                 "phone_number": "555-0000",
@@ -253,7 +253,7 @@ class TestReferrerSelfRegister:
         from app.models import ReferrerInviteToken
 
         invite = ReferrerInviteToken(
-            code="KMG-EXPIRED",
+            code="KRI-EXPIR",  # 10 chars max (KRI- + 5)
             family_limit=10,
             expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
             used=False,
@@ -264,7 +264,7 @@ class TestReferrerSelfRegister:
         resp = test_client.post(
             "/api/auth/register-referrer",
             json={
-                "code": "KMG-EXPIRED",
+                "code": "KRI-EXPIR",
                 "name": "Late Bird",
                 "email": "late@test.com",
                 "phone_number": "555-0000",
@@ -468,3 +468,280 @@ class TestInviteRedemptionAtomicity:
         )
         assert resp.status_code == 201
         return resp.json()["code"]
+
+
+# ---------------------------------------------------------------------------
+# TestFamilySelfRegister — POST /api/auth/register-family
+# ---------------------------------------------------------------------------
+
+
+class TestFamilySelfRegister:
+    """Public endpoint: family registers via a referrer's family invite code."""
+
+    def _create_referrer_with_code(self, test_client: TestClient, admin_user, db: Session):
+        """Helper: login as admin, create a referrer, return the family invite code."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/admin/referrers",
+            json={"name": "Test Ref", "family_limit": 10, "phone_number": "555-0001"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["family_invite_code"] is not None
+        assert body["family_invite_code"].startswith("KFI-")
+        return body["family_invite_code"]
+
+    def test_valid_code_registers_successfully(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "The Smiths",
+                "family_wish": "A warm blanket",
+                "contact_name": "Mom Smith",
+                "email": "smith@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+
+        # User created with family role
+        assert body["user"]["email"] == "smith@test.com"
+        assert body["user"]["role"] == "family"
+        assert body["user"]["is_active"] is True
+
+        # Family created with pending status
+        assert body["family"]["family_name"] == "The Smiths"
+        assert body["family"]["family_wish"] == "A warm blanket"
+        assert body["family"]["contact_name"] == "Mom Smith"
+        assert body["family"]["approval_status"] == "pending"
+        assert body["family"]["person_count"] == 0
+
+        # Auth cookies set (auto-login)
+        assert "access_token" in resp.cookies
+        assert "refresh_token" in resp.cookies
+
+    def test_valid_code_with_optional_fields(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "The Joneses",
+                "family_wish": "New shoes",
+                "contact_name": "Dad Jones",
+                "email": "jones@test.com",
+                "password": "GoodPass1234!",
+                "bio": "We have 3 kids",
+                "address": "123 Main St",
+                "phone_number": "555-9999",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["family"]["family_name"] == "The Joneses"
+
+    def test_invalid_code(self, test_client: TestClient):
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": "KFI-BADCODE",
+                "family_name": "Nobody",
+                "family_wish": "Nothing",
+                "contact_name": "Nobody",
+                "email": "nobody@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 400
+        assert "invite code" in resp.json()["detail"].lower()
+
+    def test_duplicate_email(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        # First registration succeeds
+        resp1 = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "First",
+                "family_wish": "A roof",
+                "contact_name": "First",
+                "email": "dup@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp1.status_code == 201
+
+        # Create another referrer with a different code
+        code2 = self._create_referrer_with_code(test_client, admin_user, db)
+
+        # Second registration with same email fails
+        resp2 = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code2,
+                "family_name": "Second",
+                "family_wish": "A car",
+                "contact_name": "Second",
+                "email": "dup@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp2.status_code == 409
+        assert "already registered" in resp2.json()["detail"].lower()
+
+    def test_password_too_short(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "Short Pass",
+                "family_wish": "A roof",
+                "contact_name": "Short",
+                "email": "short@test.com",
+                "password": "Short",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_invalid_email_format(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "Bad Email",
+                "family_wish": "A roof",
+                "contact_name": "Bad",
+                "email": "not-an-email",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_missing_required_fields(self, test_client: TestClient, admin_user, db: Session):
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "",
+                "family_wish": "",
+                "contact_name": "",
+                "email": "",
+                "password": "",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_email_normalised(self, test_client: TestClient, admin_user, db: Session):
+        """Email should be stored in lowercase."""
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "Case Test",
+                "family_wish": "A roof",
+                "contact_name": "Case",
+                "email": "UPPERCASE@TEST.COM",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["user"]["email"] == "uppercase@test.com"
+
+    def test_pending_family_not_in_referrer_family_list(self, test_client: TestClient, admin_user, db: Session):
+        """Pending families should not appear in the referrer's family list."""
+        from app.models import Referrer, User, UserRole
+        from app.auth import get_password_hash
+
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        # Register a family
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "Pending Smiths",
+                "family_wish": "A roof",
+                "contact_name": "Mom Smith",
+                "email": "pending@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+
+        # Create a referrer user so we can log in as the referrer
+        referrer = db.query(Referrer).filter(Referrer.family_invite_code == code).first()
+        assert referrer is not None
+        user = User(
+            email="ref_user@test.com",
+            hashed_password=get_password_hash("RefPass1234!"),
+            role=UserRole.referrer,
+            referrer_id=referrer.id,
+            display_name=referrer.name,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+
+        # Login as referrer and check family list
+        login_as(test_client, "ref_user@test.com", "RefPass1234!")
+        resp = test_client.get("/api/referrer/families")
+        assert resp.status_code == 200
+        body = resp.json()
+        families = body.get("families", body) if isinstance(body, dict) else body
+        assert all(f["family_name"] != "Pending Smiths" for f in families)
+
+    def test_pending_family_appears_in_pending_list(self, test_client: TestClient, admin_user, db: Session):
+        """Pending families should appear in the pending families list."""
+        from app.models import Referrer, User, UserRole
+        from app.auth import get_password_hash
+
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+
+        # Register a family
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "Pending Joneses",
+                "family_wish": "A car",
+                "contact_name": "Dad Jones",
+                "email": "pending2@test.com",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+
+        # Create a referrer user
+        referrer = db.query(Referrer).filter(Referrer.family_invite_code == code).first()
+        assert referrer is not None
+        user = User(
+            email="ref_user2@test.com",
+            hashed_password=get_password_hash("RefPass1234!"),
+            role=UserRole.referrer,
+            referrer_id=referrer.id,
+            display_name=referrer.name,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+
+        # Login as referrer and check pending list
+        login_as(test_client, "ref_user2@test.com", "RefPass1234!")
+        resp = test_client.get("/api/referrer/pending-families")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 1
+        assert body[0]["family_name"] == "Pending Joneses"
+        assert body[0]["approval_status"] == "pending"

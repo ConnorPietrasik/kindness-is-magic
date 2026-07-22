@@ -35,8 +35,8 @@ import dataclasses
 
 from sqlalchemy.orm import Session
 
-from app.auth import get_password_hash
-from app.models import Family, Person, Referrer, User, UserRole
+from app.auth import get_password_hash, generate_unique_family_invite_code
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole
 from app.user_validation import (
     sanitize_plain_text,
     validate_email,
@@ -249,7 +249,7 @@ class FieldDef:
 # ---------------------------------------------------------------------------
 
 # Columns that are managed by the framework, never imported from CSV
-_SKIP_COLUMNS = {"id", "deleted_at", "created_at"}
+_SKIP_COLUMNS = {"id", "deleted_at", "created_at", "family_invite_code", "approval_status"}
 
 
 def _build_fields(
@@ -313,6 +313,7 @@ def _build_fields(
 REFERRER_FIELDS: list[FieldDef] = _build_fields(
     Referrer,
     optional={"phone_number"},
+    skip={"family_invite_code"},
 )
 
 FAMILY_FIELDS: list[FieldDef] = _build_fields(
@@ -320,6 +321,7 @@ FAMILY_FIELDS: list[FieldDef] = _build_fields(
     csv_name_map={"referrer_id": "referrer_name"},
     fk_resolvers={"referrer_id": _resolve_ref_id},
     optional={"bio", "address", "phone_number", "referrer_id"},
+    skip={"approval_status"},
 )
 
 PERSON_FIELDS: list[FieldDef] = _build_fields(
@@ -456,7 +458,7 @@ def _process_section(
             continue
 
         # --- Phase 3: create entity ---
-        kwargs = schema.create_kwargs(resolved)
+        kwargs = schema.create_kwargs(resolved, db)
         entity = schema.entity_cls(**kwargs)
         db.add(entity)
         db.flush()
@@ -492,15 +494,17 @@ def _find_existing_person(db: Session, family_id: int, given_name: str, age: int
     return _find_person(db, family_id, given_name, age)
 
 
-def _referrer_kwargs(resolved: dict) -> dict:
+def _referrer_kwargs(resolved: dict, db: Session) -> dict:
+    code = generate_unique_family_invite_code(db)
     return {
         "name": resolved["name"],
         "family_limit": resolved["family_limit"],
         "phone_number": resolved.get("phone_number") or "",
+        "family_invite_code": code,
     }
 
 
-def _family_kwargs(resolved: dict) -> dict:
+def _family_kwargs(resolved: dict, db: Session) -> dict:
     return {
         "referrer_id": resolved.get("referrer_id"),
         "family_name": resolved["family_name"],
@@ -509,10 +513,11 @@ def _family_kwargs(resolved: dict) -> dict:
         "bio": resolved.get("bio"),
         "address": resolved.get("address"),
         "phone_number": resolved.get("phone_number"),
+        "approval_status": FamilyApprovalStatus.approved,
     }
 
 
-def _person_kwargs(resolved: dict) -> dict:
+def _person_kwargs(resolved: dict, _db: Session) -> dict:
     return {
         "family_id": resolved["family_id"],
         "given_name": resolved["given_name"],

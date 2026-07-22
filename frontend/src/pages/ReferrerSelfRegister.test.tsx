@@ -24,6 +24,7 @@ const mockResponse: ReferrerSelfRegisterResponse = {
     id: 5,
     name: "New Referrer",
     family_limit: 10,
+    family_invite_code: "KFI-ABC123",
     deleted_at: null,
   },
 };

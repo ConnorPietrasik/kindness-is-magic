@@ -15,6 +15,7 @@ const mockFamilyDetail: FamilyDetail = {
   contact_name: "Mom Smith",
   deleted_at: null,
   person_count: 3,
+  approval_status: "approved",
 };
 
 const referrerMap: Record<number, string> = {

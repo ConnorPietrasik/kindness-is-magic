@@ -27,10 +27,27 @@ INVITE_EXPIRY_HOURS = int(os.environ.get("INVITE_EXPIRY_HOURS", "168"))
 # ---------------------------------------------------------------------------
 
 
-def generate_invite_code() -> str:
-    """Return a human-readable invite code like KMG-A7X9P2."""
+def generate_invite_code(prefix: str = "KRI") -> str:
+    """Return a human-readable invite code like KRI-A7X9P2.
+
+    The *prefix* defaults to ``KRI`` for referrer invite tokens.
+    Pass ``KFI`` for family invite codes.
+    """
     raw = secrets.token_urlsafe(6).upper()[:6]  # 6 chars from base62-ish pool
-    return f"KMG-{raw}"
+    return f"{prefix}-{raw}"
+
+
+def generate_unique_family_invite_code(db: "Session") -> str:
+    """Generate a KFI- prefixed family invite code that is unique in the DB.
+
+    Retries on collision (extremely unlikely with 6 random chars).
+    """
+    from app.models import Referrer
+
+    code = generate_invite_code(prefix="KFI")
+    while db.query(Referrer).filter(Referrer.family_invite_code == code).first():
+        code = generate_invite_code(prefix="KFI")
+    return code
 
 
 # ---------------------------------------------------------------------------

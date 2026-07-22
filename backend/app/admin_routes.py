@@ -10,8 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.auth import generate_unique_family_invite_code
 from app.database import get_db
-from app.models import Family, Person, Referrer, User
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_family_detail,
@@ -93,6 +94,7 @@ def create_referrer(
         name=body.name,
         family_limit=body.family_limit,
         phone_number=body.phone_number,
+        family_invite_code=generate_unique_family_invite_code(db),
     )
     db.add(ref)
     db.commit()
@@ -184,6 +186,7 @@ def list_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
+                approval_status=f.approval_status,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
@@ -224,6 +227,7 @@ def create_family(
         bio=body.bio,
         address=body.address,
         phone_number=body.phone_number,
+        approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)
     db.commit()

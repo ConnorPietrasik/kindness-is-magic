@@ -14,9 +14,13 @@ export type {
   CsvValidationStats,
 } from "./csv";
 export type {
+  FamilyApprovalStatus,
   FamilyDetail,
   FamilyPayload,
+  FamilySelfRegisterPayload,
+  FamilySelfRegisterResponse,
   FamilySummary,
+  PendingFamilySummary,
   PersonDetail,
   PersonPayload,
   PersonSummary,

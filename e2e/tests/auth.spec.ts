@@ -92,4 +92,36 @@ test.describe("Authentication", () => {
     /* DashboardRedirect sends families to /family/dashboard */
     await expect(page.getByRole("heading", { name: "Family Dashboard" })).toBeVisible({ timeout: 10_000 });
   });
+
+  test("authenticated user visiting /login sees Already Logged In page", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto("/login");
+    await expect(page.getByText("You're already logged in")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Go to Dashboard" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Log Out" })).toBeVisible();
+  });
+
+  test("authenticated user visiting /register-family sees Already Logged In page", async ({ page }) => {
+    await loginAsReferrer(page);
+    await page.goto("/register-family");
+    await expect(page.getByText("You're already logged in")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("Already Logged In page — Go to Dashboard navigates to role dashboard", async ({ page }) => {
+    await loginAsReferrer(page);
+    await page.goto("/register-family");
+    await expect(page.getByText("You're already logged in")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Go to Dashboard" }).click();
+    await expect(page).toHaveURL(/\/referrer\/dashboard/);
+    await expect(page.getByRole("heading", { name: "Referrer Dashboard" })).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("Already Logged In page — Log Out redirects to login", async ({ page }) => {
+    await loginAsFamily(page);
+    await page.goto("/login");
+    await expect(page.getByText("You're already logged in")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Log Out" }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  });
 });

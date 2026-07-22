@@ -27,6 +27,7 @@ export interface ReferrerSummary {
   id: number;
   name: string;
   family_limit: number;
+  family_invite_code: string | null;
   deleted_at: string | null;
 }
 
@@ -36,6 +37,7 @@ export interface ReferrerDetail {
   name: string;
   family_limit: number;
   phone_number: string;
+  family_invite_code: string | null;
   family_count: number;
   deleted_at: string | null;
 }
@@ -43,6 +45,9 @@ export interface ReferrerDetail {
 // ---------------------------------------------------------------------------
 // Family
 // ---------------------------------------------------------------------------
+
+/** Family approval status — mirrors backend FamilyApprovalStatus enum. */
+export type FamilyApprovalStatus = "pending" | "approved" | "rejected";
 
 /** Mirrors FamilySummary. */
 export interface FamilySummary {
@@ -53,6 +58,7 @@ export interface FamilySummary {
   referrer_id: number | null;
   deleted_at: string | null;
   person_count: number;
+  approval_status: FamilyApprovalStatus;
 }
 
 /** Mirrors FamilyDetail (includes computed person_count). */
@@ -67,6 +73,7 @@ export interface FamilyDetail {
   contact_name: string;
   deleted_at: string | null;
   person_count: number;
+  approval_status: FamilyApprovalStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +167,40 @@ export interface ReferrerSelfRegisterPayload {
 export interface ReferrerSelfRegisterResponse {
   user: User;
   referrer: ReferrerSummary;
+}
+
+// ---------------------------------------------------------------------------
+// Family Invite / Self-Registration
+// ---------------------------------------------------------------------------
+
+/** Payload for public family self-registration via invite. */
+export interface FamilySelfRegisterPayload {
+  code: string;
+  family_name: string;
+  family_wish: string;
+  contact_name: string;
+  email: string;
+  password: string;
+  bio?: string | null;
+  address?: string | null;
+  phone_number?: string | null;
+}
+
+/** Response when a family self-registers via invite. */
+export interface FamilySelfRegisterResponse {
+  user: User;
+  family: FamilySummary;
+}
+
+/** Summary for pending families awaiting referrer approval. */
+export interface PendingFamilySummary {
+  id: number;
+  family_name: string;
+  family_wish: string;
+  contact_name: string;
+  approval_status: FamilyApprovalStatus;
+  person_count: number;
+  created_at: string | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password/:token",
   REFERRER_SELF_REGISTER: "/register-referrer",
+  FAMILY_SELF_REGISTER: "/register-family",
 
   // ── Dashboard (all authenticated roles) ────────────────────
   DASHBOARD: "/dashboard",
@@ -28,6 +29,7 @@ export const ROUTES = {
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_DASHBOARD: "/referrer/dashboard",
   REFERRER_FAMILY_DETAIL: "/referrer/families/:id",
+  REFERRER_PENDING_FAMILIES: "/referrer/pending-families",
 
   // ── Family self-service ───────────────────────────────────
   FAMILY_DASHBOARD: "/family/dashboard",

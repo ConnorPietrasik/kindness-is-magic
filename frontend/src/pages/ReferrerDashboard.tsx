@@ -26,6 +26,7 @@ import {
   deleteReferrerFamily,
   getReferrerFamily,
   getReferrerMe,
+  listPendingFamilies,
   listReferrerFamilies,
   patchReferrerMe,
   updateReferrerFamily,
@@ -36,6 +37,7 @@ import type { FamilyPayload, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_ME_KEY = ["referrerMe"];
 const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
+const PENDING_FAMILIES_KEY = ["pendingFamilies"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -47,6 +49,12 @@ export default function ReferrerDashboard() {
   const { data: referrerInfo, isLoading: infoLoading } = useQuery({
     queryKey: REFERRER_ME_KEY,
     queryFn: getReferrerMe,
+  });
+
+  // Pending families count (for the alert card)
+  const { data: pendingFamilies } = useQuery({
+    queryKey: PENDING_FAMILIES_KEY,
+    queryFn: listPendingFamilies,
   });
 
   // Family CRUD via hook (detailFn fetches full record for editing)
@@ -135,10 +143,21 @@ export default function ReferrerDashboard() {
             <div className="space-y-0">
               <InfoRow label="Name" value={referrerInfo?.name} truncate={false} />
               <InfoRow label="Phone" value={referrerInfo?.phone_number} truncate={false} />
+              <InfoRow label="Family Invite Code" value={referrerInfo?.family_invite_code ?? "Generating…"} truncate={false} />
               <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast truncate={false} />
             </div>
           )}
         </Card>
+
+        {/* ── Pending families alert ──────────────────────────── */}
+        {pendingFamilies && pendingFamilies.length > 0 && (
+          <Link
+            to={ROUTES.REFERRER_PENDING_FAMILIES}
+            className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
+          >
+            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your approval →
+          </Link>
+        )}
 
         {/* ── Families ────────────────────────────────────────── */}
         <div className="mb-4 flex items-center justify-between">

@@ -59,8 +59,10 @@ logging.basicConfig(
     handlers=[_handler],
 )
 # Silence noisy third-party loggers at INFO unless explicitly asked
+# slowapi logs ERROR when key_func returns None (dev/e2e rate-limit skip)
 for _quiet in ("uvicorn.access", "watchfiles"):
     logging.getLogger(_quiet).setLevel(logging.WARNING)
+logging.getLogger("slowapi").setLevel(logging.CRITICAL)
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +143,9 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 # ---------------------------------------------------------------------------
 # CORS — required for HttpOnly cookie auth from a different origin
 # ---------------------------------------------------------------------------
-_cors_origins = [os.environ.get("APP_BASE_URL", "http://localhost:3000")]
+_cors_origins = [os.environ.get("APP_BASE_URL", "http://localhost")]
 if os.environ.get("DEBUG", "false").lower() == "true":
-    _cors_origins.extend(["http://localhost", "http://localhost:3000"])
+    _cors_origins.append("http://localhost")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,

@@ -182,3 +182,20 @@ def build_password_reset_email(reset_link: str) -> str:
 <p style="text-align:center;"><a href="{reset_link}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Reset Password</a></p>
 <p>If you didn't request this, you can safely ignore this email. Your password will not change.</p>
 <p>This link expires in 24 hours.</p>"""
+
+
+def build_family_pending_email(family_name: str, referrer_name: str) -> str:
+    """Build the HTML body for a "new family pending approval" notification to the referrer."""
+    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
+<p>A new family, <strong>{family_name}</strong>, has registered through your family invite code and is awaiting your approval.</p>
+<p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Review Pending Families</a></p>
+<p>They can start adding family members while they wait for your approval. You can approve or reject them from your dashboard.</p>"""
+
+
+def build_family_approved_email(family_name: str, referrer_name: str) -> str:
+    """Build the HTML body for a "family approved" notification to the family contact."""
+    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    return f"""<p>Great news, <strong>{family_name}</strong>!</p>
+<p>Your family has been <strong>approved</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
+<p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""

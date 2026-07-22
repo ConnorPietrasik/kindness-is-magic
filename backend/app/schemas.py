@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models import UserRole
+from app.models import FamilyApprovalStatus, UserRole
 from app.user_validation import sanitize_plain_text, validate_email
 
 
@@ -101,6 +101,37 @@ class ReferrerSelfRegister(BaseModel):
         return sanitize_plain_text(v)
 
 
+class FamilySelfRegister(BaseModel):
+    """Public: family self-registers via a referrer's family invite code."""
+
+    code: str
+    family_name: str = Field(..., min_length=1, max_length=40)
+    family_wish: str = Field(..., min_length=1, max_length=400)
+    contact_name: str = Field(..., min_length=1, max_length=40)
+    email: str = Field(..., min_length=1, max_length=120)
+    password: str = Field(..., min_length=8)
+    bio: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
+
+    @field_validator("family_name", "family_wish", "contact_name")
+    @classmethod
+    def clean_text(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("bio", "address")
+    @classmethod
+    def clean_optional_text(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
+
 # ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
@@ -148,6 +179,7 @@ class ReferrerSummary(BaseModel):
     id: int
     name: str
     family_limit: int
+    family_invite_code: str | None = None
     deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -201,6 +233,7 @@ class ReferrerDetail(BaseModel):
     name: str
     family_limit: int
     phone_number: str
+    family_invite_code: str | None = None
     family_count: int
     deleted_at: datetime | None
 
@@ -276,6 +309,7 @@ class FamilyDetail(BaseModel):
     phone_number: Optional[str]
     family_wish: str
     contact_name: str
+    approval_status: FamilyApprovalStatus
     deleted_at: datetime | None
     person_count: int
 
@@ -288,10 +322,32 @@ class FamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     referrer_id: int | None
+    approval_status: FamilyApprovalStatus
     deleted_at: datetime | None
     person_count: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class PendingFamilySummary(BaseModel):
+    """Like FamilySummary but adds approval_status and created_at for the approval queue."""
+
+    id: int
+    family_name: str
+    family_wish: str
+    contact_name: str
+    approval_status: FamilyApprovalStatus
+    person_count: int = 0
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FamilySelfRegisterResponse(BaseModel):
+    """Returned when a family self-registers via invite."""
+
+    user: UserResponse
+    family: FamilySummary
 
 
 class FamilyListResponse(BaseModel):

@@ -2,6 +2,7 @@ import { type ComponentType, Fragment, type LazyExoticComponent, lazy, Suspense 
 import { Navigate, Route, Routes } from "react-router-dom";
 import { HeaderBar } from "./components/HeaderBar";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { PublicRoute } from "./components/PublicRoute";
 import { PageSpinner, Spinner } from "./components/Spinner";
 import { useAuth } from "./context/AuthContext";
 import { ROUTES } from "./lib/routes";
@@ -25,6 +26,8 @@ const FamilyDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => 
 const FamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyPeople"));
 const AdminInviteReferrer: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminInviteReferrer"));
 const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerSelfRegister"));
+const FamilySelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilySelfRegister"));
+const ReferrerPendingFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerPendingFamilies"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -66,11 +69,47 @@ export default function App() {
   return (
     <Suspense fallback={<AppLoadingFallback />}>
       <Routes>
-        {/* ── Public routes ──────────────────────────────────────── */}
-        <Route path={ROUTES.LOGIN} element={<Login />} />
-        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
-        <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
-        <Route path={ROUTES.REFERRER_SELF_REGISTER} element={<ReferrerSelfRegister />} />
+        {/* ── Public routes (redirect if already logged in) ──────── */}
+        <Route
+          path={ROUTES.LOGIN}
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path={ROUTES.FORGOT_PASSWORD}
+          element={
+            <PublicRoute>
+              <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path={ROUTES.RESET_PASSWORD}
+          element={
+            <PublicRoute>
+              <ResetPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path={ROUTES.REFERRER_SELF_REGISTER}
+          element={
+            <PublicRoute>
+              <ReferrerSelfRegister />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path={ROUTES.FAMILY_SELF_REGISTER}
+          element={
+            <PublicRoute>
+              <FamilySelfRegister />
+            </PublicRoute>
+          }
+        />
 
         {/* ── Authenticated routes ───────────────────────────────── */}
         <Route
@@ -162,6 +201,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["referrer"] as UserRole[]}>
               <ReferrerFamilyDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.REFERRER_PENDING_FAMILIES}
+          element={
+            <ProtectedRoute roles={["referrer"] as UserRole[]}>
+              <ReferrerPendingFamilies />
             </ProtectedRoute>
           }
         />

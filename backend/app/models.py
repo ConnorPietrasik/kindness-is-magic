@@ -58,7 +58,7 @@ class ReferrerInviteToken(Base):
     __tablename__ = "referrer_invite_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -93,9 +93,18 @@ class Referrer(Base):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    family_invite_code: Mapped[str | None] = mapped_column(String(10), nullable=True, unique=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     families: Mapped[list["Family"]] = relationship("Family", back_populates="referrer")
+
+
+class FamilyApprovalStatus(str, enum.Enum):
+    """Approval state for families that self-register via invite."""
+
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
 
 
 class Family(Base):
@@ -119,6 +128,11 @@ class Family(Base):
     phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    approval_status: Mapped[FamilyApprovalStatus] = mapped_column(
+        SAEnum(FamilyApprovalStatus, name="family_approval_status", create_constraint=True),
+        server_default="pending",
+        nullable=False,
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     referrer: Mapped["Referrer | None"] = relationship("Referrer", back_populates="families")
