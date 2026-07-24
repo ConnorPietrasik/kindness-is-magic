@@ -15,8 +15,62 @@ export interface User {
   display_name: string | null;
   referrer_id: number | null;
   family_id: number | null;
-  is_active: boolean;
   created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Users
+// ---------------------------------------------------------------------------
+
+/** Payload for admin creating a new user. */
+export interface AdminUserCreate {
+  email: string;
+  password: string;
+  role: UserRole;
+  display_name?: string | null;
+  referrer_id?: number | null;
+  family_id?: number | null;
+}
+
+/** Payload for admin updating an existing user. No password — use reset endpoint. */
+export interface AdminUserUpdate {
+  display_name?: string | null;
+  role?: UserRole;
+  referrer_id?: number | null;
+  family_id?: number | null;
+}
+
+/** Payload for admin resetting a user's password. */
+export interface UserPasswordReset {
+  password: string;
+}
+
+/** Mirrors UserSummary — list item with joined names. */
+export interface UserSummary {
+  id: number;
+  email: string;
+  display_name: string | null;
+  role: UserRole;
+  referrer_id: number | null;
+  family_id: number | null;
+  deleted_at: string | null;
+  created_at: string;
+  referrer_name: string | null;
+  family_name: string | null;
+}
+
+/** Mirrors UserDetail — full user with joined names. */
+export interface UserDetail {
+  id: number;
+  email: string;
+  display_name: string | null;
+  role: UserRole;
+  referrer_id: number | null;
+  family_id: number | null;
+  deleted_at: string | null;
+  created_at: string;
+  referrer_name: string | null;
+  family_name: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,15 +178,6 @@ export interface PersonPayload {
   fun_wish?: string;
   note?: string | null;
   deleted_at?: string | null;
-}
-
-/** Payload for user registration. */
-export interface RegisterPayload {
-  email?: string;
-  password?: string;
-  role?: string;
-  referrer_id?: number | null;
-  family_id?: number | null;
 }
 
 // ---------------------------------------------------------------------------

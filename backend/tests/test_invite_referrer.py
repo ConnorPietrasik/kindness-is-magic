@@ -215,7 +215,6 @@ class TestReferrerSelfRegister:
         # User created
         assert body["user"]["email"] == "newref@test.com"
         assert body["user"]["role"] == "referrer"
-        assert body["user"]["is_active"] is True
         assert "hashed_password" not in body["user"]
 
         # Referrer created with correct family_limit from invite
@@ -416,7 +415,6 @@ class TestInviteRedemptionAtomicity:
             email="existing@test.com",
             hashed_password=get_password_hash("ExistingPass1!"),
             role="admin",
-            is_active=True,
         )
         db.add(existing)
         db.commit()
@@ -511,7 +509,6 @@ class TestFamilySelfRegister:
         # User created with family role
         assert body["user"]["email"] == "smith@test.com"
         assert body["user"]["role"] == "family"
-        assert body["user"]["is_active"] is True
 
         # Family created with pending status
         assert body["family"]["family_name"] == "The Smiths"
@@ -689,7 +686,6 @@ class TestFamilySelfRegister:
             role=UserRole.referrer,
             referrer_id=referrer.id,
             display_name=referrer.name,
-            is_active=True,
         )
         db.add(user)
         db.commit()
@@ -732,7 +728,6 @@ class TestFamilySelfRegister:
             role=UserRole.referrer,
             referrer_id=referrer.id,
             display_name=referrer.name,
-            is_active=True,
         )
         db.add(user)
         db.commit()

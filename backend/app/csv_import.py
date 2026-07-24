@@ -684,7 +684,6 @@ def _process_users(
             display_name=display_name,
             referrer_id=referrer_id,
             family_id=family_id,
-            is_active=True,
         )
         db.add(user)
         db.flush()

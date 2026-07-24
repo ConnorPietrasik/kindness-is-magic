@@ -2,7 +2,7 @@
  * AuthContext — global auth state backed by React Query.
  *
  * Provides:
- *  - user: null | { id, email, role, referrer_id, family_id, is_active }
+ *  - user: null | { id, email, role, referrer_id, family_id }
  *  - isLoading: boolean (true while checking session on mount)
  *  - isAdmin, isReferrer, isFamily: boolean (derived from user?.role)
  *  - login(email, password)

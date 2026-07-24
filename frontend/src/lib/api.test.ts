@@ -82,15 +82,6 @@ describe("auth API functions", () => {
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/logout");
   });
 
-  it("registerRequest — POST /api/auth/register with data, returns raw axios response", async () => {
-    const body = { email: "x@y.com", password: "secret", full_name: "Test" };
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 2 } });
-    const result = await apiModule.registerRequest(body);
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/register", body);
-    // registerRequest does NOT strip .data — returns full axios response
-    expect(result).toEqual({ data: { id: 2 } });
-  });
-
   it("forgotPasswordRequest — POST /api/auth/forgot-password with email", async () => {
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { ok: true } });
     await apiModule.forgotPasswordRequest("user@example.com");
@@ -209,6 +200,68 @@ describe("admin family API functions", () => {
     mockAxiosInstance.delete.mockResolvedValueOnce({ data: null });
     await apiModule.adminDeleteFamily(3);
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/families/3");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Users
+// ---------------------------------------------------------------------------
+describe("admin user API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminListUsers — GET /api/admin/users", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    const result = await apiModule.adminListUsers();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users");
+    expect(result).toEqual({ users: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
+  });
+
+  it("adminListUsers with params — merges filters", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.adminListUsers({ page: 2, page_size: 10, include_deleted: true, role: "admin", search: "test" });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users", {
+      params: { page: 2, page_size: 10, include_deleted: true, role: "admin", search: "test" },
+    });
+  });
+
+  it("adminGetUser — GET /api/admin/users/:id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 5 } });
+    await apiModule.adminGetUser(5);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/5");
+  });
+
+  it("adminCreateUser — POST /api/admin/users", async () => {
+    const body = { email: "test@example.com", password: "secret123", role: "referrer" as const, referrer_id: 1 };
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 10 } });
+    const result = await apiModule.adminCreateUser(body);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/users", body);
+    expect(result).toEqual({ id: 10 });
+  });
+
+  it("adminUpdateUser — PATCH /api/admin/users/:id", async () => {
+    const body = { display_name: "Updated Name" };
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 5 } });
+    await apiModule.adminUpdateUser(5, body);
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/admin/users/5", body);
+  });
+
+  it("adminResetUserPassword — POST /api/admin/users/:id/reset-password", async () => {
+    const body = { password: "newpass123" };
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5 } });
+    await apiModule.adminResetUserPassword(5, body);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/users/5/reset-password", body);
+  });
+
+  it("adminDeleteUser — DELETE /api/admin/users/:id", async () => {
+    mockAxiosInstance.delete.mockResolvedValueOnce({ data: null });
+    await apiModule.adminDeleteUser(5);
+    expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/users/5");
+  });
+
+  it("adminRestoreUser — POST /api/admin/users/:id/restore", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5 } });
+    await apiModule.adminRestoreUser(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/users/5/restore");
   });
 });
 

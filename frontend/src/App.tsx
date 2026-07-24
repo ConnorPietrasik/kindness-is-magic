@@ -10,7 +10,6 @@ import type { UserRole } from "./types";
 
 // Pages (lazy-loaded on route visit)
 const Login: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Login"));
-const Register: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Register"));
 const ForgotPassword: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ResetPassword"));
 const Dashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Dashboard"));
@@ -28,6 +27,7 @@ const AdminInviteReferrer: LazyExoticComponent<ComponentType<unknown>> = lazy(()
 const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerSelfRegister"));
 const FamilySelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilySelfRegister"));
 const ReferrerPendingFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerPendingFamilies"));
+const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -123,10 +123,10 @@ export default function App() {
 
         {/* ── Admin-only ─────────────────────────────────────────── */}
         <Route
-          path={ROUTES.REGISTER}
+          path={ROUTES.ADMIN_USERS}
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <Register />
+              <AdminUsers />
             </ProtectedRoute>
           }
         />

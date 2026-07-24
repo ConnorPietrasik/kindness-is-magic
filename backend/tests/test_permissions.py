@@ -18,17 +18,10 @@ from tests.conftest import login_as
 class TestRequireAdmin:
     """require_admin guard — family-role user denied admin endpoints."""
 
-    def test_family_cannot_register(self, test_client: TestClient, family_user):
-        """Family user is rejected from admin-only /register."""
+    def test_family_cannot_access_admin_users(self, test_client: TestClient, family_user):
+        """Family user is rejected from admin-only /api/admin/users."""
         login_as(test_client, "family@test.com", "FamPass1234!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "hacker@test.com",
-                "password": "HackPass1234!",
-                "role": "admin",
-            },
-        )
+        resp = test_client.get("/api/admin/users")
         assert resp.status_code == 403
 
 
@@ -52,7 +45,9 @@ class TestTamperedToken:
 
 class TestInactiveUserAuth:
     def test_inactive_user_rejected_with_valid_token(self, test_client: TestClient, db):
-        """Even a correctly signed JWT must be rejected for an inactive user."""
+        """Even a correctly signed JWT must be rejected for a deleted user."""
+        from datetime import datetime, timezone
+
         from app.auth import create_access_token
         from app.models import User, UserRole
 
@@ -60,7 +55,7 @@ class TestInactiveUserAuth:
             email="inactive@test.com",
             hashed_password="dummy",
             role=UserRole.admin,
-            is_active=False,
+            deleted_at=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()

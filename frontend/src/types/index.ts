@@ -1,10 +1,12 @@
 /** Re-export all shared types. */
 
 export type {
+  AdminUsersListParams,
   FamilyListResponse,
   PaginationParams,
   PersonListResponse,
   ReferrerListResponse,
+  UserListResponse,
 } from "./api";
 export type { AuthContextValue } from "./auth";
 export type {
@@ -14,6 +16,8 @@ export type {
   CsvValidationStats,
 } from "./csv";
 export type {
+  AdminUserCreate,
+  AdminUserUpdate,
   FamilyApprovalStatus,
   FamilyDetail,
   FamilyPayload,
@@ -31,7 +35,9 @@ export type {
   ReferrerSelfRegisterPayload,
   ReferrerSelfRegisterResponse,
   ReferrerSummary,
-  RegisterPayload,
   User,
+  UserDetail,
+  UserPasswordReset,
   UserRole,
+  UserSummary,
 } from "./domain";

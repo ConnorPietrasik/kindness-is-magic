@@ -15,7 +15,6 @@ const mockUser: User = {
   display_name: null,
   referrer_id: 5,
   family_id: null,
-  is_active: true,
   created_at: "2025-01-14T12:00:00Z",
 };
 

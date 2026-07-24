@@ -63,7 +63,6 @@ class TestReferrerGetSelf:
             hashed_password=get_password_hash("OrphanRef1234!"),
             role=UserRole.referrer,
             referrer_id=ref.id,
-            is_active=True,
         )
         db.add(user)
         db.commit()
@@ -122,7 +121,6 @@ class TestReferrerUpdateSelf:
             hashed_password=get_password_hash("OrphanRef21234!"),
             role=UserRole.referrer,
             referrer_id=ref.id,
-            is_active=True,
         )
         db.add(user)
         db.commit()

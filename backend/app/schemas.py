@@ -14,22 +14,6 @@ from app.user_validation import sanitize_plain_text, validate_email
 # ---------------------------------------------------------------------------
 
 
-class UserCreate(BaseModel):
-    """Admin-only: create a new user."""
-
-    email: str
-    password: str = Field(..., min_length=8)
-    role: UserRole
-    display_name: Optional[str] = Field(None, max_length=40)
-    referrer_id: Optional[int] = None
-    family_id: Optional[int] = None
-
-    @field_validator("email")
-    @classmethod
-    def check_email(cls, v: str) -> str:
-        return validate_email(v)
-
-
 class UserLogin(BaseModel):
     """Login with email + password."""
 
@@ -198,7 +182,6 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
-    is_active: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -471,6 +454,87 @@ class PersonSummary(BaseModel):
 
 class PersonListResponse(BaseModel):
     people: list[PersonSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD schemas — Users
+# ---------------------------------------------------------------------------
+
+
+class AdminUserCreate(BaseModel):
+    """Admin-only: create a new user."""
+
+    email: str
+    password: str = Field(..., min_length=8)
+    role: UserRole
+    display_name: Optional[str] = Field(None, max_length=40)
+    referrer_id: Optional[int] = None
+    family_id: Optional[int] = None
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
+
+
+class AdminUserUpdate(BaseModel):
+    """Admin-only: partial update for a user.
+
+    No password field — password changes go through the dedicated reset endpoint.
+    """
+
+    display_name: Optional[str] = Field(None, max_length=40)
+    role: Optional[UserRole] = None
+    referrer_id: Optional[int] = None
+    family_id: Optional[int] = None
+
+
+class UserPasswordReset(BaseModel):
+    """Admin-only: reset a user's password via the dedicated endpoint."""
+
+    password: str = Field(..., min_length=8)
+
+
+class UserSummary(BaseModel):
+    """User summary for list responses, including joined names."""
+
+    id: int
+    email: str
+    display_name: Optional[str] = None
+    role: UserRole
+    referrer_id: Optional[int] = None
+    family_id: Optional[int] = None
+    deleted_at: Optional[datetime] = None
+    created_at: datetime
+    referrer_name: Optional[str] = None
+    family_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserDetail(BaseModel):
+    """User detail response, including joined names."""
+
+    id: int
+    email: str
+    display_name: Optional[str] = None
+    role: UserRole
+    referrer_id: Optional[int] = None
+    family_id: Optional[int] = None
+    deleted_at: Optional[datetime] = None
+    created_at: datetime
+    referrer_name: Optional[str] = None
+    family_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserListResponse(BaseModel):
+    users: list[UserSummary]
     total: int = 0
     page: int = 1
     page_size: int = 50

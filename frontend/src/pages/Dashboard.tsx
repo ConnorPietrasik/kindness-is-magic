@@ -69,7 +69,7 @@ export default function Dashboard() {
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {user?.role === "admin" && (
             <>
-              <NavCard to={ROUTES.REGISTER} icon="👤" label="Register Users" desc="Create new accounts" />
+              <NavCard to={ROUTES.ADMIN_USERS} icon="👤" label="Manage Users" desc="Create, edit, delete users" />
               <NavCard to={ROUTES.ADMIN_REFERRERS} icon="👥" label="Manage Referrers" desc="Create, edit, delete referrers" />
               <NavCard to={ROUTES.ADMIN_FAMILIES} icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
               <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />

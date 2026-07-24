@@ -29,7 +29,6 @@ from app.database import get_db
 from app.models import User, UserRole, PasswordResetToken, Referrer, Family, FamilyApprovalStatus, ReferrerInviteToken, EmailPreference
 from app.permissions import require_admin
 from app.schemas import (
-    UserCreate,
     UserLogin,
     UserResponse,
     ChangePassword,
@@ -46,25 +45,10 @@ from app.schemas import (
     UpdateProfile,
 )
 from app.rate_limit import limiter
-from app.user_validation import validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-def _resolve_display_name(role: UserRole, referrer_name: str | None = None) -> str | None:
-    """Return the default display_name for a user based on role.
-
-    * admin → "Kindness Fairy"
-    * referrer → referrer's name (if provided)
-    * family → None
-    """
-    if role == UserRole.admin:
-        return "Kindness Fairy"
-    if role == UserRole.referrer and referrer_name:
-        return referrer_name
-    return None
 
 
 def _get_inviter_name(user: User, db: Session) -> str | None:
@@ -118,73 +102,6 @@ def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Register (admin-only)
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/register",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def register(
-    data: UserCreate,
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    """Create a new user. Admin-only."""
-    # Validate role consistency
-    errors = validate_user_role_consistency(data.role, data.referrer_id, data.family_id)
-    if errors:
-        raise HTTPException(status_code=400, detail="; ".join(errors))
-
-    # Check for duplicate email
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Email already registered")
-
-    # Validate foreign key references exist
-    if data.family_id is not None:
-        fam = db.query(Family).filter(Family.id == data.family_id).first()
-        if not fam or fam.deleted_at is not None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Family with id={data.family_id} not found",
-            )
-    if data.referrer_id is not None:
-        if not db.query(Referrer).filter(Referrer.id == data.referrer_id).first():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Referrer with id={data.referrer_id} not found",
-            )
-
-    # Resolve display_name: use provided value or apply role-based default
-    display_name = data.display_name
-    if display_name is None:
-        referrer_name = None
-        if data.referrer_id is not None:
-            ref = db.query(Referrer).filter(Referrer.id == data.referrer_id).first()
-            if ref:
-                referrer_name = ref.name
-        display_name = _resolve_display_name(data.role, referrer_name)
-
-    user = User(
-        email=data.email,
-        hashed_password=get_password_hash(data.password),
-        role=data.role,
-        display_name=display_name,
-        referrer_id=data.referrer_id,
-        family_id=data.family_id,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    logger.info("User created: %s (role=%s)", user.email, user.role)
-    return user
-
-
-# ---------------------------------------------------------------------------
 # Login
 # ---------------------------------------------------------------------------
 
@@ -199,7 +116,7 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    if not user.is_active:
+    if user.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is disabled",
@@ -253,7 +170,7 @@ def refresh(
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).first()
+    user = db.query(User).filter(User.id == int(user_id), User.deleted_at.is_(None)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
@@ -508,7 +425,6 @@ def register_referrer(
         role=UserRole.referrer,
         display_name=data.name,
         referrer_id=referrer.id,
-        is_active=True,
     )
     db.add(user)
     db.flush()  # Get user.id
@@ -577,7 +493,6 @@ def register_family(
         hashed_password=get_password_hash(data.password),
         role=UserRole.family,
         family_id=family.id,
-        is_active=True,
     )
     db.add(user)
     db.flush()  # Get user.id

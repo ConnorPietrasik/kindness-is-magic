@@ -11,6 +11,9 @@
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 import type {
+  AdminUserCreate,
+  AdminUsersListParams,
+  AdminUserUpdate,
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
@@ -28,8 +31,10 @@ import type {
   ReferrerPayload,
   ReferrerSelfRegisterPayload,
   ReferrerSelfRegisterResponse,
-  RegisterPayload,
   User,
+  UserDetail,
+  UserListResponse,
+  UserPasswordReset,
 } from "../types";
 import { normalizePayload } from "./utils";
 
@@ -102,11 +107,6 @@ export function loginRequest(email: string, password: string): Promise<AxiosResp
 
 export function logoutRequest(): Promise<void> {
   return api.post("/api/auth/logout").then(() => undefined);
-}
-
-/** Returns full AxiosResponse — caller destructures `{ data }`. */
-export function registerRequest(data: RegisterPayload): Promise<AxiosResponse> {
-  return api.post("/api/auth/register", data);
 }
 
 export function forgotPasswordRequest(email: string): Promise<unknown> {
@@ -261,6 +261,38 @@ export function adminImportCsv(fileOrText: File | string): Promise<unknown> {
       headers: { "Content-Type": "text/csv" },
     })
     .then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Users
+// ---------------------------------------------------------------------------
+export function adminListUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
+  if (params) return api.get("/api/admin/users", { params }).then((res) => res.data);
+  return api.get("/api/admin/users").then((res) => res.data);
+}
+
+export function adminGetUser(id: number): Promise<UserDetail> {
+  return api.get(`/api/admin/users/${id}`).then((res) => res.data);
+}
+
+export function adminCreateUser(data: AdminUserCreate): Promise<UserDetail> {
+  return api.post("/api/admin/users", data).then((res) => res.data);
+}
+
+export function adminUpdateUser(id: number, data: AdminUserUpdate): Promise<UserDetail> {
+  return api.patch(`/api/admin/users/${id}`, data).then((res) => res.data);
+}
+
+export function adminResetUserPassword(id: number, data: UserPasswordReset): Promise<UserDetail> {
+  return api.post(`/api/admin/users/${id}/reset-password`, data).then((res) => res.data);
+}
+
+export function adminDeleteUser(id: number): Promise<void> {
+  return api.delete(`/api/admin/users/${id}`).then(() => undefined);
+}
+
+export function adminRestoreUser(id: number): Promise<UserDetail> {
+  return api.post(`/api/admin/users/${id}/restore`).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

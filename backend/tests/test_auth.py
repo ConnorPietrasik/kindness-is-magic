@@ -43,6 +43,8 @@ class TestLogin:
         assert resp.status_code == 401
 
     def test_login_inactive_user(self, test_client: TestClient, db: Session):
+        from datetime import datetime, timezone
+
         from app.models import User, UserRole
         from app.auth import get_password_hash
 
@@ -50,7 +52,7 @@ class TestLogin:
             email="disabled@test.com",
             hashed_password=get_password_hash("Pass12345!"),
             role=UserRole.admin,
-            is_active=False,
+            deleted_at=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()
@@ -89,223 +91,6 @@ class TestLogout:
 
 
 # ---------------------------------------------------------------------------
-# Register (admin-only)
-# ---------------------------------------------------------------------------
-
-
-class TestRegister:
-    def test_register_admin_user(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newadmin@test.com",
-                "password": "NewAdminPass1!",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 201
-        body = resp.json()
-        assert body["email"] == "newadmin@test.com"
-        assert body["role"] == "admin"
-        assert "hashed_password" not in body
-
-    def test_register_referrer_user(self, test_client: TestClient, admin_user, referrer_record):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newref@test.com",
-                "password": "NewRefPass1!",
-                "role": "referrer",
-                "referrer_id": referrer_record.id,
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["role"] == "referrer"
-
-    def test_register_family_user(self, test_client: TestClient, admin_user, family_record):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newfam@test.com",
-                "password": "NewFamPass1!",
-                "role": "family",
-                "family_id": family_record.id,
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["role"] == "family"
-
-    def test_register_non_admin_forbidden(self, test_client: TestClient, referrer_user):
-        login_as(test_client, "referrer@test.com", "RefPass1234!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "hacker@test.com",
-                "password": "HackPass1234!",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 403
-
-    def test_register_unauthenticated(self, test_client: TestClient):
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "nobody@test.com",
-                "password": "Pass12345!",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 401
-
-    def test_register_duplicate_email(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        # First creation succeeds
-        resp1 = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "dup@test.com",
-                "password": "DupPass1234!",
-                "role": "admin",
-            },
-        )
-        assert resp1.status_code == 201
-        # Second creation with same email fails
-        resp2 = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "dup@test.com",
-                "password": "DupPass1234!",
-                "role": "admin",
-            },
-        )
-        assert resp2.status_code == 409
-
-    def test_register_admin_with_referrer_id_rejected(self, test_client: TestClient, admin_user, referrer_record):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "badadmin@test.com",
-                "password": "BadPass1234!",
-                "role": "admin",
-                "referrer_id": referrer_record.id,
-            },
-        )
-        assert resp.status_code == 400
-        assert "must not have" in resp.json()["detail"]
-
-    def test_register_referrer_missing_referrer_id(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "badref@test.com",
-                "password": "BadPass1234!",
-                "role": "referrer",
-            },
-        )
-        assert resp.status_code == 400
-        assert "must have a referrer_id" in resp.json()["detail"]
-
-    def test_register_family_missing_family_id(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "badfam@test.com",
-                "password": "BadPass1234!",
-                "role": "family",
-            },
-        )
-        assert resp.status_code == 400
-        assert "must have a family_id" in resp.json()["detail"]
-
-    def test_register_family_with_referrer_id_rejected(self, test_client: TestClient, admin_user, family_record, referrer_record):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "badfam2@test.com",
-                "password": "BadPass1234!",
-                "role": "family",
-                "family_id": family_record.id,
-                "referrer_id": referrer_record.id,
-            },
-        )
-        assert resp.status_code == 400
-        assert "must not have a referrer_id" in resp.json()["detail"]
-
-    def test_register_referrer_with_family_id_rejected(self, test_client: TestClient, admin_user, referrer_record, family_record):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "badref2@test.com",
-                "password": "BadPass1234!",
-                "role": "referrer",
-                "referrer_id": referrer_record.id,
-                "family_id": family_record.id,
-            },
-        )
-        assert resp.status_code == 400
-        assert "must not have a family_id" in resp.json()["detail"]
-
-    def test_register_referrer_id_not_found(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "orphan@test.com",
-                "password": "OrphanPass1!",
-                "role": "referrer",
-                "referrer_id": 99999,
-            },
-        )
-        assert resp.status_code == 404
-
-    def test_register_family_id_not_found(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "orphan2@test.com",
-                "password": "OrphanPass1!",
-                "role": "family",
-                "family_id": 99999,
-            },
-        )
-        assert resp.status_code == 404
-
-    def test_register_password_too_short(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "short@test.com",
-                "password": "Short",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 422  # validation error
-
-    def test_register_invalid_email(self, test_client: TestClient, admin_user):
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "not-an-email",
-                "password": "GoodPass1234!",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 422
-
-
-# ---------------------------------------------------------------------------
 # /api/auth/me
 # ---------------------------------------------------------------------------
 
@@ -318,7 +103,6 @@ class TestMe:
         body = resp.json()
         assert body["email"] == "admin@test.com"
         assert body["role"] == "admin"
-        assert body["is_active"] is True
         assert "hashed_password" not in body
 
     def test_me_requires_auth(self, test_client: TestClient):
@@ -588,7 +372,6 @@ class TestResetPassword:
             email="userb@test.com",
             hashed_password=get_password_hash("UserBPass1234!"),
             role=UserRole.admin,
-            is_active=True,
         )
         db.add(user_b)
         db.commit()
@@ -686,90 +469,6 @@ class TestAuthCookies:
         test_client.post("/api/auth/logout")
         resp = test_client.get("/api/auth/me")
         assert resp.status_code == 401
-
-
-# ---------------------------------------------------------------------------
-# Display name
-# ---------------------------------------------------------------------------
-
-
-class TestDisplayName:
-    def test_register_admin_defaults_to_kindness_fairy(self, test_client: TestClient, admin_user, db: Session):
-        """Admin users created via register get display_name='Kindness Fairy'."""
-        from app.models import User
-
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newadmin@test.com",
-                "password": "NewAdminPass1!",
-                "role": "admin",
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["display_name"] == "Kindness Fairy"
-
-        db.expire_all()
-        user = db.query(User).filter(User.email == "newadmin@test.com").first()
-        assert user.display_name == "Kindness Fairy"
-
-    def test_register_referrer_defaults_to_referrer_name(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Referrer users created via register get display_name from referrer name."""
-        from app.models import User
-
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newref@test.com",
-                "password": "NewRefPass1!",
-                "role": "referrer",
-                "referrer_id": referrer_record.id,
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["display_name"] == referrer_record.name
-
-        db.expire_all()
-        user = db.query(User).filter(User.email == "newref@test.com").first()
-        assert user.display_name == referrer_record.name
-
-    def test_register_explicit_display_name(self, test_client: TestClient, admin_user, db: Session):
-        """Explicit display_name overrides the default."""
-        from app.models import User
-
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "custom@test.com",
-                "password": "CustomPass1!",
-                "role": "admin",
-                "display_name": "Custom Name",
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["display_name"] == "Custom Name"
-
-        db.expire_all()
-        user = db.query(User).filter(User.email == "custom@test.com").first()
-        assert user.display_name == "Custom Name"
-
-    def test_register_family_no_display_name_default(self, test_client: TestClient, admin_user, family_record):
-        """Family users get no display_name default."""
-        login_as(test_client, "admin@test.com", "AdminPass123!")
-        resp = test_client.post(
-            "/api/auth/register",
-            json={
-                "email": "newfam@test.com",
-                "password": "NewFamPass1!",
-                "role": "family",
-                "family_id": family_record.id,
-            },
-        )
-        assert resp.status_code == 201
-        assert resp.json()["display_name"] is None
 
 
 # ---------------------------------------------------------------------------

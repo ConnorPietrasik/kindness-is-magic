@@ -31,7 +31,6 @@ class TestUser:
         assert user.id is not None
         assert user.email == "test@example.com"
         assert user.role == UserRole.admin
-        assert user.is_active is True
         assert user.created_at is not None
 
     def test_user_email_unique(self, db: Session):

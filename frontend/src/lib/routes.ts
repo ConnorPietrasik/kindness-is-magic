@@ -17,7 +17,7 @@ export const ROUTES = {
   DASHBOARD: "/dashboard",
 
   // ── Admin ──────────────────────────────────────────────────
-  REGISTER: "/register",
+  ADMIN_USERS: "/admin/users",
   ADMIN_REFERRERS: "/admin/referrers",
   ADMIN_REFERRER_FAMILIES: "/admin/referrers/:id/families",
   ADMIN_INVITE_REFERRER: "/admin/invite-referrer",

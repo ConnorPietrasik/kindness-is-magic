@@ -95,7 +95,6 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
                     role=UserRole.admin,
                     referrer_id=None,
                     family_id=None,
-                    is_active=True,
                 )
                 db.add(admin)
                 db.commit()
@@ -209,12 +208,14 @@ from app.admin_routes import (  # noqa: E402
     family_admin_router,
     people_admin_router,
     referrer_admin_router,
+    user_admin_router,
 )
 
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
 app.include_router(people_admin_router)
 app.include_router(csv_admin_router)
+app.include_router(user_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)

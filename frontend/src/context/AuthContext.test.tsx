@@ -56,7 +56,6 @@ interface MakeUserOptions {
   role?: "admin" | "referrer" | "family";
   referrer_id?: number | null;
   family_id?: number | null;
-  is_active?: boolean;
   created_at?: string;
 }
 
@@ -66,10 +65,9 @@ function makeUser({
   role = "admin",
   referrer_id = null,
   family_id = null,
-  is_active = true,
   created_at = "2024-01-01T00:00:00",
 }: MakeUserOptions = {}): User {
-  return { id, email, role, display_name: null, referrer_id, family_id, is_active, created_at };
+  return { id, email, role, display_name: null, referrer_id, family_id, created_at };
 }
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ describe("ROUTES constants", () => {
   });
 
   it("has correct admin routes", () => {
-    expect(ROUTES.REGISTER).toBe("/register");
+    expect(ROUTES.ADMIN_USERS).toBe("/admin/users");
     expect(ROUTES.ADMIN_REFERRERS).toBe("/admin/referrers");
     expect(ROUTES.ADMIN_REFERRER_FAMILIES).toBe("/admin/referrers/:id/families");
     expect(ROUTES.ADMIN_FAMILIES).toBe("/admin/families");

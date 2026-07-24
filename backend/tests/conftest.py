@@ -223,7 +223,6 @@ def admin_user(db: Session):
         email="admin@test.com",
         hashed_password=get_password_hash("AdminPass123!"),
         role=UserRole.admin,
-        is_active=True,
     )
     db.add(user)
     db.commit()
@@ -254,7 +253,6 @@ def referrer_user(db: Session, referrer_record):
         hashed_password=get_password_hash("RefPass1234!"),
         role=UserRole.referrer,
         referrer_id=referrer_record.id,
-        is_active=True,
     )
     db.add(user)
     db.commit()
@@ -290,7 +288,6 @@ def family_user(db: Session, family_record):
         hashed_password=get_password_hash("FamPass1234!"),
         role=UserRole.family,
         family_id=family_record.id,
-        is_active=True,
     )
     db.add(user)
     db.commit()
@@ -411,7 +408,6 @@ def referrer_with_full_tree(db: Session):
         hashed_password=get_password_hash("TreeRef1234!"),
         role=UserRole.referrer,
         referrer_id=ref.id,
-        is_active=True,
     )
     db.add(user)
     db.commit()
@@ -439,7 +435,6 @@ def another_referrer(db: Session):
         hashed_password=get_password_hash("AnotherRef1234!"),
         role=UserRole.referrer,
         referrer_id=ref.id,
-        is_active=True,
     )
     db.add(user)
     db.commit()
@@ -473,7 +468,6 @@ def another_family(db: Session, referrer_record):
         hashed_password=get_password_hash("AnotherFam1234!"),
         role=UserRole.family,
         family_id=fam.id,
-        is_active=True,
     )
     db.add(user)
     db.commit()

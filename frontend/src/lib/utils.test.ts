@@ -141,6 +141,16 @@ describe("formatApiError", () => {
     expect(formatApiError(error)).toBe("Detail msg");
   });
 
+  it("joins detail array with semicolons", () => {
+    const error = { response: { data: { detail: ["Admin users must not have referrer_id", "Admin users must not have family_id"] } } };
+    expect(formatApiError(error)).toBe("Admin users must not have referrer_id; Admin users must not have family_id");
+  });
+
+  it("handles single-element detail array", () => {
+    const error = { response: { data: { detail: ["Referrer not found"] } } };
+    expect(formatApiError(error)).toBe("Referrer not found");
+  });
+
   it("returns JSON.stringify fallback when data is an object without detail/msg", () => {
     const error = { response: { data: { code: 500, info: "internal" } } };
     expect(formatApiError(error)).toBe('{"code":500,"info":"internal"}');

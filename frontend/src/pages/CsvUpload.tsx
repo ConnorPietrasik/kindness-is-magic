@@ -36,6 +36,7 @@ export default function CsvUpload() {
       queryClient.invalidateQueries({ queryKey: ["adminReferrers"] });
       queryClient.invalidateQueries({ queryKey: ["adminFamilies"] });
       queryClient.invalidateQueries({ queryKey: ["adminPeople"] });
+      queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
     },
   });
 

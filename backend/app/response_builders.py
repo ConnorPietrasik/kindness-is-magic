@@ -9,7 +9,7 @@ from typing import Type, TypeVar
 from fastapi import HTTPException, status
 from sqlalchemy.orm import DeclarativeBase, Session
 
-from app.models import Family, FamilyApprovalStatus, Person, Referrer
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -89,6 +89,43 @@ def build_family_detail(fam: Family, db: Session) -> dict:
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
     }
+
+
+def build_user_detail(user: User, db: Session) -> dict:
+    """Build a dict suitable for UserDetail, including joined referrer/family names."""
+    referrer_name = None
+    if user.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
+        if ref and ref.deleted_at is None:
+            referrer_name = ref.name
+
+    family_name = None
+    if user.family_id is not None:
+        fam = db.query(Family).filter(Family.id == user.family_id).first()
+        if fam and fam.deleted_at is None:
+            family_name = fam.family_name
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "role": user.role,
+        "referrer_id": user.referrer_id,
+        "family_id": user.family_id,
+        "deleted_at": user.deleted_at,
+        "created_at": user.created_at,
+        "referrer_name": referrer_name,
+        "family_name": family_name,
+    }
+
+
+def build_user_summary(user: User, db: Session) -> dict:
+    """Build a dict suitable for UserSummary, including joined referrer/family names.
+
+    Shares the same shape as UserDetail so the list table can show linked names
+    without N+1 detail fetches.
+    """
+    return build_user_detail(user, db)
 
 
 # ---------------------------------------------------------------------------

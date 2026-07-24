@@ -57,7 +57,6 @@ class TestFamilyGetSelf:
             hashed_password=get_password_hash("OrphanFam1234!"),
             role=UserRole.family,
             family_id=fam.id,
-            is_active=True,
         )
         db.add(user)
         db.commit()
@@ -119,7 +118,6 @@ class TestFamilyUpdateSelf:
             hashed_password=get_password_hash("OrphanUp1234!"),
             role=UserRole.family,
             family_id=fam.id,
-            is_active=True,
         )
         db.add(user)
         db.commit()

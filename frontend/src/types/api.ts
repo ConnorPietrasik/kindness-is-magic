@@ -1,6 +1,6 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
-import type { FamilySummary, PersonSummary, ReferrerSummary } from "./domain";
+import type { FamilySummary, PersonSummary, ReferrerSummary, UserSummary } from "./domain";
 
 // ---------------------------------------------------------------------------
 // Pagination
@@ -11,6 +11,13 @@ export interface PaginationParams {
   page: number;
   page_size: number;
   include_deleted?: boolean;
+}
+
+/** Query params for the admin users list endpoint. */
+export interface AdminUsersListParams extends PaginationParams {
+  include_deleted: boolean;
+  role?: string;
+  search?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +45,15 @@ export interface FamilyListResponse {
 /** Mirrors PersonListResponse. */
 export interface PersonListResponse {
   people: PersonSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Mirrors UserListResponse. */
+export interface UserListResponse {
+  users: UserSummary[];
   total: number;
   page: number;
   page_size: number;
