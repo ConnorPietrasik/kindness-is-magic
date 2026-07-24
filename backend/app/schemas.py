@@ -365,7 +365,7 @@ class PendingFamilySummary(BaseModel):
     contact_name: str
     approval_status: FamilyApprovalStatus
     person_count: int = 0
-    created_at: datetime | None = None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

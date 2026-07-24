@@ -95,6 +95,7 @@ class Referrer(Base):
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     family_invite_code: Mapped[str | None] = mapped_column(String(10), nullable=True, unique=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     families: Mapped[list["Family"]] = relationship("Family", back_populates="referrer")
 
@@ -134,6 +135,7 @@ class Family(Base):
         nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     referrer: Mapped["Referrer | None"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
@@ -156,6 +158,7 @@ class Person(Base):
     fun_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     note: Mapped[str] = mapped_column(String(400), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
 

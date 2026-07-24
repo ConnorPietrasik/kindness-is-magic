@@ -223,7 +223,7 @@ def list_pending_families(
             contact_name=f.contact_name,
             approval_status=f.approval_status,
             person_count=count_map.get(f.id, 0),
-            created_at=f.created_at if hasattr(f, "created_at") else None,
+            created_at=f.created_at,
         )
         for f in families
     ]
