@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -10,7 +10,7 @@ import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
-import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe } from "../lib/api";
+import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
 import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
@@ -26,14 +26,6 @@ export default function Dashboard() {
     await logout();
     navigate(ROUTES.LOGIN);
   };
-
-  const roleColors: Record<UserRole, string> = {
-    admin: "bg-red-600",
-    referrer: "bg-blue-600",
-    family: "bg-green-600",
-  };
-
-  const badgeClass = `${roleColors[user?.role as UserRole] ?? "bg-gray-500"} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
 
   // Referrer-specific queries (only run when role is referrer)
   const { data: referrerInfo, isLoading: referrerLoading } = useQuery({
@@ -57,25 +49,8 @@ export default function Dashboard() {
       <HeaderBar title="Kindness is Magic" right={<LogoutButton onClick={handleLogout} />} />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        {/* Welcome card */}
-        <Card className="mb-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Welcome back!</h2>
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-btn-start to-btn-end text-lg font-bold text-white">
-              {user?.email?.[0]?.toUpperCase() || "?"}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-semibold text-gray-900">{user?.email}</span>
-                <span className={badgeClass}>{humanize(user?.role)}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
-                {user?.referrer_id && <span>Referrer ID: {user.referrer_id}</span>}
-                {user?.family_id && <span>Family ID: {user.family_id}</span>}
-              </div>
-            </div>
-          </div>
-        </Card>
+        {/* Welcome card with inline display name edit */}
+        <WelcomeCard />
 
         {/* Referrer profile card */}
         {user?.role === "referrer" && referrerInfo && <ReferrerInfoCard referrerInfo={referrerInfo} />}
@@ -124,6 +99,105 @@ export default function Dashboard() {
         <ChangePasswordSection />
       </main>
     </div>
+  );
+}
+
+/**
+ * WelcomeCard — greeting card with inline display name edit.
+ */
+function WelcomeCard() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(user?.display_name ?? "");
+
+  const updateProfileMut = useMutation({
+    mutationFn: updateMyProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+
+  const roleColors: Record<UserRole, string> = {
+    admin: "bg-red-600",
+    referrer: "bg-blue-600",
+    family: "bg-green-600",
+  };
+  const badgeClass = `${roleColors[user?.role as UserRole] ?? "bg-gray-500"} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
+
+  useEffect(() => {
+    setValue(user?.display_name ?? "");
+  }, [user?.display_name]);
+
+  // Close edit mode when mutation settles (isPending goes from true → false)
+  const prevPending = useRef(updateProfileMut.isPending);
+  useEffect(() => {
+    if (prevPending.current && !updateProfileMut.isPending && editing) {
+      setEditing(false);
+    }
+    prevPending.current = updateProfileMut.isPending;
+  }, [updateProfileMut.isPending, editing]);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMut.mutate(value);
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setValue(user?.display_name ?? "");
+  };
+
+  const displayName = user?.display_name ?? user?.email ?? "?";
+
+  return (
+    <Card className="mb-6">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">Welcome back!</h2>
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-btn-start to-btn-end text-lg font-bold text-white">
+          {displayName[0]?.toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          {editing ? (
+            <form onSubmit={handleSave} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                maxLength={40}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-base font-semibold text-gray-900 shadow-sm transition-colors focus:border-btn-start focus:outline-none"
+                placeholder="e.g. John Smith"
+                aria-label="Display name"
+              />
+              <Button type="submit" loading={updateProfileMut.isPending} className="h-8 px-3 text-xs">
+                {updateProfileMut.isPending ? "Saving…" : "Save"}
+              </Button>
+              <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={handleCancel}>
+                Cancel
+              </Button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold text-gray-900">{displayName}</span>
+              <span className={badgeClass}>{humanize(user?.role)}</span>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="ml-1 rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                title="Edit display name"
+              >
+                ✏️
+              </button>
+            </div>
+          )}
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+            {user?.referrer_id && <span>Referrer ID: {user.referrer_id}</span>}
+            {user?.family_id && <span>Family ID: {user.family_id}</span>}
+          </div>
+        </div>
+      </div>
+      <MutationErrors mutations={[updateProfileMut]} />
+    </Card>
   );
 }
 

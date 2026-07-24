@@ -9,6 +9,7 @@ import { test, expect } from "@playwright/test";
 import { deletePersonViaApi } from "../helpers/api";
 
 const TEST_CHILD = `Referrer Test ${Math.random().toString(36).slice(2, 6)}`;
+const TEST_DISPLAY_NAME = `Sarah Display ${Math.random().toString(36).slice(2, 6)}`;
 const testData: { personId?: number } = {};
 
 test.describe("Referrer self-service", () => {
@@ -89,5 +90,52 @@ test.describe("Referrer self-service", () => {
 
     /* Role guard should redirect to /dashboard */
     await expect(page).toHaveURL(/\/dashboard/);
+  });
+
+  test("referrer sees seeded display name on dashboard", async ({ page }) => {
+    /* demo_import.csv seeds sarah.chen with display_name "SARAH THE TESTER" */
+    await page.goto("/dashboard");
+
+    /* Wait for the welcome heading (handles lazy-loaded routes) */
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
+
+    /* Assert the display name is rendered in the welcome card */
+    await expect(page.getByText("SARAH THE TESTER", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test("referrer changes display name and it persists after refresh", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard");
+
+    /* Click the pencil icon to edit display name (title="Edit display name") */
+    await page.getByTitle("Edit display name").click();
+
+    /* Fill in the new display name in the inline input */
+    await page.getByPlaceholder("e.g. John Smith").fill(TEST_DISPLAY_NAME);
+
+    /* Submit */
+    await page.getByRole("button", { name: "Save" }).click();
+
+    /* Wait for the mutation to complete — display name should update */
+    await expect(page.getByText(TEST_DISPLAY_NAME)).toBeVisible({
+      timeout: 10_000,
+    });
+
+    /* Refresh the page and verify the display name persists */
+    await page.reload();
+    await expect(page.getByText(TEST_DISPLAY_NAME)).toBeVisible({
+      timeout: 10_000,
+    });
+
+    /* Reset display name back to the seeded value for idempotent re-runs */
+    await page.getByTitle("Edit display name").click();
+    await page.getByPlaceholder("e.g. John Smith").fill("SARAH THE TESTER");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("SARAH THE TESTER")).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

@@ -20,7 +20,7 @@ export const EXPECTED_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly 
   referrers: ["name", "family_limit", "phone_number"],
   families: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number"],
   people: ["family_name", "given_name", "age", "practical_wish", "fun_wish", "title", "note"],
-  users: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id"],
+  users: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"],
 };
 
 /** Regex that matches a section header line (e.g. `# referrers`). */

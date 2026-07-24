@@ -42,7 +42,7 @@ export default defineConfig({
   projects: [
     {
       name: "admin",
-      testMatch: /tests\/(00-seed|admin-crud|csv-upload)\.spec\.ts/,
+      testMatch: /tests\/(00-seed|admin-crud|csv-upload|display-name)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "storage/admin.json",

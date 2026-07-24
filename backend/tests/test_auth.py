@@ -770,3 +770,131 @@ class TestDisplayName:
         )
         assert resp.status_code == 201
         assert resp.json()["display_name"] is None
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/auth/me (update profile)
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateProfile:
+    def test_patch_display_name_success(self, test_client: TestClient, admin_user, db: Session):
+        """Authenticated user can update their display_name."""
+        from app.models import User
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": "My New Name"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] == "My New Name"
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "admin@test.com").first()
+        assert user.display_name == "My New Name"
+
+    def test_patch_display_name_empty_string_sets_null(self, test_client: TestClient, admin_user, db: Session):
+        """Sending an empty string for display_name sets it to null."""
+        from app.models import User
+
+        # First set a name
+        admin_user.display_name = "Existing Name"
+        db.commit()
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] is None
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "admin@test.com").first()
+        assert user.display_name is None
+
+    def test_patch_display_name_null_means_no_op(self, test_client: TestClient, admin_user, db: Session):
+        """Sending null for display_name is a no-op (field stays unchanged)."""
+        from app.models import User
+
+        admin_user.display_name = "Existing Name"
+        db.commit()
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": None},
+        )
+        assert resp.status_code == 200
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "admin@test.com").first()
+        assert user.display_name == "Existing Name"
+
+    def test_patch_display_name_omit_field_no_change(self, test_client: TestClient, admin_user, db: Session):
+        """Omitting display_name entirely leaves it unchanged."""
+        from app.models import User
+
+        admin_user.display_name = "Existing Name"
+        db.commit()
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={},
+        )
+        assert resp.status_code == 200
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "admin@test.com").first()
+        assert user.display_name == "Existing Name"
+
+    def test_patch_requires_auth(self, test_client: TestClient):
+        """Unauthenticated requests are rejected."""
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": "Hacker"},
+        )
+        assert resp.status_code == 401
+
+    def test_patch_display_name_too_long(self, test_client: TestClient, admin_user):
+        """Display name exceeding 40 chars is rejected."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": "A" * 41},
+        )
+        assert resp.status_code == 422
+
+    def test_patch_referrer_can_update(self, test_client: TestClient, referrer_user, db: Session):
+        """Referrer users can also update their display_name."""
+        from app.models import User
+
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": "Referrer New Name"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] == "Referrer New Name"
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "referrer@test.com").first()
+        assert user.display_name == "Referrer New Name"
+
+    def test_patch_family_can_update(self, test_client: TestClient, family_user, db: Session):
+        """Family users can also update their display_name."""
+        from app.models import User
+
+        login_as(test_client, "family@test.com", "FamPass1234!")
+        resp = test_client.patch(
+            "/api/auth/me",
+            json={"display_name": "Family New Name"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] == "Family New Name"
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "family@test.com").first()
+        assert user.display_name == "Family New Name"

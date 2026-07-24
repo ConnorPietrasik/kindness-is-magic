@@ -443,11 +443,11 @@ The Johnsons,Bob,12,New shoes,Game,,Allergic to peanuts
 The Smiths,Charlie,5,Winter coat,Puzzle,,
 
 # users
-email,password,role,referrer_name_or_id,family_name_or_id
-john@example.com,Password123!,referrer,John Smith,
-jane@example.com,Password123!,referrer,Jane Doe,
-mom@example.com,Password123!,family,,The Johnsons
-dad@example.com,Password123!,family,,The Smiths"""
+email,password,role,referrer_name_or_id,family_name_or_id,display_name
+john@example.com,Password123!,referrer,John Smith,,John S.
+jane@example.com,Password123!,referrer,Jane Doe,,Jane D.
+mom@example.com,Password123!,family,,The Johnsons,Mom Johnson
+dad@example.com,Password123!,family,,The Smiths,Dad Smith"""
 
 
 @csv_admin_router.get("/csv-sample")

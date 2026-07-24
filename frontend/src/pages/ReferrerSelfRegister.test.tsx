@@ -12,6 +12,7 @@ const mockUser: User = {
   id: 5,
   email: "newreferrer@example.com",
   role: "referrer",
+  display_name: null,
   referrer_id: 5,
   family_id: null,
   is_active: true,

@@ -121,6 +121,11 @@ export function changePasswordRequest(old_password: string, new_password: string
   return api.put("/api/auth/me/password", { old_password, new_password }).then((res) => res.data);
 }
 
+/** Update the current user's display name. Send `""` to clear it. */
+export function updateMyProfile(displayName: string): Promise<User> {
+  return api.patch("/api/auth/me", { display_name: displayName }).then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Auth — Referrer Invite
 // ---------------------------------------------------------------------------

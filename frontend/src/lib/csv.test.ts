@@ -274,7 +274,18 @@ describe("validateCsvForImport", () => {
     expect(result.valid).toBe(true);
   });
 
-  it("handles users section headers", () => {
+  it("handles users section headers with display_name", () => {
+    const sections = {
+      users: {
+        headers: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"],
+        rows: [["admin@test.com", "secret", "admin", "", "", "Admin User"]],
+      },
+    };
+    const result = validateCsvForImport(sections);
+    expect(result.valid).toBe(true);
+  });
+
+  it("errors when users section is missing display_name", () => {
     const sections = {
       users: {
         headers: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id"],
@@ -282,7 +293,8 @@ describe("validateCsvForImport", () => {
       },
     };
     const result = validateCsvForImport(sections);
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("display_name"))).toBe(true);
   });
 
   it("aggregates errors across multiple sections", () => {
@@ -357,6 +369,6 @@ describe("EXPECTED_HEADERS", () => {
   });
 
   it("has correct users headers", () => {
-    expect(EXPECTED_HEADERS.users).toEqual(["email", "password", "role", "referrer_name_or_id", "family_name_or_id"]);
+    expect(EXPECTED_HEADERS.users).toEqual(["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"]);
   });
 });

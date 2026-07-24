@@ -116,6 +116,20 @@ describe("auth API functions", () => {
       new_password: "new",
     });
   });
+
+  it("updateMyProfile — PATCH /api/auth/me with display_name", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 1, email: "a@b.com", display_name: "Alice" } });
+    const result = await apiModule.updateMyProfile("Alice");
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/auth/me", { display_name: "Alice" });
+    expect(result).toEqual({ id: 1, email: "a@b.com", display_name: "Alice" });
+  });
+
+  it("updateMyProfile — PATCH /api/auth/me with empty string to clear", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 1, email: "a@b.com", display_name: null } });
+    const result = await apiModule.updateMyProfile("");
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/auth/me", { display_name: "" });
+    expect(result).toEqual({ id: 1, email: "a@b.com", display_name: null });
+  });
 });
 
 // ---------------------------------------------------------------------------

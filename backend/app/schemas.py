@@ -101,6 +101,50 @@ class ReferrerSelfRegister(BaseModel):
         return sanitize_plain_text(v)
 
 
+_NOT_PROVIDED = object()
+"""Sentinel: field was not present in the JSON payload."""
+
+_CLEAR = object()
+"""Sentinel: field was sent as empty string — clear to NULL."""
+
+
+class UpdateProfile(BaseModel):
+    """Update the authenticated user's profile."""
+
+    display_name: str | None | object = Field(default=_NOT_PROVIDED)  # type: ignore[assignment]
+
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, v: str | None | object) -> str | None | object:  # type: ignore[misc]
+        if v is _NOT_PROVIDED:
+            return v
+        if v is None:
+            return v  # null → no-op (handled in to_update_dict)
+        if isinstance(v, str) and v == "":
+            return _CLEAR  # "" → clear to NULL
+        if isinstance(v, str) and len(v) > 40:
+            raise ValueError("display_name must be 40 characters or fewer")
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+    def to_update_dict(self) -> dict:
+        """Return only fields that should be written to the DB.
+
+        * Field omitted → excluded (no-op)
+        * Field sent as ``null`` → excluded (no-op)
+        * Field sent as ``""`` → included as ``None`` (clear)
+        * Field sent as ``"Name"`` → included as the string
+        """
+        result: dict[str, str | None] = {}
+        dn = self.display_name
+        if dn is _CLEAR:
+            result["display_name"] = None
+        elif dn is not _NOT_PROVIDED and dn is not None:
+            result["display_name"] = dn  # type: ignore[assignment]
+        return result
+
+
 class FamilySelfRegister(BaseModel):
     """Public: family self-registers via a referrer's family invite code."""
 

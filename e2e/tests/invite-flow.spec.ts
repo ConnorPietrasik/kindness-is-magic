@@ -57,7 +57,8 @@ test.describe("Invite and self-registration", () => {
     /* Should auto-login and redirect to main dashboard */
     await expect(guestPage).toHaveURL(/\/dashboard/, { timeout: 10_000 });
     await expect(guestPage.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
-    await expect(guestPage.getByText("E2E Invite Referrer")).toBeVisible();
+    /* .first() — display name appears in welcome card AND referrer info card (both show the name) */
+    await expect(guestPage.getByText("E2E Invite Referrer").first()).toBeVisible();
 
     await adminContext.close();
     await guestContext.close();

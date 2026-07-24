@@ -69,7 +69,7 @@ function makeUser({
   is_active = true,
   created_at = "2024-01-01T00:00:00",
 }: MakeUserOptions = {}): User {
-  return { id, email, role, referrer_id, family_id, is_active, created_at };
+  return { id, email, role, display_name: null, referrer_id, family_id, is_active, created_at };
 }
 
 // ---------------------------------------------------------------------------

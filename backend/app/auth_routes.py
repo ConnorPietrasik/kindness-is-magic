@@ -43,6 +43,7 @@ from app.schemas import (
     FamilySelfRegister,
     FamilySelfRegisterResponse,
     FamilySummary,
+    UpdateProfile,
 )
 from app.rate_limit import limiter
 from app.user_validation import validate_user_role_consistency
@@ -273,6 +274,22 @@ def refresh(
 @router.get("/me", response_model=UserResponse)
 def me(user: User = Depends(get_current_user)):
     """Return the current authenticated user's profile."""
+    return user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_profile(
+    data: UpdateProfile,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Update the authenticated user's profile (display_name)."""
+    for field, value in data.to_update_dict().items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+
+    logger.info("User updated profile: %s", user.email)
     return user
 
 

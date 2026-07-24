@@ -12,6 +12,7 @@ export interface User {
   id: number;
   email: string;
   role: UserRole;
+  display_name: string | null;
   referrer_id: number | null;
   family_id: number | null;
   is_active: boolean;
