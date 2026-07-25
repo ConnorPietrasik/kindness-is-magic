@@ -49,8 +49,7 @@ class TestCheckUnsubscribed:
     def test_not_unsubscribed(self, db: Session):
         from app.mail import check_unsubscribed
 
-        with patch("app.mail.SessionLocal", return_value=db):
-            result = check_unsubscribed("nobody@example.com")
+        result = check_unsubscribed("nobody@example.com", db)
         assert result is False
 
     def test_is_unsubscribed(self, db: Session):
@@ -61,8 +60,7 @@ class TestCheckUnsubscribed:
         db.add(pref)
         db.commit()
 
-        with patch("app.mail.SessionLocal", return_value=db):
-            result = check_unsubscribed("unsub@example.com")
+        result = check_unsubscribed("unsub@example.com", db)
         assert result is True
 
     def test_case_insensitive(self, db: Session):
@@ -73,8 +71,7 @@ class TestCheckUnsubscribed:
         db.add(pref)
         db.commit()
 
-        with patch("app.mail.SessionLocal", return_value=db):
-            result = check_unsubscribed("LOWER@EXAMPLE.COM")
+        result = check_unsubscribed("LOWER@EXAMPLE.COM", db)
         assert result is True
 
 
@@ -86,17 +83,19 @@ class TestSendEmail:
             return None
 
         mock_send = MagicMock(side_effect=_no_op)
+        mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = send_email("test@example.com", "Test Subject", "<p>Body</p>")
+                result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": True, "reason": None}
 
     def test_returns_unsubscribed_when_blocked(self, monkeypatch):
         from app.mail import send_email
 
+        mock_db = MagicMock()
         with patch("app.mail.check_unsubscribed", return_value=True):
-            result = send_email("test@example.com", "Test Subject", "<p>Body</p>")
+            result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": False, "reason": "unsubscribed"}
 
@@ -107,12 +106,14 @@ class TestSendEmail:
             return None
 
         mock_send = MagicMock(side_effect=_no_op)
+        mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=True):
                 result = send_email(
                     "test@example.com",
                     "Test Subject",
                     "<p>Body</p>",
+                    mock_db,
                     exempt_unsubscribe=True,
                 )
 
@@ -124,9 +125,10 @@ class TestSendEmail:
         async def _raise(*args, **kwargs):
             raise Exception("Connection refused")
 
+        mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", side_effect=_raise):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = send_email("test@example.com", "Test Subject", "<p>Body</p>")
+                result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": False, "reason": "smtp_error"}
 
@@ -137,9 +139,10 @@ class TestSendEmail:
             return None
 
         mock_send = MagicMock(side_effect=_no_op)
+        mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                send_email("test@example.com", "Test Subject", "<p>Custom Body</p>")
+                send_email("test@example.com", "Test Subject", "<p>Custom Body</p>", mock_db)
 
         # Verify the HTML passed to send_message includes branding
         call_args = mock_send.call_args
@@ -155,12 +158,14 @@ class TestSendEmail:
             return None
 
         mock_send = MagicMock(side_effect=_no_op)
+        mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
                 send_email(
                     "test@example.com",
                     "Test Subject",
                     "<p>Body</p>",
+                    mock_db,
                     exempt_unsubscribe=True,
                     include_unsubscribe_link=False,
                 )

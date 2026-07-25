@@ -172,13 +172,12 @@ def db(_setup_test_schema: None) -> Generator[Session, Any, None]:
 def test_client(db: Session) -> Generator[Any, Any, None]:
     """Yield a synchronous TestClient bound to the Postgres test DB.
 
-    Patches both database.get_db (used by route handlers) and
-    SessionLocal (used directly by mail.py) so that all database
+    Patches database.get_db (used by route handlers) and
+    SessionLocal (used directly by some modules) so that all database
     access goes through the test session.
     """
     from app.main import app
     from app import database
-    import app.mail as mail_module
 
     # Patch the DB dependency at the module level
 
@@ -187,16 +186,14 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
 
     app.dependency_overrides[database.get_db] = _override_get_db
 
-    # Patch SessionLocal in both database.py and mail.py (mail imports
-    # its own copy at module level).
+    # Patch SessionLocal in database.py (used by code that doesn't
+    # go through the get_db dependency).
     _original_db_session_local = database.SessionLocal
-    _original_mail_session_local = mail_module.SessionLocal
 
     def _test_session_local(**kwargs):
         return db
 
     database.SessionLocal = _test_session_local  # type: ignore[assignment]
-    mail_module.SessionLocal = _test_session_local  # type: ignore[assignment]
 
     from fastapi.testclient import TestClient
 
@@ -205,7 +202,6 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
 
     app.dependency_overrides.clear()
     database.SessionLocal = _original_db_session_local  # type: ignore[assignment]
-    mail_module.SessionLocal = _original_mail_session_local  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------

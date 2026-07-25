@@ -163,6 +163,29 @@ class Person(Base):
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
 
 
+class RefreshToken(Base):
+    """Server-side refresh token tracking for security.
+
+    Each issued refresh token is recorded here.  On rotation (the /refresh
+    endpoint) the old row is deleted and a new row is inserted.
+    Logout and password-change also delete rows, preventing replay.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", backref="refresh_tokens")
+
+
 class EmailPreference(Base):
     """Unsubscribe blocklist — rows created when a user clicks an unsubscribe link."""
 

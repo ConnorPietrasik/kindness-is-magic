@@ -317,6 +317,7 @@ def _send_family_approved_email(
         to=family_user.email,
         subject="Your family has been approved — Kindness Is Magic ✨",
         html_body=html_body,
+        db=db,
     )
 
 

@@ -172,6 +172,63 @@ class TestChangePassword:
         )
         assert resp.status_code == 401
 
+    def test_change_password_invalidates_reset_tokens(self, test_client: TestClient, admin_user, db: Session):
+        """A password change should invalidate any pending reset tokens."""
+        from app.models import PasswordResetToken
+
+        # Create a pending reset token for the user
+        reset = PasswordResetToken(
+            user_id=admin_user.id,
+            token="test-reset-token-xyz",
+            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+        )
+        db.add(reset)
+        db.commit()
+
+        # Change the password
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.put(
+            "/api/auth/me/password",
+            json={
+                "old_password": "AdminPass123!",
+                "new_password": "NewAdminPass1!",
+            },
+        )
+        assert resp.status_code == 200
+
+        # The old reset token should no longer work
+        resp = test_client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": "test-reset-token-xyz",
+                "new_password": "AnotherPass1!",
+            },
+        )
+        assert resp.status_code == 400
+        assert "Invalid or expired" in resp.json()["detail"]
+
+    def test_change_password_invalidates_refresh_tokens(self, test_client: TestClient, admin_user):
+        """A password change should invalidate all active refresh tokens,
+        forcing re-login on every device."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        refresh_before = test_client.cookies.get("refresh_token")
+
+        # Change the password
+        resp = test_client.put(
+            "/api/auth/me/password",
+            json={
+                "old_password": "AdminPass123!",
+                "new_password": "NewAdminPass1!",
+            },
+        )
+        assert resp.status_code == 200
+
+        # Old refresh token should no longer work
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["detail"].lower()
+
 
 # ---------------------------------------------------------------------------
 # Forgot / Reset password
@@ -451,6 +508,37 @@ class TestRefresh:
         test_client.cookies.set("refresh_token", "garbage-token-value")
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
+
+    def test_refresh_rotates_token_cannot_reuse_old(self, test_client: TestClient, admin_user):
+        """After a successful refresh, the old refresh token is marked used
+        and cannot be presented again."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        old_refresh = test_client.cookies.get("refresh_token")
+
+        # First rotation — succeeds
+        resp1 = test_client.post("/api/auth/refresh")
+        assert resp1.status_code == 200
+        new_refresh = test_client.cookies.get("refresh_token")
+        assert new_refresh != old_refresh
+
+        # Replay the old token — should fail
+        test_client.cookies.set("refresh_token", old_refresh)
+        resp2 = test_client.post("/api/auth/refresh")
+        assert resp2.status_code == 401
+        assert "revoked" in resp2.json()["detail"].lower()
+
+    def test_refresh_after_logout_fails(self, test_client: TestClient, admin_user):
+        """A refresh token extracted before logout cannot be used after logout."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        refresh_before_logout = test_client.cookies.get("refresh_token")
+
+        test_client.post("/api/auth/logout")
+
+        # Try to refresh with the pre-logout token
+        test_client.cookies.set("refresh_token", refresh_before_logout)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------

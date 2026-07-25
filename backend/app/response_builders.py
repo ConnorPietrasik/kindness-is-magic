@@ -1,6 +1,6 @@
 """Shared helpers for building response dicts and applying partial updates.
 
-Centralises logic that was duplicated across admin_routes, referrer_routes,
+Centralises logic that was duplicated across admin_*_routes, referrer_routes,
 and family_routes.
 """
 
@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
+from app.schemas import _CLEAR
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -48,20 +49,22 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
 # ---------------------------------------------------------------------------
 
 
-def build_referrer_detail(ref: Referrer, db: Session) -> dict:
+def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | None = None) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count.
 
     Only *approved*, non-deleted families count toward the family count.
+    Pass ``family_count`` to skip the query when it is already known.
     """
-    family_count = (
-        db.query(Family)
-        .filter(
-            Family.referrer_id == ref.id,
-            Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+    if family_count is None:
+        family_count = (
+            db.query(Family)
+            .filter(
+                Family.referrer_id == ref.id,
+                Family.deleted_at.is_(None),
+                Family.approval_status == FamilyApprovalStatus.approved,
+            )
+            .count()
         )
-        .count()
-    )
     return {
         "id": ref.id,
         "name": ref.name,
@@ -73,9 +76,13 @@ def build_referrer_detail(ref: Referrer, db: Session) -> dict:
     }
 
 
-def build_family_detail(fam: Family, db: Session) -> dict:
-    """Build a dict suitable for FamilyDetail, including person_count."""
-    person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
+def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
+    """Build a dict suitable for FamilyDetail, including person_count.
+
+    Pass ``person_count`` to skip the query when it is already known.
+    """
+    if person_count is None:
+        person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
     return {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
@@ -91,19 +98,35 @@ def build_family_detail(fam: Family, db: Session) -> dict:
     }
 
 
-def build_user_detail(user: User, db: Session) -> dict:
-    """Build a dict suitable for UserDetail, including joined referrer/family names."""
+def build_user_detail(
+    user: User,
+    db: Session,
+    *,
+    referrer_map: dict[int, str] | None = None,
+    family_map: dict[int, str] | None = None,
+) -> dict:
+    """Build a dict suitable for UserDetail, including joined referrer/family names.
+
+    Pass pre-loaded ``referrer_map`` / ``family_map`` (id → name) to avoid
+    per-user queries when building a list response.
+    """
     referrer_name = None
     if user.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
-        if ref and ref.deleted_at is None:
-            referrer_name = ref.name
+        if referrer_map is not None:
+            referrer_name = referrer_map.get(user.referrer_id)
+        else:
+            ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
+            if ref and ref.deleted_at is None:
+                referrer_name = ref.name
 
     family_name = None
     if user.family_id is not None:
-        fam = db.query(Family).filter(Family.id == user.family_id).first()
-        if fam and fam.deleted_at is None:
-            family_name = fam.family_name
+        if family_map is not None:
+            family_name = family_map.get(user.family_id)
+        else:
+            fam = db.query(Family).filter(Family.id == user.family_id).first()
+            if fam and fam.deleted_at is None:
+                family_name = fam.family_name
 
     return {
         "id": user.id,
@@ -119,18 +142,34 @@ def build_user_detail(user: User, db: Session) -> dict:
     }
 
 
-def build_user_summary(user: User, db: Session) -> dict:
-    """Build a dict suitable for UserSummary, including joined referrer/family names.
-
-    Shares the same shape as UserDetail so the list table can show linked names
-    without N+1 detail fetches.
-    """
-    return build_user_detail(user, db)
-
-
 # ---------------------------------------------------------------------------
 # Partial update
 # ---------------------------------------------------------------------------
+
+
+def _resolve_sentinels(obj, update_data: dict) -> dict:
+    """Resolve sentinel values in update data before they are applied.
+
+    * ``0`` on a nullable FK column → ``_CLEAR`` (clear the FK to NULL).
+    * ``""`` on a nullable string column → ``_CLEAR`` (clear to NULL).
+    * ``None`` is left as-is (means "don't change").
+
+    Returns a new dict with resolved values. Callers can inspect the result
+    to see the effective values before committing.
+    """
+    columns = obj.__table__.columns
+    resolved: dict[str, object] = {}
+    for field, value in update_data.items():
+        if value is None:
+            resolved[field] = None
+            continue
+        if _is_clear_sentinel(value) and field in columns and columns[field].nullable:
+            resolved[field] = _CLEAR  # 0 sentinel means "clear FK"
+        elif isinstance(value, str) and value == "" and field in columns and columns[field].nullable:
+            resolved[field] = _CLEAR  # "" on nullable field means "clear"
+        else:
+            resolved[field] = value
+    return resolved
 
 
 def partial_update(obj, schema_model):
@@ -142,12 +181,11 @@ def partial_update(obj, schema_model):
     Fields sent as ``""`` on nullable string columns clear the value (set to ``None``).
     """
     update_data = schema_model.model_dump(exclude_unset=True)
-    columns = obj.__table__.columns
-    for field, value in update_data.items():
+    resolved = _resolve_sentinels(obj, update_data)
+    for field, value in resolved.items():
         if value is None:
             continue  # null means "don't change"
-        if _is_clear_sentinel(value) and field in columns and columns[field].nullable:
-            value = None  # -1 sentinel means "clear FK"
-        if isinstance(value, str) and value == "" and field in columns and columns[field].nullable:
-            value = None  # "" on nullable field means "clear"
-        setattr(obj, field, value)
+        if value is _CLEAR:
+            setattr(obj, field, None)
+        else:
+            setattr(obj, field, value)

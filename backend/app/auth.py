@@ -79,12 +79,39 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(data: dict) -> str:
-    """Create a long-lived JWT refresh token."""
+def create_refresh_token(
+    data: dict,
+    db: "Session | None" = None,
+) -> str:
+    """Create a long-lived JWT refresh token.
+
+    Each token gets a unique ``jti`` claim so that server-side rotation
+    can distinguish the old token from the new one even when all other
+    claims are identical.
+
+    If *db* is provided the raw JWT string is also persisted to the
+    ``refresh_tokens`` table so that the server can validate / revoke it
+    on rotation, logout, and password change.
+    """
+    from app.models import RefreshToken
+
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update(exp=expire, type="refresh")
-    return jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
+    to_encode.update(exp=expire, type="refresh", jti=secrets.token_urlsafe(16))
+    token = jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
+
+    if db is not None:
+        user_id = int(data["sub"])
+        db.add(
+            RefreshToken(
+                user_id=user_id,
+                token=token,
+                expires_at=expire,
+            )
+        )
+        db.flush()
+
+    return token
 
 
 def decode_access_token(token: str) -> dict:

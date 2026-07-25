@@ -26,7 +26,17 @@ from app.auth import (
 )
 from app.mail import send_email, build_invite_email, build_password_reset_email, build_family_pending_email
 from app.database import get_db
-from app.models import User, UserRole, PasswordResetToken, Referrer, Family, FamilyApprovalStatus, ReferrerInviteToken, EmailPreference
+from app.models import (
+    EmailPreference,
+    Family,
+    FamilyApprovalStatus,
+    PasswordResetToken,
+    Referrer,
+    ReferrerInviteToken,
+    RefreshToken,
+    User,
+    UserRole,
+)
 from app.permissions import require_admin
 from app.schemas import (
     UserLogin,
@@ -58,8 +68,8 @@ def _get_inviter_name(user: User, db: Session) -> str | None:
     if user.role == UserRole.admin:
         return "Kindness Fairy"
     if user.role == UserRole.referrer and user.referrer_id:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
-        if ref:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref and ref.deleted_at is None:
             return ref.name
     return None
 
@@ -123,7 +133,7 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
         )
 
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
 
     set_auth_cookies(response, access_token, refresh_token)
 
@@ -141,8 +151,21 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
 
 
 @router.post("/logout")
-def logout(response: Response, _user: User = Depends(get_current_user)):
-    """Clear auth cookies."""
+def logout(
+    response: Response,
+    refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """Clear auth cookies and delete the server-side refresh token."""
+    # Delete the refresh token so it cannot be replayed
+    if refresh_token_cookie:
+        db.query(RefreshToken).filter(
+            RefreshToken.user_id == _user.id,
+            RefreshToken.token == refresh_token_cookie,
+        ).delete(synchronize_session="fetch")
+        db.commit()
+
     clear_auth_cookies(response)
     logger.info("User logged out: %s", _user.email)
     return {"message": "Logged out"}
@@ -161,7 +184,11 @@ def refresh(
     refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
     db: Session = Depends(get_db),
 ):
-    """Rotate refresh token and issue a new access token."""
+    """Rotate refresh token and issue a new access token.
+
+    The old refresh token must exist in the DB (logout, password change,
+    or previous rotation deletes it).
+    """
     if not refresh_token_cookie:
         raise HTTPException(status_code=401, detail="No refresh token")
 
@@ -174,9 +201,25 @@ def refresh(
     if not user:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
-    # Issue new tokens (rotation)
+    # Validate the token exists on the server and delete it (rotation)
+    stored = (
+        db.query(RefreshToken)
+        .filter(
+            RefreshToken.user_id == user.id,
+            RefreshToken.token == refresh_token_cookie,
+        )
+        .first()
+    )
+    if not stored:
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+
+    db.delete(stored)
+
+    # Issue new tokens
     new_access = create_access_token(data={"sub": str(user.id), "role": user.role})
-    new_refresh = create_refresh_token(data={"sub": str(user.id)})
+    new_refresh = create_refresh_token(data={"sub": str(user.id)}, db=db)
+
+    db.commit()
 
     set_auth_cookies(response, new_access, new_refresh)
 
@@ -226,6 +269,18 @@ def change_password(
         raise HTTPException(status_code=400, detail="Incorrect old password")
 
     user.hashed_password = get_password_hash(data.new_password)
+
+    # Invalidate any existing password-reset tokens
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used.is_(False),
+    ).delete(synchronize_session="fetch")
+
+    # Invalidate all refresh tokens (force re-login on all devices)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+    ).delete(synchronize_session="fetch")
+
     db.commit()
 
     logger.info("User changed password: %s", user.email)
@@ -254,7 +309,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
         PasswordResetToken.used.is_(False),
-    ).delete()
+    ).delete(synchronize_session="fetch")
 
     reset = PasswordResetToken(
         user_id=user.id,
@@ -272,6 +327,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
         to=user.email,
         subject="Reset your Kindness Is Magic password",
         html_body=html_body,
+        db=db,
         exempt_unsubscribe=True,
         include_unsubscribe_link=False,
     )
@@ -365,6 +421,7 @@ def invite_referrer(
             to=data.email,
             subject="You're invited to join Kindness Is Magic",
             html_body=html_body,
+            db=db,
         )
         email_sent = result["sent"]
         email_send_reason = result["reason"]
@@ -437,7 +494,7 @@ def register_referrer(
 
     # 5. Issue auth cookies (auto-login)
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
     set_auth_cookies(response, access_token, refresh_token)
 
     logger.info("Referrer self-registered via invite %s: %s", data.code, data.email)
@@ -501,7 +558,7 @@ def register_family(
 
     # 4. Issue auth cookies (auto-login)
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
     set_auth_cookies(response, access_token, refresh_token)
 
     logger.info("Family self-registered via invite: %s (referrer_id=%s)", data.email, referrer.id)
@@ -515,6 +572,7 @@ def register_family(
             to=referrer_user.email,
             subject=f"New family awaiting approval — {data.family_name}",
             html_body=html_body,
+            db=db,
         )
 
     # 6. Build response

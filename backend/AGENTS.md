@@ -36,7 +36,10 @@ All app code lives under `app/` (flat, no subdirectories):
 | `response_builders.py` | Response dict construction |
 | `user_validation.py` | Shared user registration validation logic |
 | `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
-| `admin_routes.py` | Admin CRUD for referrers, families, people |
+| `admin_referrers.py` | Admin CRUD for referrers |
+| `admin_families.py` | Admin CRUD for families |
+| `admin_people.py` | Admin CRUD for people |
+| `admin_users.py` | Admin CRUD for users + CSV import |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
 | `people_routes.py` | Shared person endpoints |
@@ -54,7 +57,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 ## Authorization Rules
 
 - Never trust role or ownership information from request bodies. Always use the authenticated user from JWT dependencies.
-- Admins access resources via `admin_routes.py` only. They are explicitly excluded from self-service guards (`require_family`, `require_referrer`) — e.g. `require_family` rejects admins because they have their own routes.
+- Admins access resources via `admin_*_routes.py` modules only. They are explicitly excluded from self-service guards (`require_family`, `require_referrer`) — e.g. `require_family` rejects admins because they have their own routes.
 - Referrers may only manage their assigned families/people. Families may only access their own data.
 
 ## API Conventions

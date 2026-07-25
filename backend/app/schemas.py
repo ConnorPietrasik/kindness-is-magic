@@ -499,23 +499,6 @@ class UserPasswordReset(BaseModel):
     password: str = Field(..., min_length=8)
 
 
-class UserSummary(BaseModel):
-    """User summary for list responses, including joined names."""
-
-    id: int
-    email: str
-    display_name: Optional[str] = None
-    role: UserRole
-    referrer_id: Optional[int] = None
-    family_id: Optional[int] = None
-    deleted_at: Optional[datetime] = None
-    created_at: datetime
-    referrer_name: Optional[str] = None
-    family_name: Optional[str] = None
-
-    model_config = {"from_attributes": True}
-
-
 class UserDetail(BaseModel):
     """User detail response, including joined names."""
 
@@ -534,7 +517,7 @@ class UserDetail(BaseModel):
 
 
 class UserListResponse(BaseModel):
-    users: list[UserSummary]
+    users: list[UserDetail]
     total: int = 0
     page: int = 1
     page_size: int = 50

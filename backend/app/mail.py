@@ -8,9 +8,9 @@ from urllib.parse import urlencode
 
 import jwt
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
+from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
-from app.database import SessionLocal
 from app.models import EmailPreference
 
 logger = logging.getLogger(__name__)
@@ -70,14 +70,10 @@ def _unsubscribe_url(email: str) -> str:
     return f"{base}{path}?{params}"
 
 
-def check_unsubscribed(email: str) -> bool:
+def check_unsubscribed(email: str, db: Session) -> bool:
     """Query the preference table. Returns True if unsubscribed_at is not null."""
-    db = SessionLocal()
-    try:
-        pref = db.query(EmailPreference).filter(EmailPreference.email == email.lower()).first()
-        return pref is not None and pref.unsubscribed_at is not None
-    finally:
-        db.close()
+    pref = db.query(EmailPreference).filter(EmailPreference.email == email.lower()).first()
+    return pref is not None and pref.unsubscribed_at is not None
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +85,7 @@ def send_email(
     to: str,
     subject: str,
     html_body: str,
+    db: Session,
     exempt_unsubscribe: bool = False,
     include_unsubscribe_link: bool = True,
 ) -> dict:
@@ -102,7 +99,7 @@ def send_email(
     to_addr = to.lower()
 
     # Unsubscribe gate (skip for exempt emails like password resets)
-    if not exempt_unsubscribe and check_unsubscribed(to_addr):
+    if not exempt_unsubscribe and check_unsubscribed(to_addr, db):
         logger.info("Email suppressed (unsubscribed): %s", to_addr)
         return {"sent": False, "reason": "unsubscribed"}
 
