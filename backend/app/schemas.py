@@ -165,14 +165,6 @@ class FamilySelfRegister(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class TokenPair(BaseModel):
-    """Returned in the response body (cookies carry the real tokens)."""
-
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
 class UserResponse(BaseModel):
     """Public user profile — never exposes the password hash."""
 

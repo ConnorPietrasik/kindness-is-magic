@@ -370,6 +370,12 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
 
     user.hashed_password = get_password_hash(data.new_password)
     reset.used = True
+
+    # Invalidate all refresh tokens (force re-login on all devices)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+    ).delete(synchronize_session="fetch")
+
     db.commit()
 
     logger.info("User reset password via token: %s", user.email)
