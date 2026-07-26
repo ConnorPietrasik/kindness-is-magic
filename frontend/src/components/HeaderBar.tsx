@@ -14,7 +14,9 @@ interface HeaderBarProps {
 export const HeaderBar = memo(({ title, left, right }: HeaderBarProps) => (
   <header className="relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6">
     <div className="z-10">{left}</div>
-    <h1 className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold">{title}</h1>
+    <Link to={ROUTES.DASHBOARD} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
+      {title}
+    </Link>
     <div className="z-10">{right}</div>
   </header>
 ));

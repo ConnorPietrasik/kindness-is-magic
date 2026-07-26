@@ -33,6 +33,7 @@ export default function ReferrerSelfRegister() {
   const [form, setForm] = useState<SelfRegisterForm>(emptyForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const update = (key: keyof SelfRegisterForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -120,21 +121,26 @@ export default function ReferrerSelfRegister() {
             }}
           />
 
-          <FormField
-            label="Password"
-            type="password"
-            fieldProps={{
-              value: form.password,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value),
-              required: true,
-              minLength: 8,
-              placeholder: "Min 8 characters",
-            }}
-          />
+          <div>
+            <FormField
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              fieldProps={{
+                value: form.password,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value),
+                required: true,
+                minLength: 8,
+                placeholder: "Min 8 characters",
+              }}
+            />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="mt-1 text-xs text-btn-start hover:underline">
+              {showPassword ? "Hide" : "Show"} password
+            </button>
+          </div>
 
           <FormField
             label="Confirm Password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             fieldProps={{
               value: form.confirmPassword,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("confirmPassword", e.target.value),

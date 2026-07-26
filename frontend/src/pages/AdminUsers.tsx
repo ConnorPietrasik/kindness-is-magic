@@ -667,7 +667,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
           />
           <div className="flex gap-3 pt-1">
             <Button type="submit" className="flex-1" loading={loading}>
-              {loading ? "Resetting…" : "Reset Password"}
+              {loading ? "Resetting…" : "Set Password"}
             </Button>
             <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
               Cancel

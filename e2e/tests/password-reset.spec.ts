@@ -27,12 +27,12 @@ test.describe("Password reset", () => {
 
   test("reset password with invalid token shows error", async ({ page }) => {
     await page.goto("/reset-password/invalid-token-xyz-123");
-    await expect(page.getByRole("heading", { name: "Reset Password" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Set Password" })).toBeVisible();
 
     /* Fill the form with an invalid token */
     await page.getByLabel("New Password").fill("NewPassword123!");
     await page.getByLabel("Confirm Password").fill("NewPassword123!");
-    await page.getByRole("button", { name: "Reset Password" }).click();
+    await page.getByRole("button", { name: "Set Password" }).click();
 
     /* Should show error */
     await expect(page.getByText("Invalid or expired reset token")).toBeVisible({
@@ -42,11 +42,11 @@ test.describe("Password reset", () => {
 
   test("reset password shows mismatch error", async ({ page }) => {
     await page.goto("/reset-password/any-token");
-    await expect(page.getByRole("heading", { name: "Reset Password" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Set Password" })).toBeVisible();
 
     await page.getByLabel("New Password").fill("Password123!");
     await page.getByLabel("Confirm Password").fill("Different123!");
-    await page.getByRole("button", { name: "Reset Password" }).click();
+    await page.getByRole("button", { name: "Set Password" }).click();
 
     /* Client-side validation should catch mismatch */
     await expect(page.getByText("Passwords do not match.")).toBeVisible();

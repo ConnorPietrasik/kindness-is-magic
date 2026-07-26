@@ -21,6 +21,7 @@ import { normalizeUpdatePayload } from "../lib/utils";
 import type { PersonDetail, PersonPayload } from "../types";
 
 const FAMILY_PEOPLE_KEY = ["familyPeople"];
+const FAMILY_ME_KEY = ["familyMe"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -49,6 +50,7 @@ export default function FamilyPeople() {
     createFn: createFamilyPerson,
     updateFn: updatePerson,
     deleteFn: deletePerson,
+    invalidationKeys: [FAMILY_PEOPLE_KEY, FAMILY_ME_KEY],
   });
 
   function handleCreate(formData: PersonPayload) {
