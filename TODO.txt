@@ -1,13 +1,13 @@
-Add a way in the admin view to get from a user to their referrer / family profile
 Add admin approval for referrers; save who created the invite code and make them approve the referrer who claims it before the referrer can do anything. Email-locked codes should not need additional approval, but should still include a reference to the admin who created it.
 Add a CRUD referrer code thing for admins so that they can see which codes are still outstanding (and their locked emails).
 Add more admin views - sort by wishes, sort families by size, etc
-Add family wish-lists - Family ID, family_name, family_wish, then each person name, age, practical_wish, fun_wish, maybe note depending on space
-Add donor users - able to see families, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
-More detailed audit logs
+Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
+More detailed audit logs - maybe audit database info so admins can easily scroll through a specific user's actions?
 Automated database backups
 
 Things that need clarification:
-Add some sort of "purchased" marker for each gift. Maybe a date and purchased_by?
-Clarify if admins should have to approve referrers that they invited
+DONOR - Which fields shown in donor-view cards? Name, city, size, bio, family_wish? family ages?
+DONOR - Filter granularity? Family size, contains a person with age in range?
+Wish sizes; included in wish instructions or add an extra field? Instructions make more sense to avoid bloating fields and adding confusion + if they can't follow instructions anyway then the extra field would become a mess
+Add some sort of "purchased" marker for each gift. Maybe a date and purchased_by? Maybe a general "Admin/referrer note" section? Or just admin note?
 Approval process for referrers to approve their families' wishes and maybe additional admin approval

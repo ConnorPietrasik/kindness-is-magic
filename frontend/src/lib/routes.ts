@@ -35,6 +35,9 @@ export const ROUTES = {
   FAMILY_DASHBOARD: "/family/dashboard",
   FAMILY_PEOPLE: "/family/people",
 
+  // ── Public ────────────────────────────────────────────────
+  FAMILY_WISH_LIST: "/families/:id/wish-list",
+
   // ── Root ──────────────────────────────────────────────────
   ROOT: "/",
 } as const;
@@ -48,4 +51,5 @@ export const route = {
   referrerFamilyDetail: (id: number | string) => `/referrer/families/${id}`,
   adminReferrerFamilies: (id: number | string) => `/admin/referrers/${id}/families`,
   adminFamilyPeople: (id: number | string) => `/admin/families/${id}/people`,
+  familyWishList: (id: number | string) => `/families/${id}/wish-list`,
 };

@@ -92,7 +92,17 @@ export default function AdminFamilyPeople() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
+          <Link
+            to={route.familyWishList(famIdNum)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          >
+            Wish List
+          </Link>
+        </div>
 
         <HierarchicalManage
           backLinkTo={ROUTES.ADMIN_FAMILIES}

@@ -174,7 +174,21 @@ export default function AdminFamilies() {
               {families.map((f) => (
                 <Tr key={f.id}>
                   <Td>{f.id}</Td>
-                  <Td className={f.deleted_at != null ? "text-gray-400" : ""}>{f.family_name}</Td>
+                  <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                    {f.family_name}
+                    {f.deleted_at == null && (
+                      <Link
+                        to={route.familyWishList(f.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Wish List"
+                        className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                        title="Wish List"
+                      >
+                        📝
+                      </Link>
+                    )}
+                  </Td>
                   <Td>{f.contact_name}</Td>
                   <Td>{f.referrer_id != null ? referrerMap[f.referrer_id] || `ID ${f.referrer_id}` : "—"}</Td>
                   {includeDeleted && (

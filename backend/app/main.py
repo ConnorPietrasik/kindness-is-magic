@@ -225,6 +225,13 @@ app.include_router(referrer_router)
 app.include_router(family_router)
 app.include_router(people_router)
 
+# ---------------------------------------------------------------------------
+# Include public family resource routes
+# ---------------------------------------------------------------------------
+from app.families_routes import router as families_router  # noqa: E402
+
+app.include_router(families_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

@@ -536,6 +536,33 @@ class UserListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Public wish-list schemas
+# ---------------------------------------------------------------------------
+
+
+class PersonWishItem(BaseModel):
+    """Single person on the public wish list."""
+
+    given_name: str
+    title: str | None = None
+    age: int
+    practical_wish: str
+    fun_wish: str
+    note: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyWishListResponse(BaseModel):
+    """Public family wish list (family info + per-person wishes)."""
+
+    family_name: str
+    bio: str | None = None
+    family_wish: str
+    people: list[PersonWishItem]
+
+
+# ---------------------------------------------------------------------------
 # Self-service schemas (referrer / family — no FK IDs in body)
 # ---------------------------------------------------------------------------
 

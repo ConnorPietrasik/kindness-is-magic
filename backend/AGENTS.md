@@ -42,6 +42,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
+| `families_routes.py` | Public family resource endpoints |
 | `people_routes.py` | Shared person endpoints |
 | `csv_import.py` | Bulk CSV import (referrers/families/people/users) |
 | `rate_limit.py` | Rate limiter configuration (`slowapi`) |

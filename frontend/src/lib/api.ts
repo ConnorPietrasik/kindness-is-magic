@@ -19,6 +19,7 @@ import type {
   FamilyPayload,
   FamilySelfRegisterPayload,
   FamilySelfRegisterResponse,
+  FamilyWishListResponse,
   PaginationParams,
   PendingFamilySummary,
   PersonDetail,
@@ -359,6 +360,15 @@ export function rejectFamily(id: number): Promise<FamilyDetail> {
 /** Referrer sends a family invite email to a given address. */
 export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyInviteResponse> {
   return api.post("/api/referrer/send-family-invite", { email }).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Public — Family Wish List
+// ---------------------------------------------------------------------------
+
+/** Public: fetch the wish list for a family by ID (no auth required). */
+export function getFamilyWishList(familyId: number): Promise<FamilyWishListResponse> {
+  return api.get(`/api/families/${familyId}/wish-list`).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

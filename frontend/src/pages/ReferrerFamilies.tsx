@@ -165,7 +165,19 @@ export default function ReferrerFamilies() {
                 {families.map((f) => (
                   <Tr key={f.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
-                    <Td className="font-medium text-gray-900">{f.family_name}</Td>
+                    <Td className="font-medium text-gray-900">
+                      {f.family_name}
+                      <Link
+                        to={route.familyWishList(f.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Wish List"
+                        className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                        title="Wish List"
+                      >
+                        📝
+                      </Link>
+                    </Td>
                     <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
                     <Td>{f.contact_name}</Td>
                     <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>

@@ -159,4 +159,27 @@ test.describe("Admin CRUD", () => {
     /* Verify the person is gone from the list */
     await expect(page.getByText(TEST_PERSON)).not.toBeVisible();
   });
+
+  test("wish list link on families page opens in new tab", async ({ page, context }) => {
+    await page.goto("/admin/families");
+    await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
+
+    /* Find The Williams Family row and locate the wish-list emoji link */
+    const williamsRow = page.getByRole("row").filter({ hasText: "The Williams Family" });
+    const wishListLink = williamsRow.getByRole("link", { name: "Wish List" });
+
+    /* Wait for the new tab (popup) while clicking the link */
+    const [popup] = await Promise.all([
+      context.waitForEvent("page"),
+      wishListLink.click(),
+    ]);
+
+    /* Verify the popup loaded the wish-list page */
+    await expect(popup).toHaveURL(/\/families\/\d+\/wish-list/);
+    await expect(popup.getByRole("heading", { name: "The Williams Family" })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await popup.close();
+  });
 });

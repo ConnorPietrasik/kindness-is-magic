@@ -257,6 +257,28 @@ export interface PendingFamilySummary {
 }
 
 // ---------------------------------------------------------------------------
+// Family Wish List (public page)
+// ---------------------------------------------------------------------------
+
+/** Mirrors PersonWishItem on the backend wish-list response. */
+export interface PersonWishItem {
+  given_name: string;
+  title: string | null;
+  age: number;
+  practical_wish: string;
+  fun_wish: string;
+  note: string | null;
+}
+
+/** Mirrors FamilyWishListResponse. */
+export interface FamilyWishListResponse {
+  family_name: string;
+  bio: string | null;
+  family_wish: string;
+  people: PersonWishItem[];
+}
+
+// ---------------------------------------------------------------------------
 // Person
 // ---------------------------------------------------------------------------
 

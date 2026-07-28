@@ -28,6 +28,7 @@ const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy((
 const FamilySelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilySelfRegister"));
 const ReferrerFamilyInvites: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilyInvites"));
 const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
+const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -230,6 +231,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* ── Public (no auth required) ─────────────────────────── */}
+        <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
 
         {/* ── Catch-all: redirect root to login or dashboard ────── */}
         <Route path={ROUTES.ROOT} element={<DashboardRedirect />} />

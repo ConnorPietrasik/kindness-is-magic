@@ -5,9 +5,10 @@
  * 2. Seed the database via the CSV import API.
  * 3. Generate storageState files for admin, referrer, and family roles.
  */
+import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
-import { seedDatabaseViaApi } from "./api";
+import { listFamiliesViaApi, seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -36,6 +37,16 @@ async function globalSetup(_config: FullConfig): Promise<void> {
 
     /* 2. Seed the database via CSV import API */
     await seedDatabaseViaApi(apiContext);
+
+    /* 2b. Discover the CSV-seeded family ID for e2e wish-list tests */
+    const families = await listFamiliesViaApi(apiContext);
+    const williamsFamily = families.families.find((f) => f.family_name === "The Williams Family");
+    if (williamsFamily) {
+      fs.writeFileSync("storage/seed-family-id.json", JSON.stringify({ id: williamsFamily.id }));
+      console.log(`[globalSetup] Saved seeded family ID ${williamsFamily.id} for wish-list tests.`);
+    } else {
+      console.warn("[globalSetup] Could not find 'The Williams Family' in seeded data.");
+    }
 
     /* 3. Generate storageState files for each role */
     await saveStorageState(browser, "admin", {

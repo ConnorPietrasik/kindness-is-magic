@@ -8,6 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -28,6 +29,7 @@ import {
   adminRestoreUser,
   adminUpdateUser,
 } from "../lib/api";
+import { route } from "../lib/routes";
 import { formatApiError, normalizeUpdatePayload } from "../lib/utils";
 import type {
   AdminUserCreate,
@@ -285,7 +287,19 @@ export default function AdminUsers() {
                   <Td>
                     <RoleBadge role={u.role} />
                   </Td>
-                  <Td className="text-sm">{u.referrer_name ?? u.family_name ?? "—"}</Td>
+                  <Td>
+                    {u.referrer_id ? (
+                      <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
+                        {u.referrer_name}
+                      </Link>
+                    ) : u.family_id ? (
+                      <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
+                        {u.family_name}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </Td>
                   {includeDeleted && (
                     <Td>
                       {u.deleted_at != null ? (

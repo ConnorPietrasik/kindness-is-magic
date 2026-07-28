@@ -5,7 +5,7 @@
  * Thin wrapper around HierarchicalManage.
  */
 
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
@@ -28,7 +28,7 @@ import {
   updatePerson,
   updateReferrerFamily,
 } from "../lib/api";
-import { ROUTES } from "../lib/routes";
+import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
 
@@ -48,7 +48,17 @@ export default function ReferrerFamilyDetail() {
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.REFERRER_FAMILIES} label="My Families" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Detail</h2>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Detail</h2>
+          <Link
+            to={route.familyWishList(famIdNum)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          >
+            Wish List
+          </Link>
+        </div>
 
         <HierarchicalManage
           backLinkTo={ROUTES.REFERRER_FAMILIES}

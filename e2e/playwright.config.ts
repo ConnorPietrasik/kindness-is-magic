@@ -67,7 +67,7 @@ export default defineConfig({
     /* Unauthenticated project for auth, invite, and password-reset flows */
     {
       name: "guest",
-      testMatch: /tests\/(auth|invite-flow|password-reset)\.spec\.ts/,
+      testMatch: /tests\/(auth|invite-flow|password-reset|wish-list)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },
