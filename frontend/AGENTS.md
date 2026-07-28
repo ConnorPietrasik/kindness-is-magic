@@ -24,6 +24,7 @@
 - Keep API calls in `src/lib/api.ts`; do not call Axios directly from page components.
 - Prefer reusing components from `src/components/` and `useCrudManager` over duplicating patterns.
 - Use Tailwind utility classes for styling. Do not add CSS modules, styled-components, or arbitrary CSS files. Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or application-wide behavior. Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
+- Every `<input>` and `<FormField>` must have an `autoComplete` attribute. Default to `"off"`; use semantic values (`"email"`, `"tel"`, `"new-password"`, etc.) only on forms where the user enters their own info.
 
 ## React Query Rules
 

@@ -163,6 +163,7 @@ function WelcomeCard() {
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 maxLength={40}
+                autoComplete="off"
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-base font-semibold text-gray-900 shadow-sm transition-colors focus:border-btn-start focus:outline-none"
                 placeholder="e.g. John Smith"
                 aria-label="Display name"
@@ -291,6 +292,7 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
           required: true,
           maxLength: 60,
+          autoComplete: "name",
         }}
       />
       <FormField
@@ -301,6 +303,7 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
           required: true,
           maxLength: 20,
+          autoComplete: "tel",
         }}
       />
       <div className="flex gap-3 pt-1">
@@ -417,7 +420,7 @@ function ChangePasswordSection() {
         <FormField
           label="Current password"
           type="password"
-          fieldProps={{ value: oldPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value), required: true }}
+          fieldProps={{ value: oldPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value), required: true, autoComplete: "current-password" }}
         />
         <FormField
           label="New password"
@@ -428,6 +431,7 @@ function ChangePasswordSection() {
             required: true,
             minLength: 8,
             placeholder: "Min 8 characters",
+            autoComplete: "new-password",
           }}
         />
         <FormField
@@ -437,6 +441,7 @@ function ChangePasswordSection() {
             value: confirmPass,
             onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmPass(e.target.value),
             required: true,
+            autoComplete: "new-password",
             minLength: 8,
           }}
         />

@@ -532,6 +532,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value),
               required: true,
               disabled: isEdit,
+              autoComplete: "off",
             }}
           />
           <FormField
@@ -540,6 +541,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
               value: form.display_name,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("display_name", e.target.value),
               maxLength: 40,
+              autoComplete: "off",
             }}
           />
           <select
@@ -604,6 +606,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
                 required: true,
                 minLength: 8,
                 placeholder: "Min 8 characters",
+                autoComplete: "off",
               }}
             />
             <FormField
@@ -614,6 +617,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("confirmPassword", e.target.value),
                 required: true,
                 minLength: 8,
+                autoComplete: "off",
               }}
             />
           </div>
@@ -667,6 +671,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
               required: true,
               minLength: 8,
               placeholder: "Min 8 characters",
+              autoComplete: "off",
             }}
           />
           <FormField
@@ -677,6 +682,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, confirmPassword: e.target.value }),
               required: true,
               minLength: 8,
+              autoComplete: "off",
             }}
           />
           <div className="flex gap-3 pt-1">

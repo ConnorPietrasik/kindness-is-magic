@@ -399,6 +399,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
               required: true,
               maxLength: 60,
+              autoComplete: "off",
             }}
           />
           <FormField
@@ -410,6 +411,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
               required: true,
               min: 1,
               max: 999,
+              autoComplete: "off",
             }}
           />
           <FormField
@@ -419,6 +421,7 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
               required: true,
               maxLength: 20,
+              autoComplete: "off",
             }}
           />
         </div>

@@ -73,6 +73,7 @@ export default function ResetPassword() {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={8}
+              autoComplete="new-password"
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               placeholder="Min 8 characters"
             />
@@ -89,6 +90,7 @@ export default function ResetPassword() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
+              autoComplete="new-password"
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-base outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               placeholder="Re-enter password"
             />

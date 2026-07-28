@@ -114,6 +114,7 @@ export default function FamilySelfRegister() {
               required: true,
               placeholder: "e.g. KFI-A7X9P2",
               readOnly: isCodeLocked,
+              autoComplete: "off",
               className: isCodeLocked
                 ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
                 : undefined,
@@ -128,6 +129,7 @@ export default function FamilySelfRegister() {
               required: true,
               maxLength: 40,
               placeholder: "e.g. The Smith Family",
+              autoComplete: "family-name",
             }}
           />
 
@@ -139,6 +141,7 @@ export default function FamilySelfRegister() {
               required: true,
               maxLength: 400,
               placeholder: "What would make your family's year special?",
+              autoComplete: "off",
             }}
           />
 
@@ -150,6 +153,7 @@ export default function FamilySelfRegister() {
               required: true,
               maxLength: 40,
               placeholder: "Your name",
+              autoComplete: "name",
             }}
           />
 
@@ -161,6 +165,7 @@ export default function FamilySelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value),
               required: true,
               placeholder: "you@example.com",
+              autoComplete: "email",
             }}
           />
 
@@ -174,6 +179,7 @@ export default function FamilySelfRegister() {
                 required: true,
                 minLength: 8,
                 placeholder: "Min 8 characters",
+                autoComplete: "new-password",
               }}
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="mt-1 text-xs text-btn-start hover:underline">
@@ -190,6 +196,7 @@ export default function FamilySelfRegister() {
               required: true,
               minLength: 8,
               placeholder: "Re-enter password",
+              autoComplete: "new-password",
             }}
           />
 
@@ -201,6 +208,7 @@ export default function FamilySelfRegister() {
                 value: form.bio,
                 onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("bio", e.target.value),
                 rows: 3,
+                autoComplete: "off",
               }}
             />
           </div>
@@ -213,6 +221,7 @@ export default function FamilySelfRegister() {
                 value: form.address,
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("address", e.target.value),
                 maxLength: 200,
+                autoComplete: "street-address",
               }}
             />
           </div>
@@ -226,6 +235,7 @@ export default function FamilySelfRegister() {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
                 maxLength: 20,
                 placeholder: "e.g. 07123 456789",
+                autoComplete: "tel",
               }}
             />
           </div>

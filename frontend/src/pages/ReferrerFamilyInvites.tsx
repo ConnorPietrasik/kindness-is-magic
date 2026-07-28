@@ -133,6 +133,7 @@ function InviteSection() {
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
                   required: true,
                   placeholder: "family@example.com",
+                  autoComplete: "off",
                 }}
               />
               <div className="flex gap-3 pt-1">

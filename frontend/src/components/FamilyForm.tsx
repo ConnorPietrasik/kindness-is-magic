@@ -97,6 +97,7 @@ export function FamilyForm({
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_name", e.target.value),
               required: true,
               maxLength: 40,
+              autoComplete: "off",
             }}
           />
 
@@ -107,6 +108,7 @@ export function FamilyForm({
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
               required: true,
               maxLength: 400,
+              autoComplete: "off",
             }}
           />
 
@@ -117,6 +119,7 @@ export function FamilyForm({
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("contact_name", e.target.value),
               required: true,
               maxLength: 40,
+              autoComplete: "off",
             }}
           />
 
@@ -130,6 +133,7 @@ export function FamilyForm({
                     value: form.bio || "",
                     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("bio", e.target.value),
                     rows: 3,
+                    autoComplete: "off",
                   }}
                 />
               </div>
@@ -142,6 +146,7 @@ export function FamilyForm({
                     value: form.address || "",
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("address", e.target.value),
                     maxLength: 200,
+                    autoComplete: "off",
                   }}
                 />
               </div>
@@ -154,6 +159,7 @@ export function FamilyForm({
                     value: form.phone_number || "",
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
                     maxLength: 20,
+                    autoComplete: "off",
                   }}
                 />
               </div>

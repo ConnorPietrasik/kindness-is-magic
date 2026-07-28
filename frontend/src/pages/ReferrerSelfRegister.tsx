@@ -110,6 +110,7 @@ export default function ReferrerSelfRegister() {
               required: true,
               placeholder: "e.g. KMG-A7X9P2",
               readOnly: isCodeLocked,
+              autoComplete: "off",
               className: isCodeLocked
                 ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
                 : undefined,
@@ -123,6 +124,7 @@ export default function ReferrerSelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
               required: true,
               placeholder: "Your name",
+              autoComplete: "name",
             }}
           />
 
@@ -135,6 +137,7 @@ export default function ReferrerSelfRegister() {
               required: true,
               placeholder: "you@example.com",
               readOnly: isEmailLocked,
+              autoComplete: "email",
               className: isEmailLocked
                 ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
                 : undefined,
@@ -148,6 +151,7 @@ export default function ReferrerSelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
               required: true,
               placeholder: "e.g. 07123 456789",
+              autoComplete: "tel",
             }}
           />
 
@@ -161,6 +165,7 @@ export default function ReferrerSelfRegister() {
                 required: true,
                 minLength: 8,
                 placeholder: "Min 8 characters",
+                autoComplete: "new-password",
               }}
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="mt-1 text-xs text-btn-start hover:underline">
@@ -177,6 +182,7 @@ export default function ReferrerSelfRegister() {
               required: true,
               minLength: 8,
               placeholder: "Re-enter password",
+              autoComplete: "new-password",
             }}
           />
 

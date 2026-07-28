@@ -86,6 +86,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                   update("family_id", e.target.value ? parseInt(e.target.value, 10) : ""),
                 required: true,
                 min: 1,
+                autoComplete: "off",
               }}
             />
           )}
@@ -98,6 +99,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("given_name", e.target.value),
                 required: true,
                 maxLength: 40,
+                autoComplete: "off",
               }}
             />
             <FormField
@@ -109,6 +111,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                 required: true,
                 min: 0,
                 max: 200,
+                autoComplete: "off",
               }}
             />
           </div>
@@ -121,6 +124,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                 value: form.title || "",
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("title", e.target.value),
                 maxLength: 40,
+                autoComplete: "off",
               }}
             />
           </div>
@@ -134,6 +138,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
               required: true,
               maxLength: 400,
               rows: 2,
+              autoComplete: "off",
             }}
           />
 
@@ -146,6 +151,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
               required: true,
               maxLength: 400,
               rows: 2,
+              autoComplete: "off",
             }}
           />
 
@@ -158,6 +164,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                 onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("note", e.target.value),
                 maxLength: 400,
                 rows: 2,
+                autoComplete: "off",
               }}
             />
           </div>

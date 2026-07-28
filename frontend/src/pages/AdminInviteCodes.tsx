@@ -286,6 +286,7 @@ function InviteGenerator() {
             min: 1,
             max: 999,
             placeholder: "e.g. 10",
+            autoComplete: "off",
           }}
         />
         <div>
@@ -296,6 +297,7 @@ function InviteGenerator() {
               value: email,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
               placeholder: "referrer@example.com",
+              autoComplete: "off",
             }}
           />
           <p className="mt-1 text-xs text-gray-400">Including an email locks this invite to that address</p>

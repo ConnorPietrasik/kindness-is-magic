@@ -381,6 +381,7 @@ function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProp
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
           required: true,
           maxLength: 60,
+          autoComplete: "off",
         }}
       />
       <FormField
@@ -391,6 +392,7 @@ function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProp
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
           required: true,
           maxLength: 20,
+          autoComplete: "off",
         }}
       />
       <FormField
@@ -402,6 +404,7 @@ function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProp
           required: true,
           min: 1,
           max: 999,
+          autoComplete: "off",
         }}
       />
       <div className="flex gap-3 pt-1">
