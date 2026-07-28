@@ -165,6 +165,13 @@ class Person(Base):
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
 
+    @validates("given_name", "title")
+    def _capitalize_name_fields(self, key: str, value: str | None) -> str | None:
+        """Always store given_name and title with the first letter capitalized."""
+        if value:
+            return value[:1].upper() + value[1:]
+        return value
+
 
 class RefreshToken(Base):
     """Server-side refresh token tracking for security.

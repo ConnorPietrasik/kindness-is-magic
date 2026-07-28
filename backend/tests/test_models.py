@@ -148,6 +148,45 @@ class TestPerson:
         assert person.title == "Miss"
         assert person.note == "Loves reading"
 
+    def test_person_name_and_title_auto_capitalize(self, db: Session):
+        family = Family(
+            family_name="TestFamily",
+            family_wish="Wish",
+            contact_name="Contact",
+        )
+        db.add(family)
+        db.commit()
+        db.refresh(family)
+
+        # Lowercase inputs should be capitalized on create
+        person = Person(
+            family_id=family.id,
+            given_name="emma",
+            title="daughter",
+            age=6,
+            practical_wish="Coat",
+            fun_wish="Doll",
+        )
+        db.add(person)
+        db.commit()
+        db.refresh(person)
+        assert person.given_name == "Emma"
+        assert person.title == "Daughter"
+
+        # Updating with lowercase should also capitalize
+        person.given_name = "maria-elena"
+        person.title = "granddaughter"
+        db.commit()
+        db.refresh(person)
+        assert person.given_name == "Maria-elena"
+        assert person.title == "Granddaughter"
+
+        # None title should remain None
+        person.title = None
+        db.commit()
+        db.refresh(person)
+        assert person.title is None
+
 
 class TestPasswordResetToken:
     def test_create_token(self, db: Session):
