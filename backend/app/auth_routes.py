@@ -337,7 +337,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
 
     # Send password reset email (exempt from unsubscribe block)
     base = os.environ.get("APP_BASE_URL", "http://localhost")
-    reset_link = f"{base}/reset-password?token={raw_token}"
+    reset_link = f"{base}/reset-password/{raw_token}"
     html_body = build_password_reset_email(reset_link)
     result = send_email(
         to=user.email,
