@@ -306,12 +306,11 @@ class TestReferrerSelfRegister:
         assert "access_token" in resp.cookies
         assert "refresh_token" in resp.cookies
 
-        # Token marked as used
+        # Token marked as redeemed
         from app.models import ReferrerInviteToken
 
         token = db.query(ReferrerInviteToken).filter_by(code=code).first()
         assert token is not None
-        assert token.used is True
         assert token.redeemed_by_user_id is not None
         assert token.redeemed_by_referrer_id is not None
 
@@ -336,7 +335,6 @@ class TestReferrerSelfRegister:
             code="KRI-EXPIR",  # 10 chars max (KRI- + 5)
             family_limit=10,
             expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
-            used=False,
         )
         db.add(invite)
         db.commit()

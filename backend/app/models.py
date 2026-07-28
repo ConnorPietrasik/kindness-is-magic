@@ -2,7 +2,6 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -66,7 +65,6 @@ class ReferrerInviteToken(Base):
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     locked_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     redeemed_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     redeemed_by_referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id"), nullable=True)
@@ -77,15 +75,15 @@ class PasswordResetToken(Base):
 
     __tablename__ = "password_reset_tokens"
     __table_args__ = (
-        # Invalidation query filters (user_id, used) together.
-        Index("ix_password_reset_tokens_user_id_used", "user_id", "used"),
+        # Invalidation query filters (user_id, used_at) together.
+        Index("ix_password_reset_tokens_user_id_used_at", "user_id", "used_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", backref="reset_tokens")

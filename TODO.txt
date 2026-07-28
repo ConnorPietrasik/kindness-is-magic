@@ -1,5 +1,6 @@
-Should frontend tests be scattered or in their own folder?
 Add a way in the admin view to get from a user to their referrer / family profile
+Add admin approval for referrers; save who created the invite code and make them approve the referrer who claims it before the referrer can do anything. Email-locked codes should not need additional approval, but should still include a reference to the admin who created it.
+Add a CRUD referrer code thing for admins so that they can see which codes are still outstanding (and their locked emails).
 Add more admin views - sort by wishes, sort families by size, etc
 Add family wish-lists - Family ID, family_name, family_wish, then each person name, age, practical_wish, fun_wish, maybe note depending on space
 Add donor users - able to see families, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.

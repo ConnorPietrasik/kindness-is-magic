@@ -172,7 +172,7 @@ class TestPasswordResetToken:
         db.refresh(token)
 
         assert token.id is not None
-        assert token.used is False
+        assert token.used_at is None
         assert token.user_id == user.id
 
     def test_token_relationship(self, db: Session):

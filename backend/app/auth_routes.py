@@ -273,7 +273,7 @@ def change_password(
     # Invalidate any existing password-reset tokens
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
-        PasswordResetToken.used.is_(False),
+        PasswordResetToken.used_at.is_(None),
     ).delete(synchronize_session="fetch")
 
     # Invalidate all refresh tokens (force re-login on all devices)
@@ -308,7 +308,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
     # Invalidate any existing reset tokens for this user
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
-        PasswordResetToken.used.is_(False),
+        PasswordResetToken.used_at.is_(None),
     ).delete(synchronize_session="fetch")
 
     reset = PasswordResetToken(
@@ -353,7 +353,7 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
         db.query(PasswordResetToken)
         .filter(
             PasswordResetToken.token == data.token,
-            PasswordResetToken.used.is_(False),
+            PasswordResetToken.used_at.is_(None),
         )
         .first()
     )
@@ -369,7 +369,7 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.hashed_password = get_password_hash(data.new_password)
-    reset.used = True
+    reset.used_at = datetime.now(timezone.utc)
 
     # Invalidate all refresh tokens (force re-login on all devices)
     db.query(RefreshToken).filter(
@@ -405,7 +405,6 @@ def invite_referrer(
         family_limit=data.family_limit,
         locked_email=data.email,
         expires_at=expires_at,
-        used=False,
     )
     db.add(invite)
     db.commit()
@@ -462,7 +461,11 @@ def register_referrer(
 ):
     """Public self-registration: redeem an invite code to create a Referrer + User."""
     # 1. Look up the invite token
-    invite = db.query(ReferrerInviteToken).filter(ReferrerInviteToken.code == data.code, ReferrerInviteToken.used.is_(False)).first()
+    invite = (
+        db.query(ReferrerInviteToken)
+        .filter(ReferrerInviteToken.code == data.code, ReferrerInviteToken.redeemed_by_user_id.is_(None))
+        .first()
+    )
     if not invite:
         raise HTTPException(status_code=400, detail="Invalid or already-used invite code")
 
@@ -503,7 +506,6 @@ def register_referrer(
     db.flush()  # Get user.id
 
     # Mark the invite as redeemed
-    invite.used = True
     invite.redeemed_by_user_id = user.id
     invite.redeemed_by_referrer_id = referrer.id
     db.commit()
