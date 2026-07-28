@@ -20,7 +20,7 @@ export const ROUTES = {
   ADMIN_USERS: "/admin/users",
   ADMIN_REFERRERS: "/admin/referrers",
   ADMIN_REFERRER_FAMILIES: "/admin/referrers/:id/families",
-  ADMIN_INVITE_REFERRER: "/admin/invite-referrer",
+  ADMIN_INVITE_CODES: "/admin/invite-codes",
   ADMIN_FAMILIES: "/admin/families",
   ADMIN_FAMILY_PEOPLE: "/admin/families/:id/people",
   ADMIN_PEOPLE: "/admin/people",

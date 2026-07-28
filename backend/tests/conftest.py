@@ -229,9 +229,15 @@ def admin_user(db: Session):
 @pytest.fixture()
 def referrer_record(db: Session):
     """Create a Referrer row in the DB."""
-    from app.models import Referrer
+    from app.models import Referrer, ReferrerApprovalStatus
 
-    r = Referrer(name="Test Referrer", family_limit=10, phone_number="555-0001", family_invite_code="KFI-TEST01")
+    r = Referrer(
+        name="Test Referrer",
+        family_limit=10,
+        phone_number="555-0001",
+        family_invite_code="KFI-TEST01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
     db.add(r)
     db.commit()
     db.refresh(r)
@@ -369,10 +375,16 @@ def referrer_with_full_tree(db: Session):
 
     Returns a dict with keys: referrer, family, person, user.
     """
-    from app.models import FamilyApprovalStatus, Family, Person, Referrer, User, UserRole
+    from app.models import FamilyApprovalStatus, Family, Person, Referrer, ReferrerApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
-    ref = Referrer(name="Tree Referrer", family_limit=5, phone_number="555-1000", family_invite_code="KFI-TREE01")
+    ref = Referrer(
+        name="Tree Referrer",
+        family_limit=5,
+        phone_number="555-1000",
+        family_invite_code="KFI-TREE01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
     db.add(ref)
     db.commit()
     db.refresh(ref)
@@ -418,10 +430,16 @@ def another_referrer(db: Session):
 
     Returns a dict with keys: referrer, user.
     """
-    from app.models import Referrer, User, UserRole
+    from app.models import Referrer, ReferrerApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
-    ref = Referrer(name="Another Referrer", family_limit=5, phone_number="555-2000", family_invite_code="KFI-ANOT01")
+    ref = Referrer(
+        name="Another Referrer",
+        family_limit=5,
+        phone_number="555-2000",
+        family_invite_code="KFI-ANOT01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
     db.add(ref)
     db.commit()
     db.refresh(ref)

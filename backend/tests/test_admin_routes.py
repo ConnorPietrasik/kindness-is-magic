@@ -123,6 +123,9 @@ class TestAdminCreateReferrer:
         assert body["family_limit"] == 5
         assert body["phone_number"] == "555-1234"
         assert body["family_count"] == 0
+        assert body["approval_status"] == "approved"
+        assert body["approved_by_admin_name"] is not None
+        assert body["approved_at"] is not None
 
 
 class TestAdminUpdateReferrer:

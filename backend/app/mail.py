@@ -211,3 +211,20 @@ def build_family_invite_email(code: str, referrer_name: str) -> str:
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
 <p style="text-align:center;"><a href="{base}/register-family?code={code}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
 <p style="margin-top:16px;">Once you register, your family will be reviewed and you'll be able to share your wishes.</p>"""
+
+
+def build_referrer_approved_email(referrer_name: str) -> str:
+    """Build the HTML body for a referrer approval notification."""
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
+<p>Great news — your Kindness Is Magic account has been <strong>approved</strong> ✨</p>
+<p>You can now send family invite emails and connect families in need with the support and joy they deserve.</p>
+<p style="text-align:center;"><a href="{base}/referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>
+<p style="margin-top:16px;">Thank you for being part of something wonderful.</p>"""
+
+
+def build_referrer_rejected_email(referrer_name: str) -> str:
+    """Build the HTML body for a referrer rejection notification."""
+    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
+<p>Thank you for your interest in helping with Kindness Is Magic.</p>
+<p>After review, we've decided not to move forward with your account at this time. We appreciate your willingness to contribute and wish you the best.</p>"""

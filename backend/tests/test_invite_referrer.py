@@ -328,13 +328,14 @@ class TestReferrerSelfRegister:
         assert resp.status_code == 400
         assert "invite code" in resp.json()["detail"].lower()
 
-    def test_expired_code(self, test_client: TestClient, db: Session):
+    def test_expired_code(self, test_client: TestClient, db: Session, admin_user):
         from app.models import ReferrerInviteToken
 
         invite = ReferrerInviteToken(
             code="KRI-EXPIR",  # 10 chars max (KRI- + 5)
             family_limit=10,
             expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            created_by_admin_id=admin_user.id,
         )
         db.add(invite)
         db.commit()

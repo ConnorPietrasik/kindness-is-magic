@@ -52,6 +52,9 @@ export default function Dashboard() {
         {/* Welcome card with inline display name edit */}
         <WelcomeCard />
 
+        {/* Referrer pending approval banner */}
+        {user?.role === "referrer" && referrerInfo?.approval_status === "pending" && <PendingApprovalBanner />}
+
         {/* Referrer profile card */}
         {user?.role === "referrer" && referrerInfo && <ReferrerInfoCard referrerInfo={referrerInfo} />}
 
@@ -74,12 +77,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_FAMILIES} icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
               <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />
               <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
-              <NavCard
-                to={ROUTES.ADMIN_INVITE_REFERRER}
-                icon="💌"
-                label="Invite Referrers"
-                desc="Generate invite codes for self-registration"
-              />
+              <NavCard to={ROUTES.ADMIN_INVITE_CODES} icon="💌" label="Invite Codes" desc="Manage invite codes for self-registration" />
             </>
           )}
 
@@ -447,5 +445,32 @@ function ChangePasswordSection() {
         </Button>
       </form>
     </Card>
+  );
+}
+
+/**
+ * PendingApprovalBanner — dismissible banner for referrers awaiting approval.
+ */
+function PendingApprovalBanner() {
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-amber-800">
+          Your account is pending approval. You can explore your dashboard — you'll be able to send family invites once approved.
+        </p>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="flex-shrink-0 text-amber-500 transition-colors hover:text-amber-700"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
   );
 }

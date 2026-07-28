@@ -18,6 +18,7 @@
 
 - **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.deleted_at.is_(None)`) unless the endpoint explicitly needs deleted data. Deletion sets `deleted_at` to the current timestamp (`datetime.now(timezone.utc)`) rather than removing the row. For plain Python checks (e.g. in conditionals on already-loaded objects), use `is None` / `is not None`.
 - **Family approval:** Invite-registered families start as `pending`; direct creation is `approved`. Referrer queries filter by `approved` status. Admin sees all.
+- **Referrer approval:** Unlocked invite codes start as `pending`; email-locked codes and admin-created referrers are auto-`approved`. Rejected referrers cannot log in. Pending referrers are blocked from `send-family-invite`.
 - **Invite codes:** Referrer tokens use `KRI-` prefix, family tokens use `KFI-` prefix (10 chars each). Use `generate_invite_code(prefix=...)` from `auth.py`.
 - **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides ownership and admin-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
@@ -38,7 +39,8 @@ All app code lives under `app/` (flat, no subdirectories):
 | `response_builders.py` | Response dict construction |
 | `user_validation.py` | Shared user registration validation logic |
 | `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
-| `admin_referrers.py` | Admin CRUD for referrers |
+| `admin_referrers.py` | Admin CRUD for referrers + approve/reject |
+| `admin_invites.py` | Admin CRUD for referrer invite tokens (list/get/revoke) |
 | `admin_families.py` | Admin CRUD for families |
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |

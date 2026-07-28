@@ -32,6 +32,7 @@ from app.models import (
     FamilyApprovalStatus,
     PasswordResetToken,
     Referrer,
+    ReferrerApprovalStatus,
     ReferrerInviteToken,
     RefreshToken,
     User,
@@ -132,6 +133,15 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
             detail="Account is disabled",
         )
 
+    # Rejected referrers cannot log in
+    if user.role == UserRole.referrer and user.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref and ref.approval_status == ReferrerApprovalStatus.rejected:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Your account has been rejected.",
+            )
+
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
 
@@ -200,6 +210,12 @@ def refresh(
     user = db.query(User).filter(User.id == int(user_id), User.deleted_at.is_(None)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    # Rejected referrers cannot refresh tokens
+    if user.role == UserRole.referrer and user.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref and ref.approval_status == ReferrerApprovalStatus.rejected:
+            raise HTTPException(status_code=401, detail="Your account has been rejected.")
 
     # Validate the token exists on the server and delete it (rotation)
     stored = (
@@ -405,6 +421,7 @@ def invite_referrer(
         family_limit=data.family_limit,
         locked_email=data.email,
         expires_at=expires_at,
+        created_by_admin_id=_admin.id,
     )
     db.add(invite)
     db.commit()
@@ -486,11 +503,24 @@ def register_referrer(
         raise HTTPException(status_code=409, detail="Email already registered")
 
     # 5. Atomic creation inside the session transaction
+    # Email-locked codes auto-approve; unlocked codes start as pending
+    if invite.locked_email:
+        approval_status = ReferrerApprovalStatus.approved
+        approved_by = invite.created_by_admin_id
+        approved_at = datetime.now(timezone.utc)
+    else:
+        approval_status = ReferrerApprovalStatus.pending
+        approved_by = None
+        approved_at = None
+
     referrer = Referrer(
         name=data.name,
         phone_number=data.phone_number,
         family_limit=invite.family_limit,
         family_invite_code=generate_unique_family_invite_code(db),
+        approval_status=approval_status,
+        approved_by_admin_id=approved_by,
+        approved_at=approved_at,
     )
     db.add(referrer)
     db.flush()  # Get referrer.id

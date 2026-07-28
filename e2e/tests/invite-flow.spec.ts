@@ -18,12 +18,16 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-referrer");
+    await adminPage.goto("/admin/invite-codes");
+    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+
+    /* Open the generator form */
+    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit and generate */
     await adminPage.getByLabel("Family Limit").fill("5");
-    await adminPage.getByRole("button", { name: "Generate Invite Code" }).click();
+    await adminPage.getByRole("button", { name: "Generate" }).click();
 
     /* Wait for invite code display */
     const inviteCodeBox = adminPage.getByText("Invite Code Generated");
@@ -69,13 +73,17 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-referrer");
+    await adminPage.goto("/admin/invite-codes");
+    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+
+    /* Open the generator form */
+    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit, email, and generate */
     await adminPage.getByLabel("Family Limit").fill("3");
     await adminPage.getByLabel("Email (optional)").fill(`e2e-email-invite-${SUFFIX}@example.com`);
-    await adminPage.getByRole("button", { name: "Generate Invite Code" }).click();
+    await adminPage.getByRole("button", { name: "Generate" }).click();
 
     /* Wait for invite code display */
     const inviteCodeBox = adminPage.getByText("Invite Code Generated");
@@ -100,11 +108,15 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-referrer");
+    await adminPage.goto("/admin/invite-codes");
+    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+
+    /* Open the generator form */
+    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     await adminPage.getByLabel("Family Limit").fill("3");
-    await adminPage.getByRole("button", { name: "Generate Invite Code" }).click();
+    await adminPage.getByRole("button", { name: "Generate" }).click();
     const inviteCodeBox = adminPage.getByText("Invite Code Generated");
     await expect(inviteCodeBox).toBeVisible({ timeout: 10_000 });
 

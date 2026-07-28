@@ -5,8 +5,10 @@
  * Uses useCrudManager for data fetching and mutations.
  */
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -20,10 +22,12 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
+  adminApproveReferrer,
   adminCreateReferrer,
   adminDeleteReferrer,
   adminGetReferrer,
   adminListReferrers,
+  adminRejectReferrer,
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
@@ -37,9 +41,26 @@ const REFERRER_KEYS = ["adminReferrers"];
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
+  const queryClient = useQueryClient();
   const pagination = usePagination();
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
+  const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
+  const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
+
+  const approveMut = useMutation({
+    mutationFn: adminApproveReferrer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: REFERRER_KEYS });
+    },
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: adminRejectReferrer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: REFERRER_KEYS });
+    },
+  });
 
   // Merge pagination params with include_deleted for cache separation
   const listParams = useMemo<PaginationParams>(
@@ -146,6 +167,7 @@ export default function AdminReferrers() {
               <Th>ID</Th>
               <Th>Name</Th>
               <Th>Family Limit</Th>
+              <Th>Approval</Th>
               {includeDeleted && <Th>Deleted</Th>}
               <Th>Actions</Th>
             </TableHead>
@@ -155,6 +177,9 @@ export default function AdminReferrers() {
                   <Td>{r.id}</Td>
                   <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
                   <Td>{r.family_limit}</Td>
+                  <Td>
+                    <ApprovalBadge status={r.approval_status} />
+                  </Td>
                   {includeDeleted && (
                     <Td>
                       {r.deleted_at != null ? (
@@ -165,13 +190,15 @@ export default function AdminReferrers() {
                     </Td>
                   )}
                   <Td>
-                    <div className="flex gap-2">
-                      <Link
-                        to={route.adminReferrerFamilies(r.id)}
-                        className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                      >
-                        Manage
-                      </Link>
+                    <div className="flex flex-wrap gap-2">
+                      {!r.deleted_at && (
+                        <Link
+                          to={route.adminReferrerFamilies(r.id)}
+                          className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                        >
+                          Manage
+                        </Link>
+                      )}
                       <Button
                         variant="secondary"
                         size="sm"
@@ -192,15 +219,39 @@ export default function AdminReferrers() {
                           Restore
                         </Button>
                       ) : (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => confirmDelete(r.id)}
-                          disabled={deleteMut?.isPending}
-                        >
-                          Delete
-                        </Button>
+                        <>
+                          {r.approval_status !== "approved" && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:border-emerald-700"
+                              onClick={() => setApproveConfirm(r.id)}
+                              disabled={approveMut.isPending || rejectMut.isPending}
+                            >
+                              Approve
+                            </Button>
+                          )}
+                          {r.approval_status !== "rejected" && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => setRejectConfirm(r.id)}
+                              disabled={approveMut.isPending || rejectMut.isPending}
+                            >
+                              Reject
+                            </Button>
+                          )}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => confirmDelete(r.id)}
+                            disabled={deleteMut?.isPending}
+                          >
+                            Delete
+                          </Button>
+                        </>
                       )}
                     </div>
                   </Td>
@@ -250,6 +301,42 @@ export default function AdminReferrers() {
           confirmVariant="secondary"
         />
 
+        {/* Approve confirmation */}
+        <ConfirmDialog
+          open={approveConfirm !== null}
+          title={<>Approve this referrer?</>}
+          description="They will be able to send family invite emails and will receive a notification."
+          onConfirm={() => {
+            if (approveConfirm != null) {
+              approveMut.mutate(approveConfirm);
+              setApproveConfirm(null);
+            }
+          }}
+          onCancel={() => setApproveConfirm(null)}
+          loading={approveMut.isPending}
+          confirmLabel="Yes, approve"
+          loadingLabel="Approving…"
+          confirmVariant="secondary"
+        />
+
+        {/* Reject confirmation */}
+        <ConfirmDialog
+          open={rejectConfirm !== null}
+          title={<>Reject this referrer?</>}
+          description="They will lose access and will receive a notification."
+          onConfirm={() => {
+            if (rejectConfirm != null) {
+              rejectMut.mutate(rejectConfirm);
+              setRejectConfirm(null);
+            }
+          }}
+          onCancel={() => setRejectConfirm(null)}
+          loading={rejectMut.isPending}
+          confirmLabel="Yes, reject"
+          loadingLabel="Rejecting…"
+          confirmVariant="danger"
+        />
+
         {/* Pagination */}
         <Pagination
           page={pagination.page}
@@ -261,7 +348,11 @@ export default function AdminReferrers() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[createMut, updateMut, deleteMut, restoreMut, approveMut, rejectMut].filter(
+            (m): m is NonNullable<typeof m> => m != null
+          )}
+        />
       </main>
     </div>
   );

@@ -65,6 +65,14 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
             )
             .count()
         )
+
+    # Resolve approved_by_admin name
+    approved_by_name: str | None = None
+    if ref.approved_by_admin_id is not None:
+        admin = db.query(User).filter(User.id == ref.approved_by_admin_id).first()
+        if admin and admin.deleted_at is None:
+            approved_by_name = admin.display_name or admin.email
+
     return {
         "id": ref.id,
         "name": ref.name,
@@ -72,6 +80,9 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
         "phone_number": ref.phone_number,
         "family_invite_code": ref.family_invite_code,
         "family_count": family_count,
+        "approval_status": ref.approval_status,
+        "approved_by_admin_name": approved_by_name,
+        "approved_at": ref.approved_at,
         "deleted_at": ref.deleted_at,
     }
 

@@ -12,7 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
@@ -391,6 +391,13 @@ def send_family_invite(
     from app.mail import build_family_invite_email, send_email
 
     ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
+
+    # Only approved referrers can send family invite emails
+    if ref.approval_status != ReferrerApprovalStatus.approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can send invites once your account is approved.",
+        )
 
     html_body = build_family_invite_email(
         code=ref.family_invite_code,

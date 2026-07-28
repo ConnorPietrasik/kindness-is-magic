@@ -162,6 +162,61 @@ describe("admin referrer API functions", () => {
     await apiModule.adminDeleteReferrer(5);
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/referrers/5");
   });
+
+  it("adminRestoreReferrer — POST /api/admin/referrers/:id/restore", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5 } });
+    await apiModule.adminRestoreReferrer(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/referrers/5/restore");
+  });
+
+  it("adminApproveReferrer — POST /api/admin/referrers/:id/approve", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "approved" } });
+    const result = await apiModule.adminApproveReferrer(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/referrers/5/approve");
+    expect(result).toEqual({ id: 5, approval_status: "approved" });
+  });
+
+  it("adminRejectReferrer — POST /api/admin/referrers/:id/reject", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "rejected" } });
+    const result = await apiModule.adminRejectReferrer(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/referrers/5/reject");
+    expect(result).toEqual({ id: 5, approval_status: "rejected" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Invite Tokens
+// ---------------------------------------------------------------------------
+describe("admin invite API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminListInvites — GET /api/admin/invites", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { invites: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    const result = await apiModule.adminListInvites();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/invites");
+    expect(result).toEqual({ invites: [], total: 0, page: 1, page_size: 50, total_pages: 0 });
+  });
+
+  it("adminListInvites with params", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { invites: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListInvites({ page: 2, page_size: 10, redeemed: true, expired: false });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/invites", {
+      params: { page: 2, page_size: 10, redeemed: true, expired: false },
+    });
+  });
+
+  it("adminGetInvite — GET /api/admin/invites/:id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 3, code: "KMG-ABC" } });
+    await apiModule.adminGetInvite(3);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/invites/3");
+  });
+
+  it("adminRevokeInvite — POST /api/admin/invites/:id/revoke", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 3, code: "KMG-ABC" } });
+    const result = await apiModule.adminRevokeInvite(3);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/invites/3/revoke");
+    expect(result).toEqual({ id: 3, code: "KMG-ABC" });
+  });
 });
 
 // ---------------------------------------------------------------------------

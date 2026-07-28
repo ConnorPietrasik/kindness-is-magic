@@ -207,12 +207,14 @@ from app.admin_referrers import referrer_admin_router  # noqa: E402
 from app.admin_families import family_admin_router  # noqa: E402
 from app.admin_people import people_admin_router  # noqa: E402
 from app.admin_users import csv_admin_router, user_admin_router  # noqa: E402
+from app.admin_invites import invite_admin_router  # noqa: E402
 
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
 app.include_router(people_admin_router)
 app.include_router(csv_admin_router)
 app.include_router(user_admin_router)
+app.include_router(invite_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)

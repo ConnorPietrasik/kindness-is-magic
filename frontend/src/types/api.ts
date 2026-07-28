@@ -1,6 +1,6 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
-import type { FamilySummary, PersonSummary, ReferrerSummary, UserSummary } from "./domain";
+import type { FamilySummary, PersonSummary, ReferrerInviteSummary, ReferrerSummary, UserSummary } from "./domain";
 
 // ---------------------------------------------------------------------------
 // Pagination
@@ -54,6 +54,15 @@ export interface PersonListResponse {
 /** Mirrors UserListResponse. */
 export interface UserListResponse {
   users: UserSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Mirrors InviteListResponse. */
+export interface InviteListResponse {
+  invites: ReferrerInviteSummary[];
   total: number;
   page: number;
   page_size: number;

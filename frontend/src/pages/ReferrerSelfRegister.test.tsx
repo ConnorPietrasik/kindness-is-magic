@@ -25,6 +25,9 @@ const mockResponse: ReferrerSelfRegisterResponse = {
     name: "New Referrer",
     family_limit: 10,
     family_invite_code: "KFI-ABC123",
+    approval_status: "pending",
+    approved_by_admin_name: null,
+    approved_at: null,
     deleted_at: null,
   },
 };

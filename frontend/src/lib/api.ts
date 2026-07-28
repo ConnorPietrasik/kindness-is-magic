@@ -20,6 +20,7 @@ import type {
   FamilySelfRegisterPayload,
   FamilySelfRegisterResponse,
   FamilyWishListResponse,
+  InviteListResponse,
   PaginationParams,
   PendingFamilySummary,
   PersonDetail,
@@ -29,6 +30,7 @@ import type {
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteResponse,
+  ReferrerInviteSummary,
   ReferrerListResponse,
   ReferrerPayload,
   ReferrerSelfRegisterPayload,
@@ -175,6 +177,14 @@ export function adminRestoreReferrer(id: number): Promise<ReferrerDetail> {
   return api.post(`/api/admin/referrers/${id}/restore`).then((res) => res.data);
 }
 
+export function adminApproveReferrer(id: number): Promise<ReferrerDetail> {
+  return api.post(`/api/admin/referrers/${id}/approve`).then((res) => res.data);
+}
+
+export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
+  return api.post(`/api/admin/referrers/${id}/reject`).then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
@@ -239,6 +249,28 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
 export function adminListFamilyPeople(fid: number, params?: PaginationParams): Promise<PersonListResponse> {
   if (params) return api.get("/api/admin/people", { params: { ...params, family_id: fid } }).then((res) => res.data);
   return api.get("/api/admin/people", { params: { family_id: fid } }).then((res) => res.data);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Invite Tokens
+// ---------------------------------------------------------------------------
+
+export interface InviteListParams extends PaginationParams {
+  redeemed?: boolean;
+  expired?: boolean;
+}
+
+export function adminListInvites(params?: InviteListParams): Promise<InviteListResponse> {
+  if (params) return api.get("/api/admin/invites", { params }).then((res) => res.data);
+  return api.get("/api/admin/invites").then((res) => res.data);
+}
+
+export function adminGetInvite(id: number): Promise<ReferrerInviteSummary> {
+  return api.get(`/api/admin/invites/${id}`).then((res) => res.data);
+}
+
+export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
+  return api.post(`/api/admin/invites/${id}/revoke`).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

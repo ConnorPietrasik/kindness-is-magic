@@ -39,6 +39,9 @@ function InviteSection() {
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
 
+  const isApproved = referrerInfo?.approval_status === "approved";
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
   const sendInviteMut = useMutation({
     mutationFn: sendReferrerFamilyInvite,
     onSuccess: (data) => {
@@ -83,12 +86,28 @@ function InviteSection() {
         <h3 className="mb-2 text-base font-semibold text-gray-900">Family Invite Code</h3>
         <p className="mb-4 text-sm text-gray-500">Share this code with families so they can self-register under your referral.</p>
 
+        {!isApproved && !bannerDismissed && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-amber-800">You can send invites once your account is approved.</p>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                className="flex-shrink-0 text-amber-500 transition-colors hover:text-amber-700"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex items-center gap-4">
           <div className="flex-1 rounded-lg bg-gray-50 p-4 shadow-sm">
             <div className="text-sm text-gray-500">Your code</div>
             <div className="text-2xl font-mono font-bold tracking-wider text-brand-dark">{code ?? ""}</div>
           </div>
-          <Button onClick={handleOpenDialog} disabled={!code}>
+          <Button onClick={handleOpenDialog} disabled={!code || !isApproved}>
             Send Invite
           </Button>
         </div>

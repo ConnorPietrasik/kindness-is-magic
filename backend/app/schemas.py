@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models import FamilyApprovalStatus, UserRole
+from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole
 from app.user_validation import sanitize_plain_text, validate_email
 
 
@@ -194,12 +194,15 @@ class ReferrerInviteResponse(BaseModel):
 
 
 class ReferrerSummary(BaseModel):
-    """Minimal referrer info returned on self-registration."""
+    """Minimal referrer info returned on self-registration and list views."""
 
     id: int
     name: str
     family_limit: int
     family_invite_code: str
+    approval_status: ReferrerApprovalStatus
+    approved_by_admin_name: str | None = None
+    approved_at: datetime | None = None
     deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -255,6 +258,9 @@ class ReferrerDetail(BaseModel):
     phone_number: str
     family_invite_code: str
     family_count: int
+    approval_status: ReferrerApprovalStatus
+    approved_by_admin_name: str | None = None
+    approved_at: datetime | None = None
     deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
@@ -280,6 +286,31 @@ class SendFamilyInviteResponse(BaseModel):
 
 class ReferrerListResponse(BaseModel):
     referrers: list[ReferrerSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+class ReferrerInviteSummary(BaseModel):
+    """Invite token summary for admin list/detail views."""
+
+    id: int
+    code: str
+    family_limit: int
+    locked_email: str | None = None
+    expires_at: datetime
+    created_at: datetime
+    created_by_admin_name: str | None = None
+    redeemed: bool = False
+    redeemed_by_referrer_name: str | None = None
+    referrer_approval_status: ReferrerApprovalStatus | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class InviteListResponse(BaseModel):
+    invites: list[ReferrerInviteSummary]
     total: int = 0
     page: int = 1
     page_size: int = 50

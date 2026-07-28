@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     SmallInteger,
@@ -68,6 +69,10 @@ class ReferrerInviteToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     redeemed_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     redeemed_by_referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id"), nullable=True)
+    created_by_admin_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Relationships
+    created_by_admin: Mapped["User"] = relationship("User", foreign_keys=[created_by_admin_id])
 
 
 class PasswordResetToken(Base):
@@ -89,18 +94,45 @@ class PasswordResetToken(Base):
     user: Mapped["User"] = relationship("User", backref="reset_tokens")
 
 
+class ReferrerApprovalStatus(str, enum.Enum):
+    """Approval state for referrers who self-register via unlocked invite codes."""
+
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
 class Referrer(Base):
     __tablename__ = "referrer"
+    __table_args__ = (
+        # Explicitly name the FK back to users so SQLAlchemy can resolve the
+        # circular dependency (users.referrer_id → referrer.id ↔ referrer.approved_by_admin_id → users.id)
+        # during DROP ALL at test teardown.
+        ForeignKeyConstraint(
+            ["approved_by_admin_id"],
+            ["users.id"],
+            name="fk_referrer_approved_by_admin_id",
+            ondelete="SET NULL",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     family_invite_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
+    approval_status: Mapped[ReferrerApprovalStatus] = mapped_column(
+        SAEnum(ReferrerApprovalStatus, name="referrer_approval_status", create_constraint=True),
+        server_default="pending",
+        nullable=False,
+    )
+    approved_by_admin_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     families: Mapped[list["Family"]] = relationship("Family", back_populates="referrer")
+    approved_by_admin: Mapped["User | None"] = relationship("User", foreign_keys=[approved_by_admin_id])
 
 
 class FamilyApprovalStatus(str, enum.Enum):

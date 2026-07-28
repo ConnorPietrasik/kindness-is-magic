@@ -77,12 +77,18 @@ export interface UserDetail {
 // Referrer
 // ---------------------------------------------------------------------------
 
+/** Mirrors backend ReferrerApprovalStatus enum. */
+export type ReferrerApprovalStatus = "pending" | "approved" | "rejected";
+
 /** Mirrors ReferrerSummary. */
 export interface ReferrerSummary {
   id: number;
   name: string;
   family_limit: number;
   family_invite_code: string;
+  approval_status: ReferrerApprovalStatus;
+  approved_by_admin_name: string | null;
+  approved_at: string | null;
   deleted_at: string | null;
 }
 
@@ -94,7 +100,24 @@ export interface ReferrerDetail {
   phone_number: string;
   family_invite_code: string;
   family_count: number;
+  approval_status: ReferrerApprovalStatus;
+  approved_by_admin_name: string | null;
+  approved_at: string | null;
   deleted_at: string | null;
+}
+
+/** Mirrors ReferrerInviteSummary. */
+export interface ReferrerInviteSummary {
+  id: number;
+  code: string;
+  family_limit: number;
+  locked_email: string | null;
+  expires_at: string;
+  created_at: string;
+  created_by_admin_name: string | null;
+  redeemed: boolean;
+  redeemed_by_referrer_name: string | null;
+  referrer_approval_status: ReferrerApprovalStatus | null;
 }
 
 // ---------------------------------------------------------------------------
