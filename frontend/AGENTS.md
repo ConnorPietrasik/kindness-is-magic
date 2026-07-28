@@ -1,5 +1,7 @@
 # Frontend — Agent Instructions
 
+**No backward compatibility needed.** The app is not yet deployed.
+
 ## Stack
 
 - **React 19** with **TypeScript** (`.tsx` files, strict mode enabled)

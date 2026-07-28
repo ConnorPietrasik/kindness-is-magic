@@ -1,9 +1,10 @@
 Add admin approval for referrers; save who created the invite code and make them approve the referrer who claims it before the referrer can do anything. Email-locked codes should not need additional approval, but should still include a reference to the admin who created it.
 Add a CRUD referrer code thing for admins so that they can see which codes are still outstanding (and their locked emails).
 Add more admin views - sort by wishes, sort families by size, etc
-Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
 More detailed audit logs - maybe audit database info so admins can easily scroll through a specific user's actions?
-Automated database backups
+DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
+EVENTUALLY - Automated database backups
+EVENTUALLY - Rate-limiting referrer email sending to family_limit per day just in case. Also maybe a once-per-address-per-day limit, or just once-per-address which requires an admin to reset if lost.
 
 Things that need clarification:
 DONOR - Which fields shown in donor-view cards? Name, city, size, bio, family_wish? family ages?

@@ -1,5 +1,7 @@
 # Backend - Agent Instructions
 
+**No backward compatibility needed.** The app is not yet deployed.
+
 ## Stack
 
 - **FastAPI** + **SQLAlchemy 2.0** (declarative models) + **Alembic** for migrations
