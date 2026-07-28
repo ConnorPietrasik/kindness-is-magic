@@ -289,23 +289,21 @@ function InviteGenerator() {
             autoComplete: "off",
           }}
         />
-        <div>
-          <FormField
-            label="Email (optional)"
-            type="email"
-            fieldProps={{
-              value: email,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
-              placeholder: "referrer@example.com",
-              autoComplete: "off",
-            }}
-          />
-          <p className="mt-1 text-xs text-gray-400">Including an email locks this invite to that address</p>
-        </div>
+        <FormField
+          label="Email (optional)"
+          type="email"
+          fieldProps={{
+            value: email,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
+            placeholder: "referrer@example.com",
+            autoComplete: "off",
+          }}
+        />
         <Button type="submit" loading={createMut.isPending} className="sm:ml-auto">
           {createMut.isPending ? "Generating…" : "Generate"}
         </Button>
       </form>
+      <p className="mt-3 text-xs text-gray-400">Including an email locks this invite to that address</p>
     </Card>
   );
 }

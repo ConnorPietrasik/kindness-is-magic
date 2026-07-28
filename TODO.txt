@@ -1,9 +1,15 @@
-Make reset password emails autofill the token
+Have the code and email greyed-out and unable to be changed if autofilled from the email
 Add more admin views - sort by wishes, sort families by size, etc
 More detailed audit logs - maybe audit database info so admins can easily scroll through a specific user's actions?
+Links up the chain from person -> family -> referrer, maybe with links to users too
+Have unapproved families hidden by default; same for referrers
+Add button for admins to email families directly
+Add Pickup_window for families
+Add packing slips for families - per pereson: ID, name, age, practical wish, fun wish
 DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
 EVENTUALLY - Automated database backups
 EVENTUALLY - Rate-limiting referrer email sending to family_limit per day just in case. Also maybe a once-per-address-per-day limit, or just once-per-address which requires an admin to reset if lost.
+EVENTUALLY - Email families a week before their pickup window
 
 Things that need clarification:
 DONOR - Which fields shown in donor-view cards? Name, city, size, bio, family_wish? family ages?
