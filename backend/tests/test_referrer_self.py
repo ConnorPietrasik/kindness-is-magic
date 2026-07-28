@@ -53,6 +53,7 @@ class TestReferrerGetSelf:
             name="Temp Referrer",
             family_limit=5,
             phone_number="555-3000",
+            family_invite_code="KFI-TEMP01",
         )
         db.add(ref)
         db.commit()
@@ -111,6 +112,7 @@ class TestReferrerUpdateSelf:
             name="Temp Referrer",
             family_limit=5,
             phone_number="555-3001",
+            family_invite_code="KFI-TEMP02",
         )
         db.add(ref)
         db.commit()
@@ -915,3 +917,112 @@ class TestReferrerRejectFamily:
 
         resp = test_client.post(f"/api/referrer/families/{pending.id}/reject")
         assert resp.status_code == 401
+
+
+# =========================================================================
+# Referrer — Send Family Invite Email
+# =========================================================================
+
+
+class TestSendFamilyInvite:
+    """POST /api/referrer/send-family-invite"""
+
+    def test_unauthenticated_rejected(self, test_client: TestClient):
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
+        assert resp.status_code == 401
+
+    def test_non_referrer_rejected(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
+        assert resp.status_code == 403
+
+    def test_valid_email_sends_success(self, test_client: TestClient, referrer_with_full_tree):
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "newfamily@example.com"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["email_sent"] is True
+        assert body["email_send_reason"] is None
+
+    def test_invalid_email_format(self, test_client: TestClient, referrer_with_full_tree):
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "not-an-email"},
+        )
+        assert resp.status_code == 422
+
+    def test_unsubscribed_email_returns_false(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        from app.models import EmailPreference
+        from datetime import datetime, timezone
+
+        # Subscribe the target email
+        pref = EmailPreference(
+            email="unsub@example.com",
+            unsubscribed_at=datetime.now(timezone.utc),
+        )
+        db.add(pref)
+        db.commit()
+
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "unsub@example.com"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["email_sent"] is False
+        assert body["email_send_reason"] == "unsubscribed"
+
+    def test_email_in_body_is_used(self, test_client: TestClient, referrer_with_full_tree):
+        """The email in the request body is passed to send_email."""
+        from unittest.mock import patch
+
+        captured_to = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_to["value"] = _kw.get("to")
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": "target@example.com"},
+            )
+        assert resp.status_code == 200
+        assert captured_to["value"] == "target@example.com"
+
+    def test_build_family_invite_email_called_with_referrer_data(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """build_family_invite_email is called with the referrer's code and name."""
+        from unittest.mock import patch
+
+        ref = referrer_with_full_tree["referrer"]
+        captured_kwargs = {}
+
+        def fake_build(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_kwargs["value"] = _kw
+            return "<html></html>"
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.build_family_invite_email", side_effect=fake_build):
+            with patch("app.mail.send_email", side_effect=fake_send_email):
+                resp = test_client.post(
+                    "/api/referrer/send-family-invite",
+                    json={"email": "family@example.com"},
+                )
+        assert resp.status_code == 200
+        assert captured_kwargs["value"]["code"] == ref.family_invite_code
+        assert captured_kwargs["value"]["referrer_name"] == ref.name

@@ -50,7 +50,16 @@ def list_referrers(
     total = query.count()
     referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
     return ReferrerListResponse(
-        referrers=[ReferrerSummary(id=r.id, name=r.name, family_limit=r.family_limit, deleted_at=r.deleted_at) for r in referrers],
+        referrers=[
+            ReferrerSummary(
+                id=r.id,
+                name=r.name,
+                family_limit=r.family_limit,
+                family_invite_code=r.family_invite_code,
+                deleted_at=r.deleted_at,
+            )
+            for r in referrers
+        ],
         total=total,
         page=page,
         page_size=page_size,

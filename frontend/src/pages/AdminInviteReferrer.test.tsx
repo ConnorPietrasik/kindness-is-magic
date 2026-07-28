@@ -9,6 +9,7 @@ import AdminInviteReferrer from "./AdminInviteReferrer";
 const mockInvite: ReferrerInviteResponse = {
   code: "KMG-A7X9P2",
   family_limit: 10,
+  locked_email: null,
   expires_at: "2025-01-15T12:00:00Z",
   created_at: "2025-01-14T12:00:00Z",
   email_sent: null,
@@ -18,6 +19,7 @@ const mockInvite: ReferrerInviteResponse = {
 const mockInviteWithEmail: ReferrerInviteResponse = {
   code: "KMG-B8Y0Q3",
   family_limit: 10,
+  locked_email: "newref@example.com",
   expires_at: "2025-01-15T12:00:00Z",
   created_at: "2025-01-14T12:00:00Z",
   email_sent: true,
@@ -37,6 +39,11 @@ describe("AdminInviteReferrer", () => {
     expect(screen.getByLabelText("Family Limit")).toBeInTheDocument();
     expect(screen.getByLabelText("Email (optional)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate Invite Code" })).toBeInTheDocument();
+  });
+
+  it("renders helper text explaining email lock", () => {
+    wrap(<AdminInviteReferrer />);
+    expect(screen.getByText(/Including an email locks this invite to that address/)).toBeInTheDocument();
   });
 
   it("shows validation error for family limit over 999", async () => {
@@ -90,6 +97,7 @@ describe("AdminInviteReferrer", () => {
     const mockFailInvite: ReferrerInviteResponse = {
       code: "KMG-C9Z1R4",
       family_limit: 5,
+      locked_email: "fail@example.com",
       expires_at: "2025-01-15T12:00:00Z",
       created_at: "2025-01-14T12:00:00Z",
       email_sent: false,

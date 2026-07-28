@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
@@ -38,11 +38,22 @@ const emptyForm: SelfRegisterForm = {
 export default function FamilySelfRegister() {
   const { setUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [form, setForm] = useState<SelfRegisterForm>(emptyForm);
+  const urlCode = searchParams.get("code") ?? "";
+
+  const [form, setForm] = useState<SelfRegisterForm>({
+    ...emptyForm,
+    code: urlCode,
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Keep form in sync if URL params change
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, code: urlCode }));
+  }, [urlCode]);
 
   const update = (key: keyof SelfRegisterForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -84,6 +95,8 @@ export default function FamilySelfRegister() {
     }
   };
 
+  const isCodeLocked = urlCode.length > 0;
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <div className="w-full max-w-md rounded-2xl bg-white px-8 py-10 shadow-lg">
@@ -100,6 +113,10 @@ export default function FamilySelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("code", e.target.value),
               required: true,
               placeholder: "e.g. KFI-A7X9P2",
+              readOnly: isCodeLocked,
+              className: isCodeLocked
+                ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
+                : undefined,
             }}
           />
 

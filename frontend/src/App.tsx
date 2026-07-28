@@ -26,7 +26,7 @@ const FamilyPeople: LazyExoticComponent<ComponentType<unknown>> = lazy(() => imp
 const AdminInviteReferrer: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminInviteReferrer"));
 const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerSelfRegister"));
 const FamilySelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilySelfRegister"));
-const ReferrerPendingFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerPendingFamilies"));
+const ReferrerFamilyInvites: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilyInvites"));
 const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
 
 /* ------------------------------------------------------------------ */
@@ -205,10 +205,10 @@ export default function App() {
           }
         />
         <Route
-          path={ROUTES.REFERRER_PENDING_FAMILIES}
+          path={ROUTES.REFERRER_FAMILY_INVITES}
           element={
             <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerPendingFamilies />
+              <ReferrerFamilyInvites />
             </ProtectedRoute>
           }
         />

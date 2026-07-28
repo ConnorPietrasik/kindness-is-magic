@@ -29,7 +29,7 @@ export const ROUTES = {
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
   REFERRER_FAMILY_DETAIL: "/referrer/families/:id",
-  REFERRER_PENDING_FAMILIES: "/referrer/pending-families",
+  REFERRER_FAMILY_INVITES: "/referrer/family-invites",
 
   // ── Family self-service ───────────────────────────────────
   FAMILY_DASHBOARD: "/family/dashboard",

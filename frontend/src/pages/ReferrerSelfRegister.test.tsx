@@ -31,12 +31,12 @@ const mockResponse: ReferrerSelfRegisterResponse = {
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-const wrap = (ui: React.ReactElement) => {
+const wrap = (ui: React.ReactElement, path = "/register-referrer") => {
   const queryClient = createQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter>{ui}</MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>
   );
@@ -211,5 +211,75 @@ describe("ReferrerSelfRegister", () => {
   it("shows a link back to login", () => {
     wrap(<ReferrerSelfRegister />);
     expect(screen.getByText("← Back to login")).toBeInTheDocument();
+  });
+
+  // ── URL param autofill tests ──────────────────────────────────
+
+  it("pre-fills code and email from URL params and locks both fields", () => {
+    wrap(<ReferrerSelfRegister />, "/register-referrer?code=KMG-AUTO&email=locked@example.com");
+
+    const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
+    expect(codeInput).toHaveValue("KMG-AUTO");
+    expect(codeInput).toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("locked@example.com");
+    expect(emailInput).toHaveAttribute("readonly");
+  });
+
+  it("shows info message when email is locked from URL", () => {
+    wrap(<ReferrerSelfRegister />, "/register-referrer?code=KMG-AUTO&email=locked@example.com");
+
+    expect(screen.getByText(/This invite is for/)).toBeInTheDocument();
+    expect(screen.getByText(/locked@example.com/)).toBeInTheDocument();
+  });
+
+  it("pre-fills code from URL but leaves email editable when no email param", () => {
+    wrap(<ReferrerSelfRegister />, "/register-referrer?code=KMG-CODEONLY");
+
+    const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
+    expect(codeInput).toHaveValue("KMG-CODEONLY");
+    expect(codeInput).toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("");
+    expect(emailInput).not.toHaveAttribute("readonly");
+  });
+
+  it("leaves both fields editable when no URL params", () => {
+    wrap(<ReferrerSelfRegister />, "/register-referrer");
+
+    const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
+    expect(codeInput).toHaveValue("");
+    expect(codeInput).not.toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("");
+    expect(emailInput).not.toHaveAttribute("readonly");
+  });
+
+  it("submits with pre-filled values from URL params", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "registerReferrerViaInvite").mockResolvedValue(mockResponse);
+
+    wrap(<ReferrerSelfRegister />, "/register-referrer?code=KMG-AUTO&email=locked@example.com");
+
+    // Code and email are pre-filled, just fill remaining fields
+    await user.type(screen.getByLabelText("Name"), "Test Referrer");
+    await user.type(screen.getByLabelText("Phone Number"), "07123 456789");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.type(screen.getByLabelText("Confirm Password"), "password123");
+
+    await user.click(screen.getByRole("button", { name: "Create Account" }));
+
+    await waitFor(() => {
+      expect(api.registerReferrerViaInvite).toHaveBeenCalledWith({
+        code: "KMG-AUTO",
+        name: "Test Referrer",
+        email: "locked@example.com",
+        phone_number: "07123 456789",
+        password: "password123",
+      });
+    });
   });
 });

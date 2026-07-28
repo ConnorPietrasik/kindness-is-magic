@@ -184,6 +184,7 @@ class ReferrerInviteResponse(BaseModel):
 
     code: str
     family_limit: int
+    locked_email: str | None = None
     expires_at: datetime
     created_at: datetime
     email_sent: bool | None = None
@@ -198,7 +199,7 @@ class ReferrerSummary(BaseModel):
     id: int
     name: str
     family_limit: int
-    family_invite_code: str | None = None
+    family_invite_code: str
     deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -252,11 +253,29 @@ class ReferrerDetail(BaseModel):
     name: str
     family_limit: int
     phone_number: str
-    family_invite_code: str | None = None
+    family_invite_code: str
     family_count: int
     deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class SendFamilyInviteRequest(BaseModel):
+    """Referrer sends a family invite email to a given address."""
+
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
+
+
+class SendFamilyInviteResponse(BaseModel):
+    """Response from the send-family-invite endpoint."""
+
+    email_sent: bool
+    email_send_reason: str | None = None
 
 
 class ReferrerListResponse(BaseModel):

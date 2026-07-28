@@ -64,7 +64,7 @@ def _unsubscribe_url(email: str) -> str:
     Produces a URL like ``GET /api/auth/unsubscribe?token=...``.
     """
     token = jwt.encode({"email": email}, SECRET_KEY, algorithm=ALGORITHM)
-    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
     path = "/api/auth/unsubscribe"
     params = urlencode({"token": token})
     return f"{base}{path}?{params}"
@@ -154,22 +154,27 @@ def build_invite_email(
     expires_at: datetime,
     from_name: str | None = None,
     unsubscribe_url: str | None = None,
+    email: str | None = None,
 ) -> str:
     """Build the HTML body for a referrer invite email."""
     expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
-    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
     from_line = (
         f"<p>You've been invited by <strong>{from_name}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
         if from_name
         else "<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
     )
     family_word = "family" if family_limit == 1 else "families"
+    # Build the register link — include email query param when locked
+    register_path = "/register-referrer"
+    if email:
+        register_path += f"?code={code}&email={email}"
     return f"""{from_line}
 <p>We'd love your help connecting {family_word} in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
 <p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most.</p>
 <p>This invite expires on <strong>{expires_str}</strong>.</p>
-<p style="text-align:center;"><a href="{base}/register-referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
+<p style="text-align:center;"><a href="{base}{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
 <p style="margin-top:16px;">Thank you for being part of something wonderful. Together, we can make kindness magical.</p>"""
 
 
@@ -183,7 +188,7 @@ def build_password_reset_email(reset_link: str) -> str:
 
 def build_family_pending_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "new family pending approval" notification to the referrer."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
     return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
 <p>A new family, <strong>{family_name}</strong>, has registered through your family invite code and is awaiting your approval.</p>
 <p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Review Pending Families</a></p>
@@ -192,7 +197,17 @@ def build_family_pending_email(family_name: str, referrer_name: str) -> str:
 
 def build_family_approved_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "family approved" notification to the family contact."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
     return f"""<p>Great news, <strong>{family_name}</strong>!</p>
 <p>Your family has been <strong>approved</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
 <p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""
+
+
+def build_family_invite_email(code: str, referrer_name: str) -> str:
+    """Build the HTML body for a family invite email sent by a referrer."""
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    return f"""<p>Hi there,</p>
+<p><strong>{referrer_name}</strong> would like to connect your family with Kindness Is Magic. Use the invite code below to sign up:</p>
+<p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
+<p style="text-align:center;"><a href="{base}/register-family?code={code}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
+<p style="margin-top:16px;">Once you register, your family will be reviewed and you'll be able to share your wishes.</p>"""

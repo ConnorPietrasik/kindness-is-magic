@@ -53,13 +53,18 @@ class User(Base):
 
 
 class ReferrerInviteToken(Base):
-    """One-time invite codes that admins generate for referrer self-registration."""
+    """One-time invite codes that admins generate for referrer self-registration.
+
+    When ``locked_email`` is set the code can only be redeemed by that exact
+    email address, enabling pre-filled / locked invite flows.
+    """
 
     __tablename__ = "referrer_invite_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    locked_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -93,7 +98,7 @@ class Referrer(Base):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
-    family_invite_code: Mapped[str | None] = mapped_column(String(10), nullable=True, unique=True, index=True)
+    family_invite_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -243,6 +243,44 @@ class TestEmailTemplates:
         html = build_password_reset_email("http://localhost:3000/reset?token=abc123")
         assert "unsubscribe" not in html.lower()
 
+    def test_invite_email_with_email_param_contains_link(self):
+        """When email param is provided, the Get Started link includes code+email."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-ABC123",
+            family_limit=10,
+            expires_at=datetime(2026, 12, 25, 12, 0, tzinfo=timezone.utc),
+            email="test@example.com",
+        )
+        assert "register-referrer?code=KMG-ABC123&email=test@example.com" in html
+
+    def test_invite_email_without_email_param_has_plain_link(self):
+        """When email param is not provided, the Get Started link is plain."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-ABC123",
+            family_limit=10,
+            expires_at=datetime(2026, 12, 25, 12, 0, tzinfo=timezone.utc),
+        )
+        assert '/register-referrer"' in html or "/register-referrer>" in html
+        assert "?code=" not in html
+
+    def test_family_invite_email_contains_code_and_name(self):
+        from app.mail import build_family_invite_email
+
+        html = build_family_invite_email(code="KFI-ABC123", referrer_name="Jane Smith")
+        assert "KFI-ABC123" in html
+        assert "Jane Smith" in html
+        assert "register-family?code=KFI-ABC123" in html
+
+    def test_family_invite_email_has_get_started_button(self):
+        from app.mail import build_family_invite_email
+
+        html = build_family_invite_email(code="KFI-XYZ789", referrer_name="John Doe")
+        assert "Get Started" in html
+
 
 # ---------------------------------------------------------------------------
 # Unsubscribe endpoint tests

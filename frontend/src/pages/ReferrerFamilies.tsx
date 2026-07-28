@@ -101,7 +101,7 @@ export default function ReferrerFamilies() {
         {/* ── Pending families alert ──────────────────────────── */}
         {pendingFamilies && pendingFamilies.length > 0 && (
           <Link
-            to={ROUTES.REFERRER_PENDING_FAMILIES}
+            to={ROUTES.REFERRER_FAMILY_INVITES}
             className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
           >
             {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your approval →

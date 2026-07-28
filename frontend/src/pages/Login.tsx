@@ -93,6 +93,11 @@ export default function Login() {
             Referrer self-registration
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm">
+          <Link to={ROUTES.FAMILY_SELF_REGISTER} className="text-btn-start hover:underline">
+            Family signup
+          </Link>
+        </p>
       </div>
     </div>
   );

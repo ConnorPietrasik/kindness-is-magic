@@ -33,6 +33,8 @@ from app.schemas import (
     PersonSummary,
     ReferrerDetail,
     ReferrerUpdate,
+    SendFamilyInviteRequest,
+    SendFamilyInviteResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -368,3 +370,47 @@ def create_family_person(
     db.refresh(per)
     logger.info("Referrer %s created person '%s' (id=%s) in family %s", owner.user.email, per.given_name, per.id, fid)
     return PersonDetail.model_validate(per)
+
+
+# ---------------------------------------------------------------------------
+# Referrer — Send Family Invite Email
+# ---------------------------------------------------------------------------
+
+
+@router.post("/send-family-invite", response_model=SendFamilyInviteResponse)
+def send_family_invite(
+    body: SendFamilyInviteRequest,
+    user: User = Depends(require_referrer),
+    db: Session = Depends(get_db),
+) -> SendFamilyInviteResponse:
+    """Send a family invite email to the given address.
+
+    The email includes the referrer's family invite code and a link to the
+    family self-registration page.
+    """
+    from app.mail import build_family_invite_email, send_email
+
+    ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
+
+    html_body = build_family_invite_email(
+        code=ref.family_invite_code,
+        referrer_name=ref.name,
+    )
+    result = send_email(
+        to=body.email,
+        subject="You're invited to join Kindness Is Magic",
+        html_body=html_body,
+        db=db,
+    )
+
+    logger.info(
+        "Referrer %s sent family invite to %s (sent=%s)",
+        user.email,
+        body.email,
+        result["sent"],
+    )
+
+    return SendFamilyInviteResponse(
+        email_sent=result["sent"],
+        email_send_reason=result["reason"],
+    )

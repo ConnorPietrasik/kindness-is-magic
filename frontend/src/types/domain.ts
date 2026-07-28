@@ -82,7 +82,7 @@ export interface ReferrerSummary {
   id: number;
   name: string;
   family_limit: number;
-  family_invite_code: string | null;
+  family_invite_code: string;
   deleted_at: string | null;
 }
 
@@ -92,7 +92,7 @@ export interface ReferrerDetail {
   name: string;
   family_limit: number;
   phone_number: string;
-  family_invite_code: string | null;
+  family_invite_code: string;
   family_count: number;
   deleted_at: string | null;
 }
@@ -194,6 +194,7 @@ export interface ReferrerInviteCreatePayload {
 export interface ReferrerInviteResponse {
   code: string;
   family_limit: number;
+  locked_email: string | null;
   expires_at: string;
   created_at: string;
   email_sent: boolean | null;
@@ -236,6 +237,12 @@ export interface FamilySelfRegisterPayload {
 export interface FamilySelfRegisterResponse {
   user: User;
   family: FamilySummary;
+}
+
+/** Response from the send-family-invite endpoint. */
+export interface ReferrerFamilyInviteResponse {
+  email_sent: boolean;
+  email_send_reason: string | null;
 }
 
 /** Summary for pending families awaiting referrer approval. */

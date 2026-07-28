@@ -58,7 +58,7 @@ export default function Dashboard() {
         {/* Referrer pending approvals alert */}
         {user?.role === "referrer" && pendingFamilies && pendingFamilies.length > 0 && (
           <Link
-            to={ROUTES.REFERRER_PENDING_FAMILIES}
+            to={ROUTES.REFERRER_FAMILY_INVITES}
             className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
           >
             {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your approval →
@@ -86,7 +86,7 @@ export default function Dashboard() {
           {user?.role === "referrer" && (
             <>
               <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your approved families" />
-              <NavCard to={ROUTES.REFERRER_PENDING_FAMILIES} icon="⏳" label="Pending Approvals" desc="Review family applications" />
+              <NavCard to={ROUTES.REFERRER_FAMILY_INVITES} icon="⏳" label="Family Invites" desc="Invite families & review applications" />
             </>
           )}
 
@@ -248,7 +248,7 @@ function ReferrerInfoCard({ referrerInfo }: ReferrerInfoCardProps) {
         <div className="space-y-0">
           <InfoRow label="Name" value={referrerInfo.name} truncate={false} />
           <InfoRow label="Phone" value={referrerInfo.phone_number} truncate={false} />
-          <CopyableRow label="Family Invite Code" value={referrerInfo.family_invite_code ?? "Generating…"} />
+          <CopyableRow label="Family Invite Code" value={referrerInfo.family_invite_code} />
           <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast truncate={false} />
         </div>
       )}

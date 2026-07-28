@@ -75,6 +75,7 @@ class TestReferrer:
             name="Alice Smith",
             family_limit=5,
             phone_number="555-1234",
+            family_invite_code="KFI-ALICE",
         )
         db.add(r)
         db.commit()

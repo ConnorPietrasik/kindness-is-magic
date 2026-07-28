@@ -25,6 +25,7 @@ import type {
   PersonListResponse,
   PersonPayload,
   ReferrerDetail,
+  ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteResponse,
   ReferrerListResponse,
@@ -353,6 +354,11 @@ export function approveFamily(id: number): Promise<FamilyDetail> {
 
 export function rejectFamily(id: number): Promise<FamilyDetail> {
   return api.post(`/api/referrer/families/${id}/reject`).then((res) => res.data);
+}
+
+/** Referrer sends a family invite email to a given address. */
+export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyInviteResponse> {
+  return api.post("/api/referrer/send-family-invite", { email }).then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

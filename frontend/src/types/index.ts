@@ -29,6 +29,7 @@ export type {
   PersonPayload,
   PersonSummary,
   ReferrerDetail,
+  ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteResponse,
   ReferrerPayload,

@@ -105,6 +105,87 @@ class TestInviteReferrerCreate:
         assert body["email_sent"] is None
         assert body["email_send_reason"] is None
 
+    def test_invite_with_email_sets_locked_email(self, test_client: TestClient, admin_user, db: Session):
+        """When email is provided, locked_email is persisted on the invite token."""
+        from app.models import ReferrerInviteToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email": "locked@example.com"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["locked_email"] == "locked@example.com"
+
+        # Verify in DB
+        token = db.query(ReferrerInviteToken).filter_by(code=body["code"]).first()
+        assert token is not None
+        assert token.locked_email == "locked@example.com"
+
+    def test_invite_without_email_has_null_locked(self, test_client: TestClient, admin_user, db: Session):
+        """Invite without email has locked_email=None."""
+        from app.models import ReferrerInviteToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["locked_email"] is None
+
+        token = db.query(ReferrerInviteToken).filter_by(code=body["code"]).first()
+        assert token.locked_email is None
+
+    def test_invite_email_link_contains_code_and_email(self, test_client: TestClient, admin_user):
+        """Invite email with locked email includes code+email in the Get Started link."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured_html = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_html["value"] = _kw
+            return "<html></html>"
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_html["sent_body"] = _kw.get("html_body")
+            return {"sent": True, "reason": None}
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            with patch("app.auth_routes.send_email", side_effect=fake_send_email):
+                resp = test_client.post(
+                    "/api/auth/invite-referrer",
+                    json={"family_limit": 10, "email": "newref@example.com"},
+                )
+        assert resp.status_code == 201
+        assert captured_html["value"].get("email") == "newref@example.com"
+
+    def test_invite_email_link_without_email_param(self, test_client: TestClient, admin_user):
+        """Invite email without email passes email=None to build_invite_email."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured_html = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured_html["value"] = _kw
+            return "<html></html>"
+
+        # No email in request — build_invite_email should not be called at all
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10},
+            )
+        assert resp.status_code == 201
+        # build_invite_email should NOT have been called (no email)
+        assert captured_html == {}
+
     def test_invite_email_invalid_format(self, test_client: TestClient, admin_user):
         """Invalid email format in request body returns 422."""
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -394,6 +475,71 @@ class TestReferrerSelfRegister:
         assert resp.status_code == 201
         body = resp.json()
         assert body["user"]["email"] == "uppercase@test.com"
+
+    def test_locked_email_rejected_when_mismatch(self, test_client: TestClient, admin_user):
+        """Registration fails when email doesn't match locked_email."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 5, "email": "locked@example.com"},
+        )
+        assert resp.status_code == 201
+        code = resp.json()["code"]
+
+        resp = test_client.post(
+            "/api/auth/register-referrer",
+            json={
+                "code": code,
+                "name": "Wrong Email",
+                "email": "wrong@example.com",
+                "phone_number": "555-0000",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 400
+        assert "reserved for locked@example.com" in resp.json()["detail"]
+
+    def test_locked_email_succeeds_when_match(self, test_client: TestClient, admin_user):
+        """Registration succeeds when email matches locked_email."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 5, "email": "locked@example.com"},
+        )
+        assert resp.status_code == 201
+        code = resp.json()["code"]
+
+        resp = test_client.post(
+            "/api/auth/register-referrer",
+            json={
+                "code": code,
+                "name": "Correct Email",
+                "email": "locked@example.com",
+                "phone_number": "555-0000",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["user"]["email"] == "locked@example.com"
+
+    def test_no_locked_email_allows_any_email(self, test_client: TestClient, admin_user):
+        """When locked_email is not set, any email can register."""
+        code = self._create_invite(test_client, admin_user, family_limit=5)
+
+        resp = test_client.post(
+            "/api/auth/register-referrer",
+            json={
+                "code": code,
+                "name": "Any Email",
+                "email": "anyone@example.com",
+                "phone_number": "555-0000",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["user"]["email"] == "anyone@example.com"
 
 
 # ---------------------------------------------------------------------------

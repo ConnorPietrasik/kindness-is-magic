@@ -231,7 +231,7 @@ def referrer_record(db: Session):
     """Create a Referrer row in the DB."""
     from app.models import Referrer
 
-    r = Referrer(name="Test Referrer", family_limit=10, phone_number="555-0001")
+    r = Referrer(name="Test Referrer", family_limit=10, phone_number="555-0001", family_invite_code="KFI-TEST01")
     db.add(r)
     db.commit()
     db.refresh(r)
@@ -372,7 +372,7 @@ def referrer_with_full_tree(db: Session):
     from app.models import FamilyApprovalStatus, Family, Person, Referrer, User, UserRole
     from app.auth import get_password_hash
 
-    ref = Referrer(name="Tree Referrer", family_limit=5, phone_number="555-1000")
+    ref = Referrer(name="Tree Referrer", family_limit=5, phone_number="555-1000", family_invite_code="KFI-TREE01")
     db.add(ref)
     db.commit()
     db.refresh(ref)
@@ -421,7 +421,7 @@ def another_referrer(db: Session):
     from app.models import Referrer, User, UserRole
     from app.auth import get_password_hash
 
-    ref = Referrer(name="Another Referrer", family_limit=5, phone_number="555-2000")
+    ref = Referrer(name="Another Referrer", family_limit=5, phone_number="555-2000", family_invite_code="KFI-ANOT01")
     db.add(ref)
     db.commit()
     db.refresh(ref)

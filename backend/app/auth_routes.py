@@ -320,7 +320,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
     db.commit()
 
     # Send password reset email (exempt from unsubscribe block)
-    base = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    base = os.environ.get("APP_BASE_URL", "http://localhost")
     reset_link = f"{base}/reset-password?token={raw_token}"
     html_body = build_password_reset_email(reset_link)
     result = send_email(
@@ -403,6 +403,7 @@ def invite_referrer(
     invite = ReferrerInviteToken(
         code=code,
         family_limit=data.family_limit,
+        locked_email=data.email,
         expires_at=expires_at,
         used=False,
     )
@@ -422,6 +423,7 @@ def invite_referrer(
             family_limit=data.family_limit,
             expires_at=expires_at,
             from_name=inviter_name,
+            email=data.email,
         )
         result = send_email(
             to=data.email,
@@ -435,6 +437,7 @@ def invite_referrer(
     return {
         "code": invite.code,
         "family_limit": invite.family_limit,
+        "locked_email": invite.locked_email,
         "expires_at": invite.expires_at,
         "created_at": invite.created_at,
         "email_sent": email_sent,
@@ -467,12 +470,19 @@ def register_referrer(
     if invite.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invite code has expired")
 
-    # 3. Check for duplicate email
+    # 3. Enforce locked_email (before duplicate-email check)
+    if invite.locked_email and data.email != invite.locked_email:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This invite code is reserved for {invite.locked_email}",
+        )
+
+    # 4. Check for duplicate email
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    # 4. Atomic creation inside the session transaction
+    # 5. Atomic creation inside the session transaction
     referrer = Referrer(
         name=data.name,
         phone_number=data.phone_number,

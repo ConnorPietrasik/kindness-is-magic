@@ -62,7 +62,7 @@ class TestAdminListReferrers:
         _admin_login(test_client)
         # Create 5 referrers
         for i in range(5):
-            r = Referrer(name=f"Referrer {i}", family_limit=10, phone_number="555-0000")
+            r = Referrer(name=f"Referrer {i}", family_limit=10, phone_number="555-0000", family_invite_code=f"KFI-RF00{i}")
             db.add(r)
         db.commit()
 

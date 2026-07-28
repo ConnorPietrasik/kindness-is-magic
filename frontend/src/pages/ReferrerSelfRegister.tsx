@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
@@ -29,11 +29,24 @@ const emptyForm: SelfRegisterForm = {
 export default function ReferrerSelfRegister() {
   const { setUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [form, setForm] = useState<SelfRegisterForm>(emptyForm);
+  const urlCode = searchParams.get("code") ?? "";
+  const urlEmail = searchParams.get("email") ?? "";
+
+  const [form, setForm] = useState<SelfRegisterForm>({
+    ...emptyForm,
+    code: urlCode,
+    email: urlEmail,
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Keep form in sync if URL params change
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, code: urlCode, email: urlEmail }));
+  }, [urlCode, urlEmail]);
 
   const update = (key: keyof SelfRegisterForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -71,6 +84,9 @@ export default function ReferrerSelfRegister() {
     }
   };
 
+  const isCodeLocked = urlCode.length > 0;
+  const isEmailLocked = urlEmail.length > 0;
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <div className="w-full max-w-md rounded-2xl bg-white px-8 py-10 shadow-lg">
@@ -78,6 +94,12 @@ export default function ReferrerSelfRegister() {
         <p className="mb-6 text-center text-sm text-gray-500">Use your invite code to create an account</p>
 
         {error && <ErrorBox message={error} className="mb-4" />}
+
+        {isEmailLocked && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            This invite is for <strong>{urlEmail}</strong>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField
@@ -87,6 +109,10 @@ export default function ReferrerSelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("code", e.target.value),
               required: true,
               placeholder: "e.g. KMG-A7X9P2",
+              readOnly: isCodeLocked,
+              className: isCodeLocked
+                ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
+                : undefined,
             }}
           />
 
@@ -108,6 +134,10 @@ export default function ReferrerSelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value),
               required: true,
               placeholder: "you@example.com",
+              readOnly: isEmailLocked,
+              className: isEmailLocked
+                ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
+                : undefined,
             }}
           />
 

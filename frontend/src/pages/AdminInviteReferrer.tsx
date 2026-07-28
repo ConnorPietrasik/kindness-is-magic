@@ -76,15 +76,20 @@ export default function AdminInviteReferrer() {
                 placeholder: "e.g. 10",
               }}
             />
-            <FormField
-              label="Email (optional)"
-              type="email"
-              fieldProps={{
-                value: email,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
-                placeholder: "referrer@example.com",
-              }}
-            />
+            <div>
+              <FormField
+                label="Email (optional)"
+                type="email"
+                fieldProps={{
+                  value: email,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
+                  placeholder: "referrer@example.com",
+                }}
+              />
+              <p className="mt-1.5 text-xs text-gray-400">
+                Including an email locks this invite to that address — the recipient can only register with that email
+              </p>
+            </div>
             <Button type="submit" loading={loading}>
               {loading ? "Generating…" : "Generate Invite Code"}
             </Button>
