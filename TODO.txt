@@ -1,6 +1,3 @@
-Make referrer invite automatically fill code and email when they click the link + lock code to specific email if email is included
-Add a "family invite" thing to the referrer approval page to send emails that autofill code and email on click
-Add a "family signup" link to the registration page
 Should frontend tests be scattered or in their own folder?
 Add a way in the admin view to get from a user to their referrer / family profile
 Add more admin views - sort by wishes, sort families by size, etc

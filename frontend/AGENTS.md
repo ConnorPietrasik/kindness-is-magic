@@ -108,7 +108,7 @@ Only entries that encode conventions are listed here. The full directory tree is
 - `src/hooks/useCrudManager.ts` — Shared CRUD hook. Reuse it instead of duplicating CRUD state management.
 - `src/components/HierarchicalManage.tsx` — Shared parent-detail + child-CRUD wrapper. Use for hierarchical admin views (e.g. referrer → families → people).
 - Pages in `src/pages/` are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
-- Test files: `*.test.ts` / `*.test.tsx` alongside source, or in `src/__tests__/`.
+- Test files: `*.test.ts` / `*.test.tsx` alongside source.
 
 ## Linting and Formatting
 
