@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
@@ -37,6 +38,7 @@ export function FamilyForm({
   loading,
 }: FamilyFormProps) {
   const [form, setForm] = useState(() => ({ ...defaultFamilyForm, ...initial }));
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({ ...defaultFamilyForm, ...initial });
@@ -51,6 +53,11 @@ export function FamilyForm({
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+      const phoneErr = validatePhoneNumber(form.phone_number || "");
+      if (phoneErr) {
+        setPhoneError(phoneErr);
+        return;
+      }
       onSubmit(form as unknown as FamilyPayload);
     },
     [form, onSubmit]
@@ -151,18 +158,22 @@ export function FamilyForm({
                 />
               </div>
 
-              <div>
-                <OptionalLabel text="Phone" />
-                <FormField
-                  type="text"
-                  fieldProps={{
-                    value: form.phone_number || "",
-                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-                    maxLength: 20,
-                    autoComplete: "off",
-                  }}
-                />
-              </div>
+              <FormField
+                label="Phone"
+                type="text"
+                error={phoneError}
+                fieldProps={{
+                  value: form.phone_number || "",
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                    update("phone_number", e.target.value);
+                    setPhoneError(null);
+                  },
+                  required: true,
+                  maxLength: 20,
+                  placeholder: "e.g. 111-111-1111",
+                  autoComplete: "off",
+                }}
+              />
             </>
           )}
         </div>

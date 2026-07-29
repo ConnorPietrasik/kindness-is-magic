@@ -394,7 +394,12 @@ def _process_families(
             except ValueError:
                 pass
 
-        phone_number = rec.get("phone_number", "").strip() or None
+        # phone_number (required)
+        phone_number = rec.get("phone_number", "").strip()
+        if not phone_number:
+            summary.rows.append(RowResult(row_num, "family", "error", "Missing 'phone_number'"))
+            summary.families_errors += 1
+            continue
 
         # Skip if already exists
         existing = _find_family(db, family_name)

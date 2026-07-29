@@ -234,7 +234,7 @@ def referrer_record(db: Session):
     r = Referrer(
         name="Test Referrer",
         family_limit=10,
-        phone_number="555-0001",
+        phone_number="555-000-0001",
         family_invite_code="KFI-TEST01",
         approval_status=ReferrerApprovalStatus.approved,
     )
@@ -271,6 +271,7 @@ def family_record(db: Session):
         family_name="TestFamily",
         family_wish="World peace",
         contact_name="Contact Person",
+        phone_number="555-000-0000",
         approval_status=FamilyApprovalStatus.approved,
     )
     db.add(f)
@@ -322,6 +323,7 @@ def referrer_with_families(db: Session, referrer_record):
         family_name="Smith Family",
         family_wish="A new roof",
         contact_name="Jane Smith",
+        phone_number="555-010-0101",
         approval_status=FamilyApprovalStatus.approved,
     )
     f2 = Family(
@@ -329,6 +331,7 @@ def referrer_with_families(db: Session, referrer_record):
         family_name="Jones Family",
         family_wish="Warm clothes",
         contact_name="Bob Jones",
+        phone_number="555-010-0102",
         approval_status=FamilyApprovalStatus.approved,
     )
     db.add_all([f1, f2])
@@ -381,7 +384,7 @@ def referrer_with_full_tree(db: Session):
     ref = Referrer(
         name="Tree Referrer",
         family_limit=5,
-        phone_number="555-1000",
+        phone_number="555-100-1000",
         family_invite_code="KFI-TREE01",
         approval_status=ReferrerApprovalStatus.approved,
     )
@@ -394,6 +397,7 @@ def referrer_with_full_tree(db: Session):
         family_name="Tree Family",
         family_wish="A new home",
         contact_name="Tree Contact",
+        phone_number="555-100-1001",
         approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)
@@ -436,7 +440,7 @@ def another_referrer(db: Session):
     ref = Referrer(
         name="Another Referrer",
         family_limit=5,
-        phone_number="555-2000",
+        phone_number="555-200-2000",
         family_invite_code="KFI-ANOT01",
         approval_status=ReferrerApprovalStatus.approved,
     )
@@ -471,6 +475,7 @@ def another_family(db: Session, referrer_record):
         family_name="Another Family",
         family_wish="A computer",
         contact_name="Another Contact",
+        phone_number="555-200-2001",
         approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)

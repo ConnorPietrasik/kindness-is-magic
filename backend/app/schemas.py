@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole
-from app.user_validation import sanitize_plain_text, validate_email
+from app.user_validation import sanitize_plain_text, validate_email, validate_phone_number
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +84,12 @@ class ReferrerSelfRegister(BaseModel):
     def clean_name(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
+    @field_validator("phone_number")
+    @classmethod
+    def check_phone(cls, v: str) -> str:
+        validate_phone_number(v)
+        return v
+
 
 _NOT_PROVIDED = object()
 """Sentinel: field was not present in the JSON payload."""
@@ -140,14 +146,14 @@ class FamilySelfRegister(BaseModel):
     password: str = Field(..., min_length=8)
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
-    phone_number: Optional[str] = Field(None, max_length=20)
+    phone_number: str = Field(..., min_length=1, max_length=20)
 
     @field_validator("email")
     @classmethod
     def check_email(cls, v: str) -> str:
         return validate_email(v)
 
-    @field_validator("family_name", "family_wish", "contact_name")
+    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
@@ -158,6 +164,12 @@ class FamilySelfRegister(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @field_validator("phone_number")
+    @classmethod
+    def check_phone(cls, v: str) -> str:
+        validate_phone_number(v)
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +242,12 @@ class ReferrerCreate(BaseModel):
     def clean_name(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
+    @field_validator("phone_number")
+    @classmethod
+    def check_phone(cls, v: str) -> str:
+        validate_phone_number(v)
+        return v
+
 
 class ReferrerUpdate(BaseModel):
     """Referrer self-service update — family_limit is not allowed."""
@@ -243,6 +261,13 @@ class ReferrerUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @field_validator("phone_number", mode="before")
+    @classmethod
+    def check_phone(cls, v: str | None) -> str | None:
+        if v is not None:
+            validate_phone_number(v)
+        return v
 
 
 class AdminReferrerUpdate(ReferrerUpdate):
@@ -329,9 +354,9 @@ class FamilyCreate(BaseModel):
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
-    phone_number: Optional[str] = Field(None, max_length=20)
+    phone_number: str = Field(..., min_length=1, max_length=20)
 
-    @field_validator("family_name", "family_wish", "contact_name")
+    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
@@ -342,6 +367,12 @@ class FamilyCreate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @field_validator("phone_number")
+    @classmethod
+    def check_phone(cls, v: str) -> str:
+        validate_phone_number(v)
+        return v
 
 
 class FamilyUpdate(BaseModel):
@@ -359,6 +390,16 @@ class FamilyUpdate(BaseModel):
             return v
         return sanitize_plain_text(v)
 
+    @field_validator("phone_number", mode="before")
+    @classmethod
+    def _phone_number_validate(cls, v: str | None) -> str | None:
+        if v == "":
+            raise ValueError("phone_number cannot be empty")
+        if v is not None:
+            validate_phone_number(v)
+            return sanitize_plain_text(v)
+        return v
+
 
 class AdminFamilyUpdate(FamilyUpdate):
     """Admin-only: extends FamilyUpdate with referrer_id.
@@ -375,7 +416,7 @@ class FamilyDetail(BaseModel):
     family_name: str
     bio: Optional[str]
     address: Optional[str]
-    phone_number: Optional[str]
+    phone_number: str
     family_wish: str
     contact_name: str
     approval_status: FamilyApprovalStatus
@@ -620,9 +661,9 @@ class FamilyCreateByReferrer(BaseModel):
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
-    phone_number: Optional[str] = Field(None, max_length=20)
+    phone_number: str = Field(..., min_length=1, max_length=20)
 
-    @field_validator("family_name", "family_wish", "contact_name")
+    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
@@ -633,6 +674,12 @@ class FamilyCreateByReferrer(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @field_validator("phone_number")
+    @classmethod
+    def check_phone(cls, v: str) -> str:
+        validate_phone_number(v)
+        return v
 
 
 class PersonCreateInFamily(BaseModel):

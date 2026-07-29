@@ -58,7 +58,7 @@ class TestSelfRegApprovalStatus:
                 "code": code,
                 "name": "Pending Referrer",
                 "email": "pending_ref@test.com",
-                "phone_number": "555-1111",
+                "phone_number": "555-111-1111",
                 "password": "GoodPass1234!",
             },
         )
@@ -83,7 +83,7 @@ class TestSelfRegApprovalStatus:
                 "code": code,
                 "name": "Approved Referrer",
                 "email": "locked_ref@test.com",
-                "phone_number": "555-2222",
+                "phone_number": "555-222-2222",
                 "password": "GoodPass1234!",
             },
         )
@@ -108,7 +108,7 @@ class TestSelfRegApprovalStatus:
                 "code": code,
                 "name": "Locked Referrer",
                 "email": "locked2@test.com",
-                "phone_number": "555-3333",
+                "phone_number": "555-333-3333",
                 "password": "GoodPass1234!",
             },
         )
@@ -144,7 +144,7 @@ class TestRejectedReferrerAuth:
         ref = Referrer(
             name="Rejected Ref",
             family_limit=5,
-            phone_number="555-4444",
+            phone_number="555-444-4444",
             family_invite_code="KFI-REJECT",
             approval_status=ReferrerApprovalStatus.rejected,
         )
@@ -233,7 +233,7 @@ class TestSendFamilyInviteApprovalGate:
         ref = Referrer(
             name="Pending Ref",
             family_limit=5,
-            phone_number="555-5555",
+            phone_number="555-555-5555",
             family_invite_code="KFI-PEND01",
             approval_status=ReferrerApprovalStatus.pending,
         )
@@ -266,7 +266,7 @@ class TestSendFamilyInviteApprovalGate:
         ref = Referrer(
             name="Approved Ref",
             family_limit=5,
-            phone_number="555-6666",
+            phone_number="555-666-6666",
             family_invite_code="KFI-APPR01",
             approval_status=ReferrerApprovalStatus.approved,
         )
@@ -308,7 +308,7 @@ class TestAdminApproveReject:
         ref = Referrer(
             name="Approve Me",
             family_limit=5,
-            phone_number="555-7777",
+            phone_number="555-777-7777",
             family_invite_code="KFI-APME01",
             approval_status=ReferrerApprovalStatus.pending,
         )
@@ -502,7 +502,7 @@ class TestAdminInviteCRUD:
                 "code": code,
                 "name": "Redeemed Ref",
                 "email": "redeemed@test.com",
-                "phone_number": "555-8888",
+                "phone_number": "555-888-8888",
                 "password": "GoodPass1234!",
             },
         )
@@ -541,7 +541,7 @@ class TestAdminInviteCRUD:
                 "code": code1,
                 "name": "Redeemed Ref",
                 "email": "redeemed_filter@test.com",
-                "phone_number": "555-9999",
+                "phone_number": "555-999-9999",
                 "password": "GoodPass1234!",
             },
         )
@@ -602,7 +602,7 @@ class TestAdminInviteCRUD:
                 "code": code,
                 "name": "List Ref",
                 "email": "list_ref@test.com",
-                "phone_number": "555-0001",
+                "phone_number": "555-000-0001",
                 "password": "GoodPass1234!",
             },
         )

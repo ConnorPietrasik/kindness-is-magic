@@ -62,7 +62,7 @@ class TestAdminListReferrers:
         _admin_login(test_client)
         # Create 5 referrers
         for i in range(5):
-            r = Referrer(name=f"Referrer {i}", family_limit=10, phone_number="555-0000", family_invite_code=f"KFI-RF00{i}")
+            r = Referrer(name=f"Referrer {i}", family_limit=10, phone_number="555-000-0000", family_invite_code=f"KFI-RF00{i}")
             db.add(r)
         db.commit()
 
@@ -114,14 +114,14 @@ class TestAdminCreateReferrer:
             json={
                 "name": "New Referrer",
                 "family_limit": 5,
-                "phone_number": "555-1234",
+                "phone_number": "555-123-1234",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
         assert body["name"] == "New Referrer"
         assert body["family_limit"] == 5
-        assert body["phone_number"] == "555-1234"
+        assert body["phone_number"] == "555-123-1234"
         assert body["family_count"] == 0
         assert body["approval_status"] == "approved"
         assert body["approved_by_admin_name"] is not None
@@ -138,7 +138,7 @@ class TestAdminUpdateReferrer:
         assert resp.status_code == 200
         body = resp.json()
         assert body["name"] == "Updated Name"
-        assert body["phone_number"] == "555-0001"  # unchanged
+        assert body["phone_number"] == "555-000-0001"  # unchanged
 
     def test_200_full_update(self, test_client: TestClient, admin_user, referrer_record):
         _admin_login(test_client)
@@ -147,14 +147,14 @@ class TestAdminUpdateReferrer:
             json={
                 "name": "Fully Updated",
                 "family_limit": 20,
-                "phone_number": "999-0000",
+                "phone_number": "999-000-0000",
             },
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["name"] == "Fully Updated"
         assert body["family_limit"] == 20
-        assert body["phone_number"] == "999-0000"
+        assert body["phone_number"] == "999-000-0000"
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -321,6 +321,7 @@ class TestAdminCreateFamily:
                 "family_name": "New Family",
                 "family_wish": "A bicycle",
                 "contact_name": "New Contact",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201
@@ -340,14 +341,14 @@ class TestAdminCreateFamily:
                 "contact_name": "New Contact",
                 "bio": "We love bikes",
                 "address": "123 Main St",
-                "phone_number": "555-9999",
+                "phone_number": "555-999-9999",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
         assert body["bio"] == "We love bikes"
         assert body["address"] == "123 Main St"
-        assert body["phone_number"] == "555-9999"
+        assert body["phone_number"] == "555-999-9999"
 
     def test_404_bad_referrer_id(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -358,6 +359,7 @@ class TestAdminCreateFamily:
                 "family_name": "New Family",
                 "family_wish": "A bicycle",
                 "contact_name": "New Contact",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 404
@@ -369,7 +371,7 @@ class TestAdminCreateFamily:
             json={
                 "referrer_id": referrer_record.id,
                 "family_name": "New Family",
-                # missing family_wish and contact_name
+                # missing family_wish, contact_name, and phone_number
             },
         )
         assert resp.status_code == 422
@@ -465,7 +467,7 @@ class TestAdminUpdateFamily:
         """Sending null for a nullable field should leave it unchanged."""
         family_record.bio = "Some bio"
         family_record.address = "123 Main St"
-        family_record.phone_number = "555-1234"
+        family_record.phone_number = "555-123-1234"
         family_record._sa_instance_state.session.commit()
 
         _admin_login(test_client)
@@ -477,25 +479,34 @@ class TestAdminUpdateFamily:
         body = resp.json()
         assert body["bio"] == "Some bio"  # unchanged
         assert body["address"] == "123 Main St"  # unchanged
-        assert body["phone_number"] == "555-1234"  # unchanged
+        assert body["phone_number"] == "555-123-1234"  # unchanged
 
     def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, admin_user, family_record):
         """Sending '' for a nullable field should clear it to None."""
         family_record.bio = "Some bio"
         family_record.address = "123 Main St"
-        family_record.phone_number = "555-1234"
+        family_record.phone_number = "555-123-1234"
         family_record._sa_instance_state.session.commit()
 
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/families/{family_record.id}",
-            json={"bio": "", "address": "", "phone_number": ""},
+            json={"bio": "", "address": ""},
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["bio"] is None  # cleared
         assert body["address"] is None  # cleared
-        assert body["phone_number"] is None  # cleared
+        assert body["phone_number"] == "555-123-1234"  # unchanged
+
+    def test_422_empty_string_rejected_for_phone_number(self, test_client: TestClient, admin_user, family_record):
+        """Sending '' for phone_number should be rejected — it is now mandatory."""
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"phone_number": ""},
+        )
+        assert resp.status_code == 422
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)

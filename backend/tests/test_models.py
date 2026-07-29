@@ -74,7 +74,7 @@ class TestReferrer:
         r = Referrer(
             name="Alice Smith",
             family_limit=5,
-            phone_number="555-1234",
+            phone_number="555-123-1234",
             family_invite_code="KFI-ALICE",
         )
         db.add(r)
@@ -90,6 +90,7 @@ class TestFamily:
             family_name="The Smiths",
             family_wish="A new roof",
             contact_name="John Smith",
+            phone_number="555-123-1234",
         )
         db.add(f)
         db.commit()
@@ -105,6 +106,7 @@ class TestPerson:
             family_name="TestFamily",
             family_wish="Wish",
             contact_name="Contact",
+            phone_number="555-000-0000",
         )
         db.add(family)
         db.commit()
@@ -128,6 +130,7 @@ class TestPerson:
             family_name="TestFamily",
             family_wish="Wish",
             contact_name="Contact",
+            phone_number="555-000-0000",
         )
         db.add(family)
         db.commit()
@@ -153,6 +156,7 @@ class TestPerson:
             family_name="TestFamily",
             family_wish="Wish",
             contact_name="Contact",
+            phone_number="555-000-0000",
         )
         db.add(family)
         db.commit()

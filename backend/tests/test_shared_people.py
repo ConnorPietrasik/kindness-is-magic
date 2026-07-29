@@ -82,6 +82,7 @@ class TestPersonGetShared:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -184,6 +185,7 @@ class TestPersonUpdateShared:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -317,6 +319,7 @@ class TestPersonDeleteShared:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()

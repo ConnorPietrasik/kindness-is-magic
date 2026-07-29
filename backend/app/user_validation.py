@@ -28,6 +28,23 @@ def sanitize_plain_text(value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phone number
+# ---------------------------------------------------------------------------
+
+
+def validate_phone_number(value: str) -> str:
+    """Validate that a phone number contains at least 9 digits.
+
+    Raises ``ValueError`` if the digit count is too low.
+    Returns the value unchanged (sanitization is handled by ``sanitize_plain_text``).
+    """
+    digits = re.sub(r"\D", "", value)
+    if len(digits) < 9:
+        raise ValueError("phone_number must contain at least 9 digits")
+    return value
+
+
+# ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
 

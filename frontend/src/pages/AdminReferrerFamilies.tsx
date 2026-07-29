@@ -35,6 +35,7 @@ import {
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
+import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload, PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
@@ -362,6 +363,7 @@ interface ReferrerFormProps {
 
 function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProps) {
   const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
 
@@ -369,6 +371,12 @@ function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProp
     <form
       onSubmit={(e: React.FormEvent) => {
         e.preventDefault();
+        const phoneErr = validatePhoneNumber(form.phone_number || "");
+        if (phoneErr) {
+          setPhoneError(phoneErr);
+          return;
+        }
+        setPhoneError(null);
         onSubmit(form);
       }}
       className="mx-auto max-w-sm space-y-3"
@@ -386,10 +394,14 @@ function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProp
       />
       <FormField
         label="Phone"
+        type="text"
+        error={phoneError}
         fieldProps={{
-          type: "text",
           value: form.phone_number,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            update("phone_number", e.target.value);
+            setPhoneError(null);
+          },
           required: true,
           maxLength: 20,
           autoComplete: "off",

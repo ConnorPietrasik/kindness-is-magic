@@ -403,7 +403,7 @@ class TestAdminCreateUser:
         from app.models import Referrer
 
         _admin_login(test_client)
-        ref = Referrer(name="Deleted Ref", family_limit=5, phone_number="555-9999", family_invite_code="KFI-DELT01")
+        ref = Referrer(name="Deleted Ref", family_limit=5, phone_number="555-999-9999", family_invite_code="KFI-DELT01")
         ref.deleted_at = datetime.now(timezone.utc)
         db.add(ref)
         db.commit()
@@ -428,6 +428,7 @@ class TestAdminCreateUser:
             family_name="Deleted Fam",
             family_wish="Wish",
             contact_name="Contact",
+            phone_number="555-999-9999",
             approval_status=FamilyApprovalStatus.approved,
         )
         fam.deleted_at = datetime.now(timezone.utc)
@@ -567,7 +568,7 @@ class TestAdminUpdateUser:
         from app.models import Referrer
 
         _admin_login(test_client)
-        ref = Referrer(name="Deleted Ref 2", family_limit=5, phone_number="555-8888", family_invite_code="KFI-DELT02")
+        ref = Referrer(name="Deleted Ref 2", family_limit=5, phone_number="555-888-8888", family_invite_code="KFI-DELT02")
         ref.deleted_at = datetime.now(timezone.utc)
         db.add(ref)
         db.commit()

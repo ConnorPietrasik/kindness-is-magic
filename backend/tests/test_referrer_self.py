@@ -39,7 +39,7 @@ class TestReferrerGetSelf:
         assert body["id"] == ref.id
         assert body["name"] == "Tree Referrer"
         assert body["family_limit"] == 5
-        assert body["phone_number"] == "555-1000"
+        assert body["phone_number"] == "555-100-1000"
         assert body["family_count"] == 1
 
     def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
@@ -52,7 +52,7 @@ class TestReferrerGetSelf:
         ref = Referrer(
             name="Temp Referrer",
             family_limit=5,
-            phone_number="555-3000",
+            phone_number="555-300-3000",
             family_invite_code="KFI-TEMP01",
         )
         db.add(ref)
@@ -94,12 +94,12 @@ class TestReferrerUpdateSelf:
         _tree_referrer_login(test_client)
         resp = test_client.patch(
             "/api/referrer/me",
-            json={"name": "Updated Tree Referrer", "phone_number": "555-9999"},
+            json={"name": "Updated Tree Referrer", "phone_number": "555-999-9999"},
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["name"] == "Updated Tree Referrer"
-        assert body["phone_number"] == "555-9999"
+        assert body["phone_number"] == "555-999-9999"
         assert body["family_limit"] == 5  # unchanged
 
     def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
@@ -111,7 +111,7 @@ class TestReferrerUpdateSelf:
         ref = Referrer(
             name="Temp Referrer",
             family_limit=5,
-            phone_number="555-3001",
+            phone_number="555-300-3001",
             family_invite_code="KFI-TEMP02",
         )
         db.add(ref)
@@ -210,6 +210,7 @@ class TestReferrerGetFamily:
             family_name="Other Ref Family",
             family_wish="Something else",
             contact_name="Other Contact",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -235,6 +236,7 @@ class TestReferrerCreateFamily:
                 "family_name": "New Ref Family",
                 "family_wish": "A house",
                 "contact_name": "New Contact",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201
@@ -253,14 +255,14 @@ class TestReferrerCreateFamily:
                 "contact_name": "Full Contact",
                 "bio": "We need a car",
                 "address": "456 Oak Ave",
-                "phone_number": "555-3333",
+                "phone_number": "555-333-3333",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
         assert body["bio"] == "We need a car"
         assert body["address"] == "456 Oak Ave"
-        assert body["phone_number"] == "555-3333"
+        assert body["phone_number"] == "555-333-3333"
 
     def test_family_limit_enforced(self, test_client: TestClient, another_referrer, db: Session):
         from app.models import Family, FamilyApprovalStatus, Referrer
@@ -273,6 +275,7 @@ class TestReferrerCreateFamily:
             family_name="Limit Family",
             family_wish="A roof",
             contact_name="Limit Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.approved,
         )
         db.add(existing)
@@ -285,6 +288,7 @@ class TestReferrerCreateFamily:
                 "family_name": "Over Limit",
                 "family_wish": "Too many",
                 "contact_name": "Nope",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 400
@@ -348,6 +352,7 @@ class TestReferrerUpdateFamily:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -398,6 +403,7 @@ class TestReferrerDeleteFamily:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -460,6 +466,7 @@ class TestReferrerListFamilyPeople:
             family_name="Empty Family",
             family_wish="Nothing",
             contact_name="Empty",
+            phone_number="555-000-0000",
         )
         db.add(empty_fam)
         db.commit()
@@ -483,6 +490,7 @@ class TestReferrerListFamilyPeople:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -555,6 +563,7 @@ class TestReferrerCreateFamilyPerson:
             family_name="Other Family",
             family_wish="Something",
             contact_name="Other",
+            phone_number="555-000-0000",
         )
         db.add(other_fam)
         db.commit()
@@ -636,6 +645,7 @@ class TestReferrerPendingFamilies:
             family_name="Pending Family",
             family_wish="A roof",
             contact_name="Pending Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -669,6 +679,7 @@ class TestReferrerPendingFamilies:
             family_name="Other Pending",
             family_wish="A car",
             contact_name="Other Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -700,6 +711,7 @@ class TestReferrerApproveFamily:
             family_name="To Approve",
             family_wish="A roof",
             contact_name="Approve Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -722,6 +734,7 @@ class TestReferrerApproveFamily:
             family_name="Count Me",
             family_wish="A roof",
             contact_name="Count Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -755,6 +768,7 @@ class TestReferrerApproveFamily:
             family_name="Rejected Family",
             family_wish="A roof",
             contact_name="Rejected Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.rejected,
         )
         db.add(rejected)
@@ -776,6 +790,7 @@ class TestReferrerApproveFamily:
             family_name="At Limit",
             family_wish="A roof",
             contact_name="Limit Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.approved,
         )
         # Create 1 pending family
@@ -784,6 +799,7 @@ class TestReferrerApproveFamily:
             family_name="Over Limit",
             family_wish="A car",
             contact_name="Over Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add_all([approved, pending])
@@ -804,6 +820,7 @@ class TestReferrerApproveFamily:
             family_name="Not Yours",
             family_wish="A roof",
             contact_name="Not Yours",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -823,6 +840,7 @@ class TestReferrerApproveFamily:
             family_name="No Auth",
             family_wish="A roof",
             contact_name="No Auth",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -843,6 +861,7 @@ class TestReferrerRejectFamily:
             family_name="To Reject",
             family_wish="A roof",
             contact_name="Reject Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -871,6 +890,7 @@ class TestReferrerRejectFamily:
             family_name="Already Rejected",
             family_wish="A roof",
             contact_name="Rejected Contact",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.rejected,
         )
         db.add(rejected)
@@ -890,6 +910,7 @@ class TestReferrerRejectFamily:
             family_name="Not Yours",
             family_wish="A roof",
             contact_name="Not Yours",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)
@@ -909,6 +930,7 @@ class TestReferrerRejectFamily:
             family_name="No Auth",
             family_wish="A roof",
             contact_name="No Auth",
+            phone_number="555-000-0000",
             approval_status=FamilyApprovalStatus.pending,
         )
         db.add(pending)

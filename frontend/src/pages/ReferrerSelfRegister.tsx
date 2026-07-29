@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { registerReferrerViaInvite } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { formatApiError } from "../lib/utils";
+import { validatePhoneNumber } from "../lib/validators";
 
 interface SelfRegisterForm {
   code: string;
@@ -61,6 +62,12 @@ export default function ReferrerSelfRegister() {
 
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    const phoneErr = validatePhoneNumber(form.phone_number);
+    if (phoneErr) {
+      setError(phoneErr);
       return;
     }
 

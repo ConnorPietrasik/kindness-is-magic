@@ -2,7 +2,7 @@
  * NULLABLE_STRING_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
-const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "phone_number", "title", "note"]);
+const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "title", "note"]);
 
 /**
  * normalizePayload — convert empty strings to `null` on known nullable fields.

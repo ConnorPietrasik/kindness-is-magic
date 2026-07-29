@@ -7,6 +7,7 @@ interface FormFieldProps {
   htmlFor?: string;
   type?: string;
   as?: AsElement;
+  error?: string | null;
   fieldProps?: Record<string, unknown>;
   className?: string;
   children?: ReactNode;
@@ -15,7 +16,16 @@ interface FormFieldProps {
 /**
  * FormField — label + input/select/textarea with consistent spacing.
  */
-export function FormField({ label, htmlFor, type = "text", as = "input", fieldProps = {}, className = "", children }: FormFieldProps) {
+export function FormField({
+  label,
+  htmlFor,
+  type = "text",
+  as = "input",
+  error,
+  fieldProps = {},
+  className = "",
+  children,
+}: FormFieldProps) {
   const autoId = useId();
   const id = htmlFor ?? autoId;
   const Component = as;
@@ -33,11 +43,13 @@ export function FormField({ label, htmlFor, type = "text", as = "input", fieldPr
       <Component
         id={id}
         type={Component === "input" ? type : undefined}
-        className={`${baseInputClass}${extraClass ? ` ${extraClass}` : ""}`}
+        className={`${baseInputClass}${error ? " border-red-400 focus:border-red-400 focus:ring-red-400/20" : ""}${extraClass ? ` ${extraClass}` : ""}`}
+        aria-invalid={error ? "true" : undefined}
         {...restProps}
       >
         {children}
       </Component>
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

@@ -161,7 +161,7 @@ class Family(Base):
     family_name: Mapped[str] = mapped_column(String(40), nullable=False)
     bio: Mapped[str | None] = mapped_column(String(400), nullable=True)
     address: Mapped[str] = mapped_column(String(200), nullable=True)
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
     family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
     approval_status: Mapped[FamilyApprovalStatus] = mapped_column(

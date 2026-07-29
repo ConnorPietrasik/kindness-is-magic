@@ -91,6 +91,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Email"), "family@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
+    await user.type(screen.getByLabelText("Phone"), "555-123-4567");
 
     await user.click(screen.getByRole("button", { name: "Create Account" }));
 
@@ -104,7 +105,7 @@ describe("FamilySelfRegister", () => {
         password: "password123",
         bio: null,
         address: null,
-        phone_number: null,
+        phone_number: "555-123-4567",
       });
     });
   });
@@ -120,6 +121,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Email"), "family@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "different1");
+    await user.type(screen.getByLabelText("Phone"), "555-123-4567");
 
     await user.click(screen.getByRole("button", { name: "Create Account" }));
 

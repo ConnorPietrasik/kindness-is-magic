@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { registerFamilyViaInvite } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { formatApiError } from "../lib/utils";
+import { validatePhoneNumber } from "../lib/validators";
 
 interface SelfRegisterForm {
   code: string;
@@ -71,6 +72,12 @@ export default function FamilySelfRegister() {
       return;
     }
 
+    const phoneErr = validatePhoneNumber(form.phone_number);
+    if (phoneErr) {
+      setError(phoneErr);
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await registerFamilyViaInvite({
@@ -82,7 +89,7 @@ export default function FamilySelfRegister() {
         password: form.password,
         bio: form.bio || null,
         address: form.address || null,
-        phone_number: form.phone_number || null,
+        phone_number: form.phone_number,
       });
 
       // Backend auto-logs the user in via cookies. Update auth context and redirect.
@@ -226,19 +233,18 @@ export default function FamilySelfRegister() {
             />
           </div>
 
-          <div>
-            <OptionalLabel text="Phone" />
-            <FormField
-              type="text"
-              fieldProps={{
-                value: form.phone_number,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-                maxLength: 20,
-                placeholder: "e.g. 111-111-1111",
-                autoComplete: "tel",
-              }}
-            />
-          </div>
+          <FormField
+            label="Phone"
+            type="text"
+            fieldProps={{
+              value: form.phone_number,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
+              required: true,
+              maxLength: 20,
+              placeholder: "e.g. 111-111-1111",
+              autoComplete: "tel",
+            }}
+          />
 
           <Button type="submit" loading={loading} className="mt-2 w-full">
             {loading ? "Creating account…" : "Create Account"}

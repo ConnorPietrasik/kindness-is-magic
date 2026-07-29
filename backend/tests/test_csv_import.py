@@ -29,11 +29,11 @@ def _post_csv(client: TestClient, csv_text: str):
 
 CSV_MINIMAL = """# referrers
 name,family_limit,phone_number
-Test Ref,5,555-0001
+Test Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Test Ref,Test Fam,A wish,Contact,,,
+Test Ref,Test Fam,A wish,Contact,,,555-000-0002
 
 # people
 family_name,given_name,age,practical_wish,fun_wish,title,note
@@ -46,14 +46,14 @@ user@example.com,Password123!,referrer,Test Ref,
 
 CSV_FULL_OPTIONALS = """# referrers
 name,family_limit,phone_number
-Ref One,10,555-1001
-Ref Two,20,555-1002
+Ref One,10,555-100-1001
+Ref Two,20,555-100-1002
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Ref One,Family Alpha,Wish A,Mom Alpha,Bio A,123 Main St,555-2001
-Ref One,Family Beta,Wish B,Dad Beta,,456 Oak Ave,
-Ref Two,Family Gamma,Wish C,Sis Gamma,,,
+Ref One,Family Alpha,Wish A,Mom Alpha,Bio A,123 Main St,555-200-2001
+Ref One,Family Beta,Wish B,Dad Beta,,456 Oak Ave,555-200-2002
+Ref Two,Family Gamma,Wish C,Sis Gamma,,,555-200-2003
 
 # people
 family_name,given_name,age,practical_wish,fun_wish,title,note
@@ -74,11 +74,11 @@ admin2@test.com,Password123!,admin,,
 
 CSV_USERS_BY_ID = """# referrers
 name,family_limit,phone_number
-ID Ref,5,555-9999
+ID Ref,5,555-999-9999
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-ID Ref,ID Fam,Wish,Contact,,,
+ID Ref,ID Fam,Wish,Contact,,,555-999-9998
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -201,7 +201,7 @@ class TestCsvImportFull:
         fam = db.query(Family).filter(Family.family_name == "Family Alpha").first()
         assert fam.bio == "Bio A"
         assert fam.address == "123 Main St"
-        assert fam.phone_number == "555-2001"
+        assert fam.phone_number == "555-200-2001"
 
         fam2 = db.query(Family).filter(Family.family_name == "Family Beta").first()
         assert fam2.bio is None
@@ -258,7 +258,7 @@ name,family_limit,phone_number
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Missing Ref,Orphan Fam,A wish,Contact,,,
+Missing Ref,Orphan Fam,A wish,Contact,,,555-000-0000
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -275,7 +275,7 @@ Missing Ref,Orphan Fam,A wish,Contact,,,
     def test_bad_referrer_id_for_family(self, test_client: TestClient, admin_user):
         csv_data = """# families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Does Not Exist,No Ref Fam,Wish,Contact,,,
+Does Not Exist,No Ref Fam,Wish,Contact,,,555-000-0000
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -325,7 +325,7 @@ noreffam@test.com,Password123!,family,,
     def test_admin_user_with_refs_rejected(self, test_client: TestClient, admin_user):
         csv_data = """# referrers
 name,family_limit,phone_number
-AdminRef,5,555-0001
+AdminRef,5,555-000-0001
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -394,11 +394,11 @@ class TestCsvImportPeopleDedup:
         """A person with the same family, given_name, and age is skipped."""
         csv_data = """# referrers
 name,family_limit,phone_number
-Dedup Ref,5,555-0001
+Dedup Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref,Dedup Fam,Wish,Contact,,,
+Dedup Ref,Dedup Fam,Wish,Contact,,,555-001-0010
 
 # people
 family_name,given_name,age,practical_wish,fun_wish,title,note
@@ -416,12 +416,12 @@ Dedup Fam,Alice,8,Backpack,Doll,,
         """Same name+age in a different family is NOT a duplicate."""
         csv_data = """# referrers
 name,family_limit,phone_number
-Dedup Ref2,5,555-0002
+Dedup Ref2,5,555-000-0002
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref2,Fam A,Wish A,Contact A,,,
-Dedup Ref2,Fam B,Wish B,Contact B,,,
+Dedup Ref2,Fam A,Wish A,Contact A,,,555-002-0020
+Dedup Ref2,Fam B,Wish B,Contact B,,,555-002-0021
 
 # people
 family_name,given_name,age,practical_wish,fun_wish,title,note
@@ -439,11 +439,11 @@ Fam B,Alice,8,Coat,Game,,
         """Same name but different age in the same family is NOT a duplicate."""
         csv_data = """# referrers
 name,family_limit,phone_number
-Dedup Ref3,5,555-0003
+Dedup Ref3,5,555-000-0003
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref3,Dedup Fam3,Wish,Contact,,,
+Dedup Ref3,Dedup Fam3,Wish,Contact,,,555-003-0030
 
 # people
 family_name,given_name,age,practical_wish,fun_wish,title,note
@@ -487,7 +487,7 @@ csv_admin@test.com,Password123!,admin,,
 
         csv_data = """# referrers
 name,family_limit,phone_number
-Csv Ref,5,555-0001
+Csv Ref,5,555-000-0001
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -508,11 +508,11 @@ csv_ref@test.com,Password123!,referrer,Csv Ref,
 
         csv_data = """# referrers
 name,family_limit,phone_number
-Fam Ref,5,555-0001
+Fam Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Fam Ref,Fam Csv,Wish,Contact,,,
+Fam Ref,Fam Csv,Wish,Contact,,,555-004-0040
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id

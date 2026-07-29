@@ -47,6 +47,7 @@ class TestFamilyGetSelf:
             family_name="Temp Family",
             family_wish="Temporary",
             contact_name="Temp",
+            phone_number="555-000-0000",
         )
         db.add(fam)
         db.commit()
@@ -90,14 +91,14 @@ class TestFamilyUpdateSelf:
             json={
                 "family_name": "Updated Family",
                 "contact_name": "Updated Contact",
-                "phone_number": "555-9999",
+                "phone_number": "555-999-9999",
             },
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["family_name"] == "Updated Family"
         assert body["contact_name"] == "Updated Contact"
-        assert body["phone_number"] == "555-9999"
+        assert body["phone_number"] == "555-999-9999"
         assert body["family_wish"] == "World peace"  # unchanged
 
     def test_404_missing_family_record(self, test_client: TestClient, db: Session):
@@ -108,6 +109,7 @@ class TestFamilyUpdateSelf:
             family_name="Temp Family",
             family_wish="Temporary",
             contact_name="Temp",
+            phone_number="555-000-0000",
         )
         db.add(fam)
         db.commit()
@@ -140,7 +142,7 @@ class TestFamilyUpdateSelf:
         """Sending null for a nullable field should leave it unchanged."""
         family_record.bio = "Some bio"
         family_record.address = "123 Main St"
-        family_record.phone_number = "555-1234"
+        family_record.phone_number = "555-123-1234"
         family_record._sa_instance_state.session.commit()
 
         _family_login(test_client)
@@ -152,25 +154,34 @@ class TestFamilyUpdateSelf:
         body = resp.json()
         assert body["bio"] == "Some bio"  # unchanged
         assert body["address"] == "123 Main St"  # unchanged
-        assert body["phone_number"] == "555-1234"  # unchanged
+        assert body["phone_number"] == "555-123-1234"  # unchanged
 
     def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, family_user, family_record):
         """Sending '' for a nullable field should clear it to None."""
         family_record.bio = "Some bio"
         family_record.address = "123 Main St"
-        family_record.phone_number = "555-1234"
+        family_record.phone_number = "555-123-1234"
         family_record._sa_instance_state.session.commit()
 
         _family_login(test_client)
         resp = test_client.patch(
             "/api/family/me",
-            json={"bio": "", "address": "", "phone_number": ""},
+            json={"bio": "", "address": ""},
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["bio"] is None  # cleared
         assert body["address"] is None  # cleared
-        assert body["phone_number"] is None  # cleared
+        assert body["phone_number"] == "555-123-1234"  # unchanged
+
+    def test_422_empty_string_rejected_for_phone_number(self, test_client: TestClient, family_user):
+        """Sending '' for phone_number should be rejected — it is now mandatory."""
+        _family_login(test_client)
+        resp = test_client.patch(
+            "/api/family/me",
+            json={"phone_number": ""},
+        )
+        assert resp.status_code == 422
 
     def test_401_unauthenticated(self, test_client: TestClient, family_user):
         resp = test_client.patch("/api/family/me", json={"family_name": "Nope"})

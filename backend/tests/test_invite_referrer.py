@@ -286,7 +286,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "New Referrer",
                 "email": "newref@test.com",
-                "phone_number": "555-1234",
+                "phone_number": "555-123-1234",
                 "password": "GoodPass1234!",
             },
         )
@@ -321,7 +321,7 @@ class TestReferrerSelfRegister:
                 "code": "KRI-INVALID",
                 "name": "Nobody",
                 "email": "nobody@test.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -346,7 +346,7 @@ class TestReferrerSelfRegister:
                 "code": "KRI-EXPIR",
                 "name": "Late Bird",
                 "email": "late@test.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -363,7 +363,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "First",
                 "email": "first@test.com",
-                "phone_number": "555-0001",
+                "phone_number": "555-000-0001",
                 "password": "GoodPass1234!",
             },
         )
@@ -376,7 +376,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Second",
                 "email": "second@test.com",
-                "phone_number": "555-0002",
+                "phone_number": "555-000-0002",
                 "password": "GoodPass1234!",
             },
         )
@@ -393,7 +393,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "First",
                 "email": "dup@test.com",
-                "phone_number": "555-0001",
+                "phone_number": "555-000-0001",
                 "password": "GoodPass1234!",
             },
         )
@@ -408,7 +408,7 @@ class TestReferrerSelfRegister:
                 "code": code2,
                 "name": "Second",
                 "email": "dup@test.com",
-                "phone_number": "555-0002",
+                "phone_number": "555-000-0002",
                 "password": "GoodPass1234!",
             },
         )
@@ -423,7 +423,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Short Pass",
                 "email": "short@test.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "Short",
             },
         )
@@ -437,7 +437,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Bad Email",
                 "email": "not-an-email",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -451,7 +451,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "A" * 61,
                 "email": "longname@test.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -467,7 +467,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Case Test",
                 "email": "UPPERCASE@TEST.COM",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -491,7 +491,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Wrong Email",
                 "email": "wrong@example.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -514,7 +514,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Correct Email",
                 "email": "locked@example.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -532,7 +532,7 @@ class TestReferrerSelfRegister:
                 "code": code,
                 "name": "Any Email",
                 "email": "anyone@example.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -584,7 +584,7 @@ class TestInviteRedemptionAtomicity:
                 "code": code,
                 "name": "Duplicate",
                 "email": "existing@test.com",
-                "phone_number": "555-0000",
+                "phone_number": "555-000-0000",
                 "password": "GoodPass1234!",
             },
         )
@@ -626,7 +626,7 @@ class TestFamilySelfRegister:
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/admin/referrers",
-            json={"name": "Test Ref", "family_limit": 10, "phone_number": "555-0001"},
+            json={"name": "Test Ref", "family_limit": 10, "phone_number": "555-000-0001"},
         )
         assert resp.status_code == 201
         body = resp.json()
@@ -646,6 +646,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Mom Smith",
                 "email": "smith@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201
@@ -680,7 +681,7 @@ class TestFamilySelfRegister:
                 "password": "GoodPass1234!",
                 "bio": "We have 3 kids",
                 "address": "123 Main St",
-                "phone_number": "555-9999",
+                "phone_number": "555-999-9999",
             },
         )
         assert resp.status_code == 201
@@ -697,6 +698,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Nobody",
                 "email": "nobody@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 400
@@ -715,6 +717,7 @@ class TestFamilySelfRegister:
                 "contact_name": "First",
                 "email": "dup@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp1.status_code == 201
@@ -732,6 +735,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Second",
                 "email": "dup@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp2.status_code == 409
@@ -795,6 +799,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Case",
                 "email": "UPPERCASE@TEST.COM",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201
@@ -818,6 +823,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Mom Smith",
                 "email": "pending@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201
@@ -860,6 +866,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Dad Jones",
                 "email": "pending2@test.com",
                 "password": "GoodPass1234!",
+                "phone_number": "555-000-0000",
             },
         )
         assert resp.status_code == 201

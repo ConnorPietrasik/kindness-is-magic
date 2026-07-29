@@ -19,11 +19,11 @@ describe("humanize", () => {
 
 describe("normalizePayload", () => {
   it("converts empty strings to null on nullable fields", () => {
-    const input = { family_name: "Smith", bio: "", address: "", phone_number: "" };
+    const input = { family_name: "Smith", bio: "", address: "", title: "" };
     const result = normalizePayload(input);
     expect(result.bio).toBeNull();
     expect(result.address).toBeNull();
-    expect(result.phone_number).toBeNull();
+    expect(result.title).toBeNull();
     expect(result.family_name).toBe("Smith");
   });
 
@@ -98,7 +98,7 @@ describe("normalizeUpdatePayload", () => {
     expect(result.family_name).toBeUndefined(); // unchanged
     expect(result.bio).toBe(""); // cleared
     expect(result.address).toBeUndefined(); // was null, still empty
-    expect(result.phone_number).toBe("555-1234"); // changed
+    expect(result.phone_number).toBe("555-1234"); // changed (no longer nullable, still diff-tracked)
   });
 
   it("returns empty object when nothing changed", () => {

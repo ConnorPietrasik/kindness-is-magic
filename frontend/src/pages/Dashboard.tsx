@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
+import { validatePhoneNumber } from "../lib/validators";
 import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
 
 const REFERRER_ME_KEY = ["referrerMe"];
@@ -269,6 +270,7 @@ interface ReferrerSelfFormProps {
 
 function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelfFormProps) {
   const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({ ...initial });
@@ -280,6 +282,12 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
     <form
       onSubmit={(e: React.FormEvent) => {
         e.preventDefault();
+        const phoneErr = validatePhoneNumber(form.phone_number || "");
+        if (phoneErr) {
+          setPhoneError(phoneErr);
+          return;
+        }
+        setPhoneError(null);
         onSubmit(form);
       }}
       className="mx-auto max-w-sm space-y-3"
@@ -297,10 +305,14 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
       />
       <FormField
         label="Phone"
+        type="text"
+        error={phoneError}
         fieldProps={{
-          type: "text",
           value: form.phone_number,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            update("phone_number", e.target.value);
+            setPhoneError(null);
+          },
           required: true,
           maxLength: 20,
           autoComplete: "tel",
@@ -420,7 +432,12 @@ function ChangePasswordSection() {
         <FormField
           label="Current password"
           type="password"
-          fieldProps={{ value: oldPass, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value), required: true, autoComplete: "current-password" }}
+          fieldProps={{
+            value: oldPass,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value),
+            required: true,
+            autoComplete: "current-password",
+          }}
         />
         <FormField
           label="New password"

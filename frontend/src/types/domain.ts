@@ -146,7 +146,7 @@ export interface FamilyDetail {
   family_name: string;
   bio: string | null;
   address: string | null;
-  phone_number: string | null;
+  phone_number: string;
   family_wish: string;
   contact_name: string;
   deleted_at: string | null;
@@ -185,7 +185,7 @@ export interface FamilyPayload {
   family_name?: string;
   bio?: string | null;
   address?: string | null;
-  phone_number?: string | null;
+  phone_number?: string;
   family_wish?: string;
   contact_name?: string;
   deleted_at?: string | null;
@@ -253,10 +253,8 @@ export interface FamilySelfRegisterPayload {
   password: string;
   bio?: string | null;
   address?: string | null;
-  phone_number?: string | null;
+  phone_number?: string;
 }
-
-/** Response when a family self-registers via invite. */
 export interface FamilySelfRegisterResponse {
   user: User;
   family: FamilySummary;

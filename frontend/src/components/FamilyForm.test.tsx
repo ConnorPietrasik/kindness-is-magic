@@ -10,7 +10,7 @@ const mockFamilyDetail: FamilyDetail = {
   family_name: "The Smiths",
   bio: null,
   address: null,
-  phone_number: null,
+  phone_number: "555-123-4567",
   family_wish: "A warm blanket",
   contact_name: "Mom Smith",
   deleted_at: null,
@@ -114,6 +114,7 @@ describe("FamilyForm", () => {
     await user.type(screen.getByLabelText("Family Name"), "The Joneses");
     await user.type(screen.getByLabelText("Family Wish"), "A computer");
     await user.type(screen.getByLabelText("Contact Name"), "Dad Jones");
+    await user.type(screen.getByLabelText("Phone"), "555-123-4567");
 
     await user.click(screen.getByText("Create"));
 
