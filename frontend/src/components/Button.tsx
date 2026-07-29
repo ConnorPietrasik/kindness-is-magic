@@ -1,6 +1,6 @@
 import { forwardRef, type ReactNode } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "success";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -26,6 +26,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-start/50 disabled:cursor-not-allowed disabled:opacity-50 border border-white/30 bg-white/15 text-white hover:bg-white/25",
     danger:
       "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-start/50 disabled:cursor-not-allowed disabled:opacity-50 bg-red-600 text-white hover:bg-red-700",
+    success:
+      "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-btn-start/50 disabled:cursor-not-allowed disabled:opacity-50 bg-emerald-600 text-white hover:bg-emerald-700",
   };
 
   return (

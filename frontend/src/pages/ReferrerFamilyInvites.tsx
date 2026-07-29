@@ -220,8 +220,8 @@ export default function ReferrerFamilyInvites() {
                   <Td>
                     <div className="flex items-center gap-2">
                       <Button
-                        variant="primary"
-                        className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700"
+                        variant="success"
+                        className="h-7 px-2 text-xs"
                         onClick={() => approveMut.mutate(f.id)}
                         loading={approveMut.isPending && approveMut.variables === f.id}
                         disabled={approveMut.isPending || rejectMut.isPending}

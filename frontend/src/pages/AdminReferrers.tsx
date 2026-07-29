@@ -180,7 +180,31 @@ export default function AdminReferrers() {
                   <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
                   <Td>{r.family_limit}</Td>
                   <Td>
-                    <ApprovalBadge status={r.approval_status} />
+                    <div className="flex items-center gap-2">
+                      <ApprovalBadge status={r.approval_status} />
+                      {!r.deleted_at && r.approval_status !== "approved" && (
+                        <Button
+                          variant="success"
+                          size="sm"
+                          className="px-2 py-1 text-xs"
+                          onClick={() => setApproveConfirm(r.id)}
+                          disabled={approveMut.isPending || rejectMut.isPending}
+                        >
+                          Approve
+                        </Button>
+                      )}
+                      {!r.deleted_at && r.approval_status !== "rejected" && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-2 py-1 text-xs"
+                          onClick={() => setRejectConfirm(r.id)}
+                          disabled={approveMut.isPending || rejectMut.isPending}
+                        >
+                          Reject
+                        </Button>
+                      )}
+                    </div>
                   </Td>
                   {includeDeleted && (
                     <Td>
@@ -221,39 +245,15 @@ export default function AdminReferrers() {
                           Restore
                         </Button>
                       ) : (
-                        <>
-                          {r.approval_status !== "approved" && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:border-emerald-700"
-                              onClick={() => setApproveConfirm(r.id)}
-                              disabled={approveMut.isPending || rejectMut.isPending}
-                            >
-                              Approve
-                            </Button>
-                          )}
-                          {r.approval_status !== "rejected" && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => setRejectConfirm(r.id)}
-                              disabled={approveMut.isPending || rejectMut.isPending}
-                            >
-                              Reject
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => confirmDelete(r.id)}
-                            disabled={deleteMut?.isPending}
-                          >
-                            Delete
-                          </Button>
-                        </>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => confirmDelete(r.id)}
+                          disabled={deleteMut?.isPending}
+                        >
+                          Delete
+                        </Button>
                       )}
                     </div>
                   </Td>
