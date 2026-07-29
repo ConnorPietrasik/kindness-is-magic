@@ -62,3 +62,13 @@ export function getAdminEmail(): string {
   const env = readProjectEnv();
   return env.get("ADMIN_EMAIL") ?? "connor@kindnessismagic.love";
 }
+
+/**
+ * Check whether SUPPRESS_SEND is enabled in the .env file.
+ * E2E tests require this to prevent sending real emails.
+ */
+export function isSuppressSend(): boolean {
+  const env = readProjectEnv();
+  const raw = (env.get("SUPPRESS_SEND") ?? env.get("DEBUG") ?? "false").toLowerCase();
+  return raw === "1" || raw === "true";
+}

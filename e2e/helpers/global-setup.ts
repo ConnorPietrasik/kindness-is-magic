@@ -9,9 +9,17 @@ import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
 import { listFamiliesViaApi, seedDatabaseViaApi } from "./api";
-import { getAdminEmail, getAdminPassword } from "./env";
+import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
+  /* Guard: refuse to run if emails won't be suppressed */
+  if (!isSuppressSend()) {
+    throw new Error(
+      "E2E tests require SUPPRESS_SEND=1 or DEBUG=true in .env.\n" +
+        "This prevents tests from sending real emails during execution.",
+    );
+  }
+
   const browser = await chromium.launch();
   const apiContext = await request.newContext({ baseURL: "http://localhost" });
 
