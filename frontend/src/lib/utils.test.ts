@@ -173,4 +173,40 @@ describe("formatApiError", () => {
     const error = {};
     expect(formatApiError(error)).toBe("An error occurred");
   });
+
+  it("extracts msg from Pydantic validation error objects in detail array", () => {
+    const error = {
+      response: {
+        data: {
+          detail: [{ loc: ["body", "phone_number"], msg: "phone_number must contain at least 9 digits", type: "value_error" }],
+        },
+      },
+    };
+    expect(formatApiError(error)).toBe("phone_number must contain at least 9 digits");
+  });
+
+  it("extracts msg from multiple Pydantic validation error objects", () => {
+    const error = {
+      response: {
+        data: {
+          detail: [
+            { loc: ["body", "name"], msg: "HTML tags are not allowed", type: "value_error" },
+            { loc: ["body", "email"], msg: "Invalid email address: bad", type: "value_error" },
+          ],
+        },
+      },
+    };
+    expect(formatApiError(error)).toBe("HTML tags are not allowed; Invalid email address: bad");
+  });
+
+  it("handles mixed string and object entries in detail array", () => {
+    const error = {
+      response: {
+        data: {
+          detail: ["Plain error string", { loc: ["body", "field"], msg: "Object error", type: "value_error" }],
+        },
+      },
+    };
+    expect(formatApiError(error)).toBe("Plain error string; Object error");
+  });
 });

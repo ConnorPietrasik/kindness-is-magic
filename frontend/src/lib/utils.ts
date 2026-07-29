@@ -75,7 +75,10 @@ export function formatApiError(error: unknown, fallback = "An error occurred"): 
   const data = response?.data;
   if (data) {
     if (typeof data.detail === "string") return data.detail;
-    if (Array.isArray(data.detail)) return data.detail.join("; ");
+    if (Array.isArray(data.detail)) {
+      // Pydantic validation errors are arrays of objects with a `msg` field
+      return data.detail.map((item) => (typeof item === "string" ? item : (item.msg ?? String(item)))).join("; ");
+    }
     if (typeof data.msg === "string") return data.msg;
     try {
       return JSON.stringify(data);
