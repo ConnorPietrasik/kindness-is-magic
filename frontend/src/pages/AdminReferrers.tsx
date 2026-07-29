@@ -182,7 +182,7 @@ export default function AdminReferrers() {
                   <Td>
                     <div className="flex items-center gap-2">
                       <ApprovalBadge status={r.approval_status} />
-                      {!r.deleted_at && r.approval_status !== "approved" && (
+                      {!r.deleted_at && r.approval_status === "pending" && (
                         <Button
                           variant="success"
                           size="sm"
@@ -193,7 +193,7 @@ export default function AdminReferrers() {
                           Approve
                         </Button>
                       )}
-                      {!r.deleted_at && r.approval_status !== "rejected" && (
+                      {!r.deleted_at && r.approval_status === "pending" && (
                         <Button
                           variant="danger"
                           size="sm"

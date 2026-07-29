@@ -36,7 +36,17 @@ import dataclasses
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash, generate_unique_family_invite_code
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole, Wish, WishType
+from app.models import (
+    Family,
+    FamilyApprovalStatus,
+    Person,
+    Referrer,
+    ReferrerApprovalStatus,
+    User,
+    UserRole,
+    Wish,
+    WishType,
+)
 from app.user_validation import (
     sanitize_plain_text,
     validate_email,
@@ -291,6 +301,7 @@ def _process_referrers(
             family_limit=family_limit,
             phone_number=phone_number,
             family_invite_code=code,
+            approval_status=ReferrerApprovalStatus.approved,
         )
         db.add(referrer)
         db.flush()

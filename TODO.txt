@@ -1,5 +1,3 @@
-Fix CSV update so that it marks people created as approved
-Fix admin referrer list so that the approve button is actually usable
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Replace family name with their ID for all public views
 Make the IDs displayed for lists and such use a more meaningful code. Families would show as {referrer ID}-{family within referrer} while people would show as {referrer ID}-{family within referrer}-{person within family}.
