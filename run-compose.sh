@@ -9,9 +9,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Read a variable from the .env file (first match, no quotes)
+env_get() {
+  local key="$1"
+  local value
+  value=$(grep -m1 "^${key}=" .env 2>/dev/null | cut -d'=' -f2- | tr -d "'\"")
+  echo "$value"
+}
+
 # Convenience: `./run-compose.sh clear` removes all containers, volumes, and
 # networks for the project, including the persistent database volume.
+# Only allowed when DEBUG is set to a truthy value.
 if [ "$1" = "clear" ]; then
+  if [ "$(env_get DEBUG)" != "true" ]; then
+    echo "Error: 'clear' is only available when DEBUG=true in .env."
+    exit 1
+  fi
   sudo docker compose down -v --remove-orphans
   sudo docker compose --profile test down -v --remove-orphans 2>/dev/null || true
   # Also remove the named db volume (compose down -v may miss it if no service
