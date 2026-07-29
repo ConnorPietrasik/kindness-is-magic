@@ -113,6 +113,15 @@ describe("PersonForm", () => {
 
   /* ── Age-based conditional rendering ────────────────────── */
 
+  it("hides wish fields and shows hint when age is not entered", () => {
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{}} />);
+
+    expect(screen.getByText("Enter the person's age above to see wish fields.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Practical Wish")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Wish")).not.toBeInTheDocument();
+  });
+
   it("renders Practical Wish and Fun Wish fields for children (age < 18)", () => {
     render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 8 }} />);
 

@@ -22,7 +22,7 @@ interface PersonFormProps {
 /** Internal form state shape — flat fields that map to wishes on submit. */
 interface FormState {
   given_name: string;
-  age: number;
+  age: number | "";
   title: string;
   wish_description: string;
   wish_size: string;
@@ -46,14 +46,15 @@ function wishesToFormFields(wishes: WishSummary[]): Pick<FormState, "wish_descri
   return result as Pick<FormState, "wish_description" | "wish_size" | "fun_wish_description">;
 }
 
-/** Normalize user-entered size: empty string or "0" → null (N/A). */
+/** Normalize user-entered size: empty string, "0", '"0"', or "N/A" → null (not applicable). */
 function normalizeSize(value: string): string | null {
-  if (value === "" || value === "0") return null;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed === "0" || trimmed === '"0"' || trimmed === "'0'" || trimmed.toUpperCase() === "N/A") return null;
   return value;
 }
 
 /** Build the wishes array from form fields based on age. */
-function buildWishes(form: FormState): WishCreate[] {
+function buildWishes(form: Omit<FormState, "age"> & { age: number }): WishCreate[] {
   if (form.age >= 18) {
     return [
       {
@@ -92,7 +93,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
     const base: FormState = {
       ...defaultPersonForm,
       given_name: initial?.given_name ?? "",
-      age: initial?.age ?? 0,
+      age: initial?.age !== undefined ? initial.age : "",
       title: initial?.title ?? "",
       note: initial?.note ?? "",
       family_id: initial?.family_id ?? 0,
@@ -108,7 +109,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
     const base: FormState = {
       ...defaultPersonForm,
       given_name: initial?.given_name ?? "",
-      age: initial?.age ?? 0,
+      age: initial?.age !== undefined ? initial.age : "",
       title: initial?.title ?? "",
       note: initial?.note ?? "",
       family_id: initial?.family_id ?? 0,
@@ -123,7 +124,9 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
 
   const update = (key: keyof FormState, val: string | number) => setForm((prev) => ({ ...prev, [key]: val }));
 
-  const isAdult = form.age >= 18;
+  const ageValue = form.age === "" ? 0 : form.age;
+  const hasEnteredAge = form.age !== "";
+  const isAdult = hasEnteredAge && ageValue >= 18;
 
   // Only shown on admin create when familyMap is provided
   const familyOptions = familyMap ? Object.entries(familyMap) : [];
@@ -132,10 +135,11 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      const wishes = buildWishes(form);
+      const ageNum = form.age === "" ? 0 : form.age;
+      const wishes = buildWishes({ ...form, age: ageNum });
       const payload: PersonPayload = {
         given_name: form.given_name,
-        age: form.age,
+        age: ageNum,
         title: form.title || null,
         note: form.note || null,
         wishes,
@@ -211,7 +215,9 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
               type="number"
               fieldProps={{
                 value: form.age,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("age", parseInt(e.target.value, 10) || 0),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                  update("age", e.target.value === "" ? "" : parseInt(e.target.value, 10)),
+                placeholder: "e.g. 8 or 25",
                 required: true,
                 min: 0,
                 max: 200,
@@ -233,46 +239,53 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
             />
           </div>
 
-          {/* Primary wish (adult wish or practical wish) + size */}
-          <FormField
-            label={primaryWishLabel}
-            as="textarea"
-            fieldProps={{
-              value: form.wish_description,
-              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("wish_description", e.target.value),
-              required: true,
-              maxLength: 60,
-              rows: 2,
-              autoComplete: "off",
-            }}
-          />
+          {/* Wish fields — hidden until age is entered */}
+          {hasEnteredAge ? (
+            <>
+              {/* Primary wish (adult wish or practical wish) + size */}
+              <FormField
+                label={primaryWishLabel}
+                as="textarea"
+                fieldProps={{
+                  value: form.wish_description,
+                  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("wish_description", e.target.value),
+                  required: true,
+                  maxLength: 60,
+                  rows: 2,
+                  autoComplete: "off",
+                }}
+              />
 
-          <FormField
-            label="Size"
-            fieldProps={{
-              value: form.wish_size,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),
-              required: true,
-              maxLength: 20,
-              placeholder: 'e.g. "M", "8", or "0" if N/A',
-              autoComplete: "off",
-            }}
-          />
+              <FormField
+                label="Size"
+                fieldProps={{
+                  value: form.wish_size,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),
+                  required: true,
+                  maxLength: 20,
+                  placeholder: 'e.g. "M", "8", or "0" if not applicable',
+                  autoComplete: "off",
+                }}
+              />
 
-          {/* Fun wish — children only */}
-          {!isAdult && (
-            <FormField
-              label="Fun Wish"
-              as="textarea"
-              fieldProps={{
-                value: form.fun_wish_description,
-                onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("fun_wish_description", e.target.value),
-                required: true,
-                maxLength: 60,
-                rows: 2,
-                autoComplete: "off",
-              }}
-            />
+              {/* Fun wish — children only */}
+              {!isAdult && (
+                <FormField
+                  label="Fun Wish"
+                  as="textarea"
+                  fieldProps={{
+                    value: form.fun_wish_description,
+                    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("fun_wish_description", e.target.value),
+                    required: true,
+                    maxLength: 60,
+                    rows: 2,
+                    autoComplete: "off",
+                  }}
+                />
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">Enter the person's age above to see wish fields.</p>
           )}
 
           <div>

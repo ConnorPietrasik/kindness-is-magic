@@ -1,7 +1,6 @@
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Replace family name with their ID for all public views
 Make the IDs displayed for lists and such use a more meaningful code. Families would show as {referrer ID}-{family within referrer} while people would show as {referrer ID}-{family within referrer}-{person within family}.
-Wishes should be by age: 18 and over get one unified wish, while under 18 get fun + practical. Person signup for families should be age first, then show wish fields based on that age.
 Add a size field for practical / unified wishes: always required to enter a value, but enter 0 if not relevant.
 Add more admin views - sort by wishes, sort families by size, etc
 Links up the chain from person -> family -> referrer, maybe with links to users too

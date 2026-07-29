@@ -5,7 +5,6 @@
 
 export const defaultPersonForm = {
   given_name: "",
-  age: 0,
   title: "",
   wish_description: "",
   wish_size: "",
