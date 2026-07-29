@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from app.schemas import (
     AdminReferrerUpdate,
+    AdminUserCreate,
+    AdminUserUpdate,
     FamilyCreate,
     FamilyCreateByReferrer,
     FamilyUpdate,
@@ -15,6 +17,7 @@ from app.schemas import (
     ReferrerSelfRegister,
     ReferrerUpdate,
 )
+from app.models import UserRole
 from app.user_validation import sanitize_plain_text
 
 
@@ -269,3 +272,43 @@ class TestValidInputPasses:
         )
         assert f.family_name == "The Smiths"
         assert f.family_wish == "A new roof"
+
+
+class TestAdminUserSchemasRejectHtml:
+    def test_admin_user_create_rejects_html(self):
+        with pytest.raises(ValidationError):
+            AdminUserCreate(
+                email="admin@test.com",
+                password="Password123!",
+                role=UserRole.admin,
+                display_name=HTML_PAYLOAD,
+            )
+
+    def test_admin_user_update_rejects_html(self):
+        with pytest.raises(ValidationError):
+            AdminUserUpdate(display_name=HTML_PAYLOAD)
+
+    def test_admin_user_create_clean(self):
+        u = AdminUserCreate(
+            email="admin@test.com",
+            password="Password123!",
+            role=UserRole.admin,
+            display_name="  Admin   User  ",
+        )
+        assert u.display_name == "Admin User"
+
+    def test_admin_user_create_none_display_name(self):
+        u = AdminUserCreate(
+            email="admin@test.com",
+            password="Password123!",
+            role=UserRole.admin,
+        )
+        assert u.display_name is None
+
+    def test_admin_user_update_clean(self):
+        u = AdminUserUpdate(display_name="  Updated   Name  ")
+        assert u.display_name == "Updated Name"
+
+    def test_admin_user_update_none_display_name(self):
+        u = AdminUserUpdate(display_name=None)
+        assert u.display_name is None

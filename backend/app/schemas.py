@@ -522,6 +522,13 @@ class AdminUserCreate(BaseModel):
     def check_email(cls, v: str) -> str:
         return validate_email(v)
 
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
 
 class AdminUserUpdate(BaseModel):
     """Admin-only: partial update for a user.
@@ -533,6 +540,13 @@ class AdminUserUpdate(BaseModel):
     role: Optional[UserRole] = None
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
+
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
 
 class UserPasswordReset(BaseModel):
