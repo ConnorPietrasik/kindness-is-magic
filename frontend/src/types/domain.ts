@@ -191,14 +191,42 @@ export interface FamilyPayload {
   deleted_at?: string | null;
 }
 
+/** Wish type — mirrors backend WishType enum. */
+export type WishType = "adult" | "practical" | "fun";
+
+/** Literal wish-type values — typed so `as WishType` casts are unnecessary. */
+export const WISH_TYPE = {
+  adult: "adult" as const,
+  practical: "practical" as const,
+  fun: "fun" as const,
+};
+
+/** Mirrors WishSummary — compact wish embedded in person responses. */
+export interface WishSummary {
+  id: number;
+  type: WishType;
+  description: string;
+  size: string | null;
+  purchased_by_id: number | null;
+  purchased_at: string | null;
+  purchased_where: string | null;
+  deleted_at: string | null;
+}
+
+/** Payload for creating a single wish (person_id inferred from route). */
+export interface WishCreate {
+  type: WishType;
+  description: string;
+  size?: string | null;
+}
+
 /** Payload for creating or updating a person. `family_id` and `deleted_at` are admin-only. */
 export interface PersonPayload {
   family_id?: number;
   given_name?: string;
   title?: string | null;
   age?: number;
-  practical_wish?: string;
-  fun_wish?: string;
+  wishes?: WishCreate[];
   note?: string | null;
   deleted_at?: string | null;
 }
@@ -286,9 +314,8 @@ export interface PersonWishItem {
   given_name: string;
   title: string | null;
   age: number;
-  practical_wish: string;
-  fun_wish: string;
   note: string | null;
+  wishes: WishSummary[];
 }
 
 /** Mirrors FamilyWishListResponse. */
@@ -310,8 +337,7 @@ export interface PersonDetail {
   given_name: string;
   title: string | null;
   age: number;
-  practical_wish: string;
-  fun_wish: string;
   note: string | null;
   deleted_at: string | null;
+  wishes: WishSummary[];
 }

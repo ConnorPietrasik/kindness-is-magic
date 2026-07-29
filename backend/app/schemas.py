@@ -3,9 +3,9 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole
+from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole, WishType
 from app.user_validation import sanitize_plain_text, validate_email, validate_phone_number
 
 
@@ -469,6 +469,115 @@ class FamilyListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Wish schemas
+# ---------------------------------------------------------------------------
+
+
+class WishCreate(BaseModel):
+    """Create a single wish for a person (person_id inferred from route)."""
+
+    type: WishType
+    description: str = Field(..., min_length=1, max_length=60)
+    size: str | None = Field(None, max_length=20)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+    @field_validator("size")
+    @classmethod
+    def normalize_size(cls, v: str | None) -> str | None:
+        """Map empty string or '0' to None (N/A size)."""
+        if v is None or v == "" or v == "0":
+            return None
+        return sanitize_plain_text(v)
+
+
+class WishUpdate(BaseModel):
+    """Partial update for a wish."""
+
+    type: WishType | None = None
+    description: Optional[str] = Field(None, min_length=1, max_length=60)
+    size: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def normalize_size(cls, v: str | None) -> str | None:
+        """Map empty string or '0' to None (N/A size)."""
+        if v is None or v == "" or v == "0":
+            return None
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+
+class WishSummary(BaseModel):
+    """Compact wish representation embedded in person responses."""
+
+    id: int
+    type: WishType
+    description: str
+    size: str | None = None
+    purchased_by_id: int | None = None
+    purchased_at: datetime | None = None
+    purchased_where: str | None = None
+    deleted_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class WishDetail(WishSummary):
+    """Full wish with person info."""
+
+    person_id: int
+    person_given_name: str | None = None
+    person_family_name: str | None = None
+
+
+class PersonWishesCreate(BaseModel):
+    """Bulk create wishes for a person, enforcing age-based rules.
+
+    * age >= 18: exactly one wish of type ``adult``
+    * age < 18: exactly one ``practical`` + one ``fun``
+    """
+
+    wishes: list[WishCreate]
+
+    @field_validator("wishes")
+    @classmethod
+    def validate_wish_uniqueness(cls, v: list[WishCreate]) -> list[WishCreate]:
+        """Ensure non-empty batch with no duplicate types."""
+        if not v:
+            raise ValueError("At least one wish is required")
+        types = {w.type for w in v}
+        if len(types) != len(v):
+            raise ValueError("Duplicate wish types in batch")
+        return v
+
+
+def validate_wishes_for_age(wishes: list[WishCreate], age: int) -> None:
+    """Validate that wishes match the person's age.
+
+    Raises ValueError with a descriptive message on failure.
+    """
+    types = {w.type for w in wishes}
+    if age >= 18:
+        if types != {WishType.adult}:
+            raise ValueError(f"Adult (age {age}) must have exactly one 'adult' wish. Got: {sorted(types)}")
+    else:
+        if types != {WishType.practical, WishType.fun}:
+            raise ValueError(f"Child (age {age}) must have one 'practical' and one 'fun' wish. Got: {sorted(types)}")
+
+
+# ---------------------------------------------------------------------------
 # Admin CRUD schemas — People
 # ---------------------------------------------------------------------------
 
@@ -477,12 +586,11 @@ class PersonCreate(BaseModel):
     family_id: int
     given_name: str = Field(..., min_length=1, max_length=40)
     age: int = Field(..., ge=0, le=200)
-    practical_wish: str = Field(..., min_length=1, max_length=400)
-    fun_wish: str = Field(..., min_length=1, max_length=400)
+    wishes: list[WishCreate]
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
-    @field_validator("given_name", "practical_wish", "fun_wish")
+    @field_validator("given_name")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
@@ -494,21 +602,39 @@ class PersonCreate(BaseModel):
             return v
         return sanitize_plain_text(v)
 
+    @field_validator("wishes")
+    @classmethod
+    def validate_wishes(cls, v: list[WishCreate], info) -> list[WishCreate]:
+        age = info.data.get("age")
+        if age is not None:
+            validate_wishes_for_age(v, age)
+        return v
+
 
 class PersonUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=40)
     age: Optional[int] = Field(None, ge=0, le=200)
-    practical_wish: Optional[str] = Field(None, min_length=1, max_length=400)
-    fun_wish: Optional[str] = Field(None, min_length=1, max_length=400)
+    wishes: PersonWishesCreate | None = None
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
-    @field_validator("given_name", "practical_wish", "fun_wish", "title", "note")
+    @field_validator("given_name", "title", "note")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @model_validator(mode="after")
+    def _validate_wishes_match_age(self) -> "PersonUpdate":
+        """When both age and wishes are sent, validate they match.
+
+        If only wishes are sent (no age), validation happens in the route
+        handler against the existing person's age.
+        """
+        if self.wishes is not None and self.age is not None:
+            validate_wishes_for_age(self.wishes.wishes, self.age)
+        return self
 
 
 class PersonDetail(BaseModel):
@@ -517,10 +643,9 @@ class PersonDetail(BaseModel):
     given_name: str
     title: Optional[str]
     age: int
-    practical_wish: str
-    fun_wish: str
     note: Optional[str]
     deleted_at: datetime | None
+    wishes: list[WishSummary] = []
 
     model_config = {"from_attributes": True}
 
@@ -632,9 +757,8 @@ class PersonWishItem(BaseModel):
     given_name: str
     title: str | None = None
     age: int
-    practical_wish: str
-    fun_wish: str
     note: str | None = None
+    wishes: list[WishSummary] = []
 
     model_config = {"from_attributes": True}
 
@@ -687,12 +811,11 @@ class PersonCreateInFamily(BaseModel):
 
     given_name: str = Field(..., min_length=1, max_length=40)
     age: int = Field(..., ge=0, le=200)
-    practical_wish: str = Field(..., min_length=1, max_length=400)
-    fun_wish: str = Field(..., min_length=1, max_length=400)
+    wishes: list[WishCreate]
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
-    @field_validator("given_name", "practical_wish", "fun_wish")
+    @field_validator("given_name")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
@@ -703,3 +826,11 @@ class PersonCreateInFamily(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
+
+    @field_validator("wishes")
+    @classmethod
+    def validate_wishes(cls, v: list[WishCreate], info) -> list[WishCreate]:
+        age = info.data.get("age")
+        if age is not None:
+            validate_wishes_for_age(v, age)
+        return v

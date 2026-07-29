@@ -7,7 +7,7 @@ starting with ``#``.  Recognised section names (case-insensitive) are:
 
 - **referrers**  — name, family_limit, phone_number
 - **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number
-- **people**     — family_name, given_name, age, practical_wish, fun_wish, title, note
+- **people**     — family_name, given_name, age, wish, size, fun_wish, title, note
 - **users**      — email, password, role, referrer_name_or_id, family_name_or_id
 
 Sections are processed in dependency order:
@@ -36,7 +36,7 @@ import dataclasses
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash, generate_unique_family_invite_code
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole, Wish, WishType
 from app.user_validation import (
     sanitize_plain_text,
     validate_email,
@@ -499,33 +499,53 @@ def _process_people(
             summary.people_errors += 1
             continue
 
-        # practical_wish (required)
-        practical_wish = rec.get("practical_wish", "").strip()
-        if not practical_wish:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'practical_wish'"))
+        # wish (required for all ages)
+        wish_desc = rec.get("wish", "").strip()
+        if not wish_desc:
+            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'wish'"))
             summary.people_errors += 1
             continue
 
         try:
-            practical_wish = sanitize_plain_text(practical_wish)
+            wish_desc = sanitize_plain_text(wish_desc)
         except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "person", "error", f"practical_wish: {exc}"))
+            summary.rows.append(RowResult(row_num, "person", "error", f"wish: {exc}"))
             summary.people_errors += 1
             continue
 
-        # fun_wish (required)
-        fun_wish = rec.get("fun_wish", "").strip()
-        if not fun_wish:
-            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'fun_wish'"))
-            summary.people_errors += 1
-            continue
+        # size (optional, empty → NULL)
+        size_raw = rec.get("size", "").strip()
+        size: str | None = None
+        if size_raw and size_raw != "0":
+            try:
+                size = sanitize_plain_text(size_raw)
+            except ValueError:
+                size = None
 
-        try:
-            fun_wish = sanitize_plain_text(fun_wish)
-        except ValueError as exc:
-            summary.rows.append(RowResult(row_num, "person", "error", f"fun_wish: {exc}"))
-            summary.people_errors += 1
-            continue
+        # fun_wish (required for children, error if present for adults)
+        fun_wish_raw = rec.get("fun_wish", "").strip()
+        fun_wish: str | None = None
+        if fun_wish_raw:
+            try:
+                fun_wish = sanitize_plain_text(fun_wish_raw)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "person", "error", f"fun_wish: {exc}"))
+                summary.people_errors += 1
+                continue
+
+        # Validate age-based wish rules
+        if age >= 18:
+            # Adults: no fun_wish allowed
+            if fun_wish:
+                summary.rows.append(RowResult(row_num, "person", "error", "Adult (age >= 18) should not have fun_wish"))
+                summary.people_errors += 1
+                continue
+        else:
+            # Children: fun_wish is required
+            if not fun_wish:
+                summary.rows.append(RowResult(row_num, "person", "error", "Child (age < 18) must have fun_wish"))
+                summary.people_errors += 1
+                continue
 
         # Optional fields
         title = rec.get("title", "").strip() or None
@@ -560,13 +580,38 @@ def _process_people(
             family_id=family_id,
             given_name=given_name,
             age=age,
-            practical_wish=practical_wish,
-            fun_wish=fun_wish,
             title=title,
             note=note,
         )
         db.add(person)
         db.flush()
+
+        # Create wish(es) based on age
+        if age >= 18:
+            # Adult: one 'adult' wish
+            wish = Wish(
+                person_id=person.id,
+                type=WishType.adult,
+                description=wish_desc,
+                size=size,
+            )
+            db.add(wish)
+        else:
+            # Child: practical + fun wishes
+            practical_wish = Wish(
+                person_id=person.id,
+                type=WishType.practical,
+                description=wish_desc,
+                size=size,
+            )
+            fun_wish_obj = Wish(
+                person_id=person.id,
+                type=WishType.fun,
+                description=fun_wish,
+                size=None,
+            )
+            db.add_all([practical_wish, fun_wish_obj])
+
         db.refresh(person)
         summary.rows.append(
             RowResult(

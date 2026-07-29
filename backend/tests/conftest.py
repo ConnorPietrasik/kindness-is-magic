@@ -343,24 +343,27 @@ def referrer_with_families(db: Session, referrer_record):
 
 @pytest.fixture()
 def family_with_people(db: Session, family_record):
-    """Create a Family with 1-2 Person rows."""
-    from app.models import Person
+    """Create a Family with 1-2 Person rows, each with wishes."""
+    from app.models import Person, Wish, WishType
 
     p1 = Person(
         family_id=family_record.id,
         given_name="Alice",
         age=8,
-        practical_wish="A backpack",
-        fun_wish="A doll",
     )
     p2 = Person(
         family_id=family_record.id,
         given_name="Charlie",
         age=12,
-        practical_wish="New shoes",
-        fun_wish="A football",
     )
     db.add_all([p1, p2])
+    db.flush()
+
+    w1a = Wish(person_id=p1.id, type=WishType.practical, description="A backpack")
+    w1b = Wish(person_id=p1.id, type=WishType.fun, description="A doll")
+    w2a = Wish(person_id=p2.id, type=WishType.practical, description="New shoes")
+    w2b = Wish(person_id=p2.id, type=WishType.fun, description="A football")
+    db.add_all([w1a, w1b, w2a, w2b])
     db.commit()
     db.refresh(p1)
     db.refresh(p2)
@@ -408,10 +411,15 @@ def referrer_with_full_tree(db: Session):
         family_id=fam.id,
         given_name="Tree Person",
         age=10,
-        practical_wish="A bike",
-        fun_wish="A game",
     )
     db.add(person)
+    db.flush()
+
+    from app.models import Wish, WishType
+
+    w1 = Wish(person_id=person.id, type=WishType.practical, description="A bike")
+    w2 = Wish(person_id=person.id, type=WishType.fun, description="A game")
+    db.add_all([w1, w2])
     db.commit()
     db.refresh(person)
 
@@ -508,10 +516,15 @@ def person_in_another_family(db: Session, another_family):
         family_id=fam.id,
         given_name="Another Person",
         age=7,
-        practical_wish="A jacket",
-        fun_wish="A toy",
     )
     db.add(person)
+    db.flush()
+
+    from app.models import Wish, WishType
+
+    w1 = Wish(person_id=person.id, type=WishType.practical, description="A jacket")
+    w2 = Wish(person_id=person.id, type=WishType.fun, description="A toy")
+    db.add_all([w1, w2])
     db.commit()
     db.refresh(person)
 

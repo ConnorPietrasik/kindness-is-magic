@@ -16,8 +16,9 @@ from app.schemas import (
     ReferrerCreate,
     ReferrerSelfRegister,
     ReferrerUpdate,
+    WishCreate,
 )
-from app.models import UserRole
+from app.models import UserRole, WishType
 from app.user_validation import sanitize_plain_text
 
 
@@ -168,28 +169,22 @@ class TestPersonSchemasRejectHtml:
                 family_id=1,
                 given_name=HTML_PAYLOAD,
                 age=10,
-                practical_wish="Shoes",
-                fun_wish="Game",
+                wishes=[
+                    WishCreate(type=WishType.practical, description="Shoes"),
+                    WishCreate(type=WishType.fun, description="Game"),
+                ],
             )
 
-    def test_person_create_practical_wish(self):
+    def test_person_create_wish_description(self):
         with pytest.raises(ValidationError):
             PersonCreate(
                 family_id=1,
                 given_name="Alice",
                 age=10,
-                practical_wish=HTML_PAYLOAD,
-                fun_wish="Game",
-            )
-
-    def test_person_create_fun_wish(self):
-        with pytest.raises(ValidationError):
-            PersonCreate(
-                family_id=1,
-                given_name="Alice",
-                age=10,
-                practical_wish="Shoes",
-                fun_wish=HTML_PAYLOAD,
+                wishes=[
+                    WishCreate(type=WishType.practical, description=HTML_PAYLOAD),
+                    WishCreate(type=WishType.fun, description="Game"),
+                ],
             )
 
     def test_person_create_note(self):
@@ -198,8 +193,10 @@ class TestPersonSchemasRejectHtml:
                 family_id=1,
                 given_name="Alice",
                 age=10,
-                practical_wish="Shoes",
-                fun_wish="Game",
+                wishes=[
+                    WishCreate(type=WishType.practical, description="Shoes"),
+                    WishCreate(type=WishType.fun, description="Game"),
+                ],
                 note=HTML_PAYLOAD,
             )
 
@@ -209,8 +206,10 @@ class TestPersonSchemasRejectHtml:
                 family_id=1,
                 given_name="Alice",
                 age=10,
-                practical_wish="Shoes",
-                fun_wish="Game",
+                wishes=[
+                    WishCreate(type=WishType.practical, description="Shoes"),
+                    WishCreate(type=WishType.fun, description="Game"),
+                ],
                 title=HTML_PAYLOAD,
             )
 
@@ -223,8 +222,10 @@ class TestPersonSchemasRejectHtml:
             PersonCreateInFamily(
                 given_name=HTML_PAYLOAD,
                 age=10,
-                practical_wish="Shoes",
-                fun_wish="Game",
+                wishes=[
+                    WishCreate(type=WishType.practical, description="Shoes"),
+                    WishCreate(type=WishType.fun, description="Game"),
+                ],
             )
 
 
@@ -257,8 +258,10 @@ class TestValidInputPasses:
             family_id=1,
             given_name="Alice",
             age=10,
-            practical_wish="A backpack for school",
-            fun_wish="A doll",
+            wishes=[
+                WishCreate(type=WishType.practical, description="A backpack for school"),
+                WishCreate(type=WishType.fun, description="A doll"),
+            ],
             note="Allergic to peanuts",
         )
         assert p.given_name == "Alice"

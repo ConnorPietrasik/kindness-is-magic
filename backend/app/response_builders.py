@@ -9,8 +9,10 @@ from typing import Type, TypeVar
 from fastapi import HTTPException, status
 from sqlalchemy.orm import DeclarativeBase, Session
 
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
-from app.schemas import _CLEAR
+from datetime import datetime, timezone
+
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, Wish, WishType
+from app.schemas import _CLEAR, WishCreate
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -85,6 +87,122 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
         "approved_at": ref.approved_at,
         "deleted_at": ref.deleted_at,
     }
+
+
+def build_person_detail(per: Person, db: Session) -> dict:
+    """Build a dict suitable for PersonDetail, including eager-loaded wishes.
+
+    Only non-deleted wishes are included.
+    """
+    wishes = db.query(Wish).filter(Wish.person_id == per.id, Wish.deleted_at.is_(None)).all()
+    return {
+        "id": per.id,
+        "family_id": per.family_id,
+        "given_name": per.given_name,
+        "title": per.title,
+        "age": per.age,
+        "note": per.note,
+        "deleted_at": per.deleted_at,
+        "wishes": [
+            {
+                "id": w.id,
+                "type": w.type,
+                "description": w.description,
+                "size": w.size,
+                "purchased_by_id": w.purchased_by_id,
+                "purchased_at": w.purchased_at,
+                "purchased_where": w.purchased_where,
+                "deleted_at": w.deleted_at,
+            }
+            for w in wishes
+        ],
+    }
+
+
+def sync_person_wishes(
+    db: Session,
+    person_id: int,
+    new_wishes: list[WishCreate],
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Sync a person's active wishes to match *new_wishes*.
+
+    * Wishes whose ``type`` already exists are updated in place (preserving ID / purchase tracking).
+    * Wishes whose ``type`` is new are created (soft-deleted remnants of that type are hard-deleted first).
+    * Active wishes whose ``type`` is no longer present are soft-deleted.
+
+    Does **not** commit — caller owns the transaction.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    active_wishes = db.query(Wish).filter(Wish.person_id == person_id, Wish.deleted_at.is_(None)).all()
+    active_by_type: dict[WishType, Wish] = {w.type: w for w in active_wishes}
+    new_types = {wd.type for wd in new_wishes}
+
+    for wish_data in new_wishes:
+        existing = active_by_type.get(wish_data.type)
+        if existing:
+            existing.description = wish_data.description
+            existing.size = wish_data.size
+        else:
+            # Hard-delete any soft-deleted wish of this type first (partial unique index)
+            old_deleted = (
+                db.query(Wish)
+                .filter(
+                    Wish.person_id == person_id,
+                    Wish.type == wish_data.type,
+                    Wish.deleted_at.isnot(None),
+                )
+                .first()
+            )
+            if old_deleted:
+                db.delete(old_deleted)
+
+            db.add(
+                Wish(
+                    person_id=person_id,
+                    type=wish_data.type,
+                    description=wish_data.description,
+                    size=wish_data.size,
+                )
+            )
+
+    # Soft-delete active wishes whose type is no longer in the new set
+    for wtype, w in active_by_type.items():
+        if wtype not in new_types:
+            w.deleted_at = now
+
+
+def soft_delete_person_wishes(db: Session, person_id: int, now: datetime) -> None:
+    """Soft-delete all wishes belonging to a person.
+
+    Does **not** commit — caller owns the transaction.
+    """
+    db.query(Wish).filter(Wish.person_id == person_id).update({Wish.deleted_at: now}, synchronize_session=False)
+
+
+def restore_person_wishes(db: Session, person_id: int) -> None:
+    """Restore (un-delete) all soft-deleted wishes for a person.
+
+    Does **not** commit — caller owns the transaction.
+    """
+    db.query(Wish).filter(Wish.person_id == person_id).update({Wish.deleted_at: None}, synchronize_session=False)
+
+
+def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, list[Wish]]:
+    """Load all active wishes for a batch of person IDs in a single query.
+
+    Returns ``{person_id: [Wish, ...]}``.
+    """
+    if not person_ids:
+        return {}
+    wishes = db.query(Wish).filter(Wish.person_id.in_(person_ids), Wish.deleted_at.is_(None)).all()
+    result: dict[int, list[Wish]] = {pid: [] for pid in person_ids}
+    for w in wishes:
+        result[w.person_id].append(w)
+    return result
 
 
 def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
@@ -183,15 +301,17 @@ def _resolve_sentinels(obj, update_data: dict) -> dict:
     return resolved
 
 
-def partial_update(obj, schema_model):
+def partial_update(obj, schema_model, *, exclude: set[str] | None = None):
     """Apply all explicitly-set fields from a Pydantic model to a SQLAlchemy object.
 
     Fields omitted by the client are excluded (via ``exclude_unset``).
     Fields sent as ``null`` are ignored (no change).
     Fields sent as ``0`` on nullable FK columns clear the value (set to ``None``).
     Fields sent as ``""`` on nullable string columns clear the value (set to ``None``).
+
+    Pass ``exclude`` to skip specific fields (e.g. ``{'wishes'}``).
     """
-    update_data = schema_model.model_dump(exclude_unset=True)
+    update_data = schema_model.model_dump(exclude_unset=True, exclude=exclude or set())
     resolved = _resolve_sentinels(obj, update_data)
     for field, value in resolved.items():
         if value is None:

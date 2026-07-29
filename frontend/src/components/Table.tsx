@@ -66,9 +66,14 @@ export const Tr = forwardRef<HTMLTableRowElement, TrProps>(function Tr({ classNa
 interface TdProps {
   className?: string;
   children?: ReactNode;
+  colSpan?: number;
 }
 
 /**
  * Td — body cell.
  */
-export const Td = memo(({ className = "", children }: TdProps) => <td className={`px-4 py-3 text-gray-700 ${className}`}>{children}</td>);
+export const Td = memo(({ className = "", children, colSpan }: TdProps) => (
+  <td {...(colSpan !== undefined && { colSpan })} className={`px-4 py-3 text-gray-700 ${className}`}>
+    {children}
+  </td>
+));

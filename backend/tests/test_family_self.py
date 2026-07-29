@@ -232,8 +232,10 @@ class TestFamilyCreatePerson:
             json={
                 "given_name": "New Kid",
                 "age": 4,
-                "practical_wish": "A jacket",
-                "fun_wish": "A balloon",
+                "wishes": [
+                    {"type": "practical", "description": "A jacket"},
+                    {"type": "fun", "description": "A balloon"},
+                ],
             },
         )
         assert resp.status_code == 201
@@ -241,6 +243,7 @@ class TestFamilyCreatePerson:
         assert body["given_name"] == "New Kid"
         assert body["age"] == 4
         assert body["note"] is None
+        assert len(body["wishes"]) == 2
 
     def test_201_with_optional_fields(self, test_client: TestClient, family_user):
         _family_login(test_client)
@@ -249,8 +252,10 @@ class TestFamilyCreatePerson:
             json={
                 "given_name": "New Kid",
                 "age": 4,
-                "practical_wish": "A jacket",
-                "fun_wish": "A balloon",
+                "wishes": [
+                    {"type": "practical", "description": "A jacket", "size": "Small"},
+                    {"type": "fun", "description": "A balloon"},
+                ],
                 "title": "Mr.",
                 "note": "Loves balloons",
             },
@@ -259,6 +264,7 @@ class TestFamilyCreatePerson:
         body = resp.json()
         assert body["title"] == "Mr."
         assert body["note"] == "Loves balloons"
+        assert len(body["wishes"]) == 2
 
     def test_422_bad_data(self, test_client: TestClient, family_user):
         _family_login(test_client)
@@ -267,8 +273,10 @@ class TestFamilyCreatePerson:
             json={
                 "given_name": "",
                 "age": -1,
-                "practical_wish": "A jacket",
-                "fun_wish": "A balloon",
+                "wishes": [
+                    {"type": "practical", "description": "A jacket"},
+                    {"type": "fun", "description": "A balloon"},
+                ],
             },
         )
         assert resp.status_code == 422
@@ -279,8 +287,10 @@ class TestFamilyCreatePerson:
             json={
                 "given_name": "Nope",
                 "age": 5,
-                "practical_wish": "Nope",
-                "fun_wish": "Nope",
+                "wishes": [
+                    {"type": "practical", "description": "Nope"},
+                    {"type": "fun", "description": "Nope"},
+                ],
             },
         )
         assert resp.status_code == 401
@@ -292,8 +302,10 @@ class TestFamilyCreatePerson:
             json={
                 "given_name": "Nope",
                 "age": 5,
-                "practical_wish": "Nope",
-                "fun_wish": "Nope",
+                "wishes": [
+                    {"type": "practical", "description": "Nope"},
+                    {"type": "fun", "description": "Nope"},
+                ],
             },
         )
         assert resp.status_code == 403

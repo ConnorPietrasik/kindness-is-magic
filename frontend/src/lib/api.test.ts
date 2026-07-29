@@ -339,7 +339,14 @@ describe("admin people API functions", () => {
   });
 
   it("adminCreatePerson — POST /api/admin/people", async () => {
-    const body = { given_name: "Jane", age: 10, practical_wish: "Wish", fun_wish: "Wish" };
+    const body = {
+      given_name: "Jane",
+      age: 10,
+      wishes: [
+        { type: "practical" as const, description: "Wish" },
+        { type: "fun" as const, description: "Wish" },
+      ],
+    };
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 9 } });
     await apiModule.adminCreatePerson(body);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/people", body);
@@ -481,7 +488,14 @@ describe("referrer family people API functions", () => {
   });
 
   it("createReferrerFamilyPerson — POST /api/referrer/families/:fid/people", async () => {
-    const body = { given_name: "Bob", age: 10, practical_wish: "Wish", fun_wish: "Wish" };
+    const body = {
+      given_name: "Bob",
+      age: 10,
+      wishes: [
+        { type: "practical" as const, description: "Wish" },
+        { type: "fun" as const, description: "Wish" },
+      ],
+    };
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 11 } });
     await apiModule.createReferrerFamilyPerson(4, body);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/4/people", body);
@@ -521,7 +535,14 @@ describe("family people API functions", () => {
   });
 
   it("createFamilyPerson — POST /api/family/people", async () => {
-    const body = { given_name: "Alice", age: 10, practical_wish: "Wish", fun_wish: "Wish" };
+    const body = {
+      given_name: "Alice",
+      age: 10,
+      wishes: [
+        { type: "practical" as const, description: "Wish" },
+        { type: "fun" as const, description: "Wish" },
+      ],
+    };
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 12 } });
     await apiModule.createFamilyPerson(body);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/family/people", body);

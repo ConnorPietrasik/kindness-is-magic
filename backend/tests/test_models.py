@@ -12,6 +12,8 @@ from app.models import (
     Referrer,
     User,
     UserRole,
+    Wish,
+    WishType,
 )
 
 
@@ -101,7 +103,7 @@ class TestFamily:
 
 
 class TestPerson:
-    def test_create_person(self, db: Session):
+    def _create_family(self, db: Session) -> Family:
         family = Family(
             family_name="TestFamily",
             family_wish="Wish",
@@ -111,38 +113,31 @@ class TestPerson:
         db.add(family)
         db.commit()
         db.refresh(family)
+        return family
+
+    def test_create_person(self, db: Session):
+        family = self._create_family(db)
 
         person = Person(
             family_id=family.id,
             given_name="Bob",
             age=10,
-            practical_wish="Bicycle",
-            fun_wish="Rollercoaster",
         )
         db.add(person)
         db.commit()
         db.refresh(person)
         assert person.id is not None
         assert person.given_name == "Bob"
+        assert person.wishes == []
 
     def test_person_with_title(self, db: Session):
-        family = Family(
-            family_name="TestFamily",
-            family_wish="Wish",
-            contact_name="Contact",
-            phone_number="555-000-0000",
-        )
-        db.add(family)
-        db.commit()
-        db.refresh(family)
+        family = self._create_family(db)
 
         person = Person(
             family_id=family.id,
             given_name="Alice",
             title="Miss",
             age=8,
-            practical_wish="Books",
-            fun_wish="Cinema",
             note="Loves reading",
         )
         db.add(person)
@@ -152,15 +147,7 @@ class TestPerson:
         assert person.note == "Loves reading"
 
     def test_person_name_and_title_auto_capitalize(self, db: Session):
-        family = Family(
-            family_name="TestFamily",
-            family_wish="Wish",
-            contact_name="Contact",
-            phone_number="555-000-0000",
-        )
-        db.add(family)
-        db.commit()
-        db.refresh(family)
+        family = self._create_family(db)
 
         # Lowercase inputs should be capitalized on create
         person = Person(
@@ -168,8 +155,6 @@ class TestPerson:
             given_name="emma",
             title="daughter",
             age=6,
-            practical_wish="Coat",
-            fun_wish="Doll",
         )
         db.add(person)
         db.commit()
@@ -190,6 +175,155 @@ class TestPerson:
         db.commit()
         db.refresh(person)
         assert person.title is None
+
+
+class TestWish:
+    def _create_person(self, db: Session) -> Person:
+        family = Family(
+            family_name="TestFamily",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0000",
+        )
+        db.add(family)
+        db.commit()
+        db.refresh(family)
+
+        person = Person(
+            family_id=family.id,
+            given_name="TestChild",
+            age=10,
+        )
+        db.add(person)
+        db.commit()
+        db.refresh(person)
+        return person
+
+    def test_create_wish(self, db: Session):
+        person = self._create_person(db)
+
+        wish = Wish(
+            person_id=person.id,
+            type=WishType.practical,
+            description="A backpack",
+            size="Medium",
+        )
+        db.add(wish)
+        db.commit()
+        db.refresh(wish)
+
+        assert wish.id is not None
+        assert wish.type == WishType.practical
+        assert wish.description == "A backpack"
+        assert wish.size == "Medium"
+        assert wish.purchased_by_id is None
+        assert wish.purchased_at is None
+
+    def test_wish_nullable_size(self, db: Session):
+        person = self._create_person(db)
+
+        wish = Wish(
+            person_id=person.id,
+            type=WishType.fun,
+            description="A toy",
+        )
+        db.add(wish)
+        db.commit()
+        db.refresh(wish)
+
+        assert wish.size is None
+
+    def test_wish_unique_per_person_type(self, db: Session):
+        person = self._create_person(db)
+
+        wish1 = Wish(
+            person_id=person.id,
+            type=WishType.practical,
+            description="A backpack",
+        )
+        db.add(wish1)
+        db.commit()
+
+        # Duplicate type for same person should fail
+        with pytest.raises(Exception):  # IntegrityError
+            wish2 = Wish(
+                person_id=person.id,
+                type=WishType.practical,
+                description="Another backpack",
+            )
+            db.add(wish2)
+            db.commit()
+
+    def test_wish_soft_delete(self, db: Session):
+        person = self._create_person(db)
+
+        wish = Wish(
+            person_id=person.id,
+            type=WishType.fun,
+            description="A toy",
+        )
+        db.add(wish)
+        db.commit()
+
+        # Soft delete
+        wish.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(wish)
+        assert wish.deleted_at is not None
+
+        # Restore
+        wish.deleted_at = None
+        db.commit()
+        db.refresh(wish)
+        assert wish.deleted_at is None
+
+    def test_wish_relationship_to_person(self, db: Session):
+        person = self._create_person(db)
+
+        wish1 = Wish(
+            person_id=person.id,
+            type=WishType.practical,
+            description="A backpack",
+        )
+        wish2 = Wish(
+            person_id=person.id,
+            type=WishType.fun,
+            description="A doll",
+        )
+        db.add_all([wish1, wish2])
+        db.commit()
+
+        # Reload person to test relationship
+        person = db.query(Person).filter(Person.id == person.id).first()
+        assert len(person.wishes) == 2
+        types = {w.type for w in person.wishes}
+        assert types == {WishType.practical, WishType.fun}
+
+    def test_wish_purchased_by_relationship(self, db: Session):
+        from app.auth import get_password_hash
+
+        person = self._create_person(db)
+
+        user = User(
+            email="buyer@test.com",
+            hashed_password=get_password_hash("Pass1234!"),
+            role=UserRole.admin,
+        )
+        db.add(user)
+        db.flush()
+
+        wish = Wish(
+            person_id=person.id,
+            type=WishType.practical,
+            description="A backpack",
+            purchased_by_id=user.id,
+        )
+        db.add(wish)
+        db.commit()
+        db.refresh(wish)
+
+        assert wish.purchased_by_id == user.id
+        assert wish.purchased_by.email == "buyer@test.com"
 
 
 class TestPasswordResetToken:

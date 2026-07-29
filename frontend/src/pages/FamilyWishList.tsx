@@ -77,15 +77,31 @@ export default function FamilyWishList() {
               {hasNotes(data.people) && <Th>Note</Th>}
             </TableHead>
             <TableBody>
-              {data.people.map((person, idx) => (
-                <Tr key={idx}>
-                  <Td className="font-medium text-gray-900">{person.title ? `${person.title} ${person.given_name}` : person.given_name}</Td>
-                  <Td>{person.age}</Td>
-                  <Td className="max-w-xs">{person.practical_wish}</Td>
-                  <Td className="max-w-xs">{person.fun_wish}</Td>
-                  {hasNotes(data.people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}
-                </Tr>
-              ))}
+              {data.people.map((person, idx) => {
+                const activeWishes = person.wishes.filter((w) => !w.deleted_at);
+                const practicalOrAdult = activeWishes.find((w) => w.type === "practical" || w.type === "adult");
+                const fun = activeWishes.find((w) => w.type === "fun");
+                const isAdult = person.age >= 18;
+                return (
+                  <Tr key={idx}>
+                    <Td className="font-medium text-gray-900">
+                      {person.title ? `${person.title} ${person.given_name}` : person.given_name}
+                    </Td>
+                    <Td>{person.age}</Td>
+                    {isAdult ? (
+                      <Td colSpan={2} className="max-w-xs">
+                        {practicalOrAdult?.description ?? "—"}
+                      </Td>
+                    ) : (
+                      <>
+                        <Td className="max-w-xs">{practicalOrAdult?.description ?? "—"}</Td>
+                        <Td className="max-w-xs">{fun?.description ?? "—"}</Td>
+                      </>
+                    )}
+                    {hasNotes(data.people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}
+                  </Tr>
+                );
+              })}
             </TableBody>
           </Table>
         )}

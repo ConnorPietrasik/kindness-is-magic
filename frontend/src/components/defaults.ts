@@ -7,9 +7,11 @@ export const defaultPersonForm = {
   given_name: "",
   age: 0,
   title: "",
-  practical_wish: "",
-  fun_wish: "",
+  wish_description: "",
+  wish_size: "",
+  fun_wish_description: "",
   note: "",
+  family_id: 0,
 } as const;
 
 export const defaultFamilyForm = {

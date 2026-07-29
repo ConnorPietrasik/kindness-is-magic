@@ -46,4 +46,8 @@ export type {
   UserPasswordReset,
   UserRole,
   UserSummary,
+  WishCreate,
+  WishSummary,
+  WishType,
 } from "./domain";
+export { WISH_TYPE } from "./domain";

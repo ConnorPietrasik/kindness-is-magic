@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import type { PersonDetail, PersonPayload } from "../types/domain";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PersonDetail, PersonPayload, WishCreate, WishSummary } from "../types/domain";
+import { WISH_TYPE } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { defaultPersonForm } from "./defaults";
@@ -18,20 +19,111 @@ interface PersonFormProps {
   loading?: boolean;
 }
 
+/** Internal form state shape — flat fields that map to wishes on submit. */
+interface FormState {
+  given_name: string;
+  age: number;
+  title: string;
+  wish_description: string;
+  wish_size: string;
+  fun_wish_description: string;
+  note: string;
+  family_id: number;
+}
+
+/** Map existing wishes into the flat form fields. */
+function wishesToFormFields(wishes: WishSummary[]): Pick<FormState, "wish_description" | "wish_size" | "fun_wish_description"> {
+  const result: Partial<FormState> = {};
+  for (const wish of wishes) {
+    if (wish.deleted_at) continue;
+    if (wish.type === "adult" || wish.type === "practical") {
+      result.wish_description = wish.description;
+      result.wish_size = wish.size ?? "";
+    } else if (wish.type === "fun") {
+      result.fun_wish_description = wish.description;
+    }
+  }
+  return result as Pick<FormState, "wish_description" | "wish_size" | "fun_wish_description">;
+}
+
+/** Normalize user-entered size: empty string or "0" → null (N/A). */
+function normalizeSize(value: string): string | null {
+  if (value === "" || value === "0") return null;
+  return value;
+}
+
+/** Build the wishes array from form fields based on age. */
+function buildWishes(form: FormState): WishCreate[] {
+  if (form.age >= 18) {
+    return [
+      {
+        type: WISH_TYPE.adult,
+        description: form.wish_description,
+        size: normalizeSize(form.wish_size),
+      },
+    ];
+  }
+  return [
+    {
+      type: WISH_TYPE.practical,
+      description: form.wish_description,
+      size: normalizeSize(form.wish_size),
+    },
+    {
+      type: WISH_TYPE.fun,
+      description: form.fun_wish_description,
+      size: null,
+    },
+  ];
+}
+
 /**
  * PersonForm — shared form for creating and editing people.
+ *
+ * Age-based conditional wish rendering:
+ * - age >= 18: single "Wish" textarea + "Size" input
+ * - age < 18: "Practical Wish" textarea + "Size" input, "Fun Wish" textarea
  *
  * Admin-only features (gated by props):
  * - `familyMap` — shows a family selector on create.
  */
 export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoading, onSubmit, onCancel, loading }: PersonFormProps) {
-  const [form, setForm] = useState(() => ({ ...defaultPersonForm, ...initial }));
+  const [form, setForm] = useState<FormState>(() => {
+    const base: FormState = {
+      ...defaultPersonForm,
+      given_name: initial?.given_name ?? "",
+      age: initial?.age ?? 0,
+      title: initial?.title ?? "",
+      note: initial?.note ?? "",
+      family_id: initial?.family_id ?? 0,
+    };
+    // If editing, populate wish fields from existing wishes
+    if (initial?.wishes && initial.wishes.length > 0) {
+      return { ...base, ...wishesToFormFields(initial.wishes) };
+    }
+    return base;
+  });
 
   useEffect(() => {
-    setForm({ ...defaultPersonForm, ...initial });
+    const base: FormState = {
+      ...defaultPersonForm,
+      given_name: initial?.given_name ?? "",
+      age: initial?.age ?? 0,
+      title: initial?.title ?? "",
+      note: initial?.note ?? "",
+      family_id: initial?.family_id ?? 0,
+    };
+    // If editing, populate wish fields from existing wishes
+    if (initial?.wishes && initial.wishes.length > 0) {
+      setForm({ ...base, ...wishesToFormFields(initial.wishes) });
+    } else {
+      setForm(base);
+    }
   }, [initial]);
 
-  const update = (key: string, val: string | number | boolean | null) => setForm((prev) => ({ ...prev, [key]: val }));
+  const update = (key: keyof FormState, val: string | number) => setForm((prev) => ({ ...prev, [key]: val }));
+
+  const isAdult = form.age >= 18;
 
   // Only shown on admin create when familyMap is provided
   const familyOptions = familyMap ? Object.entries(familyMap) : [];
@@ -40,10 +132,22 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      onSubmit(form as unknown as PersonPayload);
+      const wishes = buildWishes(form);
+      const payload: PersonPayload = {
+        given_name: form.given_name,
+        age: form.age,
+        title: form.title || null,
+        note: form.note || null,
+        wishes,
+        ...(form.family_id > 0 ? { family_id: form.family_id } : {}),
+      };
+      onSubmit(payload);
     },
     [form, onSubmit]
   );
+
+  // Memoize label text for the primary wish field
+  const primaryWishLabel = useMemo(() => (isAdult ? "Wish" : "Practical Wish"), [isAdult]);
 
   return (
     <Card className="mb-6 border border-gray-200">
@@ -62,7 +166,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
               label="Family"
               as="select"
               fieldProps={{
-                value: (form as Record<string, unknown>).family_id || "",
+                value: form.family_id || "",
                 onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("family_id", parseInt(e.target.value, 10)),
                 required: true,
               }}
@@ -81,9 +185,9 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
               label="Family ID"
               type="number"
               fieldProps={{
-                value: (form as Record<string, unknown>).family_id ?? "",
+                value: form.family_id ?? "",
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                  update("family_id", e.target.value ? parseInt(e.target.value, 10) : ""),
+                  update("family_id", e.target.value ? parseInt(e.target.value, 10) : 0),
                 required: true,
                 min: 1,
                 autoComplete: "off",
@@ -129,31 +233,47 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
             />
           </div>
 
+          {/* Primary wish (adult wish or practical wish) + size */}
           <FormField
-            label="Practical Wish"
+            label={primaryWishLabel}
             as="textarea"
             fieldProps={{
-              value: form.practical_wish,
-              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("practical_wish", e.target.value),
+              value: form.wish_description,
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("wish_description", e.target.value),
               required: true,
-              maxLength: 400,
+              maxLength: 60,
               rows: 2,
               autoComplete: "off",
             }}
           />
 
           <FormField
-            label="Fun Wish"
-            as="textarea"
+            label="Size"
             fieldProps={{
-              value: form.fun_wish,
-              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("fun_wish", e.target.value),
+              value: form.wish_size,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),
               required: true,
-              maxLength: 400,
-              rows: 2,
+              maxLength: 20,
+              placeholder: 'e.g. "M", "8", or "0" if N/A',
               autoComplete: "off",
             }}
           />
+
+          {/* Fun wish — children only */}
+          {!isAdult && (
+            <FormField
+              label="Fun Wish"
+              as="textarea"
+              fieldProps={{
+                value: form.fun_wish_description,
+                onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("fun_wish_description", e.target.value),
+                required: true,
+                maxLength: 60,
+                rows: 2,
+                autoComplete: "off",
+              }}
+            />
+          )}
 
           <div>
             <OptionalLabel text="Note" />

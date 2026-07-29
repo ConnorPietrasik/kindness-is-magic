@@ -67,6 +67,7 @@ test.describe("Referrer self-service", () => {
     await page.getByLabel("Given Name").fill(TEST_CHILD);
     await page.getByLabel("Age").fill("3");
     await page.getByLabel("Practical Wish").fill("Warm socks");
+    await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("Coloring book");
 
     await page.getByRole("button", { name: "Create" }).click();

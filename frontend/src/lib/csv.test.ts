@@ -266,8 +266,8 @@ describe("validateCsvForImport", () => {
   it("handles people section headers", () => {
     const sections = {
       people: {
-        headers: ["family_name", "given_name", "age", "practical_wish", "fun_wish", "title", "note"],
-        rows: [["Smiths", "Alice", "8", "Bike", "Lego", "", ""]],
+        headers: ["family_name", "given_name", "age", "wish", "size", "fun_wish", "title", "note"],
+        rows: [["Smiths", "Alice", "8", "Bike", "", "Lego", "", ""]],
       },
     };
     const result = validateCsvForImport(sections);
@@ -363,9 +363,12 @@ describe("EXPECTED_HEADERS", () => {
   });
 
   it("has correct people headers", () => {
-    expect(EXPECTED_HEADERS.people.length).toBe(7);
+    expect(EXPECTED_HEADERS.people.length).toBe(8);
     expect(EXPECTED_HEADERS.people).toContain("given_name");
     expect(EXPECTED_HEADERS.people).toContain("age");
+    expect(EXPECTED_HEADERS.people).toContain("wish");
+    expect(EXPECTED_HEADERS.people).toContain("size");
+    expect(EXPECTED_HEADERS.people).toContain("fun_wish");
   });
 
   it("has correct users headers", () => {

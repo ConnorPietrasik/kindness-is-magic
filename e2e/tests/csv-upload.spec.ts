@@ -21,8 +21,8 @@ referrer_name,family_name,family_wish,contact_name
 NonExistent Referrer,Bad Family,Wish,Contact
 
 # people
-family_name,given_name,age
-Bad Family,Test Person,not_a_number
+family_name,given_name,age,wish,size,fun_wish
+Bad Family,Test Person,not_a_number,Bike,,Lego
 `;
 
     /* Use setInputFiles with inline buffer */

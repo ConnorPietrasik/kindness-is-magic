@@ -4,16 +4,58 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PersonDetail } from "../types";
 import { PersonForm } from "./PersonForm";
 
-const mockPersonDetail: PersonDetail = {
+const mockChildPerson: PersonDetail = {
   id: 1,
   family_id: 5,
   given_name: "Alice",
   title: null,
   age: 8,
-  practical_wish: "A backpack",
-  fun_wish: "A doll",
   note: null,
   deleted_at: null,
+  wishes: [
+    {
+      id: 1,
+      type: "practical",
+      description: "A backpack",
+      size: "M",
+      purchased_by_id: null,
+      purchased_at: null,
+      purchased_where: null,
+      deleted_at: null,
+    },
+    {
+      id: 2,
+      type: "fun",
+      description: "A doll",
+      size: null,
+      purchased_by_id: null,
+      purchased_at: null,
+      purchased_where: null,
+      deleted_at: null,
+    },
+  ],
+};
+
+const mockAdultPerson: PersonDetail = {
+  id: 2,
+  family_id: 5,
+  given_name: "Bob",
+  title: null,
+  age: 25,
+  note: null,
+  deleted_at: null,
+  wishes: [
+    {
+      id: 3,
+      type: "adult",
+      description: "A coffee maker",
+      size: null,
+      purchased_by_id: null,
+      purchased_at: null,
+      purchased_where: null,
+      deleted_at: null,
+    },
+  ],
 };
 
 const familyMap: Record<number, string> = {
@@ -45,7 +87,7 @@ describe("PersonForm", () => {
   });
 
   it("does not show family dropdown on edit mode", () => {
-    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockPersonDetail} />);
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
 
     expect(screen.queryByLabelText("Family")).not.toBeInTheDocument();
     expect(screen.queryByText("Select family…")).not.toBeInTheDocument();
@@ -57,24 +99,152 @@ describe("PersonForm", () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
 
-    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockPersonDetail} onCancel={onCancel} />);
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} onCancel={onCancel} />);
 
     await user.click(screen.getByText("Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it("shows loading state on submit button", () => {
-    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockPersonDetail} loading={true} />);
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} loading={true} />);
 
     expect(screen.getByText("Saving…")).toBeInTheDocument();
   });
 
-  it("renders all required fields on create", () => {
-    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{}} />);
+  /* ── Age-based conditional rendering ────────────────────── */
 
-    expect(screen.getByLabelText("Given Name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+  it("renders Practical Wish and Fun Wish fields for children (age < 18)", () => {
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 8 }} />);
+
     expect(screen.getByLabelText("Practical Wish")).toBeInTheDocument();
     expect(screen.getByLabelText("Fun Wish")).toBeInTheDocument();
+    expect(screen.getByLabelText("Size")).toBeInTheDocument();
+  });
+
+  it("renders single Wish field for adults (age >= 18)", () => {
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 25 }} />);
+
+    expect(screen.getByLabelText("Wish")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Practical Wish")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+  });
+
+  it("hides Fun Wish when age changes from child to adult", async () => {
+    const user = userEvent.setup();
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 8 }} />);
+
+    expect(screen.getByLabelText("Fun Wish")).toBeInTheDocument();
+
+    const ageInput = screen.getByLabelText("Age");
+    await user.clear(ageInput);
+    await user.type(ageInput, "20");
+
+    expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Wish")).toBeInTheDocument();
+  });
+
+  it("shows Fun Wish when age changes from adult to child", async () => {
+    const user = userEvent.setup();
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 25 }} />);
+
+    expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+
+    const ageInput = screen.getByLabelText("Age");
+    await user.clear(ageInput);
+    await user.type(ageInput, "10");
+
+    expect(screen.getByLabelText("Fun Wish")).toBeInTheDocument();
+    expect(screen.getByLabelText("Practical Wish")).toBeInTheDocument();
+  });
+
+  /* ── Edit mode — populates from existing wishes ─────────── */
+
+  it("populates form fields from child wishes on edit", () => {
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
+
+    expect(screen.getByLabelText("Practical Wish")).toHaveValue("A backpack");
+    expect(screen.getByLabelText("Size")).toHaveValue("M");
+    expect(screen.getByLabelText("Fun Wish")).toHaveValue("A doll");
+  });
+
+  it("populates form fields from adult wish on edit", () => {
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockAdultPerson} />);
+
+    expect(screen.getByLabelText("Wish")).toHaveValue("A coffee maker");
+    expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+  });
+
+  /* ── Form submission ────────────────────────────────────── */
+
+  it("submits wishes array for a child", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 8 }} onSubmit={onSubmit} onCancel={() => {}} />);
+
+    await user.type(screen.getByLabelText("Given Name"), "Charlie");
+    await user.type(screen.getByLabelText("Practical Wish"), "Bike");
+    await user.type(screen.getByLabelText("Size"), "S");
+    await user.type(screen.getByLabelText("Fun Wish"), "Lego set");
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        given_name: "Charlie",
+        age: 8,
+        wishes: [
+          { type: "practical", description: "Bike", size: "S" },
+          { type: "fun", description: "Lego set", size: null },
+        ],
+      })
+    );
+  });
+
+  it("submits wishes array for an adult", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 30 }} onSubmit={onSubmit} onCancel={() => {}} />);
+
+    await user.type(screen.getByLabelText("Given Name"), "Diana");
+    await user.type(screen.getByLabelText("Wish"), "Headphones");
+    await user.type(screen.getByLabelText("Size"), "0");
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        given_name: "Diana",
+        age: 30,
+        wishes: [{ type: "adult", description: "Headphones", size: null }],
+      })
+    );
+  });
+
+  it("includes family_id in payload when set", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 8 }} onSubmit={onSubmit} />);
+
+    await user.selectOptions(screen.getByLabelText("Family"), "5");
+    await user.type(screen.getByLabelText("Given Name"), "Eve");
+    await user.type(screen.getByLabelText("Practical Wish"), "Book");
+    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Fun Wish"), "Puzzle");
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        family_id: 5,
+        given_name: "Eve",
+        wishes: [
+          expect.objectContaining({ type: "practical", description: "Book" }),
+          expect.objectContaining({ type: "fun", description: "Puzzle" }),
+        ],
+      })
+    );
   });
 });

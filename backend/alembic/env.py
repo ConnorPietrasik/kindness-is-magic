@@ -20,6 +20,7 @@ from app.models import (  # noqa: F401
     ReferrerInviteToken,
     RefreshToken,
     User,
+    Wish,
 )
 
 # this is the Alembic Config object, which provides

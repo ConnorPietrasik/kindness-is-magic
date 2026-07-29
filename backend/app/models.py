@@ -10,6 +10,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     func,
+    text,
     Enum as SAEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
@@ -189,13 +190,12 @@ class Person(Base):
     given_name: Mapped[str] = mapped_column(String(40), nullable=False)
     title: Mapped[str | None] = mapped_column(String(40), nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
-    practical_wish: Mapped[str] = mapped_column(String(400), nullable=False)
-    fun_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     note: Mapped[str] = mapped_column(String(400), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
+    wishes: Mapped[list["Wish"]] = relationship("Wish", back_populates="person")
 
     @validates("given_name", "title")
     def _capitalize_name_fields(self, key: str, value: str | None) -> str | None:
@@ -203,6 +203,49 @@ class Person(Base):
         if value:
             return value[:1].upper() + value[1:]
         return value
+
+
+class WishType(str, enum.Enum):
+    """Wish type determined by person age.
+
+    Adults (18+) get one ``adult`` wish.
+    Children (under 18) get one ``practical`` and one ``fun`` wish.
+    """
+
+    adult = "adult"
+    practical = "practical"
+    fun = "fun"
+
+
+class Wish(Base):
+    __tablename__ = "wish"
+    __table_args__ = (
+        # Partial unique index: only one active wish per (person_id, type).
+        # Soft-deleted wishes (deleted_at IS NOT NULL) are excluded so new
+        # wishes can reuse the same (person_id, type) combination.
+        Index(
+            "uq_wish_person_type_active",
+            "person_id",
+            "type",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index("ix_wish_person_id_deleted_at", "person_id", "deleted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=False)
+    type: Mapped[WishType] = mapped_column(SAEnum(WishType, name="wish_type", create_constraint=True), nullable=False)
+    description: Mapped[str] = mapped_column(String(60), nullable=False)
+    size: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    purchased_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    purchased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    purchased_where: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    person: Mapped["Person"] = relationship("Person", back_populates="wishes")
+    purchased_by: Mapped["User | None"] = relationship("User", foreign_keys=[purchased_by_id])
 
 
 class RefreshToken(Base):

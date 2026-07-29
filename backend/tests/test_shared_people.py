@@ -74,7 +74,7 @@ class TestPersonGetShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person
+        from app.models import Family, Person, Wish, WishType
 
         # Create a family and person under another_referrer
         other_fam = Family(
@@ -92,10 +92,12 @@ class TestPersonGetShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
-            practical_wish="A coat",
-            fun_wish="A toy",
         )
         db.add(other_person)
+        db.flush()
+        w1 = Wish(person_id=other_person.id, type=WishType.practical, description="A coat")
+        w2 = Wish(person_id=other_person.id, type=WishType.fun, description="A toy")
+        db.add_all([w1, w2])
         db.commit()
         db.refresh(other_person)
 
@@ -178,7 +180,7 @@ class TestPersonUpdateShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person
+        from app.models import Family, Person, Wish, WishType
 
         other_fam = Family(
             referrer_id=another_referrer["referrer"].id,
@@ -195,10 +197,12 @@ class TestPersonUpdateShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
-            practical_wish="A coat",
-            fun_wish="A toy",
         )
         db.add(other_person)
+        db.flush()
+        w1 = Wish(person_id=other_person.id, type=WishType.practical, description="A coat")
+        w2 = Wish(person_id=other_person.id, type=WishType.fun, description="A toy")
+        db.add_all([w1, w2])
         db.commit()
         db.refresh(other_person)
 
@@ -312,7 +316,7 @@ class TestPersonDeleteShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person
+        from app.models import Family, Person, Wish, WishType
 
         other_fam = Family(
             referrer_id=another_referrer["referrer"].id,
@@ -329,10 +333,12 @@ class TestPersonDeleteShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
-            practical_wish="A coat",
-            fun_wish="A toy",
         )
         db.add(other_person)
+        db.flush()
+        w1 = Wish(person_id=other_person.id, type=WishType.practical, description="A coat")
+        w2 = Wish(person_id=other_person.id, type=WishType.fun, description="A toy")
+        db.add_all([w1, w2])
         db.commit()
         db.refresh(other_person)
 

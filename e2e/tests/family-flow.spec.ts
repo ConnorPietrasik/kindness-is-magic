@@ -52,6 +52,7 @@ test.describe("Family self-service", () => {
     await page.getByLabel("Given Name").fill(TEST_CHILD);
     await page.getByLabel("Age").fill("5");
     await page.getByLabel("Practical Wish").fill("Winter gloves");
+    await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("Sticker book");
 
     await page.getByRole("button", { name: "Create" }).click();

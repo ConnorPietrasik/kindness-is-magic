@@ -1,4 +1,4 @@
-"""Admin CRUD routes for People.
+"""Admin CRUD routes for People and Wishes.
 
 All endpoints are guarded with ``require_admin``.
 """
@@ -11,12 +11,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User
+from app.models import Family, Person, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
+    build_person_detail,
     get_active_or_404,
     get_or_404,
     partial_update,
+    restore_person_wishes,
+    soft_delete_person_wishes,
+    sync_person_wishes,
 )
 from app.schemas import (
     PersonCreate,
@@ -24,6 +28,11 @@ from app.schemas import (
     PersonListResponse,
     PersonSummary,
     PersonUpdate,
+    WishCreate,
+    WishDetail,
+    WishSummary,
+    WishUpdate,
+    validate_wishes_for_age,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +41,11 @@ people_admin_router = APIRouter(
     prefix="/api/admin/people",
     tags=["admin-people"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Person — List / Get / Create / Update / Delete / Restore
+# ---------------------------------------------------------------------------
 
 
 @people_admin_router.get("")
@@ -75,7 +89,7 @@ def get_person(
     _admin: User = Depends(require_admin),
 ) -> PersonDetail:
     per = get_active_or_404(db, Person, per_id, "Person not found")
-    return PersonDetail.model_validate(per)
+    return PersonDetail(**build_person_detail(per, db))
 
 
 @people_admin_router.post("", status_code=201)
@@ -91,16 +105,26 @@ def create_person(
         family_id=body.family_id,
         given_name=body.given_name,
         age=body.age,
-        practical_wish=body.practical_wish,
-        fun_wish=body.fun_wish,
         title=body.title,
         note=body.note,
     )
     db.add(per)
+    db.flush()
+
+    # Create wishes
+    for wish_data in body.wishes:
+        wish = Wish(
+            person_id=per.id,
+            type=wish_data.type,
+            description=wish_data.description,
+            size=wish_data.size,
+        )
+        db.add(wish)
+
     db.commit()
     db.refresh(per)
     logger.info("Admin %s created person '%s' (id=%s) in family %s", _admin.email, per.given_name, per.id, body.family_id)
-    return PersonDetail.model_validate(per)
+    return PersonDetail(**build_person_detail(per, db))
 
 
 @people_admin_router.patch("/{per_id}")
@@ -112,11 +136,24 @@ def update_person(
 ) -> PersonDetail:
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted people.
     per = get_or_404(db, Person, per_id, "Person not found")
-    partial_update(per, body)
+
+    # Validate wishes against age if both are provided
+    if body.wishes is not None:
+        effective_age = body.age if body.age is not None else per.age
+        validate_wishes_for_age(body.wishes.wishes, effective_age)
+
+    # Apply person field updates (exclude 'wishes' — handled separately below)
+    partial_update(per, body, exclude={"wishes"})
+
+    # Handle wishes update if provided
+    if body.wishes is not None:
+        sync_person_wishes(db, per_id, body.wishes.wishes)
+        db.flush()
+
     db.commit()
     db.refresh(per)
     logger.info("Admin %s updated person (id=%s)", _admin.email, per_id)
-    return PersonDetail.model_validate(per)
+    return PersonDetail(**build_person_detail(per, db))
 
 
 @people_admin_router.post("/{per_id}/restore", status_code=200)
@@ -132,10 +169,12 @@ def restore_person(
     if family and family.deleted_at is not None:
         raise HTTPException(status_code=400, detail="family_deleted")
     per.deleted_at = None
+    # Restore associated wishes too
+    restore_person_wishes(db, per_id)
     db.commit()
     db.refresh(per)
     logger.info("Admin %s restored person (id=%s)", _admin.email, per_id)
-    return PersonDetail.model_validate(per)
+    return PersonDetail(**build_person_detail(per, db))
 
 
 @people_admin_router.delete("/{per_id}", status_code=204)
@@ -145,7 +184,229 @@ def delete_person(
     _admin: User = Depends(require_admin),
 ) -> Response:
     per = get_active_or_404(db, Person, per_id, "Person not found")
-    per.deleted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    per.deleted_at = now
+    # Soft-delete all associated wishes
+    soft_delete_person_wishes(db, per_id, now)
     db.commit()
     logger.info("Admin %s soft-deleted person (id=%s)", _admin.email, per_id)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Wish CRUD (scoped to a person)
+# ---------------------------------------------------------------------------
+
+
+@people_admin_router.get("/{per_id}/wishes")
+def list_person_wishes(
+    per_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[WishSummary]:
+    """List all active wishes for a person."""
+    get_active_or_404(db, Person, per_id, "Person not found")
+    wishes = db.query(Wish).filter(Wish.person_id == per_id, Wish.deleted_at.is_(None)).all()
+    return [WishSummary.model_validate(w) for w in wishes]
+
+
+@people_admin_router.post("/{per_id}/wishes", status_code=201)
+def create_person_wish(
+    per_id: int,
+    body: WishCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> WishDetail:
+    """Create a single wish for a person."""
+    per = get_active_or_404(db, Person, per_id, "Person not found")
+
+    # Validate wish type matches person age
+    validate_wishes_for_age([body], per.age)
+
+    # Check for duplicate type
+    existing = (
+        db.query(Wish)
+        .filter(
+            Wish.person_id == per_id,
+            Wish.type == body.type,
+            Wish.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Wish of type '{body.type.value}' already exists")
+
+    # Hard-delete any soft-deleted wish of the same (person_id, type) first
+    old_deleted = (
+        db.query(Wish)
+        .filter(
+            Wish.person_id == per_id,
+            Wish.type == body.type,
+            Wish.deleted_at.isnot(None),
+        )
+        .first()
+    )
+    if old_deleted:
+        logger.info(
+            "Admin %s replacing soft-deleted wish (id=%s, type=%s, desc='%s', size=%s) for person (id=%s)",
+            _admin.email,
+            old_deleted.id,
+            old_deleted.type.value,
+            old_deleted.description,
+            old_deleted.size,
+            per_id,
+        )
+        db.delete(old_deleted)
+
+    wish = Wish(
+        person_id=per_id,
+        type=body.type,
+        description=body.description,
+        size=body.size,
+    )
+    db.add(wish)
+    db.commit()
+    db.refresh(wish)
+    logger.info("Admin %s created wish (id=%s) for person (id=%s)", _admin.email, wish.id, per_id)
+
+    return WishDetail(
+        id=wish.id,
+        type=wish.type,
+        description=wish.description,
+        size=wish.size,
+        purchased_by_id=wish.purchased_by_id,
+        purchased_at=wish.purchased_at,
+        purchased_where=wish.purchased_where,
+        deleted_at=wish.deleted_at,
+        person_id=wish.person_id,
+        person_given_name=per.given_name,
+        person_family_name=per.family.family_name if per.family else None,
+    )
+
+
+@people_admin_router.patch("/{per_id}/wishes/{wish_id}")
+def update_person_wish(
+    per_id: int,
+    wish_id: int,
+    body: WishUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> WishDetail:
+    """Update a single wish for a person."""
+    per = get_active_or_404(db, Person, per_id, "Person not found")
+    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
+
+    if wish.person_id != per_id:
+        raise HTTPException(status_code=404, detail="Wish not found")
+
+    # If type is being changed, validate against person age and check for conflicts
+    if body.type is not None:
+        validate_wishes_for_age([WishCreate(type=body.type, description=body.description or wish.description, size=body.size)], per.age)
+        if body.type != wish.type:
+            conflicting = (
+                db.query(Wish)
+                .filter(
+                    Wish.person_id == per_id,
+                    Wish.type == body.type,
+                    Wish.deleted_at.is_(None),
+                    Wish.id != wish_id,
+                )
+                .first()
+            )
+            if conflicting:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Wish of type '{body.type.value}' already exists (id={conflicting.id})",
+                )
+
+    partial_update(wish, body)
+    db.commit()
+    db.refresh(wish)
+    logger.info("Admin %s updated wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+
+    return WishDetail(
+        id=wish.id,
+        type=wish.type,
+        description=wish.description,
+        size=wish.size,
+        purchased_by_id=wish.purchased_by_id,
+        purchased_at=wish.purchased_at,
+        purchased_where=wish.purchased_where,
+        deleted_at=wish.deleted_at,
+        person_id=wish.person_id,
+        person_given_name=per.given_name,
+        person_family_name=per.family.family_name if per.family else None,
+    )
+
+
+@people_admin_router.delete("/{per_id}/wishes/{wish_id}", status_code=204)
+def delete_person_wish(
+    per_id: int,
+    wish_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> Response:
+    """Soft-delete a single wish."""
+    get_active_or_404(db, Person, per_id, "Person not found")
+    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
+
+    if wish.person_id != per_id:
+        raise HTTPException(status_code=404, detail="Wish not found")
+
+    wish.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    logger.info("Admin %s soft-deleted wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+    return Response(status_code=204)
+
+
+@people_admin_router.post("/{per_id}/wishes/{wish_id}/restore", status_code=200)
+def restore_person_wish(
+    per_id: int,
+    wish_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> WishDetail:
+    """Restore a soft-deleted wish."""
+    per = get_active_or_404(db, Person, per_id, "Person not found")
+    wish = get_or_404(db, Wish, wish_id, "Wish not found")
+
+    if wish.person_id != per_id:
+        raise HTTPException(status_code=404, detail="Wish not found")
+    if wish.deleted_at is None:
+        raise HTTPException(status_code=400, detail="Wish is not deleted")
+
+    # Check for active wish of the same type that would conflict
+    conflicting = (
+        db.query(Wish)
+        .filter(
+            Wish.person_id == per_id,
+            Wish.type == wish.type,
+            Wish.deleted_at.is_(None),
+            Wish.id != wish_id,
+        )
+        .first()
+    )
+    if conflicting:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot restore: active wish of type '{wish.type.value}' already exists (id={conflicting.id})",
+        )
+
+    wish.deleted_at = None
+    db.commit()
+    db.refresh(wish)
+    logger.info("Admin %s restored wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+
+    return WishDetail(
+        id=wish.id,
+        type=wish.type,
+        description=wish.description,
+        size=wish.size,
+        purchased_by_id=wish.purchased_by_id,
+        purchased_at=wish.purchased_at,
+        purchased_where=wish.purchased_where,
+        deleted_at=wish.deleted_at,
+        person_id=wish.person_id,
+        person_given_name=per.given_name,
+        person_family_name=per.family.family_name if per.family else None,
+    )

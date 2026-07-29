@@ -12,10 +12,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User, Wish
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
+    build_person_detail,
     build_referrer_detail,
     get_or_404,
     partial_update,
@@ -360,16 +361,26 @@ def create_family_person(
         family_id=fid,
         given_name=body.given_name,
         age=body.age,
-        practical_wish=body.practical_wish,
-        fun_wish=body.fun_wish,
         title=body.title,
         note=body.note,
     )
     db.add(per)
+    db.flush()
+
+    # Create wishes
+    for wish_data in body.wishes:
+        wish = Wish(
+            person_id=per.id,
+            type=wish_data.type,
+            description=wish_data.description,
+            size=wish_data.size,
+        )
+        db.add(wish)
+
     db.commit()
     db.refresh(per)
     logger.info("Referrer %s created person '%s' (id=%s) in family %s", owner.user.email, per.given_name, per.id, fid)
-    return PersonDetail.model_validate(per)
+    return PersonDetail(**build_person_detail(per, db))
 
 
 # ---------------------------------------------------------------------------

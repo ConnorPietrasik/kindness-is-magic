@@ -56,10 +56,10 @@ John Smith,The Johnsons,A warm blanket,Mom Johnson,,,555-1111
 Jane Doe,The Smiths,A computer,Dad Smith,,123 Main St,
 
 # people
-family_name,given_name,age,practical_wish,fun_wish,title,note
-The Johnsons,Alice,8,Backpack,Doll,,
-The Johnsons,Bob,12,New shoes,Game,,Allergic to peanuts
-The Smiths,Charlie,5,Winter coat,Puzzle,,
+family_name,given_name,age,wish,size,fun_wish,title,note
+The Johnsons,Alice,8,Backpack,,Doll,,
+The Johnsons,Bob,12,New shoes,,Game,,Allergic to peanuts
+The Smiths,Charlie,5,Winter coat,,Puzzle,,
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id,display_name

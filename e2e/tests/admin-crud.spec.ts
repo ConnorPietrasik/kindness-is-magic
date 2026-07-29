@@ -102,6 +102,7 @@ test.describe("Admin CRUD", () => {
     await page.getByLabel("Given Name").fill(TEST_PERSON);
     await page.getByLabel("Age").fill("7");
     await page.getByLabel("Practical Wish").fill("A warm jacket");
+    await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("A puzzle");
 
     await page.getByRole("button", { name: "Create" }).click();

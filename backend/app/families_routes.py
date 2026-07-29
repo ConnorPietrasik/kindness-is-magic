@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, Person
-from app.schemas import FamilyWishListResponse, PersonWishItem
+from app.response_builders import batch_load_person_wishes
+from app.schemas import FamilyWishListResponse, PersonWishItem, WishSummary
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ def get_family_wish_list(
     # Active people ordered by id
     people = db.query(Person).filter(Person.family_id == family_id, Person.deleted_at.is_(None)).order_by(Person.id).all()
 
+    # Batch-load wishes for all people in one query (avoids N+1)
+    person_ids = [p.id for p in people]
+    wishes_by_person = batch_load_person_wishes(db, person_ids)
+
     return FamilyWishListResponse(
         family_name=fam.family_name,
         bio=fam.bio,
@@ -55,9 +60,8 @@ def get_family_wish_list(
                 given_name=p.given_name,
                 title=p.title,
                 age=p.age,
-                practical_wish=p.practical_wish,
-                fun_wish=p.fun_wish,
                 note=p.note,
+                wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
             )
             for p in people
         ],

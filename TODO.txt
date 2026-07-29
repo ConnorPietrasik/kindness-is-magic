@@ -1,19 +1,21 @@
+Fix CSV update so that it marks people created as approved
+Fix admin referrer list so that the approve button is actually usable
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Replace family name with their ID for all public views
 Make the IDs displayed for lists and such use a more meaningful code. Families would show as {referrer ID}-{family within referrer} while people would show as {referrer ID}-{family within referrer}-{person within family}.
 Wishes should be by age: 18 and over get one unified wish, while under 18 get fun + practical. Person signup for families should be age first, then show wish fields based on that age.
 Add a size field for practical / unified wishes: always required to enter a value, but enter 0 if not relevant.
 Add more admin views - sort by wishes, sort families by size, etc
-More detailed audit logs - maybe audit database info so admins can easily scroll through a specific user's actions?
 Links up the chain from person -> family -> referrer, maybe with links to users too
 Have unapproved families hidden by default; same for referrers
 Add button for admins to email families directly
 Add Pickup_window for families
 Add packing slips for families - per pereson: ID, name, age, practical wish, fun wish
-Add family wish approval status; referrers can approve which locks families from changing anything, and then admins have to approve before it gets shown to donors (and also locks referrer edits)
+Add family wish_approval status; referrers can approve (which locks families from changing anything aside from their own contact info), and then admins have to approve before it gets shown to donors (admin approval also locks referrer edits)
 Add wish purchasing fields: purchased_by (drop-down in frontend), when (defaults to current date when marked purchased, but can be edited), and where (text field).
 Purchaser user type: Is assigned wishes specifically. Can mark wishes as purchased by themselves (checkbox) as well as editing the date and location fields
 DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
+EVENTUALLY - More detailed audit logs? They said not important, but I feel like it could be helpful
 EVENTUALLY - Admins should have their own email client info for sending emails through the site
 EVENTUALLY - Automated database backups
 EVENTUALLY - Rate-limiting referrer email sending to family_limit per day just in case. Also maybe a once-per-address-per-day limit, or just once-per-address which requires an admin to reset if lost.

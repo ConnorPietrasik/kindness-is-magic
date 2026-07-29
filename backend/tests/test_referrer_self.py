@@ -520,8 +520,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "New Person",
                 "age": 6,
-                "practical_wish": "A coat",
-                "fun_wish": "A toy",
+                "wishes": [
+                    {"type": "practical", "description": "A coat"},
+                    {"type": "fun", "description": "A toy"},
+                ],
             },
         )
         assert resp.status_code == 201
@@ -529,6 +531,7 @@ class TestReferrerCreateFamilyPerson:
         assert body["given_name"] == "New Person"
         assert body["family_id"] == fam.id
         assert body["age"] == 6
+        assert len(body["wishes"]) == 2
 
     def test_201_with_optional_fields(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
@@ -538,8 +541,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "New Person",
                 "age": 6,
-                "practical_wish": "A coat",
-                "fun_wish": "A toy",
+                "wishes": [
+                    {"type": "practical", "description": "A coat", "size": "Small"},
+                    {"type": "fun", "description": "A toy"},
+                ],
                 "title": "Ms.",
                 "note": "Allergic to nuts",
             },
@@ -548,6 +553,7 @@ class TestReferrerCreateFamilyPerson:
         body = resp.json()
         assert body["title"] == "Ms."
         assert body["note"] == "Allergic to nuts"
+        assert len(body["wishes"]) == 2
 
     def test_403_other_referrers_family(
         self,
@@ -575,8 +581,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "Nope",
                 "age": 5,
-                "practical_wish": "Nope",
-                "fun_wish": "Nope",
+                "wishes": [
+                    {"type": "practical", "description": "Nope"},
+                    {"type": "fun", "description": "Nope"},
+                ],
             },
         )
         assert resp.status_code == 403
@@ -588,8 +596,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "Nope",
                 "age": 5,
-                "practical_wish": "Nope",
-                "fun_wish": "Nope",
+                "wishes": [
+                    {"type": "practical", "description": "Nope"},
+                    {"type": "fun", "description": "Nope"},
+                ],
             },
         )
         assert resp.status_code == 404
@@ -602,8 +612,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "",
                 "age": -1,
-                "practical_wish": "A coat",
-                "fun_wish": "A toy",
+                "wishes": [
+                    {"type": "practical", "description": "A coat"},
+                    {"type": "fun", "description": "A toy"},
+                ],
             },
         )
         assert resp.status_code == 422
@@ -615,8 +627,10 @@ class TestReferrerCreateFamilyPerson:
             json={
                 "given_name": "Nope",
                 "age": 5,
-                "practical_wish": "Nope",
-                "fun_wish": "Nope",
+                "wishes": [
+                    {"type": "practical", "description": "Nope"},
+                    {"type": "fun", "description": "Nope"},
+                ],
             },
         )
         assert resp.status_code == 401

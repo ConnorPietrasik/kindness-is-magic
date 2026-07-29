@@ -581,7 +581,7 @@ class TestAdminListPeople:
         assert body["total_pages"] == 1
 
     def test_pagination(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, Wish, WishType
 
         _admin_login(test_client)
         # Create 5 people in the family
@@ -590,10 +590,12 @@ class TestAdminListPeople:
                 family_id=family_record.id,
                 given_name=f"Person {i}",
                 age=10,
-                practical_wish="Wish",
-                fun_wish="Fun",
             )
             db.add(p)
+            db.flush()
+            w1 = Wish(person_id=p.id, type=WishType.practical, description="Wish")
+            w2 = Wish(person_id=p.id, type=WishType.fun, description="Fun")
+            db.add_all([w1, w2])
         db.commit()
 
         # Page 1, page_size=2
@@ -623,8 +625,14 @@ class TestAdminGetPerson:
         assert body["id"] == person.id
         assert body["given_name"] == "Alice"
         assert body["age"] == 8
-        assert body["practical_wish"] == "A backpack"
-        assert body["fun_wish"] == "A doll"
+        # Wishes are now returned as an array
+        assert len(body["wishes"]) == 2
+        wish_types = {w["type"] for w in body["wishes"]}
+        assert {"practical", "fun"} == wish_types
+        practical_wish = next(w for w in body["wishes"] if w["type"] == "practical")
+        assert practical_wish["description"] == "A backpack"
+        fun_wish = next(w for w in body["wishes"] if w["type"] == "fun")
+        assert fun_wish["description"] == "A doll"
 
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -641,8 +649,10 @@ class TestAdminCreatePerson:
                 "family_id": family_record.id,
                 "given_name": "Diana",
                 "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
+                "wishes": [
+                    {"type": "practical", "description": "A coat"},
+                    {"type": "fun", "description": "A puzzle"},
+                ],
             },
         )
         assert resp.status_code == 201
@@ -651,6 +661,7 @@ class TestAdminCreatePerson:
         assert body["age"] == 5
         assert body["family_id"] == family_record.id
         assert body["note"] is None
+        assert len(body["wishes"]) == 2
 
     def test_201_with_optional_fields(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
@@ -660,8 +671,10 @@ class TestAdminCreatePerson:
                 "family_id": family_record.id,
                 "given_name": "Diana",
                 "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
+                "wishes": [
+                    {"type": "practical", "description": "A coat", "size": "Small"},
+                    {"type": "fun", "description": "A puzzle"},
+                ],
                 "title": "Ms.",
                 "note": "Allergic to peanuts",
             },
@@ -670,6 +683,44 @@ class TestAdminCreatePerson:
         body = resp.json()
         assert body["title"] == "Ms."
         assert body["note"] == "Allergic to peanuts"
+        assert len(body["wishes"]) == 2
+        assert body["wishes"][0]["size"] == "Small"
+
+    def test_201_adult_person(self, test_client: TestClient, admin_user, family_record):
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/people",
+            json={
+                "family_id": family_record.id,
+                "given_name": "Diana",
+                "age": 25,
+                "wishes": [
+                    {"type": "adult", "description": "A laptop"},
+                ],
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["given_name"] == "Diana"
+        assert body["age"] == 25
+        assert len(body["wishes"]) == 1
+        assert body["wishes"][0]["type"] == "adult"
+
+    def test_422_wrong_wish_type_for_age(self, test_client: TestClient, admin_user, family_record):
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/people",
+            json={
+                "family_id": family_record.id,
+                "given_name": "Diana",
+                "age": 25,
+                "wishes": [
+                    {"type": "practical", "description": "A coat"},
+                    {"type": "fun", "description": "A puzzle"},
+                ],
+            },
+        )
+        assert resp.status_code == 422
 
     def test_404_bad_family_id(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -679,8 +730,10 @@ class TestAdminCreatePerson:
                 "family_id": 99999,
                 "given_name": "Diana",
                 "age": 5,
-                "practical_wish": "A coat",
-                "fun_wish": "A puzzle",
+                "wishes": [
+                    {"type": "practical", "description": "A coat"},
+                    {"type": "fun", "description": "A puzzle"},
+                ],
             },
         )
         assert resp.status_code == 404
@@ -707,8 +760,12 @@ class TestAdminUpdatePerson:
             json={
                 "given_name": "Alicia",
                 "age": 9,
-                "practical_wish": "A new coat",
-                "fun_wish": "A board game",
+                "wishes": {
+                    "wishes": [
+                        {"type": "practical", "description": "A new coat"},
+                        {"type": "fun", "description": "A board game"},
+                    ]
+                },
                 "title": "Miss",
                 "note": "Updated note",
             },
@@ -717,10 +774,16 @@ class TestAdminUpdatePerson:
         body = resp.json()
         assert body["given_name"] == "Alicia"
         assert body["age"] == 9
-        assert body["practical_wish"] == "A new coat"
-        assert body["fun_wish"] == "A board game"
         assert body["title"] == "Miss"
         assert body["note"] == "Updated note"
+        # Wishes should be updated
+        assert len(body["wishes"]) == 2
+        wish_types = {w["type"] for w in body["wishes"]}
+        assert {"practical", "fun"} == wish_types
+        practical_wish = next(w for w in body["wishes"] if w["type"] == "practical")
+        assert practical_wish["description"] == "A new coat"
+        fun_wish = next(w for w in body["wishes"] if w["type"] == "fun")
+        assert fun_wish["description"] == "A board game"
 
     def test_200_restore_soft_deleted_person(self, test_client: TestClient, admin_user, family_with_people, db: Session):
         _admin_login(test_client)
@@ -833,7 +896,16 @@ ADMIN_ENDPOINTS = [
     ("DELETE", "/api/admin/families/1", {}),
     ("GET", "/api/admin/people", {}),
     ("GET", "/api/admin/people/1", {}),
-    ("POST", "/api/admin/people", {"family_id": 1, "given_name": "P", "age": 5, "practical_wish": "W", "fun_wish": "W"}),
+    (
+        "POST",
+        "/api/admin/people",
+        {
+            "family_id": 1,
+            "given_name": "P",
+            "age": 5,
+            "wishes": [{"type": "practical", "description": "W"}, {"type": "fun", "description": "W"}],
+        },
+    ),
     ("PATCH", "/api/admin/people/1", {"given_name": "Updated"}),
     ("DELETE", "/api/admin/people/1", {}),
 ]

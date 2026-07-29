@@ -17,29 +17,29 @@ David Okonkwo,The Okafor Family,A microwave,Chidinma Okafor,Bargain hunter extra
 David Okonkwo,The Lee Family,New bedding and towels,Jane Lee,Homeless shelter family with two kids,250 Spruce Street,718-555-0208
 
 # people
-family_name,given_name,age,practical_wish,fun_wish,title,note
-The Williams Family,Emma,6,New coat and mittens,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
-The Williams Family,Liam,4,Boots for kindergarten,Toy truck set,son,
-The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,Play-Doh set,,Baby
-The Rodriguez Family,Sofia,11,Backpack and notebooks,LEGO set,granddaughter,Loves science
-The Rodriguez Family,Mateo,8,New sneakers,Foosball table,grandson,
-The Rodriguez Family,Valentina,3,Diapers size 4 and onesies,Peppa Pig plush,granddaughter,Granddaughter of Luis
-The Thompson Family,Jada,14,Period supplies and warm socks,Headphones and a music playlist,daughter,Teenager
-The Thompson Family,Malik,10,Backpack and pencils,Nintendo Switch game,son,Has asthma
-The Thompson Family,Zuri,5,Coat and winter hat,Disney Princess dress-up set,daughter,Kindergarten
-The Kim Family,Jae,16,College prep books and a laptop stand,Art supplies and sketchbook,son,Scholar
-The Kim Family,Mina,13,Notebooks and a calculator,Watercolor paint set,daughter,Loves to draw
-The Garcia Family,Lucas,9,Coat and boots,Basketball,son,
-The Garcia Family,Isabella,7,Winter jacket and scarf,Fisher-Price tea set,daughter,
-The Garcia Family,Diego,3,Boots size 7 and pajamas,Baby Shark toys,son,
-The Nguyen Family,Hoa,15,Laptop for school and a backpack,Kindle e-reader,daughter,Top student
-The Nguyen Family,Tam,12,New shoes and notebooks,Board game collection,son,
-The Nguyen Family,Linh,6,Coat and winter gloves,Puzzle set,daughter,
-The Okafor Family,Nkem,13,Coat,Skirt and accessories,daughter,Loves fashion
-The Okafor Family,Chigozie,11,Backpack and school supplies,Chess set,son,
-The Okafor Family,Uche,5,Winter hat and mittens,Thomas the Tank Engine train set,son,
-The Lee Family,Ethan,8,Backpack,Card games like Uno,son,
-The Lee Family,Grace,4,Coat and boots,Magnetic drawing board,daughter,
+family_name,given_name,age,wish,size,fun_wish,title,note
+The Williams Family,Emma,6,New coat and mittens,,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
+The Williams Family,Liam,4,Boots for kindergarten,,Toy truck set,son,
+The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,,Play-Doh set,,Baby
+The Rodriguez Family,Sofia,11,Backpack and notebooks,,LEGO set,granddaughter,Loves science
+The Rodriguez Family,Mateo,8,New sneakers,,Foosball table,grandson,
+The Rodriguez Family,Valentina,3,Diapers size 4 and onesies,,Peppa Pig plush,granddaughter,Granddaughter of Luis
+The Thompson Family,Jada,14,Period supplies and warm socks,,Headphones and a music playlist,daughter,Teenager
+The Thompson Family,Malik,10,Backpack and pencils,,Nintendo Switch game,son,Has asthma
+The Thompson Family,Zuri,5,Coat and winter hat,,Disney Princess dress-up set,daughter,Kindergarten
+The Kim Family,Jae,16,College prep books and a laptop stand,,Art supplies and sketchbook,son,Scholar
+The Kim Family,Mina,13,Notebooks and a calculator,,Watercolor paint set,daughter,Loves to draw
+The Garcia Family,Lucas,9,Coat and boots,,Basketball,son,
+The Garcia Family,Isabella,7,Winter jacket and scarf,,Fisher-Price tea set,daughter,
+The Garcia Family,Diego,3,Boots size 7 and pajamas,,Baby Shark toys,son,
+The Nguyen Family,Hoa,15,Laptop for school and a backpack,,Kindle e-reader,daughter,Top student
+The Nguyen Family,Tam,12,New shoes and notebooks,,Board game collection,son,
+The Nguyen Family,Linh,6,Coat and winter gloves,,Puzzle set,daughter,
+The Okafor Family,Nkem,13,Coat,,Skirt and accessories,daughter,Loves fashion
+The Okafor Family,Chigozie,11,Backpack and school supplies,,Chess set,son,
+The Okafor Family,Uche,5,Winter hat and mittens,,Thomas the Tank Engine train set,son,
+The Lee Family,Ethan,8,Backpack,,Card games like Uno,son,
+The Lee Family,Grace,4,Coat and boots,,Magnetic drawing board,daughter,
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id,display_name
