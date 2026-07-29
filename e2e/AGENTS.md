@@ -10,6 +10,8 @@ curl -sf http://localhost/login > /dev/null 2>&1 && echo "up" || echo "down"
 
 If the stack is down, **ask the user to bring it up** before proceeding.
 
+Additionally, `SUPPRESS_SEND=1` or `DEBUG=1` must be set in `.env` — `global-setup.ts` will abort otherwise.
+
 Run and capture output:
 
 ```bash
