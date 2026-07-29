@@ -42,7 +42,7 @@ test.describe("Admin CRUD", () => {
     /* Fill the form */
     await page.getByLabel("Name").fill(TEST_REFERRER);
     await page.getByLabel("Family Limit").fill("5");
-    await page.getByLabel("Phone").fill("555-999-0000");
+    await page.getByLabel("Phone Number").fill("5559990000");
 
     /* Submit */
     await page.getByRole("button", { name: "Create" }).click();

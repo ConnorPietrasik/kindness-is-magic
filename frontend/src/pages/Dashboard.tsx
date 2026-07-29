@@ -8,6 +8,7 @@ import { FormField } from "../components/FormField";
 import { HeaderBar, LogoutButton } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
+import { PhoneInput } from "../components/PhoneInput";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
@@ -303,20 +304,13 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
           autoComplete: "name",
         }}
       />
-      <FormField
-        label="Phone"
-        type="text"
-        error={phoneError}
-        fieldProps={{
-          value: form.phone_number,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            update("phone_number", e.target.value);
-            setPhoneError(null);
-          },
-          required: true,
-          maxLength: 20,
-          autoComplete: "tel",
+      <PhoneInput
+        value={form.phone_number ?? ""}
+        onChange={(val) => {
+          update("phone_number", val);
+          setPhoneError(null);
         }}
+        error={phoneError}
       />
       <div className="flex gap-3 pt-1">
         <Button type="submit" loading={loading} className="flex-1">

@@ -114,7 +114,7 @@ describe("ReferrerSelfRegister", () => {
         code: "KMG-TEST1",
         name: "Test Referrer",
         email: "test@example.com",
-        phone_number: "07123 456789",
+        phone_number: "07123456789",
         password: "password123",
       });
     });
@@ -280,7 +280,7 @@ describe("ReferrerSelfRegister", () => {
         code: "KMG-AUTO",
         name: "Test Referrer",
         email: "locked@example.com",
-        phone_number: "07123 456789",
+        phone_number: "07123456789",
         password: "password123",
       });
     });

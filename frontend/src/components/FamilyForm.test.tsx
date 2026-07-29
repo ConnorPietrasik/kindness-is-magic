@@ -114,7 +114,7 @@ describe("FamilyForm", () => {
     await user.type(screen.getByLabelText("Family Name"), "The Joneses");
     await user.type(screen.getByLabelText("Family Wish"), "A computer");
     await user.type(screen.getByLabelText("Contact Name"), "Dad Jones");
-    await user.type(screen.getByLabelText("Phone"), "555-123-4567");
+    await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
     await user.click(screen.getByText("Create"));
 

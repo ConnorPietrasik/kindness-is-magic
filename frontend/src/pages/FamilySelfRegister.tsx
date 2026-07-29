@@ -4,6 +4,7 @@ import { Button } from "../components/Button";
 import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { OptionalLabel } from "../components/OptionalLabel";
+import { PhoneInput } from "../components/PhoneInput";
 import { useAuth } from "../context/AuthContext";
 import { registerFamilyViaInvite } from "../lib/api";
 import { ROUTES } from "../lib/routes";
@@ -233,18 +234,7 @@ export default function FamilySelfRegister() {
             />
           </div>
 
-          <FormField
-            label="Phone"
-            type="text"
-            fieldProps={{
-              value: form.phone_number,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-              required: true,
-              maxLength: 20,
-              placeholder: "e.g. 111-111-1111",
-              autoComplete: "tel",
-            }}
-          />
+          <PhoneInput value={form.phone_number} onChange={(val) => update("phone_number", val)} />
 
           <Button type="submit" loading={loading} className="mt-2 w-full">
             {loading ? "Creating account…" : "Create Account"}

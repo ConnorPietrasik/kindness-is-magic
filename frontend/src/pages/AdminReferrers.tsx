@@ -17,6 +17,7 @@ import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
+import { PhoneInput } from "../components/PhoneInput";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
@@ -423,20 +424,13 @@ function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: R
               autoComplete: "off",
             }}
           />
-          <FormField
-            label="Phone"
-            type="text"
-            error={phoneError}
-            fieldProps={{
-              value: form.phone_number,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                update("phone_number", e.target.value);
-                setPhoneError(null);
-              },
-              required: true,
-              maxLength: 20,
-              autoComplete: "off",
+          <PhoneInput
+            value={form.phone_number ?? ""}
+            onChange={(val) => {
+              update("phone_number", val);
+              setPhoneError(null);
             }}
+            error={phoneError}
           />
         </div>
 

@@ -6,6 +6,7 @@ import { Card } from "./Card";
 import { defaultFamilyForm } from "./defaults";
 import { FormField } from "./FormField";
 import { OptionalLabel } from "./OptionalLabel";
+import { PhoneInput } from "./PhoneInput";
 import { Spinner } from "./Spinner";
 
 interface FamilyFormProps {
@@ -158,21 +159,13 @@ export function FamilyForm({
                 />
               </div>
 
-              <FormField
-                label="Phone"
-                type="text"
-                error={phoneError}
-                fieldProps={{
-                  value: form.phone_number || "",
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                    update("phone_number", e.target.value);
-                    setPhoneError(null);
-                  },
-                  required: true,
-                  maxLength: 20,
-                  placeholder: "e.g. 111-111-1111",
-                  autoComplete: "off",
+              <PhoneInput
+                value={form.phone_number || ""}
+                onChange={(val) => {
+                  update("phone_number", val);
+                  setPhoneError(null);
                 }}
+                error={phoneError}
               />
             </>
           )}

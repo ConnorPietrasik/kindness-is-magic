@@ -317,13 +317,13 @@ class TestAdminUserSchemasRejectHtml:
 
 
 # ---------------------------------------------------------------------------
-# Phone number validation — minimum 9 digits
+# Phone number validation — minimum 10 digits
 # ---------------------------------------------------------------------------
 
 
 class TestPhoneNumberValidation:
     def test_family_create_rejects_too_few_digits(self):
-        with pytest.raises(ValidationError, match="at least 9 digits"):
+        with pytest.raises(ValidationError, match="10 digits"):
             FamilyCreate(
                 referrer_id=1,
                 family_name="Test",
@@ -332,7 +332,7 @@ class TestPhoneNumberValidation:
                 phone_number="555-1234",
             )
 
-    def test_family_create_accepts_9_digits(self):
+    def test_family_create_accepts_10_digits(self):
         f = FamilyCreate(
             referrer_id=1,
             family_name="Test",
@@ -353,9 +353,9 @@ class TestPhoneNumberValidation:
         assert f.phone_number == "+1 (555) 123-4567"
 
     def test_referrer_create_rejects_too_few_digits(self):
-        with pytest.raises(ValidationError, match="at least 9 digits"):
+        with pytest.raises(ValidationError, match="10 digits"):
             ReferrerCreate(name="Test", family_limit=5, phone_number="123-4567")
 
     def test_family_update_rejects_too_few_digits(self):
-        with pytest.raises(ValidationError, match="at least 9 digits"):
+        with pytest.raises(ValidationError, match="10 digits"):
             FamilyUpdate(phone_number="555-1234")

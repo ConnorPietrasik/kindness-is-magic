@@ -178,11 +178,11 @@ describe("formatApiError", () => {
     const error = {
       response: {
         data: {
-          detail: [{ loc: ["body", "phone_number"], msg: "phone_number must contain at least 9 digits", type: "value_error" }],
+          detail: [{ loc: ["body", "phone_number"], msg: "phone_number must contain 10 digits", type: "value_error" }],
         },
       },
     };
-    expect(formatApiError(error)).toBe("phone_number must contain at least 9 digits");
+    expect(formatApiError(error)).toBe("phone_number must contain 10 digits");
   });
 
   it("extracts msg from multiple Pydantic validation error objects", () => {

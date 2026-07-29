@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
+import { PhoneInput } from "../components/PhoneInput";
 import { useAuth } from "../context/AuthContext";
 import { registerReferrerViaInvite } from "../lib/api";
 import { ROUTES } from "../lib/routes";
@@ -151,16 +152,7 @@ export default function ReferrerSelfRegister() {
             }}
           />
 
-          <FormField
-            label="Phone Number"
-            fieldProps={{
-              value: form.phone_number,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
-              required: true,
-              placeholder: "e.g. 111-111-1111",
-              autoComplete: "tel",
-            }}
-          />
+          <PhoneInput value={form.phone_number} onChange={(val) => update("phone_number", val)} />
 
           <div>
             <FormField

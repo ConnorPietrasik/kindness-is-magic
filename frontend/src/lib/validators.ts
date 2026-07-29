@@ -13,6 +13,6 @@
 export function validatePhoneNumber(value: string): string | null {
   const digits = value.replace(/\D/g, "");
   if (!value) return "Phone number is required";
-  if (digits.length < 9) return "Phone number must contain at least 9 digits";
+  if (digits.length < 10) return "Phone number must contain 10 digits";
   return null;
 }
