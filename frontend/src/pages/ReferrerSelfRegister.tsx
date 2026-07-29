@@ -150,7 +150,7 @@ export default function ReferrerSelfRegister() {
               value: form.phone_number,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("phone_number", e.target.value),
               required: true,
-              placeholder: "e.g. 07123 456789",
+              placeholder: "e.g. 111-111-1111",
               autoComplete: "tel",
             }}
           />
