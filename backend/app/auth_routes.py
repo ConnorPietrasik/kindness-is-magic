@@ -310,7 +310,7 @@ def change_password(
 
 @router.post("/forgot-password")
 @limiter.limit("5/minute")
-def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
+async def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
     """Generate a password-reset token and send a reset email."""
     user = db.query(User).filter(User.email == data.email).first()
 
@@ -339,7 +339,7 @@ def forgot_password(request: Request, data: ForgotPassword, db: Session = Depend
     base = os.environ.get("APP_BASE_URL", "http://localhost")
     reset_link = f"{base}/reset-password/{raw_token}"
     html_body = build_password_reset_email(reset_link)
-    result = send_email(
+    result = await send_email(
         to=user.email,
         subject="Reset your Kindness Is Magic password",
         html_body=html_body,
@@ -408,7 +408,7 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
     response_model=ReferrerInviteResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def invite_referrer(
+async def invite_referrer(
     data: ReferrerInviteCreate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -441,7 +441,7 @@ def invite_referrer(
             from_name=inviter_name,
             email=data.email,
         )
-        result = send_email(
+        result = await send_email(
             to=data.email,
             subject="You're invited to join Kindness Is Magic",
             html_body=html_body,
@@ -563,7 +563,7 @@ def register_referrer(
     response_model=FamilySelfRegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register_family(
+async def register_family(
     data: FamilySelfRegister,
     response: Response,
     db: Session = Depends(get_db),
@@ -616,7 +616,7 @@ def register_family(
     if referrer_user:
         display_name = referrer_user.display_name or referrer.name
         html_body = build_family_pending_email(data.family_name, display_name)
-        send_email(
+        await send_email(
             to=referrer_user.email,
             subject=f"New family awaiting approval — {data.family_name}",
             html_body=html_body,

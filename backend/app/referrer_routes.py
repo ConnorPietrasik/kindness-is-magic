@@ -236,7 +236,7 @@ def list_pending_families(
 
 
 @router.post("/families/{fam_id}/approve", status_code=200)
-def approve_family(
+async def approve_family(
     fam_id: int,
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
@@ -274,7 +274,7 @@ def approve_family(
     logger.info("Referrer %s approved family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
 
     # Send approval notification email to the family
-    _send_family_approved_email(
+    await _send_family_approved_email(
         fam=fam,
         db=db,
         referrer_display_name=owner.user.display_name or "",
@@ -306,7 +306,7 @@ def reject_family(
     return FamilyDetail(**build_family_detail(fam, db))
 
 
-def _send_family_approved_email(
+async def _send_family_approved_email(
     fam: Family,
     db: Session,
     referrer_display_name: str,
@@ -319,7 +319,7 @@ def _send_family_approved_email(
         return
 
     html_body = build_family_approved_email(fam.family_name, referrer_display_name)
-    send_email(
+    await send_email(
         to=family_user.email,
         subject="Your family has been approved — Kindness Is Magic ✨",
         html_body=html_body,
@@ -393,7 +393,7 @@ def create_family_person(
 
 
 @router.post("/send-family-invite", response_model=SendFamilyInviteResponse)
-def send_family_invite(
+async def send_family_invite(
     body: SendFamilyInviteRequest,
     user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
@@ -418,7 +418,7 @@ def send_family_invite(
         code=ref.family_invite_code,
         referrer_name=ref.name,
     )
-    result = send_email(
+    result = await send_email(
         to=body.email,
         subject="You're invited to join Kindness Is Magic",
         html_body=html_body,

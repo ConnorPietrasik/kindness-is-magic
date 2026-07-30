@@ -1,6 +1,5 @@
 """Email sending infrastructure via fastapi-mail (Gmail SMTP)."""
 
-import asyncio
 import logging
 import os
 from datetime import datetime
@@ -81,7 +80,7 @@ def check_unsubscribed(email: str, db: Session) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def send_email(
+async def send_email(
     to: str,
     subject: str,
     html_body: str,
@@ -115,7 +114,7 @@ def send_email(
     )
 
     try:
-        asyncio.run(mail_manager.send_message(message))
+        await mail_manager.send_message(message)
         logger.info("Email sent: to=%s subject=%s", to_addr, subject)
         return {"sent": True, "reason": None}
     except Exception as exc:  # noqa: BLE001

@@ -76,7 +76,7 @@ class TestCheckUnsubscribed:
 
 
 class TestSendEmail:
-    def test_returns_sent_true_on_success(self, monkeypatch):
+    async def test_returns_sent_true_on_success(self, monkeypatch):
         from app.mail import send_email
 
         async def _no_op(*args, **kwargs):
@@ -86,20 +86,20 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+                result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": True, "reason": None}
 
-    def test_returns_unsubscribed_when_blocked(self, monkeypatch):
+    async def test_returns_unsubscribed_when_blocked(self, monkeypatch):
         from app.mail import send_email
 
         mock_db = MagicMock()
         with patch("app.mail.check_unsubscribed", return_value=True):
-            result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+            result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": False, "reason": "unsubscribed"}
 
-    def test_exempt_bypasses_unsubscribe_check(self, monkeypatch):
+    async def test_exempt_bypasses_unsubscribe_check(self, monkeypatch):
         from app.mail import send_email
 
         async def _no_op(*args, **kwargs):
@@ -109,7 +109,7 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=True):
-                result = send_email(
+                result = await send_email(
                     "test@example.com",
                     "Test Subject",
                     "<p>Body</p>",
@@ -119,7 +119,7 @@ class TestSendEmail:
 
         assert result == {"sent": True, "reason": None}
 
-    def test_smtp_error_returns_failure(self, monkeypatch):
+    async def test_smtp_error_returns_failure(self, monkeypatch):
         from app.mail import send_email
 
         async def _raise(*args, **kwargs):
@@ -128,11 +128,11 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", side_effect=_raise):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+                result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
 
         assert result == {"sent": False, "reason": "smtp_error"}
 
-    def test_wraps_body_with_branding(self, monkeypatch):
+    async def test_wraps_body_with_branding(self, monkeypatch):
         from app.mail import send_email
 
         async def _no_op(*args, **kwargs):
@@ -142,7 +142,7 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                send_email("test@example.com", "Test Subject", "<p>Custom Body</p>", mock_db)
+                await send_email("test@example.com", "Test Subject", "<p>Custom Body</p>", mock_db)
 
         # Verify the HTML passed to send_message includes branding
         call_args = mock_send.call_args
@@ -151,7 +151,7 @@ class TestSendEmail:
         assert "Custom Body" in html
         assert "unsubscribe" in html.lower()
 
-    def test_exempt_omits_unsubscribe_link(self, monkeypatch):
+    async def test_exempt_omits_unsubscribe_link(self, monkeypatch):
         from app.mail import send_email
 
         async def _no_op(*args, **kwargs):
@@ -161,7 +161,7 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                send_email(
+                await send_email(
                     "test@example.com",
                     "Test Subject",
                     "<p>Body</p>",

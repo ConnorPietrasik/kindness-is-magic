@@ -198,7 +198,7 @@ def delete_referrer(
 
 
 @referrer_admin_router.post("/{ref_id}/approve", status_code=200)
-def approve_referrer(
+async def approve_referrer(
     ref_id: int,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -215,13 +215,13 @@ def approve_referrer(
     logger.info("Admin %s approved referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
 
     # Send approval email
-    _send_referrer_approved_email(ref, db)
+    await _send_referrer_approved_email(ref, db)
 
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
 @referrer_admin_router.post("/{ref_id}/reject", status_code=200)
-def reject_referrer(
+async def reject_referrer(
     ref_id: int,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -236,12 +236,12 @@ def reject_referrer(
     logger.info("Admin %s rejected referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
 
     # Send rejection email
-    _send_referrer_rejected_email(ref, db)
+    await _send_referrer_rejected_email(ref, db)
 
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
-def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
+async def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
     """Send approval notification email to the referrer."""
     from app.mail import build_referrer_approved_email, send_email
 
@@ -250,7 +250,7 @@ def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
         return
 
     html_body = build_referrer_approved_email(ref.name)
-    send_email(
+    await send_email(
         to=referrer_user.email,
         subject="Your Kindness Is Magic account has been approved ✨",
         html_body=html_body,
@@ -258,7 +258,7 @@ def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
     )
 
 
-def _send_referrer_rejected_email(ref: Referrer, db: Session) -> None:
+async def _send_referrer_rejected_email(ref: Referrer, db: Session) -> None:
     """Send rejection notification email to the referrer."""
     from app.mail import build_referrer_rejected_email, send_email
 
@@ -267,7 +267,7 @@ def _send_referrer_rejected_email(ref: Referrer, db: Session) -> None:
         return
 
     html_body = build_referrer_rejected_email(ref.name)
-    send_email(
+    await send_email(
         to=referrer_user.email,
         subject="Update on your Kindness Is Magic account",
         html_body=html_body,
