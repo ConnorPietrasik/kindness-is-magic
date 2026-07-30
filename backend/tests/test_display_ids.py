@@ -312,9 +312,7 @@ class TestAdminFamilyDisplayIdDeleted:
 
     def test_deleted_endpoint_shows_deleted(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Deleted families appear in /deleted endpoint with 'DELETED' display_id."""
-        from app.models import Family, FamilyApprovalStatus
 
-        ref = referrer_with_families["referrer"]
         families = referrer_with_families["families"]
         # Soft-delete one family
         families[1].deleted_at = datetime.now(timezone.utc)
@@ -389,7 +387,6 @@ class TestAdminFamilyDisplayIdDeleted:
 
     def test_deleted_endpoint_scoped_by_referrer(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Deleted endpoint supports referrer_id filter."""
-        from app.models import Family, FamilyApprovalStatus
 
         ref = referrer_with_families["referrer"]
         families = referrer_with_families["families"]
@@ -585,10 +582,8 @@ class TestAdminPeopleDisplayIdDeleted:
 
     def test_deleted_endpoint_shows_deleted(self, test_client: TestClient, admin_user, family_with_people, db: Session):
         """Soft-deleted people appear in /deleted endpoint with 'DELETED' display_id."""
-        from app.models import Person
 
         people = family_with_people["people"]
-        family = family_with_people["family"]
         # Soft-delete one person
         people[1].deleted_at = datetime.now(timezone.utc)
         db.commit()
@@ -651,7 +646,6 @@ class TestAdminPeopleDisplayIdDeleted:
 
     def test_deleted_endpoint_scoped_by_family(self, test_client: TestClient, admin_user, family_with_people, db: Session):
         """Deleted endpoint supports family_id filter."""
-        from app.models import Person
 
         people = family_with_people["people"]
         family = family_with_people["family"]
