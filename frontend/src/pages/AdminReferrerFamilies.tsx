@@ -42,6 +42,8 @@ import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload, PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
+const FAMILY_KEYS = ["adminFamilies"];
+const DELETED_FAMILY_KEYS = ["adminDeletedFamilies"];
 
 type ViewTab = "active" | "deleted";
 
@@ -114,7 +116,7 @@ export default function AdminReferrerFamilies() {
     updateFn: isDeletedView ? undefined : adminUpdateFamily,
     deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [familiesKey, deletedFamiliesKey],
+    invalidationKeys: [familiesKey, deletedFamiliesKey, FAMILY_KEYS, DELETED_FAMILY_KEYS],
     entityName: "Family",
   });
 

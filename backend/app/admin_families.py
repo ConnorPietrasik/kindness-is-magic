@@ -47,9 +47,11 @@ def list_families(
 ) -> FamilyListResponse:
     """List active (non-deleted) families with stable display IDs.
 
-    Flat view: all active families get a stable ROW_NUMBER position (1-based,
-    ordered by id) prefixed with the referrer id (or 0 for orphans). Deleting
-    a family causes later ones to shift up and fill the gap.
+    Flat view: families are grouped by referrer (ordered by referrer_id, then
+    id). Within each referrer group, families get a sequential position
+    starting at 1. The display_id is ``{referrer_id}-{position}``, or
+    ``0-{position}`` for orphans. Deleting a family causes later ones in the
+    same group to shift up and fill the gap.
 
     Scoped view (referrer_id set): shows all active families for that referrer.
     Approved families get sequential numbering matching the referrer's own view.
@@ -63,14 +65,14 @@ def list_families(
 
     total = query.count()
     offset = (page - 1) * page_size
-    families = query.order_by(Family.id).offset(offset).limit(page_size).all()
+    families = query.order_by(func.coalesce(Family.referrer_id, 0), Family.id).offset(offset).limit(page_size).all()
 
     # Single aggregation query for person counts
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
     # Pre-compute stable positions via ROW_NUMBER.
-    # Flat view: global position among all active families.
+    # Flat view: position within each referrer group (partitioned by referrer_id).
     # Scoped view: position among approved families only (pending/rejected excluded).
     pos_map: dict[int, int] = {}
     if families:
@@ -92,11 +94,16 @@ def list_families(
             full_map = {fid: int(rn) for fid, rn in positions}
             pos_map = {fid: full_map[fid] for fid in family_ids if fid in full_map}
         else:
-            # Flat: ROW_NUMBER over all active families
+            # Flat: ROW_NUMBER partitioned by referrer, ordered by id
             positions = (
                 db.query(
                     Family.id,
-                    func.row_number().over(order_by=Family.id).label("rn"),
+                    func.row_number()
+                    .over(
+                        partition_by=func.coalesce(Family.referrer_id, 0),
+                        order_by=Family.id,
+                    )
+                    .label("rn"),
                 )
                 .filter(Family.deleted_at.is_(None))
                 .all()

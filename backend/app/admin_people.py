@@ -78,7 +78,12 @@ def list_people(
             db.query(
                 Family.id,
                 Family.referrer_id,
-                func.row_number().over(order_by=Family.id).label("rn"),
+                func.row_number()
+                .over(
+                    partition_by=func.coalesce(Family.referrer_id, 0),
+                    order_by=Family.id,
+                )
+                .label("rn"),
             )
             .filter(Family.deleted_at.is_(None))
             .all()

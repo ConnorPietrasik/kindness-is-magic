@@ -93,7 +93,7 @@ class TestAdminFamilyDisplayIdFlat:
         assert body["families"][2]["display_id"] == f"{expected_prefix}-3"
 
     def test_mixed_referrer_and_orphan(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Mixed orphan and referrer families share a single enumeration."""
+        """Mixed orphan and referrer families are in separate enumeration groups."""
         from app.models import Family, FamilyApprovalStatus
 
         # Orphan first (lower id)
@@ -125,13 +125,13 @@ class TestAdminFamilyDisplayIdFlat:
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["families"]) == 2
-        # Orphan gets 0-1
+        # Orphan gets 0-1 (1st in orphan group)
         assert body["families"][0]["display_id"] == "0-1"
-        # Referrer family gets {ref_id}-2 (counter continues)
-        assert body["families"][1]["display_id"] == f"{referrer_record.id}-2"
+        # Referrer family gets {ref_id}-1 (1st in its referrer group)
+        assert body["families"][1]["display_id"] == f"{referrer_record.id}-1"
 
-    def test_multiple_referrers_share_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Families from different referrers share a single counter."""
+    def test_multiple_referrers_independent_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Families from different referrers have independent counters (each starts at 1)."""
         from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus
 
         # Create a second referrer
@@ -171,8 +171,9 @@ class TestAdminFamilyDisplayIdFlat:
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["families"]) == 2
+        # Each referrer's families are numbered independently from 1
         assert body["families"][0]["display_id"] == f"{referrer_record.id}-1"
-        assert body["families"][1]["display_id"] == f"{ref2.id}-2"
+        assert body["families"][1]["display_id"] == f"{ref2.id}-1"
 
     def test_pending_families_included_in_flat_view(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Flat admin view includes pending families (unlike referrer's view)."""
