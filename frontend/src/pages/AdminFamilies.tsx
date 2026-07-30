@@ -77,6 +77,7 @@ export default function AdminFamilies() {
     deleteFn: adminDeleteFamily,
     restoreFn: adminRestoreFamily,
     invalidationKeys: [FAMILY_KEYS, ["adminPeople"]],
+    entityName: "Family",
   });
 
   const pageInfo = useMemo(

@@ -11,13 +11,13 @@ import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { usePagination } from "../hooks/usePagination";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite, type InviteListParams } from "../lib/api";
 import { formatApiError } from "../lib/utils";
@@ -30,6 +30,7 @@ const INVITES_KEY = ["adminInvites"];
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const pagination = usePagination();
 
   const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
@@ -55,6 +56,7 @@ export default function AdminInviteCodes() {
     mutationFn: adminRevokeInvite,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: INVITES_KEY });
+      toast.success("Invite code revoked");
     },
   });
 
@@ -216,9 +218,9 @@ export default function AdminInviteCodes() {
 /* ------------------------------------------------------------------ */
 function InviteGenerator() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [familyLimit, setFamilyLimit] = useState("");
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
   const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
 
   const createMut = useMutation({
@@ -228,18 +230,17 @@ function InviteGenerator() {
       queryClient.invalidateQueries({ queryKey: INVITES_KEY });
     },
     onError: (err: unknown) => {
-      setError(formatApiError(err, "Failed to create invite."));
+      toast.error(formatApiError(err, "Failed to create invite."));
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setInvite(null);
 
     const limit = parseInt(familyLimit, 10);
     if (Number.isNaN(limit) || limit < 1 || limit > 999) {
-      setError("Family limit must be between 1 and 999.");
+      toast.error("Family limit must be between 1 and 999.");
       return;
     }
 
@@ -255,8 +256,6 @@ function InviteGenerator() {
       <p className="mb-4 text-sm text-gray-500">
         Create a one-time invite code that allows someone to self-register as a referrer. The code expires after 24 hours.
       </p>
-
-      {error && <ErrorBox message={error} className="mb-4" />}
 
       {/* Success display */}
       {invite && (

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { FamilySelfRegisterResponse, User } from "../types";
 import FamilySelfRegister from "./FamilySelfRegister";
@@ -38,9 +39,11 @@ const wrap = (ui: React.ReactElement, path = "/register-family") => {
   const queryClient = createQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
-      </AuthProvider>
+      <ToastContainer>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+        </AuthProvider>
+      </ToastContainer>
     </QueryClientProvider>
   );
 };

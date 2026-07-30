@@ -51,6 +51,7 @@ export default function FamilyPeople() {
     updateFn: updatePerson,
     deleteFn: deletePerson,
     invalidationKeys: [FAMILY_PEOPLE_KEY, FAMILY_ME_KEY],
+    entityName: "Person",
   });
 
   function handleCreate(formData: PersonPayload) {

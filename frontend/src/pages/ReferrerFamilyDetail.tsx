@@ -86,6 +86,8 @@ export default function ReferrerFamilyDetail() {
           childrenTitle="People"
           createButtonLabel="+ Add Person"
           childInvalidationKeys={[peopleKey, familyKey]}
+          parentEntityName="Family"
+          childEntityName="Person"
         />
       </main>
     </div>

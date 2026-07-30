@@ -12,6 +12,7 @@
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useToast } from "../context/ToastContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +37,8 @@ export interface CrudManagerOptions<ListResponse, Item, Payload = unknown, ListP
   restoreFn?: (id: number) => Promise<Item>;
   /** Keys to invalidate after mutations (defaults to `[rootKey]`) */
   invalidationKeys?: (string | string[])[];
+  /** Entity name for success toast messages (e.g. "Referrer", "Family"). Omit to disable success toasts. */
+  entityName?: string;
 }
 
 export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
@@ -68,9 +71,21 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
 export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams = Record<string, unknown>>(
   options: CrudManagerOptions<ListResponse, Item, Payload, ListParams>
 ): CrudManagerReturn<ListResponse, Item, Payload> {
-  const { rootKey, listFn, listParams, detailFn, createFn, updateFn, deleteFn, restoreFn, invalidationKeys = [rootKey] } = options;
+  const {
+    rootKey,
+    listFn,
+    listParams,
+    detailFn,
+    createFn,
+    updateFn,
+    deleteFn,
+    restoreFn,
+    invalidationKeys = [rootKey],
+    entityName,
+  } = options;
 
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   /* ── List query ─────────────────────────────────────────── */
   const listQueryKey = listParams != null ? [...rootKey, listParams] : rootKey;
@@ -100,6 +115,7 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
         onSuccess: () => {
           invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
           setShowForm(false);
+          if (entityName) toast.success(`${entityName} created`);
         },
       })
     : null;
@@ -113,6 +129,7 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
             queryClient.invalidateQueries({ queryKey: [...rootKey, "detail"] });
           }
           setEditingId(null);
+          if (entityName) toast.success(`${entityName} updated`);
         },
       })
     : null;
@@ -122,6 +139,7 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
         mutationFn: deleteFn as (variables: number) => Promise<void>,
         onSuccess: () => {
           invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+          if (entityName) toast.success(`${entityName} deleted`);
         },
       })
     : null;
@@ -131,6 +149,7 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
         mutationFn: restoreFn as (variables: number) => Promise<Item>,
         onSuccess: () => {
           invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+          if (entityName) toast.success(`${entityName} restored`);
         },
       })
     : null;

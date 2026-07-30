@@ -11,11 +11,12 @@ import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { defaultFamilyForm } from "../components/defaults";
-import { ErrorBox } from "../components/ErrorBox";
 import { FamilyForm } from "../components/FamilyForm";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
+import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
+import { useToast } from "../context/ToastContext";
 import { getFamilyMe, patchFamilyMe } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
@@ -28,6 +29,7 @@ const FAMILY_ME_KEY = ["familyMe"];
 /* ------------------------------------------------------------------ */
 export default function FamilyDashboard() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const { data: familyInfo, isLoading } = useQuery({
     queryKey: FAMILY_ME_KEY,
@@ -39,6 +41,7 @@ export default function FamilyDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: FAMILY_ME_KEY });
       setShowEdit(false);
+      toast.success("Profile updated");
     },
   });
 
@@ -111,15 +114,7 @@ export default function FamilyDashboard() {
         </div>
 
         {/* ── Errors ────────────────────────────────────────── */}
-        {updateSelfMut.error && (
-          <ErrorBox
-            message={
-              (updateSelfMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-              JSON.stringify((updateSelfMut.error as { response?: { data?: unknown } })?.response?.data) ||
-              "Request failed."
-            }
-          />
-        )}
+        <MutationErrors mutations={[updateSelfMut]} />
       </main>
     </div>
   );

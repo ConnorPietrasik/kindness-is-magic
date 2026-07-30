@@ -96,6 +96,7 @@ export default function AdminReferrers() {
     updateFn: adminUpdateReferrer,
     deleteFn: adminDeleteReferrer,
     restoreFn: adminRestoreReferrer,
+    entityName: "Referrer",
   });
 
   const pageInfo = useMemo(

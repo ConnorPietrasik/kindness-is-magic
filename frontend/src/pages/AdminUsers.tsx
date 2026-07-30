@@ -12,12 +12,12 @@ import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import {
   adminCreateUser,
   adminDeleteUser,
@@ -30,7 +30,7 @@ import {
   adminUpdateUser,
 } from "../lib/api";
 import { route } from "../lib/routes";
-import { formatApiError, normalizeUpdatePayload } from "../lib/utils";
+import { normalizeUpdatePayload } from "../lib/utils";
 import type {
   AdminUserCreate,
   AdminUsersListParams,
@@ -42,12 +42,6 @@ import type {
 } from "../types";
 
 const USER_KEYS = ["adminUsers"];
-
-/** Extract a readable error string from a mutation error, or null if none. */
-function getMutationErrorString(error: unknown): string | null {
-  const msg = formatApiError(error);
-  return msg !== "An error occurred" ? msg : null;
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -107,6 +101,7 @@ export default function AdminUsers() {
 
   // Mutations
   const queryClient = useQueryClient();
+  const toast = useToast();
   const invalidateUsers = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: USER_KEYS });
   }, [queryClient]);
@@ -116,6 +111,7 @@ export default function AdminUsers() {
     onSuccess: () => {
       invalidateUsers();
       setShowForm(false);
+      toast.success("User created");
     },
   });
 
@@ -124,6 +120,7 @@ export default function AdminUsers() {
     onSuccess: () => {
       invalidateUsers();
       setEditingId(null);
+      toast.success("User updated");
     },
   });
 
@@ -131,6 +128,7 @@ export default function AdminUsers() {
     mutationFn: (id: number) => adminDeleteUser(id),
     onSuccess: () => {
       invalidateUsers();
+      toast.success("User deleted");
     },
   });
 
@@ -138,6 +136,7 @@ export default function AdminUsers() {
     mutationFn: (id: number) => adminRestoreUser(id),
     onSuccess: () => {
       invalidateUsers();
+      toast.success("User restored");
     },
   });
 
@@ -146,6 +145,7 @@ export default function AdminUsers() {
     onSuccess: () => {
       invalidateUsers();
       setResetPasswordId(null);
+      toast.success("Password reset");
     },
   });
 
@@ -259,7 +259,6 @@ export default function AdminUsers() {
             onSubmit={handleCreateOrEdit}
             onCancel={cancelForm}
             loading={!!(createMut.isPending || updateMut.isPending)}
-            error={editingId ? getMutationErrorString(updateMut.error) : getMutationErrorString(createMut.error)}
           />
         )}
 
@@ -457,10 +456,9 @@ interface UserFormProps {
   onSubmit: (data: AdminUserCreate | AdminUserUpdate) => void;
   onCancel: () => void;
   loading: boolean;
-  error: string | null;
 }
 
-function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCancel, loading, error }: UserFormProps) {
+function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCancel, loading }: UserFormProps) {
   const [form, setForm] = useState(() => ({
     email: initial.email ?? "",
     display_name: initial.display_name ?? "",
@@ -622,8 +620,6 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
             />
           </div>
         )}
-
-        {error && <ErrorBox className="mt-4" message={error} />}
 
         <div className="mt-4 flex gap-2">
           <Button type="submit" loading={loading}>

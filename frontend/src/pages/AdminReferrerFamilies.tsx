@@ -106,6 +106,7 @@ export default function AdminReferrerFamilies() {
     deleteFn: adminDeleteFamily,
     restoreFn: adminRestoreFamily,
     invalidationKeys: [familiesKey],
+    entityName: "Family",
   });
 
   const pageInfo = useMemo(

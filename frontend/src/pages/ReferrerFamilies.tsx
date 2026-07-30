@@ -73,6 +73,7 @@ export default function ReferrerFamilies() {
     updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
     invalidationKeys: [REFERRER_FAMILIES_KEY, REFERRER_ME_KEY],
+    entityName: "Family",
   });
 
   function handleCreateFam(formData: FamilyPayload) {

@@ -1,24 +1,24 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useToast } from "../context/ToastContext";
 import { resetPasswordRequest } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 
 export default function ResetPassword() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
 
@@ -30,7 +30,7 @@ export default function ResetPassword() {
       // Auto-redirect to login after 3 seconds
       setTimeout(() => navigate(ROUTES.LOGIN), 3000);
     } catch (err: unknown) {
-      setError(
+      toast.error(
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
           "Reset failed. The token may be invalid or expired."
       );
@@ -58,8 +58,6 @@ export default function ResetPassword() {
       <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 text-center shadow-lg">
         <h1 className="mb-1 text-2xl font-bold text-brand-dark">Set Password</h1>
         <p className="mb-6 text-sm text-gray-500">Enter your new password below.</p>
-
-        {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4 text-left">

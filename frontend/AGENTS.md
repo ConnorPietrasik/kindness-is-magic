@@ -72,8 +72,9 @@ Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`)
 
 ## Error Handling
 
-- `formatApiError(error, fallback?)` in `src/lib/utils.ts` extracts user-facing strings from Axios errors, checking `response.data.detail`, `.msg`, then full JSON, then `error.message`.
-- `ErrorBox` and `MutationErrors` components render errors in the UI.
+- `formatApiError(error, fallback?)` in `src/lib/utils.ts` extracts user-facing strings from Axios errors.
+- `useToast()` from `src/context/ToastContext` — use `toast.error()` / `toast.success()` / `toast.info()` for popup notifications.
+- `MutationErrors` auto-shows mutation errors as toasts. `ErrorBox` is for inline form validation only.
 
 ## Shared CRUD Hook
 

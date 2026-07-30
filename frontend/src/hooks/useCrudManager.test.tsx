@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import { useCrudManager } from "./useCrudManager";
 
 // ---------------------------------------------------------------------------
@@ -17,7 +18,11 @@ function wrap(initialCache: [string | string[], unknown][] = []) {
   initialCache.forEach(([key, value]) => {
     queryClient.setQueryData(Array.isArray(key) ? key : [key], value);
   });
-  return ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <ToastContainer>{children}</ToastContainer>
+    </QueryClientProvider>
+  );
 }
 
 interface MakeFnsOptions {

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
-import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { OptionalLabel } from "../components/OptionalLabel";
 import { PhoneInput } from "../components/PhoneInput";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { registerFamilyViaInvite } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { formatApiError } from "../lib/utils";
@@ -39,6 +39,7 @@ const emptyForm: SelfRegisterForm = {
 
 export default function FamilySelfRegister() {
   const { setUser } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -48,7 +49,6 @@ export default function FamilySelfRegister() {
     ...emptyForm,
     code: urlCode,
   });
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -61,21 +61,20 @@ export default function FamilySelfRegister() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
 
     if (form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      toast.error("Password must be at least 8 characters.");
       return;
     }
 
     const phoneErr = validatePhoneNumber(form.phone_number);
     if (phoneErr) {
-      setError(phoneErr);
+      toast.error(phoneErr);
       return;
     }
 
@@ -97,7 +96,7 @@ export default function FamilySelfRegister() {
       setUser(result.user);
       navigate(ROUTES.FAMILY_DASHBOARD, { replace: true });
     } catch (err: unknown) {
-      setError(formatApiError(err, "Registration failed. Check your invite code and try again."));
+      toast.error(formatApiError(err, "Registration failed. Check your invite code and try again."));
     } finally {
       setLoading(false);
     }
@@ -110,8 +109,6 @@ export default function FamilySelfRegister() {
       <div className="w-full max-w-md rounded-2xl bg-white px-8 py-10 shadow-lg">
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Family Registration</h1>
         <p className="mb-6 text-center text-sm text-gray-500">Use your invite code to create an account</p>
-
-        {error && <ErrorBox message={error} className="mb-4" />}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField

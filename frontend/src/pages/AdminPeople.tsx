@@ -17,6 +17,7 @@ import { Pagination } from "../components/Pagination";
 import { PersonForm } from "../components/PersonForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
@@ -74,14 +75,17 @@ export default function AdminPeople() {
     createFn: adminCreatePerson,
     updateFn: adminUpdatePerson,
     deleteFn: adminDeletePerson,
+    entityName: "Person",
   });
 
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const personRestoreMut = useMutation({
     mutationFn: (id: number) => adminRestorePerson(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
+      toast.success("Person restored");
     },
     onError: (error) => {
       const data = (error as { response?: { data?: Record<string, unknown> } })?.response?.data;
@@ -101,6 +105,7 @@ export default function AdminPeople() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
       queryClient.invalidateQueries({ queryKey: FAMILY_KEYS });
+      toast.success("Family restored");
     },
   });
 
@@ -320,11 +325,22 @@ export default function AdminPeople() {
           onPageSizeChange={pagination.setPageSize}
         />
 
-        {/* Errors */}
+        {/* Errors (suppress family_deleted — handled by the family-restore dialog) */}
         <MutationErrors
-          mutations={[createMut, updateMut, deleteMut, personRestoreMut, familyRestoreMut].filter(
-            (m): m is NonNullable<typeof m> => m != null
-          )}
+          mutations={[
+            createMut,
+            updateMut,
+            deleteMut,
+            {
+              ...personRestoreMut,
+              error:
+                personRestoreMut.error &&
+                (personRestoreMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail === "family_deleted"
+                  ? null
+                  : personRestoreMut.error,
+            },
+            familyRestoreMut,
+          ].filter((m): m is NonNullable<typeof m> => m != null)}
         />
       </main>
     </div>

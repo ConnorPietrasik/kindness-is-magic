@@ -11,7 +11,9 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ErrorBox } from "../components/ErrorBox";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { MutationErrors } from "../components/MutationErrors";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { adminGetCsvSample, adminImportCsv } from "../lib/api";
 import { isValidCsvFile, parseCsvSections, validateCsvForImport } from "../lib/csv";
 import type { CsvValidationResult } from "../types";
@@ -21,6 +23,7 @@ import type { CsvValidationResult } from "../types";
 /* ------------------------------------------------------------------ */
 export default function CsvUpload() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
@@ -37,6 +40,7 @@ export default function CsvUpload() {
       queryClient.invalidateQueries({ queryKey: ["adminFamilies"] });
       queryClient.invalidateQueries({ queryKey: ["adminPeople"] });
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("CSV imported successfully");
     },
   });
 
@@ -78,7 +82,7 @@ export default function CsvUpload() {
     if (!file) return;
     // Block upload if client-side validation found errors
     if (validation && !validation.valid) {
-      alert("Please fix the CSV errors before importing.");
+      toast.error("Please fix the CSV errors before importing.");
       return;
     }
     const reader = new FileReader();
@@ -235,15 +239,7 @@ export default function CsvUpload() {
         {importMut.data != null && <ImportResults data={importMut.data} />}
 
         {/* Error */}
-        {importMut.error && (
-          <ErrorBox
-            message={
-              (importMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-              JSON.stringify((importMut.error as { response?: { data?: unknown } })?.response?.data) ||
-              "Import failed."
-            }
-          />
-        )}
+        <MutationErrors mutations={[importMut]} fallback="Import failed." />
       </main>
     </div>
   );

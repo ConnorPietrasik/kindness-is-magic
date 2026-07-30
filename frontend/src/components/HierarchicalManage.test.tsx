@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import { HierarchicalManage, type HierarchicalManageChildCallbacks } from "./HierarchicalManage";
 
 // ---------------------------------------------------------------------------
@@ -71,7 +72,11 @@ function wrap() {
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <ToastContainer>{children}</ToastContainer>
+    </QueryClientProvider>
+  );
 }
 
 function makeApiFns() {

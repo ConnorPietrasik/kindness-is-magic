@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { HeaderBar, LogoutButton } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
@@ -11,6 +10,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PhoneInput } from "../components/PhoneInput";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
@@ -387,41 +387,37 @@ function NavCard({ to, icon, label, desc }: NavCardProps) {
  * ChangePasswordSection — form to change the user's password.
  */
 function ChangePasswordSection() {
+  const toast = useToast();
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("");
 
     if (newPass !== confirmPass) {
-      setMessage("New passwords do not match.");
+      toast.error("New passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
       await changePasswordRequest(oldPass, newPass);
-      setMessage("Password updated successfully!");
+      toast.success("Password updated successfully!");
       setOldPass("");
       setNewPass("");
       setConfirmPass("");
     } catch (err: unknown) {
-      setMessage((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to change password.");
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to change password.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isOk = message.toLowerCase().includes("success");
-
   return (
     <Card>
       <h2 className="mb-4 text-lg font-semibold text-gray-900">Change Password</h2>
-      {message && <ErrorBox variant={isOk ? "success" : "error"} message={message} className="mb-4" />}
       <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
         <FormField
           label="Current password"

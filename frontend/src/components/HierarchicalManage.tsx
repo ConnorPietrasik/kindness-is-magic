@@ -22,6 +22,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ComponentType } from "react";
 import { useState } from "react";
+import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { Button } from "./Button";
 import { Card } from "./Card";
@@ -130,6 +131,10 @@ export interface HierarchicalManageProps<
   childrenTitle: string;
   createButtonLabel: string;
   childInvalidationKeys: ReadonlyArray<string | readonly string[]>;
+  /** Entity name for parent success toast messages (e.g. "Referrer"). Omit to disable. */
+  parentEntityName?: string;
+  /** Entity name for child success toast messages (e.g. "Family"). Omit to disable. */
+  childEntityName?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +177,8 @@ export function HierarchicalManage<
   childFormDefault,
   childFormComponent: ChildForm,
   childFormExtra,
+  parentEntityName,
+  childEntityName,
   renderChildren,
   childrenTitle,
   createButtonLabel,
@@ -187,6 +194,7 @@ export function HierarchicalManage<
   ChildFormProps
 >) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   /* ── Parent query ──────────────────────────────────────── */
   const { data: parentData, isLoading: parentLoading } = useQuery({
@@ -203,6 +211,7 @@ export function HierarchicalManage<
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: parentQueryKey as string[] });
       parentInvalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+      if (parentEntityName) toast.success(`${parentEntityName} updated`);
     },
   });
 
@@ -219,6 +228,7 @@ export function HierarchicalManage<
     deleteFn: childDeleteApi,
     restoreFn: childRestoreApi,
     invalidationKeys: childInvalidationKeys as (string | string[])[],
+    entityName: childEntityName,
   });
 
   /* ── Derived state ─────────────────────────────────────── */
