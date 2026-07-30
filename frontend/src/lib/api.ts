@@ -88,7 +88,9 @@ api.interceptors.response.use(
         // Refresh succeeded — retry the original request
         return api(originalRequest);
       } catch {
-        // Refresh failed — reject so caller handles it (e.g. redirect to /login)
+        // Refresh failed — clear auth state and notify listeners
+        setAuthQueryData(null);
+        window.dispatchEvent(FAILED_REFRESH_EVENT);
         return Promise.reject(error);
       }
     }
@@ -100,8 +102,36 @@ api.interceptors.response.use(
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
-export function fetchCurrentUser(): Promise<User> {
-  return api.get("/api/auth/me").then((res) => res.data);
+
+/**
+ * Set the auth query data. Called by the 401 interceptor when refresh fails
+ * so AuthContext can clear its cached user and navigate to /login.
+ *
+ * AuthProvider registers the actual implementation via a ref. Until then,
+ * this is a no-op (page load before AuthProvider mounts is unlikely in SPA).
+ */
+let _setAuthQueryData: ((data: null) => void) | null = null;
+export function setAuthQueryData(data: null): void {
+  _setAuthQueryData?.(data);
+}
+export function _registerSetAuthQueryData(fn: (data: null) => void): void {
+  _setAuthQueryData = fn;
+}
+
+/**
+ * Dispatched when the refresh-token flow fails (both access + refresh expired).
+ * AuthContext listens for this to clear user and navigate to /login.
+ */
+const FAILED_REFRESH_EVENT = new CustomEvent("onFailedRefresh");
+
+export function fetchCurrentUser(): Promise<User | null> {
+  return api
+    .get("/api/auth/me")
+    .then((res) => res.data as User)
+    .catch((err) => {
+      if (err?.response?.status === 401) return null;
+      throw err;
+    });
 }
 
 /** Returns full AxiosResponse — caller destructures `{ data }`. */

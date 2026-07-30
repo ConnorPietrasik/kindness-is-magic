@@ -38,13 +38,13 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 const wrap = (ui: React.ReactElement, path = "/register-referrer") => {
   const queryClient = createQueryClient();
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastContainer>
-        <AuthProvider>
-          <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
-        </AuthProvider>
-      </ToastContainer>
-    </QueryClientProvider>
+    <MemoryRouter initialEntries={[path]}>
+      <QueryClientProvider client={queryClient}>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
+      </QueryClientProvider>
+    </MemoryRouter>
   );
 };
 
@@ -267,6 +267,7 @@ describe("ReferrerSelfRegister", () => {
   it("submits with pre-filled values from URL params", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "registerReferrerViaInvite").mockResolvedValue(mockResponse);
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
 
     wrap(<ReferrerSelfRegister />, "/register-referrer?code=KMG-AUTO&email=locked@example.com");
 

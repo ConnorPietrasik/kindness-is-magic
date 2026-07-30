@@ -17,6 +17,8 @@ vi.mock("../lib/api", () => ({
   fetchCurrentUser: vi.fn(),
   loginRequest: vi.fn(),
   logoutRequest: vi.fn(),
+  _registerSetAuthQueryData: vi.fn(),
+  setAuthQueryData: vi.fn(),
 }));
 
 import * as api from "../lib/api";
@@ -103,11 +105,9 @@ describe("AuthContext", () => {
     expect(result.current.user).toBeNull();
   });
 
-  it("resolves to user undefined on 401 (logged out)", async () => {
-    const error = Object.assign(new Error("Unauthorized"), {
-      response: { status: 401, data: { detail: "Not authenticated" } },
-    });
-    mockFetchCurrentUser.mockRejectedValueOnce(error);
+  it("resolves to user null on 401 (fetchCurrentUser returns null)", async () => {
+    // fetchCurrentUser now catches 401 and returns null instead of throwing
+    mockFetchCurrentUser.mockResolvedValueOnce(null);
 
     const { result } = renderHook(() => useAuth(), { wrapper: wrap() });
 
@@ -115,8 +115,7 @@ describe("AuthContext", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // No prior data, so data stays undefined after error
-    expect(result.current.user).toBeUndefined();
+    expect(result.current.user).toBeNull();
   });
 
   /* ── Successful session fetch ───────────────────────────── */

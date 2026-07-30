@@ -1,5 +1,5 @@
 import type { Mock } from "vitest";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // We can't use static import + vi.mock here because the api module is
 // already cached from api.test.js. Instead, we reset modules and
@@ -24,6 +24,7 @@ interface MockAxiosInstance extends Mock {
 describe("response interceptor — 401 token refresh", () => {
   let mockApi: MockAxiosInstance;
   let rejectedHandler: ((error: unknown) => Promise<unknown>) | undefined;
+  let dispatchedEvents: CustomEvent[];
 
   beforeAll(async () => {
     vi.resetModules();
@@ -51,11 +52,22 @@ describe("response interceptor — 401 token refresh", () => {
       },
     }));
 
+    // Capture dispatched custom events
+    dispatchedEvents = [];
+    window.addEventListener("onFailedRefresh", () => {
+      dispatchedEvents.push(new CustomEvent("onFailedRefresh"));
+    });
+
     void (await import("./api"));
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    dispatchedEvents.length = 0;
+  });
+
+  afterEach(() => {
+    dispatchedEvents.length = 0;
   });
 
   it("attempts refresh on 401 and retries on success", async () => {
@@ -88,7 +100,7 @@ describe("response interceptor — 401 token refresh", () => {
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it("rejects with original error when refresh fails", async () => {
+  it("rejects with original error when refresh fails, dispatching onFailedRefresh", async () => {
     mockApi.post.mockRejectedValueOnce(new Error("refresh failed"));
 
     const error = {
@@ -97,6 +109,7 @@ describe("response interceptor — 401 token refresh", () => {
     };
 
     await expect(rejectedHandler!(error)).rejects.toBe(error);
+    expect(dispatchedEvents.length).toBe(1);
   });
 
   it("does not refresh if _retry is already true", async () => {

@@ -65,6 +65,23 @@ describe("auth API functions", () => {
     expect(result).toEqual({ id: 1, role: "admin" });
   });
 
+  it("fetchCurrentUser — returns null on 401", async () => {
+    const error = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Not authenticated" } },
+    });
+    mockAxiosInstance.get.mockRejectedValueOnce(error);
+    const result = await apiModule.fetchCurrentUser();
+    expect(result).toBeNull();
+  });
+
+  it("fetchCurrentUser — re-throws non-401 errors", async () => {
+    const error = Object.assign(new Error("Server error"), {
+      response: { status: 500, data: { detail: "Internal error" } },
+    });
+    mockAxiosInstance.get.mockRejectedValueOnce(error);
+    await expect(apiModule.fetchCurrentUser()).rejects.toBe(error);
+  });
+
   it("loginRequest — POST /api/auth/login with body, returns raw axios response", async () => {
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { token: "abc" } });
     const result = await apiModule.loginRequest("a@b.com", "pass");
