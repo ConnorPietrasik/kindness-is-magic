@@ -8,7 +8,7 @@ import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
@@ -127,15 +127,89 @@ user_admin_router = APIRouter(
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    include_deleted: bool = Query(False),
     role: str | None = Query(None),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> UserListResponse:
-    query = db.query(User)
-    if not include_deleted:
-        query = query.filter(User.deleted_at.is_(None))
+    """List active (non-deleted) users with stable display IDs."""
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    if role is not None:
+        query = query.filter(User.role == role)
+    if search is not None:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.email.ilike(pattern),
+                User.display_name.ilike(pattern),
+            )
+        )
+    total = query.count()
+    users = query.order_by(User.id).offset((page - 1) * page_size).limit(page_size).all()
+
+    # Stable positions via ROW_NUMBER over all active users (respecting role/search filters)
+    pos_map: dict[int, int] = {}
+    if users:
+        user_ids = [u.id for u in users]
+        # Rebuild the same filtered query for ROW_NUMBER
+        pos_query = db.query(User).filter(User.deleted_at.is_(None))
+        if role is not None:
+            pos_query = pos_query.filter(User.role == role)
+        if search is not None:
+            pattern = f"%{search}%"
+            pos_query = pos_query.filter(
+                or_(
+                    User.email.ilike(pattern),
+                    User.display_name.ilike(pattern),
+                )
+            )
+        positions = pos_query.with_entities(
+            User.id,
+            func.row_number().over(order_by=User.id).label("rn"),
+        ).all()
+        full_map = {uid: int(rn) for uid, rn in positions}
+        pos_map = {uid: full_map[uid] for uid in user_ids if uid in full_map}
+
+    # Pre-load referrer and family name maps to avoid N+1 queries
+    referrer_ids = {u.referrer_id for u in users if u.referrer_id is not None}
+    family_ids = {u.family_id for u in users if u.family_id is not None}
+
+    referrer_map: dict[int, str] = {}
+    if referrer_ids:
+        for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
+            referrer_map[ref.id] = ref.name
+
+    family_map: dict[int, str] = {}
+    if family_ids:
+        for fam in db.query(Family).filter(Family.id.in_(family_ids), Family.deleted_at.is_(None)).all():
+            family_map[fam.id] = fam.family_name
+
+    return UserListResponse(
+        users=[
+            UserDetail(
+                **build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map),
+                display_id=str(pos_map.get(u.id, 0)),
+            )
+            for u in users
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
+    )
+
+
+@user_admin_router.get("/deleted")
+def list_deleted_users(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    role: str | None = Query(None),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> UserListResponse:
+    """List soft-deleted users."""
+    query = db.query(User).filter(User.deleted_at.isnot(None))
     if role is not None:
         query = query.filter(User.role == role)
     if search is not None:
@@ -164,7 +238,13 @@ def list_users(
             family_map[fam.id] = fam.family_name
 
     return UserListResponse(
-        users=[UserDetail(**build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map)) for u in users],
+        users=[
+            UserDetail(
+                **build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map),
+                display_id="DELETED",
+            )
+            for u in users
+        ],
         total=total,
         page=page,
         page_size=page_size,

@@ -185,6 +185,12 @@ export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
   return api.post(`/api/admin/referrers/${id}/reject`).then((res) => res.data);
 }
 
+/** Fetch soft-deleted referrers (separate /deleted endpoint). */
+export function adminListDeletedReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
+  if (params) return api.get("/api/admin/referrers/deleted", { params }).then((res) => res.data);
+  return api.get("/api/admin/referrers/deleted").then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
@@ -218,6 +224,12 @@ export function adminListReferrerFamilies(rid: number, params?: PaginationParams
   return api.get("/api/admin/families", { params: { referrer_id: rid } }).then((res) => res.data);
 }
 
+/** Fetch soft-deleted families (separate /deleted endpoint). */
+export function adminListDeletedFamilies(params?: PaginationParams & { referrer_id?: number | null }): Promise<FamilyListResponse> {
+  if (params) return api.get("/api/admin/families/deleted", { params }).then((res) => res.data);
+  return api.get("/api/admin/families/deleted").then((res) => res.data);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
@@ -249,6 +261,12 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
 export function adminListFamilyPeople(fid: number, params?: PaginationParams): Promise<PersonListResponse> {
   if (params) return api.get("/api/admin/people", { params: { ...params, family_id: fid } }).then((res) => res.data);
   return api.get("/api/admin/people", { params: { family_id: fid } }).then((res) => res.data);
+}
+
+/** Fetch soft-deleted people (separate /deleted endpoint). */
+export function adminListDeletedPeople(params?: PaginationParams & { family_id?: number | null }): Promise<PersonListResponse> {
+  if (params) return api.get("/api/admin/people/deleted", { params }).then((res) => res.data);
+  return api.get("/api/admin/people/deleted").then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +345,12 @@ export function adminDeleteUser(id: number): Promise<void> {
 
 export function adminRestoreUser(id: number): Promise<UserDetail> {
   return api.post(`/api/admin/users/${id}/restore`).then((res) => res.data);
+}
+
+/** Fetch soft-deleted users (separate /deleted endpoint). */
+export function adminListDeletedUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
+  if (params) return api.get("/api/admin/users/deleted", { params }).then((res) => res.data);
+  return api.get("/api/admin/users/deleted").then((res) => res.data);
 }
 
 // ---------------------------------------------------------------------------

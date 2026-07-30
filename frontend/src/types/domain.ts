@@ -62,6 +62,7 @@ export interface UserSummary {
 /** Mirrors UserDetail — full user with joined names. */
 export interface UserDetail {
   id: number;
+  display_id: string | null;
   email: string;
   display_name: string | null;
   role: UserRole;
@@ -130,6 +131,7 @@ export type FamilyApprovalStatus = "pending" | "approved" | "rejected";
 /** Mirrors FamilySummary. */
 export interface FamilySummary {
   id: number;
+  display_id: string;
   family_name: string;
   family_wish: string;
   contact_name: string;
@@ -161,6 +163,7 @@ export interface FamilyDetail {
 /** Mirrors PersonSummary. */
 export interface PersonSummary {
   id: number;
+  display_id: string;
   family_id: number;
   given_name: string;
   age: number;
@@ -301,6 +304,7 @@ export interface ReferrerFamilyInviteResponse {
 /** Summary for pending families awaiting referrer approval. */
 export interface PendingFamilySummary {
   id: number;
+  display_id: string;
   family_name: string;
   family_wish: string;
   contact_name: string;

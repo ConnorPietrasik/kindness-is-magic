@@ -8,6 +8,7 @@ import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -52,22 +53,125 @@ people_admin_router = APIRouter(
 def list_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    include_deleted: bool = Query(False),
     family_id: int | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
-    query = db.query(Person)
-    if not include_deleted:
-        query = query.filter(Person.deleted_at.is_(None))
+    """List active (non-deleted) people with stable display IDs.
+
+    When scoped to a family, display IDs are simple sequential numbers
+    matching the referrer/family's own view. In the flat view, the format
+    is {referrer_id_or_0}-{family_position}-{person_position}.
+    """
+    query = db.query(Person).filter(Person.deleted_at.is_(None))
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)
+
     total = query.count()
-    people = query.order_by(Person.id).offset((page - 1) * page_size).limit(page_size).all()
+    offset = (page - 1) * page_size
+    people = query.order_by(Person.id).offset(offset).limit(page_size).all()
+
+    # Pre-compute family enumeration for flat views
+    family_enum_map: dict[int, tuple[int, int]] = {}  # family_id -> (referrer_id_or_0, family_position)
+    if family_id is None:
+        fam_positions = (
+            db.query(
+                Family.id,
+                Family.referrer_id,
+                func.row_number().over(order_by=Family.id).label("rn"),
+            )
+            .filter(Family.deleted_at.is_(None))
+            .all()
+        )
+        family_enum_map = {fid: (ref_id if ref_id is not None else 0, int(rn)) for fid, ref_id, rn in fam_positions}
+
+    # Compute per-person position within their family (1-based, among active people).
+    # Uses ROW_NUMBER for stable IDs that don't depend on pagination.
+    person_pos_map: dict[int, int] = {}
+    if people:
+        if family_id is not None:
+            # Scoped: ROW_NUMBER over active people in this family
+            page_person_ids = [p.id for p in people]
+            positions = (
+                db.query(
+                    Person.id,
+                    func.row_number().over(order_by=Person.id).label("rn"),
+                )
+                .filter(
+                    Person.deleted_at.is_(None),
+                    Person.family_id == family_id,
+                )
+                .all()
+            )
+            full_map = {pid: int(rn) for pid, rn in positions}
+            person_pos_map = {pid: full_map[pid] for pid in page_person_ids if pid in full_map}
+        else:
+            # Flat: ROW_NUMBER per family, scoped to families on this page.
+            page_family_ids = list({p.family_id for p in people})
+            page_person_ids = list({p.id for p in people})
+            if page_family_ids:
+                positions = (
+                    db.query(
+                        Person.id,
+                        func.row_number().over(partition_by=Person.family_id, order_by=Person.id).label("rn"),
+                    )
+                    .filter(
+                        Person.deleted_at.is_(None),
+                        Person.family_id.in_(page_family_ids),
+                    )
+                    .all()
+                )
+                full_map = {pid: int(rn) for pid, rn in positions}
+                person_pos_map = {pid: full_map[pid] for pid in page_person_ids if pid in full_map}
+
+    def _person_display_id(p: Person) -> str:
+        pos = person_pos_map.get(p.id, 0)
+        if family_id is not None:
+            return str(pos)
+        ref_id, fam_n = family_enum_map.get(p.family_id, (0, 0))
+        return f"{ref_id}-{fam_n}-{pos}"
+
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
+                display_id=_person_display_id(p),
+                family_id=p.family_id,
+                given_name=p.given_name,
+                age=p.age,
+                deleted_at=p.deleted_at,
+            )
+            for p in people
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
+    )
+
+
+@people_admin_router.get("/deleted")
+def list_deleted_people(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    family_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> PersonListResponse:
+    """List soft-deleted people."""
+    query = db.query(Person).filter(Person.deleted_at.isnot(None))
+    if family_id is not None:
+        query = query.filter(Person.family_id == family_id)
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    people = query.order_by(Person.id).offset(offset).limit(page_size).all()
+
+    return PersonListResponse(
+        people=[
+            PersonSummary(
+                id=p.id,
+                display_id="DELETED",
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,

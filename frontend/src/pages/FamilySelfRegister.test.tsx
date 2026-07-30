@@ -23,6 +23,7 @@ const mockResponse: FamilySelfRegisterResponse = {
   user: mockUser,
   family: {
     id: 10,
+    display_id: "PENDING",
     family_name: "The Test Family",
     family_wish: "A wonderful Christmas",
     contact_name: "Test Contact",

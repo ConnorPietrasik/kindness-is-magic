@@ -64,11 +64,28 @@ export function getAdminEmail(): string {
 }
 
 /**
- * Check whether SUPPRESS_SEND is enabled in the .env file.
- * E2E tests require this to prevent sending real emails.
+ * Check whether DEBUG is enabled in the .env file.
+ * E2E tests require DEBUG=true so the backend is in development mode.
+ */
+export function isDebug(): boolean {
+  const env = readProjectEnv();
+  const raw = (env.get("DEBUG") ?? "false").toLowerCase();
+  return raw === "1" || raw === "true";
+}
+
+/**
+ * Check whether SUPPRESS_SEND is explicitly disabled (set to 0) in .env.
+ * Returns true if SUPPRESS_SEND is 0 (bad for e2e), false otherwise.
+ */
+export function isSuppressSendDisabled(): boolean {
+  const env = readProjectEnv();
+  const raw = (env.get("SUPPRESS_SEND") ?? "").toLowerCase().trim();
+  return raw === "0";
+}
+
+/**
+ * Combined guard: DEBUG must be true AND SUPPRESS_SEND must not be 0.
  */
 export function isSuppressSend(): boolean {
-  const env = readProjectEnv();
-  const raw = (env.get("SUPPRESS_SEND") ?? env.get("DEBUG") ?? "false").toLowerCase();
-  return raw === "1" || raw === "true";
+  return isDebug() && !isSuppressSendDisabled();
 }

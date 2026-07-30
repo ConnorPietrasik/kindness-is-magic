@@ -12,11 +12,11 @@ import { listFamiliesViaApi, seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
-  /* Guard: refuse to run if emails won't be suppressed */
+  /* Guard: refuse to run if DEBUG is not true or SUPPRESS_SEND is 0 */
   if (!isSuppressSend()) {
     throw new Error(
-      "E2E tests require SUPPRESS_SEND=1 or DEBUG=true in .env.\n" +
-        "This prevents tests from sending real emails during execution.",
+      "E2E tests require DEBUG=true and SUPPRESS_SEND!=0 in .env.\n" +
+        "DEBUG must be set to true/1, and SUPPRESS_SEND must not be set to 0.",
     );
   }
 

@@ -428,6 +428,7 @@ class FamilyDetail(BaseModel):
 
 class FamilySummary(BaseModel):
     id: int
+    display_id: str
     family_name: str
     family_wish: str
     contact_name: str
@@ -443,6 +444,7 @@ class PendingFamilySummary(BaseModel):
     """Like FamilySummary but adds approval_status and created_at for the approval queue."""
 
     id: int
+    display_id: str
     family_name: str
     family_wish: str
     contact_name: str
@@ -649,6 +651,7 @@ class PersonDetail(BaseModel):
 
 class PersonSummary(BaseModel):
     id: int
+    display_id: str
     family_id: int
     given_name: str
     age: int
@@ -722,6 +725,7 @@ class UserDetail(BaseModel):
     """User detail response, including joined names."""
 
     id: int
+    display_id: Optional[str] = None
     email: str
     display_name: Optional[str] = None
     role: UserRole

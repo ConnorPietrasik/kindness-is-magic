@@ -4,6 +4,7 @@
  * View/edit a specific referrer and manage their families.
  * Thin wrapper around HierarchicalManage.
  * Each family row has a "Manage" link to that family's people page.
+ * Separate "Deleted" tab calls the /deleted endpoint.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ import {
   adminDeleteFamily,
   adminGetFamily,
   adminGetReferrer,
+  adminListDeletedFamilies,
   adminListReferrerFamilies,
   adminRestoreFamily,
   adminUpdateFamily,
@@ -41,6 +43,8 @@ import type { FamilyDetail, FamilyPayload, PaginationParams, ReferrerDetail, Ref
 
 const REFERRER_KEYS = ["adminReferrers"];
 
+type ViewTab = "active" | "deleted";
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -51,12 +55,15 @@ export default function AdminReferrerFamilies() {
 
   const referrerKey = [...REFERRER_KEYS, refIdStr];
   const familiesKey = ["adminReferrerFamilies", refIdStr];
+  const deletedFamiliesKey = ["adminDeletedReferrerFamilies", refIdStr];
 
   const queryClient = useQueryClient();
   const pagination = usePagination();
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [viewTab, setViewTab] = useState<ViewTab>("active");
   const [showEditReferrer, setShowEditReferrer] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
+
+  const isDeletedView = viewTab === "deleted";
 
   // Referrer detail
   const { data: referrerData, isLoading: referrerLoading } = useQuery({
@@ -74,10 +81,7 @@ export default function AdminReferrerFamilies() {
   });
 
   // Families CRUD
-  const listParams = useMemo<PaginationParams>(
-    () => ({ ...pagination.params, include_deleted: includeDeleted }),
-    [pagination.params, includeDeleted]
-  );
+  const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
 
   const {
     listData,
@@ -97,15 +101,20 @@ export default function AdminReferrerFamilies() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: familiesKey,
-    listFn: (params) => adminListReferrerFamilies(refIdNum, params as PaginationParams),
+    rootKey: isDeletedView ? deletedFamiliesKey : familiesKey,
+    listFn: isDeletedView
+      ? (params) => {
+          const base = (params as PaginationParams | undefined) ?? pagination.params;
+          return adminListDeletedFamilies({ ...base, referrer_id: refIdNum });
+        }
+      : (params) => adminListReferrerFamilies(refIdNum, params as PaginationParams | undefined),
     listParams,
     detailFn: adminGetFamily,
-    createFn: adminCreateFamily,
-    updateFn: adminUpdateFamily,
-    deleteFn: adminDeleteFamily,
+    createFn: isDeletedView ? undefined : adminCreateFamily,
+    updateFn: isDeletedView ? undefined : adminUpdateFamily,
+    deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [familiesKey],
+    invalidationKeys: [familiesKey, deletedFamiliesKey],
     entityName: "Family",
   });
 
@@ -127,6 +136,12 @@ export default function AdminReferrerFamilies() {
   function handleUpdateReferrer(formData: ReferrerPayload) {
     const payload = normalizeUpdatePayload(formData, referrerData as ReferrerDetail);
     referrerUpdateMut.mutate(payload as ReferrerPayload);
+  }
+
+  // Reset to page 1 when switching tabs
+  function handleTabChange(tab: ViewTab) {
+    setViewTab(tab);
+    pagination.goToPage(1);
   }
 
   if (referrerLoading || listLoading) return <PageSpinner />;
@@ -177,172 +192,187 @@ export default function AdminReferrerFamilies() {
         {/* ── Families section ────────────────────────────────── */}
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-gray-900">Families</h3>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={includeDeleted}
-                onChange={(e) => setIncludeDeleted(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-              />
-              Show deleted
-            </label>
-            <Button onClick={openCreate}>+ Add Family</Button>
-          </div>
+          {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
         </div>
 
-        {/* Create / Edit form */}
-        {editingId && detailLoading && (
-          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-gray-400">
-            <Spinner size="sm" />
-            <span className="text-sm">Loading…</span>
-          </Card>
-        )}
+        {/* Tabs */}
+        <div role="tablist" className="mb-4 flex gap-4 border-b border-gray-200">
+          <button
+            role="tab"
+            type="button"
+            aria-selected={viewTab === "active"}
+            onClick={() => handleTabChange("active")}
+            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
+              viewTab === "active" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            role="tab"
+            type="button"
+            aria-selected={viewTab === "deleted"}
+            onClick={() => handleTabChange("deleted")}
+            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
+              viewTab === "deleted" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Deleted
+          </button>
+        </div>
 
-        {(showForm || (editingId && detail)) && (
-          <FamilyForm
-            title={editingId ? "Edit Family" : "Add Family"}
-            initial={editingId ? (detail ?? defaultFamilyForm) : { ...defaultFamilyForm, referrer_id: refIdNum }}
-            isEdit={!!editingId}
-            onSubmit={editingId ? handleUpdate : handleCreate}
-            onCancel={cancelForm}
-            loading={createMut?.isPending || updateMut?.isPending}
-          />
-        )}
+        {/* Tab panel content */}
+        <div role="tabpanel">
+          {/* Create / Edit form (active tab only) */}
+          {editingId && detailLoading && (
+            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-gray-400">
+              <Spinner size="sm" />
+              <span className="text-sm">Loading…</span>
+            </Card>
+          )}
 
-        {/* Table */}
-        {families.length === 0 ? (
-          <Card>
-            <p className="py-8 text-center text-gray-400">No families for this referrer yet.</p>
-          </Card>
-        ) : (
-          <Table>
-            <TableHead>
-              <Th>ID</Th>
-              <Th>Family Name</Th>
-              <Th>Contact</Th>
-              <Th>People</Th>
-              {includeDeleted && <Th>Deleted</Th>}
-              <Th>Actions</Th>
-            </TableHead>
-            <TableBody>
-              {families.map((f) => (
-                <Tr key={f.id}>
-                  <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
-                  <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-                    {f.family_name}
-                    {f.deleted_at == null && (
-                      <Link
-                        to={route.familyWishList(f.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Wish List"
-                        className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                        title="Wish List"
-                      >
-                        📝
-                      </Link>
-                    )}
-                  </Td>
-                  <Td>{f.contact_name}</Td>
-                  <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-                  {includeDeleted && (
-                    <Td>
-                      {f.deleted_at != null ? (
-                        <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
-                      ) : (
-                        <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+          {(showForm || (editingId && detail)) && (
+            <FamilyForm
+              title={editingId ? "Edit Family" : "Add Family"}
+              initial={editingId ? (detail ?? defaultFamilyForm) : { ...defaultFamilyForm, referrer_id: refIdNum }}
+              isEdit={!!editingId}
+              onSubmit={editingId ? handleUpdate : handleCreate}
+              onCancel={cancelForm}
+              loading={createMut?.isPending || updateMut?.isPending}
+            />
+          )}
+
+          {/* Table */}
+          {families.length === 0 ? (
+            <Card>
+              <p className="py-8 text-center text-gray-400">
+                {isDeletedView ? "No deleted families for this referrer." : "No families for this referrer yet."}
+              </p>
+            </Card>
+          ) : (
+            <Table>
+              <TableHead>
+                <Th>ID</Th>
+                <Th>Family Name</Th>
+                <Th>Contact</Th>
+                <Th>People</Th>
+                <Th>Actions</Th>
+              </TableHead>
+              <TableBody>
+                {families.map((f) => (
+                  <Tr key={f.id}>
+                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+                    <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                      {f.family_name}
+                      {f.deleted_at == null && !isDeletedView && (
+                        <Link
+                          to={route.familyWishList(f.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Wish List"
+                          className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                          title="Wish List"
+                        >
+                          📝
+                        </Link>
                       )}
                     </Td>
-                  )}
-                  <Td>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to={`${route.adminFamilyPeople(f.id)}?from=referrer`}
-                        className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                      >
-                        Manage
-                      </Link>
-                      <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(f.id)} disabled={!!editingId}>
-                        Edit
-                      </Button>
-                      {f.deleted_at != null ? (
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => setRestoreConfirm(f.id)}
-                          disabled={restoreMut?.isPending}
-                        >
-                          Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => confirmDelete(f.id)}
-                          disabled={deleteMut?.isPending}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </Td>
-                </Tr>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                    <Td>{f.contact_name}</Td>
+                    <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        {!isDeletedView && f.deleted_at == null && (
+                          <Link
+                            to={`${route.adminFamilyPeople(f.id)}?from=referrer`}
+                            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                          >
+                            Manage
+                          </Link>
+                        )}
+                        {!isDeletedView && f.deleted_at == null && (
+                          <>
+                            <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(f.id)} disabled={!!editingId}>
+                              Edit
+                            </Button>
+                            <Button
+                              variant="danger"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => confirmDelete(f.id)}
+                              disabled={deleteMut?.isPending}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {isDeletedView && (
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setRestoreConfirm(f.id)}
+                            disabled={restoreMut?.isPending}
+                          >
+                            Restore
+                          </Button>
+                        )}
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </TableBody>
+            </Table>
+          )}
 
-        {/* Delete confirmation */}
-        <ConfirmDialog
-          open={deleteConfirm !== null}
-          title={
-            <>
-              Delete family <strong>#{deleteConfirm}</strong>?
-            </>
-          }
-          description="This will also soft-delete all people in the family."
-          onConfirm={() => {
-            if (deleteConfirm != null) {
-              deleteMut?.mutate(deleteConfirm);
-              cancelDelete();
+          {/* Delete confirmation */}
+          <ConfirmDialog
+            open={deleteConfirm !== null}
+            title={
+              <>
+                Delete family <strong>#{deleteConfirm}</strong>?
+              </>
             }
-          }}
-          onCancel={cancelDelete}
-          loading={deleteMut?.isPending}
-        />
+            description="This will also soft-delete all people in the family."
+            onConfirm={() => {
+              if (deleteConfirm != null) {
+                deleteMut?.mutate(deleteConfirm);
+                cancelDelete();
+              }
+            }}
+            onCancel={cancelDelete}
+            loading={deleteMut?.isPending}
+          />
 
-        {/* Restore confirmation */}
-        <ConfirmDialog
-          open={restoreConfirm !== null}
-          title={
-            <>
-              Restore family <strong>#{restoreConfirm}</strong>?
-            </>
-          }
-          description="This will also restore all people in the family."
-          onConfirm={() => {
-            if (restoreConfirm != null) {
-              restoreMut?.mutate(restoreConfirm);
-              setRestoreConfirm(null);
+          {/* Restore confirmation */}
+          <ConfirmDialog
+            open={restoreConfirm !== null}
+            title={
+              <>
+                Restore family <strong>#{restoreConfirm}</strong>?
+              </>
             }
-          }}
-          onCancel={() => setRestoreConfirm(null)}
-          loading={restoreMut?.isPending}
-          confirmLabel="Yes, restore"
-          loadingLabel="Restoring…"
-          confirmVariant="secondary"
-        />
+            description="This will also restore all people in the family."
+            onConfirm={() => {
+              if (restoreConfirm != null) {
+                restoreMut?.mutate(restoreConfirm);
+                setRestoreConfirm(null);
+              }
+            }}
+            onCancel={() => setRestoreConfirm(null)}
+            loading={restoreMut?.isPending}
+            confirmLabel="Yes, restore"
+            loadingLabel="Restoring…"
+            confirmVariant="secondary"
+          />
 
-        {/* Pagination */}
-        <Pagination
-          page={pagination.page}
-          totalPages={pageInfo.totalPages}
-          total={listData?.total ?? 0}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.goToPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
+          {/* Pagination */}
+          <Pagination
+            page={pagination.page}
+            totalPages={pageInfo.totalPages}
+            total={listData?.total ?? 0}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.goToPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </div>
 
         {/* Errors */}
         <MutationErrors

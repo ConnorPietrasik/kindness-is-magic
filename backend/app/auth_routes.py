@@ -625,10 +625,13 @@ def register_family(
 
     # 6. Build response
     person_count = 0  # No persons yet
+    # Pending families use "PENDING" display_id (they don't have a stable
+    # position yet — the referrer's view only shows approved families).
     return FamilySelfRegisterResponse(
         user=UserResponse.model_validate(user),
         family=FamilySummary(
             id=family.id,
+            display_id="PENDING",
             family_name=family.family_name,
             family_wish=family.family_wish,
             contact_name=family.contact_name,

@@ -30,6 +30,7 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+
 family_admin_router = APIRouter(
     prefix="/api/admin/families",
     tags=["admin-families"],
@@ -40,20 +41,118 @@ family_admin_router = APIRouter(
 def list_families(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    include_deleted: bool = Query(False),
     referrer_id: int | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyListResponse:
-    query = db.query(Family)
-    if not include_deleted:
-        query = query.filter(Family.deleted_at.is_(None))
+    """List active (non-deleted) families with stable display IDs.
+
+    Flat view: all active families get a stable ROW_NUMBER position (1-based,
+    ordered by id) prefixed with the referrer id (or 0 for orphans). Deleting
+    a family causes later ones to shift up and fill the gap.
+
+    Scoped view (referrer_id set): shows all active families for that referrer.
+    Approved families get sequential numbering matching the referrer's own view.
+    Pending/rejected families get display_id "PENDING"/"REJECTED" so they
+    don't disrupt the approved numbering.
+    """
+    # Build the base query for active families
+    query = db.query(Family).filter(Family.deleted_at.is_(None))
     if referrer_id is not None:
         query = query.filter(Family.referrer_id == referrer_id)
-    total = query.count()
-    families = query.order_by(Family.id).offset((page - 1) * page_size).limit(page_size).all()
 
-    # Single aggregation query instead of N+1 count() calls
+    total = query.count()
+    offset = (page - 1) * page_size
+    families = query.order_by(Family.id).offset(offset).limit(page_size).all()
+
+    # Single aggregation query for person counts
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
+    count_map = {fid: cnt for fid, cnt in counts}
+
+    # Pre-compute stable positions via ROW_NUMBER.
+    # Flat view: global position among all active families.
+    # Scoped view: position among approved families only (pending/rejected excluded).
+    pos_map: dict[int, int] = {}
+    if families:
+        family_ids = [f.id for f in families]
+        if referrer_id is not None:
+            # Scoped: ROW_NUMBER over approved families for this referrer
+            positions = (
+                db.query(
+                    Family.id,
+                    func.row_number().over(order_by=Family.id).label("rn"),
+                )
+                .filter(
+                    Family.deleted_at.is_(None),
+                    Family.referrer_id == referrer_id,
+                    Family.approval_status == FamilyApprovalStatus.approved,
+                )
+                .all()
+            )
+            full_map = {fid: int(rn) for fid, rn in positions}
+            pos_map = {fid: full_map[fid] for fid in family_ids if fid in full_map}
+        else:
+            # Flat: ROW_NUMBER over all active families
+            positions = (
+                db.query(
+                    Family.id,
+                    func.row_number().over(order_by=Family.id).label("rn"),
+                )
+                .filter(Family.deleted_at.is_(None))
+                .all()
+            )
+            full_map = {fid: int(rn) for fid, rn in positions}
+            pos_map = {fid: full_map[fid] for fid in family_ids if fid in full_map}
+
+    def _family_display_id(f: Family) -> str:
+        if referrer_id is not None:
+            # Scoped: approved families get their position among approved only
+            if f.approval_status == FamilyApprovalStatus.approved:
+                return str(pos_map.get(f.id, 0))
+            return f.approval_status.value.upper() if f.approval_status.value.upper() in ("PENDING", "REJECTED") else "UNKNOWN"
+        # Flat: stable global position prefixed with referrer id
+        ref_prefix = f.referrer_id if f.referrer_id is not None else 0
+        return f"{ref_prefix}-{pos_map.get(f.id, 0)}"
+
+    return FamilyListResponse(
+        families=[
+            FamilySummary(
+                id=f.id,
+                display_id=_family_display_id(f),
+                family_name=f.family_name,
+                family_wish=f.family_wish,
+                contact_name=f.contact_name,
+                referrer_id=f.referrer_id,
+                approval_status=f.approval_status,
+                deleted_at=f.deleted_at,
+                person_count=count_map.get(f.id, 0),
+            )
+            for f in families
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
+    )
+
+
+@family_admin_router.get("/deleted")
+def list_deleted_families(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    referrer_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> FamilyListResponse:
+    """List soft-deleted families."""
+    query = db.query(Family).filter(Family.deleted_at.isnot(None))
+    if referrer_id is not None:
+        query = query.filter(Family.referrer_id == referrer_id)
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    families = query.order_by(Family.id).offset(offset).limit(page_size).all()
+
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
@@ -61,6 +160,7 @@ def list_families(
         families=[
             FamilySummary(
                 id=f.id,
+                display_id="DELETED",
                 family_name=f.family_name,
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,

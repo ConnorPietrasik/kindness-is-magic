@@ -47,11 +47,11 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
   listLoading: boolean;
   detail: Item | null;
   detailLoading: boolean;
-  // Mutations
-  createMut: UseMutationResult<Item, Error, Payload> | null;
-  updateMut: UseMutationResult<Item, Error, { id: number; data: Payload }> | null;
-  deleteMut: UseMutationResult<void, Error, number> | null;
-  restoreMut: UseMutationResult<Item, Error, number> | null;
+  // Mutations (always created to satisfy Rules of Hooks; no-op when fn not provided)
+  createMut: UseMutationResult<Item, Error, Payload>;
+  updateMut: UseMutationResult<Item, Error, { id: number; data: Payload }>;
+  deleteMut: UseMutationResult<void, Error, number>;
+  restoreMut: UseMutationResult<Item, Error, number>;
   // UI state
   showForm: boolean;
   editingId: number | null;
@@ -108,51 +108,49 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
   const detail: Item | null = detailQuery.data ?? null;
   const detailLoading = editingId != null && detailFn != null && detailQuery.isLoading;
 
-  /* ── Mutations ──────────────────────────────────────────── */
-  const createMut = createFn
-    ? useMutation({
-        mutationFn: createFn,
-        onSuccess: () => {
-          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
-          setShowForm(false);
-          if (entityName) toast.success(`${entityName} created`);
-        },
-      })
-    : null;
+  /* ── Mutations (always created to satisfy Rules of Hooks) ── */
+  const createMut = useMutation({
+    mutationFn: createFn ?? ((_data: Payload) => Promise.resolve(null as unknown as Item)),
+    onSuccess: () => {
+      if (!createFn) return;
+      invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+      setShowForm(false);
+      if (entityName) toast.success(`${entityName} created`);
+    },
+  });
 
-  const updateMut = updateFn
-    ? useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Payload }) => updateFn(id, data),
-        onSuccess: () => {
-          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
-          if (detailFn) {
-            queryClient.invalidateQueries({ queryKey: [...rootKey, "detail"] });
-          }
-          setEditingId(null);
-          if (entityName) toast.success(`${entityName} updated`);
-        },
-      })
-    : null;
+  const updateMut = useMutation({
+    mutationFn: updateFn
+      ? ({ id, data }: { id: number; data: Payload }) => updateFn!(id, data)
+      : (_data: { id: number; data: Payload }) => Promise.resolve(null as unknown as Item),
+    onSuccess: () => {
+      if (!updateFn) return;
+      invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+      if (detailFn) {
+        queryClient.invalidateQueries({ queryKey: [...rootKey, "detail"] });
+      }
+      setEditingId(null);
+      if (entityName) toast.success(`${entityName} updated`);
+    },
+  });
 
-  const deleteMut = deleteFn
-    ? useMutation({
-        mutationFn: deleteFn as (variables: number) => Promise<void>,
-        onSuccess: () => {
-          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
-          if (entityName) toast.success(`${entityName} deleted`);
-        },
-      })
-    : null;
+  const deleteMut = useMutation({
+    mutationFn: deleteFn ?? ((_data: number) => Promise.resolve()),
+    onSuccess: () => {
+      if (!deleteFn) return;
+      invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+      if (entityName) toast.success(`${entityName} deleted`);
+    },
+  });
 
-  const restoreMut = restoreFn
-    ? useMutation({
-        mutationFn: restoreFn as (variables: number) => Promise<Item>,
-        onSuccess: () => {
-          invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
-          if (entityName) toast.success(`${entityName} restored`);
-        },
-      })
-    : null;
+  const restoreMut = useMutation({
+    mutationFn: restoreFn ?? ((_data: number) => Promise.resolve(null as unknown as Item)),
+    onSuccess: () => {
+      if (!restoreFn) return;
+      invalidationKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
+      if (entityName) toast.success(`${entityName} restored`);
+    },
+  });
 
   /* ── Actions ────────────────────────────────────────────── */
   function openCreate() {

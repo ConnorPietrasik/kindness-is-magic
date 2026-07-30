@@ -40,15 +40,54 @@ referrer_admin_router = APIRouter(
 def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    include_deleted: bool = Query(False),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
-    query = db.query(Referrer)
-    if not include_deleted:
-        query = query.filter(Referrer.deleted_at.is_(None))
+    """List active (non-deleted) referrers."""
+    query = db.query(Referrer).filter(Referrer.deleted_at.is_(None))
     total = query.count()
     referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
+
+    # Resolve approved_by_admin names in bulk
+    admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
+    admin_map: dict[int, str] = {}
+    if admin_ids:
+        admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
+        admin_map = {a.id: (a.display_name or a.email) for a in admins}
+
+    return ReferrerListResponse(
+        referrers=[
+            ReferrerSummary(
+                id=r.id,
+                name=r.name,
+                family_limit=r.family_limit,
+                family_invite_code=r.family_invite_code,
+                approval_status=r.approval_status,
+                approved_by_admin_name=admin_map.get(r.approved_by_admin_id) if r.approved_by_admin_id else None,
+                approved_at=r.approved_at,
+                deleted_at=r.deleted_at,
+            )
+            for r in referrers
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total / page_size) if total else 0,
+    )
+
+
+@referrer_admin_router.get("/deleted")
+def list_deleted_referrers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> ReferrerListResponse:
+    """List soft-deleted referrers."""
+    query = db.query(Referrer).filter(Referrer.deleted_at.isnot(None))
+    total = query.count()
+    referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
+
     # Resolve approved_by_admin names in bulk
     admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
     admin_map: dict[int, str] = {}

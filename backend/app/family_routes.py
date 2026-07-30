@@ -63,17 +63,18 @@ def list_people(
     user: User = Depends(require_family),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    people = db.query(Person).filter(Person.family_id == user.family_id, Person.deleted_at.is_(None)).all()
+    people = db.query(Person).filter(Person.family_id == user.family_id, Person.deleted_at.is_(None)).order_by(Person.id).all()
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
+                display_id=str(idx + 1),
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
             )
-            for p in people
+            for idx, p in enumerate(people)
         ]
     )
 

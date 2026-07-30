@@ -165,7 +165,7 @@ export default function ReferrerFamilies() {
               <TableBody>
                 {families.map((f) => (
                   <Tr key={f.id}>
-                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.id}</Td>
+                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                     <Td className="font-medium text-gray-900">
                       {f.family_name}
                       <Link

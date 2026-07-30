@@ -86,6 +86,7 @@ def list_families(
             Family.deleted_at.is_(None),
             Family.approval_status == FamilyApprovalStatus.approved,
         )
+        .order_by(Family.id)
         .all()
     )
 
@@ -97,6 +98,7 @@ def list_families(
         families=[
             FamilySummary(
                 id=f.id,
+                display_id=str(idx + 1),
                 family_name=f.family_name,
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
@@ -105,7 +107,7 @@ def list_families(
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
-            for f in families
+            for idx, f in enumerate(families)
         ]
     )
 
@@ -221,6 +223,7 @@ def list_pending_families(
     return [
         PendingFamilySummary(
             id=f.id,
+            display_id="PENDING",
             family_name=f.family_name,
             family_wish=f.family_wish,
             contact_name=f.contact_name,
@@ -335,17 +338,18 @@ def list_family_people(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
-    people = db.query(Person).filter(Person.family_id == fid, Person.deleted_at.is_(None)).all()
+    people = db.query(Person).filter(Person.family_id == fid, Person.deleted_at.is_(None)).order_by(Person.id).all()
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
+                display_id=str(idx + 1),
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
             )
-            for p in people
+            for idx, p in enumerate(people)
         ]
     )
 

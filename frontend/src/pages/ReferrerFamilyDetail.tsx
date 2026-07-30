@@ -166,7 +166,7 @@ function PeopleTable({ rows, callbacks }: { rows: PersonSummary[]; callbacks: Hi
           <TableBody>
             {rows.map((p) => (
               <Tr key={p.id}>
-                <Td className="whitespace-nowrap text-xs text-gray-400">{p.id}</Td>
+                <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                 <Td className="font-medium text-gray-900">{p.given_name}</Td>
                 <Td>{p.age}</Td>
                 <Td>

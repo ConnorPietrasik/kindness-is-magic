@@ -2,8 +2,9 @@
  * Admin — Manage Users
  *
  * List, create, edit, delete users.
- * Uses useCrudManager for data fetching and mutations.
- * Supports role filter, text search, and include_deleted toggle.
+ * Uses manual queries and mutations.
+ * Separate "Deleted" tab calls the /deleted endpoint.
+ * Supports role filter and text search on both tabs.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +23,7 @@ import {
   adminCreateUser,
   adminDeleteUser,
   adminGetUser,
+  adminListDeletedUsers,
   adminListFamilies,
   adminListReferrers,
   adminListUsers,
@@ -42,12 +44,15 @@ import type {
 } from "../types";
 
 const USER_KEYS = ["adminUsers"];
+const DELETED_USER_KEYS = ["adminDeletedUsers"];
+
+type ViewTab = "active" | "deleted";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminUsers() {
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [viewTab, setViewTab] = useState<ViewTab>("active");
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -55,22 +60,23 @@ export default function AdminUsers() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
 
-  // Build list params from filters
+  const isDeletedView = viewTab === "deleted";
+
+  // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
     () => ({
       page,
       page_size: pageSize,
-      include_deleted: includeDeleted,
       role: roleFilter || undefined,
       search: searchQuery || undefined,
     }),
-    [page, pageSize, includeDeleted, roleFilter, searchQuery]
+    [page, pageSize, roleFilter, searchQuery]
   );
 
-  // Fetch users
+  // Fetch users (switch endpoint based on tab)
   const { data: listData, isLoading: listLoading } = useQuery({
-    queryKey: [...USER_KEYS, listParams],
-    queryFn: () => adminListUsers(listParams),
+    queryKey: [...(isDeletedView ? DELETED_USER_KEYS : USER_KEYS), listParams],
+    queryFn: () => (isDeletedView ? adminListDeletedUsers(listParams) : adminListUsers(listParams)),
   });
 
   // Fetch user detail for editing
@@ -84,14 +90,14 @@ export default function AdminUsers() {
   // Fetch referrers for dropdown (only active)
   const { data: referrerListData } = useQuery({
     queryKey: ["adminReferrersDropdown"],
-    queryFn: () => adminListReferrers({ page: 1, page_size: 200, include_deleted: false }),
+    queryFn: () => adminListReferrers({ page: 1, page_size: 200 }),
   });
   const referrers = useMemo<ReferrerSummary[]>(() => referrerListData?.referrers ?? [], [referrerListData]);
 
   // Fetch families for dropdown (only active)
   const { data: familyListData } = useQuery({
     queryKey: ["adminFamiliesDropdown"],
-    queryFn: () => adminListFamilies({ page: 1, page_size: 200, include_deleted: false }),
+    queryFn: () => adminListFamilies({ page: 1, page_size: 200 }),
   });
   const families = useMemo(() => familyListData?.families ?? [], [familyListData]);
 
@@ -104,6 +110,7 @@ export default function AdminUsers() {
   const toast = useToast();
   const invalidateUsers = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: USER_KEYS });
+    queryClient.invalidateQueries({ queryKey: DELETED_USER_KEYS });
   }, [queryClient]);
 
   const createMut = useMutation({
@@ -184,6 +191,12 @@ export default function AdminUsers() {
     resetPasswordMut.mutate({ id: resetPasswordId, data: { password: resetForm.password } });
   }
 
+  // Reset to page 1 when switching tabs
+  function handleTabChange(tab: ViewTab) {
+    setViewTab(tab);
+    setPage(1);
+  }
+
   const users = listData?.users ?? [];
   const totalPages = listData ? Math.ceil(listData.total / pageSize) : 0;
 
@@ -197,235 +210,248 @@ export default function AdminUsers() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Users</h2>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={includeDeleted}
-                onChange={(e) => {
-                  setIncludeDeleted(e.target.checked);
-                  setPage(1);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-              />
-              Show deleted
-            </label>
-            <Button onClick={openCreate}>+ Add User</Button>
-          </div>
+          {!isDeletedView && <Button onClick={openCreate}>+ Add User</Button>}
         </div>
 
-        {/* Filters */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+        {/* Tabs */}
+        <div role="tablist" className="mb-6 flex gap-4 border-b border-gray-200">
+          <button
+            role="tab"
+            type="button"
+            aria-selected={viewTab === "active"}
+            onClick={() => handleTabChange("active")}
+            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
+              viewTab === "active" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
           >
-            <option value="">All roles</option>
-            <option value="admin">Admin</option>
-            <option value="referrer">Referrer</option>
-            <option value="family">Family</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Search email or name…"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setPage(1);
-            }}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          />
+            Active
+          </button>
+          <button
+            role="tab"
+            type="button"
+            aria-selected={viewTab === "deleted"}
+            onClick={() => handleTabChange("deleted")}
+            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
+              viewTab === "deleted" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Deleted
+          </button>
         </div>
 
-        {/* Create / Edit form */}
-        {editingId && detailLoading && (
-          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-            <Spinner size="sm" />
-            <span>Loading…</span>
-          </Card>
-        )}
+        {/* Tab panel content */}
+        <div role="tabpanel">
+          {/* Filters */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <select
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="referrer">Referrer</option>
+              <option value="family">Family</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search email or name…"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            />
+          </div>
 
-        {(showForm || (editingId && detail)) && (
-          <UserForm
-            title={editingId ? "Edit User" : "Add User"}
-            initial={editingId ? (detail ?? defaultUserForm) : defaultUserForm}
-            isEdit={!!editingId}
-            referrers={referrers}
-            families={families}
-            onSubmit={handleCreateOrEdit}
-            onCancel={cancelForm}
-            loading={!!(createMut.isPending || updateMut.isPending)}
-          />
-        )}
+          {/* Create / Edit form (active tab only) */}
+          {editingId && detailLoading && (
+            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
+              <Spinner size="sm" />
+              <span>Loading…</span>
+            </Card>
+          )}
 
-        {/* Table */}
-        {users.length === 0 ? (
-          <Card>
-            <p className="py-8 text-center text-gray-400">No users found.</p>
-          </Card>
-        ) : (
-          <Table>
-            <TableHead>
-              <Th>Email</Th>
-              <Th>Display Name</Th>
-              <Th>Role</Th>
-              <Th>Linked to</Th>
-              {includeDeleted && <Th>Deleted</Th>}
-              <Th>Created</Th>
-              <Th>Actions</Th>
-            </TableHead>
-            <TableBody>
-              {users.map((u) => (
-                <Tr key={u.id}>
-                  <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
-                  <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name ?? "—"}</Td>
-                  <Td>
-                    <RoleBadge role={u.role} />
-                  </Td>
-                  <Td>
-                    {u.referrer_id ? (
-                      <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
-                        {u.referrer_name}
-                      </Link>
-                    ) : u.family_id ? (
-                      <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
-                        {u.family_name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </Td>
-                  {includeDeleted && (
+          {(showForm || (editingId && detail)) && (
+            <UserForm
+              title={editingId ? "Edit User" : "Add User"}
+              initial={editingId ? (detail ?? defaultUserForm) : defaultUserForm}
+              isEdit={!!editingId}
+              referrers={referrers}
+              families={families}
+              onSubmit={handleCreateOrEdit}
+              onCancel={cancelForm}
+              loading={!!(createMut.isPending || updateMut.isPending)}
+            />
+          )}
+
+          {/* Table */}
+          {users.length === 0 ? (
+            <Card>
+              <p className="py-8 text-center text-gray-400">{isDeletedView ? "No deleted users." : "No users found."}</p>
+            </Card>
+          ) : (
+            <Table>
+              <TableHead>
+                <Th>Email</Th>
+                <Th>Display Name</Th>
+                <Th>Role</Th>
+                <Th>Linked to</Th>
+                <Th>Created</Th>
+                <Th>Actions</Th>
+              </TableHead>
+              <TableBody>
+                {users.map((u) => (
+                  <Tr key={u.id}>
+                    <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
+                    <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name ?? "—"}</Td>
                     <Td>
-                      {u.deleted_at != null ? (
-                        <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+                      <RoleBadge role={u.role} />
+                    </Td>
+                    <Td>
+                      {u.referrer_id ? (
+                        <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
+                          {u.referrer_name}
+                        </Link>
+                      ) : u.family_id ? (
+                        <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
+                          {u.family_name}
+                        </Link>
                       ) : (
-                        <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                        "—"
                       )}
                     </Td>
-                  )}
-                  <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
-                  <Td>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => openEdit(u.id)}
-                        disabled={!!editingId}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => {
-                          setResetPasswordId(u.id);
-                          setResetForm({ password: "", confirmPassword: "" });
-                        }}
-                        disabled={!!editingId}
-                      >
-                        Reset Pw
-                      </Button>
-                      {u.deleted_at != null ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => setRestoreConfirm(u.id)}
-                          disabled={restoreMut.isPending}
-                        >
-                          Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => setDeleteConfirm(u.id)}
-                          disabled={deleteMut.isPending}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </Td>
-                </Tr>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                    <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
+                    <Td>
+                      <div className="flex gap-2">
+                        {!isDeletedView && u.deleted_at == null && (
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => openEdit(u.id)}
+                              disabled={!!editingId}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => {
+                                setResetPasswordId(u.id);
+                                setResetForm({ password: "", confirmPassword: "" });
+                              }}
+                              disabled={!!editingId}
+                            >
+                              Reset Pw
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => setDeleteConfirm(u.id)}
+                              disabled={deleteMut.isPending}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {isDeletedView && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => setRestoreConfirm(u.id)}
+                            disabled={restoreMut.isPending}
+                          >
+                            Restore
+                          </Button>
+                        )}
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </TableBody>
+            </Table>
+          )}
 
-        {/* Pagination */}
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            {listData?.total ?? 0} user{listData?.total !== 1 ? "s" : ""}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              Prev
-            </Button>
-            <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-              Next
-            </Button>
+          {/* Pagination */}
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-sm text-gray-500">
+              {listData?.total ?? 0} user{listData?.total !== 1 ? "s" : ""}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                Prev
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
+
+          {/* Delete confirmation */}
+          <ConfirmDialog
+            open={deleteConfirm !== null}
+            title={
+              <>
+                Delete user <strong>#{deleteConfirm}</strong>?
+              </>
+            }
+            description="This will soft-delete the user. They will no longer be able to log in."
+            onConfirm={() => {
+              if (deleteConfirm != null) {
+                deleteMut.mutate(deleteConfirm);
+                setDeleteConfirm(null);
+              }
+            }}
+            onCancel={() => setDeleteConfirm(null)}
+            loading={deleteMut.isPending}
+          />
+
+          {/* Restore confirmation */}
+          <ConfirmDialog
+            open={restoreConfirm !== null}
+            title={
+              <>
+                Restore user <strong>#{restoreConfirm}</strong>?
+              </>
+            }
+            onConfirm={() => {
+              if (restoreConfirm != null) {
+                restoreMut.mutate(restoreConfirm);
+                setRestoreConfirm(null);
+              }
+            }}
+            onCancel={() => setRestoreConfirm(null)}
+            loading={restoreMut.isPending}
+            confirmLabel="Yes, restore"
+            loadingLabel="Restoring…"
+            confirmVariant="secondary"
+          />
+
+          {/* Reset password dialog */}
+          <ResetPasswordDialog
+            open={resetPasswordId !== null}
+            userId={resetPasswordId}
+            form={resetForm}
+            setForm={setResetForm}
+            onSubmit={handleResetPassword}
+            onCancel={() => setResetPasswordId(null)}
+            loading={resetPasswordMut.isPending}
+          />
         </div>
-
-        {/* Delete confirmation */}
-        <ConfirmDialog
-          open={deleteConfirm !== null}
-          title={
-            <>
-              Delete user <strong>#{deleteConfirm}</strong>?
-            </>
-          }
-          description="This will soft-delete the user. They will no longer be able to log in."
-          onConfirm={() => {
-            if (deleteConfirm != null) {
-              deleteMut.mutate(deleteConfirm);
-              setDeleteConfirm(null);
-            }
-          }}
-          onCancel={() => setDeleteConfirm(null)}
-          loading={deleteMut.isPending}
-        />
-
-        {/* Restore confirmation */}
-        <ConfirmDialog
-          open={restoreConfirm !== null}
-          title={
-            <>
-              Restore user <strong>#{restoreConfirm}</strong>?
-            </>
-          }
-          onConfirm={() => {
-            if (restoreConfirm != null) {
-              restoreMut.mutate(restoreConfirm);
-              setRestoreConfirm(null);
-            }
-          }}
-          onCancel={() => setRestoreConfirm(null)}
-          loading={restoreMut.isPending}
-          confirmLabel="Yes, restore"
-          loadingLabel="Restoring…"
-          confirmVariant="secondary"
-        />
-
-        {/* Reset password dialog */}
-        <ResetPasswordDialog
-          open={resetPasswordId !== null}
-          userId={resetPasswordId}
-          form={resetForm}
-          setForm={setResetForm}
-          onSubmit={handleResetPassword}
-          onCancel={() => setResetPasswordId(null)}
-          loading={resetPasswordMut.isPending}
-        />
 
         {/* Errors */}
         <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut, resetPasswordMut]} />

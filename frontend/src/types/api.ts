@@ -10,12 +10,10 @@ import type { FamilySummary, PersonSummary, ReferrerInviteSummary, ReferrerSumma
 export interface PaginationParams {
   page: number;
   page_size: number;
-  include_deleted?: boolean;
 }
 
 /** Query params for the admin users list endpoint. */
 export interface AdminUsersListParams extends PaginationParams {
-  include_deleted: boolean;
   role?: string;
   search?: string;
 }

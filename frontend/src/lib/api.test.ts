@@ -182,6 +182,20 @@ describe("admin referrer API functions", () => {
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/referrers/5/reject");
     expect(result).toEqual({ id: 5, approval_status: "rejected" });
   });
+
+  it("adminListDeletedReferrers — GET /api/admin/referrers/deleted", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { referrers: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedReferrers();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/referrers/deleted");
+  });
+
+  it("adminListDeletedReferrers with params", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { referrers: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedReferrers({ page: 2, page_size: 10 });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/referrers/deleted", {
+      params: { page: 2, page_size: 10 },
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -273,9 +287,9 @@ describe("admin user API functions", () => {
 
   it("adminListUsers with params — merges filters", async () => {
     mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
-    await apiModule.adminListUsers({ page: 2, page_size: 10, include_deleted: true, role: "admin", search: "test" });
+    await apiModule.adminListUsers({ page: 2, page_size: 10, role: "admin", search: "test" });
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users", {
-      params: { page: 2, page_size: 10, include_deleted: true, role: "admin", search: "test" },
+      params: { page: 2, page_size: 10, role: "admin", search: "test" },
     });
   });
 
@@ -317,6 +331,20 @@ describe("admin user API functions", () => {
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5 } });
     await apiModule.adminRestoreUser(5);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/users/5/restore");
+  });
+
+  it("adminListDeletedUsers — GET /api/admin/users/deleted", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.adminListDeletedUsers();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/deleted");
+  });
+
+  it("adminListDeletedUsers with params", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.adminListDeletedUsers({ page: 2, page_size: 10, role: "admin", search: "test" });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/deleted", {
+      params: { page: 2, page_size: 10, role: "admin", search: "test" },
+    });
   });
 });
 
@@ -373,9 +401,37 @@ describe("admin people API functions", () => {
 
   it("adminListFamilyPeople with pagination — merges params with family_id", async () => {
     mockAxiosInstance.get.mockResolvedValueOnce({ data: { people: [{ id: 1 }], total: 1, page: 1, page_size: 50, total_pages: 1 } });
-    await apiModule.adminListFamilyPeople(5, { page: 2, page_size: 25, include_deleted: true });
+    await apiModule.adminListFamilyPeople(5, { page: 2, page_size: 25 });
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people", {
-      params: { page: 2, page_size: 25, include_deleted: true, family_id: 5 },
+      params: { page: 2, page_size: 25, family_id: 5 },
+    });
+  });
+
+  it("adminListDeletedFamilies — GET /api/admin/families/deleted", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { families: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedFamilies();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/deleted");
+  });
+
+  it("adminListDeletedFamilies with params", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { families: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedFamilies({ page: 2, page_size: 10, referrer_id: 3 });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/deleted", {
+      params: { page: 2, page_size: 10, referrer_id: 3 },
+    });
+  });
+
+  it("adminListDeletedPeople — GET /api/admin/people/deleted", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { people: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedPeople();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people/deleted");
+  });
+
+  it("adminListDeletedPeople with params", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { people: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListDeletedPeople({ page: 2, page_size: 10, family_id: 5 });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/people/deleted", {
+      params: { page: 2, page_size: 10, family_id: 5 },
     });
   });
 

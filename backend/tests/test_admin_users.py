@@ -132,7 +132,7 @@ class TestAdminListUsers:
         emails = [u["email"] for u in body["users"]]
         assert "deleted@test.com" not in emails
 
-    def test_include_deleted(self, test_client: TestClient, admin_user, db: Session):
+    def test_deleted_endpoint(self, test_client: TestClient, admin_user, db: Session):
         from app.models import User, UserRole
         from app.auth import get_password_hash
 
@@ -146,7 +146,7 @@ class TestAdminListUsers:
         db.add(u)
         db.commit()
 
-        resp = test_client.get("/api/admin/users?include_deleted=true")
+        resp = test_client.get("/api/admin/users/deleted")
         assert resp.status_code == 200
         body = resp.json()
         emails = [u["email"] for u in body["users"]]
@@ -732,7 +732,7 @@ class TestAdminDeleteUser:
         emails = [u["email"] for u in body["users"]]
         assert "excluded@test.com" not in emails
 
-    def test_soft_delete_reappears_with_include_deleted(self, test_client: TestClient, admin_user, db: Session):
+    def test_soft_delete_reappears_in_deleted_endpoint(self, test_client: TestClient, admin_user, db: Session):
         from app.models import User, UserRole
         from app.auth import get_password_hash
 
@@ -749,7 +749,7 @@ class TestAdminDeleteUser:
         resp = test_client.delete(f"/api/admin/users/{u.id}")
         assert resp.status_code == 204
 
-        resp = test_client.get("/api/admin/users?include_deleted=true")
+        resp = test_client.get("/api/admin/users/deleted")
         assert resp.status_code == 200
         body = resp.json()
         emails = [u["email"] for u in body["users"]]

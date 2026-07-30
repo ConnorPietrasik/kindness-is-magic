@@ -373,34 +373,38 @@ describe("useCrudManager", () => {
     expect(fns.listFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  /* ── Optional functions — null mutations ────────────────── */
+  /* ── Optional functions — no-op mutations (Rules of Hooks) ── */
 
-  it("createMut is null when createFn is not provided", () => {
+  it("createMut is a no-op when createFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
-    expect(result.current.createMut).toBeNull();
+    expect(result.current.createMut).toBeDefined();
+    expect(result.current.createMut.status).toBe("idle");
   });
 
-  it("updateMut is null when updateFn is not provided", () => {
+  it("updateMut is a no-op when updateFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
-    expect(result.current.updateMut).toBeNull();
+    expect(result.current.updateMut).toBeDefined();
+    expect(result.current.updateMut.status).toBe("idle");
   });
 
-  it("deleteMut is null when deleteFn is not provided", () => {
+  it("deleteMut is a no-op when deleteFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
-    expect(result.current.deleteMut).toBeNull();
+    expect(result.current.deleteMut).toBeDefined();
+    expect(result.current.deleteMut.status).toBe("idle");
   });
 
-  it("restoreMut is null when restoreFn is not provided", () => {
+  it("restoreMut is a no-op when restoreFn is not provided", () => {
     const listFn = vi.fn().mockResolvedValue({ list: [] });
     const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], listFn }), { wrapper: wrap() });
 
-    expect(result.current.restoreMut).toBeNull();
+    expect(result.current.restoreMut).toBeDefined();
+    expect(result.current.restoreMut.status).toBe("idle");
   });
 
   /* ── Mutations — restore ────────────────────────────────── */
