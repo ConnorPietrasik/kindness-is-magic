@@ -760,12 +760,10 @@ class TestAdminUpdatePerson:
             json={
                 "given_name": "Alicia",
                 "age": 9,
-                "wishes": {
-                    "wishes": [
-                        {"type": "practical", "description": "A new coat"},
-                        {"type": "fun", "description": "A board game"},
-                    ]
-                },
+                "wishes": [
+                    {"type": "practical", "description": "A new coat"},
+                    {"type": "fun", "description": "A board game"},
+                ],
                 "title": "Miss",
                 "note": "Updated note",
             },

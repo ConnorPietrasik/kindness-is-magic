@@ -8,7 +8,6 @@ from app.schemas import (
     PersonCreate,
     PersonCreateInFamily,
     PersonUpdate,
-    PersonWishesCreate,
     WishCreate,
     WishUpdate,
     validate_wishes_for_age,
@@ -248,39 +247,6 @@ class TestPersonCreateInFamilyWishes:
 
 
 # ---------------------------------------------------------------------------
-# PersonWishesCreate schema tests
-# ---------------------------------------------------------------------------
-
-
-class TestPersonWishesCreate:
-    def test_valid_child_wishes(self):
-        pw = PersonWishesCreate(
-            wishes=[
-                WishCreate(type=WishType.practical, description="A coat"),
-                WishCreate(type=WishType.fun, description="A game"),
-            ]
-        )
-        assert len(pw.wishes) == 2
-
-    def test_valid_adult_wish(self):
-        pw = PersonWishesCreate(wishes=[WishCreate(type=WishType.adult, description="A laptop")])
-        assert len(pw.wishes) == 1
-
-    def test_duplicate_types_rejected(self):
-        with pytest.raises(ValidationError):
-            PersonWishesCreate(
-                wishes=[
-                    WishCreate(type=WishType.practical, description="A coat"),
-                    WishCreate(type=WishType.practical, description="Shoes"),
-                ]
-            )
-
-    def test_empty_wishes_rejected(self):
-        with pytest.raises(ValidationError):
-            PersonWishesCreate(wishes=[])
-
-
-# ---------------------------------------------------------------------------
 # PersonUpdate schema tests
 # ---------------------------------------------------------------------------
 
@@ -294,32 +260,28 @@ class TestPersonUpdateWishes:
     def test_update_wishes_with_age(self):
         update = PersonUpdate(
             age=10,
-            wishes=PersonWishesCreate(
-                wishes=[
-                    WishCreate(type=WishType.practical, description="New coat"),
-                    WishCreate(type=WishType.fun, description="New game"),
-                ]
-            ),
+            wishes=[
+                WishCreate(type=WishType.practical, description="New coat"),
+                WishCreate(type=WishType.fun, description="New game"),
+            ],
         )
         assert update.age == 10
-        assert len(update.wishes.wishes) == 2
+        assert len(update.wishes) == 2
 
     def test_update_wishes_rejects_wrong_age(self):
         with pytest.raises(ValidationError, match="adult"):
             PersonUpdate(
                 age=25,
-                wishes=PersonWishesCreate(
-                    wishes=[
-                        WishCreate(type=WishType.practical, description="A coat"),
-                        WishCreate(type=WishType.fun, description="A game"),
-                    ]
-                ),
+                wishes=[
+                    WishCreate(type=WishType.practical, description="A coat"),
+                    WishCreate(type=WishType.fun, description="A game"),
+                ],
             )
 
     def test_update_wishes_without_age_no_validation(self):
         """Wishes-only update skips age validation (route handler checks existing age)."""
         update = PersonUpdate(
-            wishes=PersonWishesCreate(wishes=[WishCreate(type=WishType.adult, description="A laptop")]),
+            wishes=[WishCreate(type=WishType.adult, description="A laptop")],
         )
         # Should not raise — age validation happens in route handler
         assert update.wishes is not None

@@ -79,9 +79,7 @@ export default function ReferrerFamilyDetail() {
           childCreateApi={(data) => createReferrerFamilyPerson(famIdNum, data)}
           childUpdateApi={updatePerson}
           childDeleteApi={deletePerson}
-          childUpdateNormaliseFn={(formData, original) =>
-            normalizeUpdatePayload(formData as PersonPayload, original as PersonPayload) as PersonPayload
-          }
+          childUpdateNormaliseFn={(formData, original) => normalizeUpdatePayload(formData as PersonPayload, original)}
           childFormDefault={defaultPersonForm as unknown as PersonPayload}
           childFormComponent={PersonForm}
           renderChildren={(rows, callbacks) => <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} />}

@@ -30,7 +30,7 @@ import {
   adminUpdatePerson,
 } from "../lib/api";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { PaginationParams, PersonDetail, PersonPayload } from "../types";
+import type { PaginationParams, PersonPayload } from "../types";
 
 const PEOPLE_KEYS = ["adminPeople"];
 const FAMILY_KEYS = ["adminFamilies"];
@@ -129,8 +129,8 @@ export default function AdminPeople() {
 
   function handleUpdate(formData: PersonPayload) {
     if (!editingId) return;
-    const payload = normalizeUpdatePayload(formData, detail as PersonDetail);
-    updateMut?.mutate({ id: editingId, data: payload as PersonPayload });
+    const payload = normalizeUpdatePayload(formData, detail);
+    updateMut?.mutate({ id: editingId, data: payload });
   }
 
   if (listLoading) return <PageSpinner />;

@@ -31,11 +31,15 @@ export function normalizePayload<T>(data: T): T {
  *
  * Treats `null` and `""` as equivalent for comparison since forms always
  * render nullable fields as controlled inputs with `""` defaults.
+ *
+ * The `original` parameter accepts a separate type parameter so it works when
+ * the response shape differs from the request shape (e.g. WishSummary[] vs
+ * WishCreate[] on the `wishes` field).
  */
-export function normalizeUpdatePayload<T>(formData: T, original: T): Partial<T> {
+export function normalizeUpdatePayload<T, O>(formData: T, original: O | null): Partial<T> {
   const result: Record<string, unknown> = {};
   const formRecord = formData as Record<string, unknown>;
-  const origRecord = original as Record<string, unknown>;
+  const origRecord = (original ?? {}) as Record<string, unknown>;
   for (const key of Object.keys(formRecord)) {
     const formValue = formRecord[key];
     const originalValue = origRecord[key];

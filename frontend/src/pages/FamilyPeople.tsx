@@ -18,7 +18,7 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { ROUTES } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { PersonDetail, PersonPayload } from "../types";
+import type { PersonPayload } from "../types";
 
 const FAMILY_PEOPLE_KEY = ["familyPeople"];
 const FAMILY_ME_KEY = ["familyMe"];
@@ -59,8 +59,8 @@ export default function FamilyPeople() {
 
   function handleUpdate(formData: PersonPayload) {
     if (!editingId) return;
-    const payload = normalizeUpdatePayload(formData, detail as PersonDetail);
-    updateMut?.mutate({ id: editingId, data: payload as PersonPayload });
+    const payload = normalizeUpdatePayload(formData, detail);
+    updateMut?.mutate({ id: editingId, data: payload });
   }
 
   if (listLoading) return <PageSpinner />;

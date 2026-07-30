@@ -542,25 +542,13 @@ class WishDetail(WishSummary):
     person_family_name: str | None = None
 
 
-class PersonWishesCreate(BaseModel):
-    """Bulk create wishes for a person, enforcing age-based rules.
-
-    * age >= 18: exactly one wish of type ``adult``
-    * age < 18: exactly one ``practical`` + one ``fun``
-    """
-
-    wishes: list[WishCreate]
-
-    @field_validator("wishes")
-    @classmethod
-    def validate_wish_uniqueness(cls, v: list[WishCreate]) -> list[WishCreate]:
-        """Ensure non-empty batch with no duplicate types."""
-        if not v:
-            raise ValueError("At least one wish is required")
-        types = {w.type for w in v}
-        if len(types) != len(v):
-            raise ValueError("Duplicate wish types in batch")
-        return v
+def validate_wish_list(wishes: list[WishCreate]) -> None:
+    """Validate non-empty wish list with no duplicate types."""
+    if not wishes:
+        raise ValueError("At least one wish is required")
+    types = {w.type for w in wishes}
+    if len(types) != len(wishes):
+        raise ValueError("Duplicate wish types in batch")
 
 
 def validate_wishes_for_age(wishes: list[WishCreate], age: int) -> None:
@@ -605,6 +593,7 @@ class PersonCreate(BaseModel):
     @field_validator("wishes")
     @classmethod
     def validate_wishes(cls, v: list[WishCreate], info) -> list[WishCreate]:
+        validate_wish_list(v)
         age = info.data.get("age")
         if age is not None:
             validate_wishes_for_age(v, age)
@@ -614,7 +603,7 @@ class PersonCreate(BaseModel):
 class PersonUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=40)
     age: Optional[int] = Field(None, ge=0, le=200)
-    wishes: PersonWishesCreate | None = None
+    wishes: list[WishCreate] | None = None
     title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
@@ -625,6 +614,14 @@ class PersonUpdate(BaseModel):
             return v
         return sanitize_plain_text(v)
 
+    @field_validator("wishes")
+    @classmethod
+    def validate_wishes(cls, v: list[WishCreate] | None) -> list[WishCreate] | None:
+        if v is None:
+            return v
+        validate_wish_list(v)
+        return v
+
     @model_validator(mode="after")
     def _validate_wishes_match_age(self) -> "PersonUpdate":
         """When both age and wishes are sent, validate they match.
@@ -633,7 +630,7 @@ class PersonUpdate(BaseModel):
         handler against the existing person's age.
         """
         if self.wishes is not None and self.age is not None:
-            validate_wishes_for_age(self.wishes.wishes, self.age)
+            validate_wishes_for_age(self.wishes, self.age)
         return self
 
 
@@ -830,6 +827,7 @@ class PersonCreateInFamily(BaseModel):
     @field_validator("wishes")
     @classmethod
     def validate_wishes(cls, v: list[WishCreate], info) -> list[WishCreate]:
+        validate_wish_list(v)
         age = info.data.get("age")
         if age is not None:
             validate_wishes_for_age(v, age)

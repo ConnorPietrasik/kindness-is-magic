@@ -140,14 +140,14 @@ def update_person(
     # Validate wishes against age if both are provided
     if body.wishes is not None:
         effective_age = body.age if body.age is not None else per.age
-        validate_wishes_for_age(body.wishes.wishes, effective_age)
+        validate_wishes_for_age(body.wishes, effective_age)
 
     # Apply person field updates (exclude 'wishes' — handled separately below)
     partial_update(per, body, exclude={"wishes"})
 
     # Handle wishes update if provided
     if body.wishes is not None:
-        sync_person_wishes(db, per_id, body.wishes.wishes)
+        sync_person_wishes(db, per_id, body.wishes)
         db.flush()
 
     db.commit()

@@ -220,7 +220,11 @@ export interface WishCreate {
   size?: string | null;
 }
 
-/** Payload for creating or updating a person. `family_id` and `deleted_at` are admin-only. */
+/** Payload for creating or updating a person. `family_id` and `deleted_at` are admin-only.
+
+    All fields are optional so the same type works for both create (all present) and
+    update (partial) operations. The backend enforces required fields on create.
+ */
 export interface PersonPayload {
   family_id?: number;
   given_name?: string;
