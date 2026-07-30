@@ -16,6 +16,7 @@ from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_family_detail,
+    compute_display_ids,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -71,61 +72,13 @@ def list_families(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
-    # Pre-compute stable positions via ROW_NUMBER.
-    # Flat view: position within each referrer group (partitioned by referrer_id).
-    # Scoped view: position among approved families only (pending/rejected excluded).
-    pos_map: dict[int, int] = {}
-    if families:
-        family_ids = [f.id for f in families]
-        if referrer_id is not None:
-            # Scoped: ROW_NUMBER over approved families for this referrer
-            positions = (
-                db.query(
-                    Family.id,
-                    func.row_number().over(order_by=Family.id).label("rn"),
-                )
-                .filter(
-                    Family.deleted_at.is_(None),
-                    Family.referrer_id == referrer_id,
-                    Family.approval_status == FamilyApprovalStatus.approved,
-                )
-                .all()
-            )
-            full_map = {fid: int(rn) for fid, rn in positions}
-            pos_map = {fid: full_map[fid] for fid in family_ids if fid in full_map}
-        else:
-            # Flat: ROW_NUMBER partitioned by referrer, ordered by id
-            positions = (
-                db.query(
-                    Family.id,
-                    func.row_number()
-                    .over(
-                        partition_by=func.coalesce(Family.referrer_id, 0),
-                        order_by=Family.id,
-                    )
-                    .label("rn"),
-                )
-                .filter(Family.deleted_at.is_(None))
-                .all()
-            )
-            full_map = {fid: int(rn) for fid, rn in positions}
-            pos_map = {fid: full_map[fid] for fid in family_ids if fid in full_map}
-
-    def _family_display_id(f: Family) -> str:
-        if referrer_id is not None:
-            # Scoped: approved families get their position among approved only
-            if f.approval_status == FamilyApprovalStatus.approved:
-                return str(pos_map.get(f.id, 0))
-            return f.approval_status.value.upper() if f.approval_status.value.upper() in ("PENDING", "REJECTED") else "UNKNOWN"
-        # Flat: stable global position prefixed with referrer id
-        ref_prefix = f.referrer_id if f.referrer_id is not None else 0
-        return f"{ref_prefix}-{pos_map.get(f.id, 0)}"
+    pos_map = compute_display_ids(db, "family", families, scope=referrer_id, show_status_labels=True)
 
     return FamilyListResponse(
         families=[
             FamilySummary(
                 id=f.id,
-                display_id=_family_display_id(f),
+                display_id=pos_map[f.id],
                 family_name=f.family_name,
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,

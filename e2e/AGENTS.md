@@ -27,6 +27,7 @@ See `playwright.config.ts` (4 projects: admin, referrer, family, guest) and `hel
 ## Conventions
 
 - **No `data-testid` attributes.** Selectors use labels, roles, headings, visible text.
+- **`data-id` on table rows.** Family and people table rows carry `data-id={entity.id}` so tests can extract the raw DB ID for API calls. The visible ID column shows the presentational `display_id` (e.g. `3-2-1`), which must not be parsed as a DB key.
 - Use `{ exact: true }` when text could collide (e.g., "Family" matches "Family ID: N").
 - Reuse helpers from `helpers/auth.ts` and `helpers/assertions.ts`.
 - **Unique test data per run.** Use `Math.random().toString(36).slice(2, 6)` suffixes on names/emails so re-runs without a DB wipe don't collide with stale records from prior runs.

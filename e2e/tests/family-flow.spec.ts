@@ -64,10 +64,9 @@ test.describe("Family self-service", () => {
 
     /* Capture person ID for cleanup */
     const personRow = page.getByRole("row").filter({ hasText: TEST_CHILD });
-    const idCell = personRow.getByRole("cell").first();
-    const idText = await idCell.textContent();
-    if (idText) {
-      testData.personId = parseInt(idText.trim(), 10);
+    const personIdRaw = await personRow.getAttribute("data-id");
+    if (personIdRaw) {
+      testData.personId = parseInt(personIdRaw, 10);
     }
   });
 

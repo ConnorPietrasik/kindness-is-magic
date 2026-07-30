@@ -208,6 +208,135 @@ class TestAdminFamilyDisplayIdFlat:
         assert "Approved Family" in names
         assert "Pending Family" in names
 
+    def test_pending_does_not_disrupt_approved_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Pending families interleaved between approved ones don't shift approved numbering."""
+        from app.models import Family, FamilyApprovalStatus
+
+        f1 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved First",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0000",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        f2 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Pending Middle",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.pending,
+        )
+        f3 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved Second",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0002",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        db.add_all([f1, f2, f3])
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["families"]) == 3
+
+        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
+        pending = [f for f in body["families"] if f["approval_status"] == "pending"]
+        # Approved families keep sequential numbering (1, 2) despite pending in between
+        assert approved[0]["display_id"] == f"{referrer_record.id}-1"
+        assert approved[1]["display_id"] == f"{referrer_record.id}-2"
+        # Pending family gets a status label, not a numeric ID
+        assert pending[0]["display_id"] == "PENDING"
+
+    def test_rejected_does_not_disrupt_approved_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Rejected families interleaved between approved ones don't shift approved numbering."""
+        from app.models import Family, FamilyApprovalStatus
+
+        f1 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved First",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0000",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        f2 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Rejected Middle",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.rejected,
+        )
+        f3 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved Second",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0002",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        db.add_all([f1, f2, f3])
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["families"]) == 3
+
+        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
+        rejected = [f for f in body["families"] if f["approval_status"] == "rejected"]
+        # Approved families keep sequential numbering (1, 2) despite rejected in between
+        assert approved[0]["display_id"] == f"{referrer_record.id}-1"
+        assert approved[1]["display_id"] == f"{referrer_record.id}-2"
+        # Rejected family gets a status label, not a numeric ID
+        assert rejected[0]["display_id"] == "REJECTED"
+
+    def test_flat_approved_display_id_matches_scoped(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Approved family display_id is consistent between flat and scoped views (minus prefix)."""
+        from app.models import Family, FamilyApprovalStatus
+
+        f1 = Family(
+            referrer_id=referrer_record.id,
+            family_name="First",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0000",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        f2 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Second",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        db.add_all([f1, f2])
+        db.commit()
+
+        _admin_login(test_client)
+        # Flat view
+        flat_resp = test_client.get("/api/admin/families")
+        flat_body = flat_resp.json()
+        # Scoped view
+        scoped_resp = test_client.get(f"/api/admin/families?referrer_id={referrer_record.id}")
+        scoped_body = scoped_resp.json()
+
+        # Same families, same core IDs (flat just has referrer prefix)
+        assert len(flat_body["families"]) == 2
+        assert len(scoped_body["families"]) == 2
+        for flat_f, scoped_f in zip(flat_body["families"], scoped_body["families"]):
+            assert flat_f["id"] == scoped_f["id"]
+            # Flat: "{ref_id}-{n}", Scoped: "{n}"
+            assert flat_f["display_id"] == f"{referrer_record.id}-{scoped_f['display_id']}"
+
 
 class TestAdminFamilyDisplayIdScoped:
     """Admin family list scoped to a single referrer."""
@@ -253,6 +382,37 @@ class TestAdminFamilyDisplayIdScoped:
         # Pending family has PENDING display_id
         pending_f = next(f for f in body["families"] if f["family_name"] == "Pending Family")
         assert pending_f["display_id"] == "PENDING"
+        # Approved families still have sequential numbering (1, 2)
+        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
+        assert len(approved) == 2
+        assert approved[0]["display_id"] == "1"
+        assert approved[1]["display_id"] == "2"
+
+    def test_scoped_includes_rejected_with_label(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
+        """Scoped admin view includes rejected families with 'REJECTED' display_id."""
+        from app.models import Family, FamilyApprovalStatus
+
+        ref = referrer_with_families["referrer"]
+        rejected = Family(
+            referrer_id=ref.id,
+            family_name="Rejected Family",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0088",
+            approval_status=FamilyApprovalStatus.rejected,
+        )
+        db.add(rejected)
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get(f"/api/admin/families?referrer_id={ref.id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        # All three families appear (2 approved + 1 rejected)
+        assert len(body["families"]) == 3
+        # Rejected family has REJECTED display_id
+        rejected_f = next(f for f in body["families"] if f["family_name"] == "Rejected Family")
+        assert rejected_f["display_id"] == "REJECTED"
         # Approved families still have sequential numbering (1, 2)
         approved = [f for f in body["families"] if f["approval_status"] == "approved"]
         assert len(approved) == 2
@@ -560,6 +720,89 @@ class TestAdminPeopleDisplayIdFlat:
         assert body["people"][0]["display_id"] == f"{referrer_record.id}-1-1"  # Alice
         assert body["people"][1]["display_id"] == f"{referrer_record.id}-1-2"  # Bob
         assert body["people"][2]["display_id"] == f"{referrer_record.id}-2-1"  # Charlie
+
+    def test_people_in_pending_family_skipped_in_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """People in pending/rejected families don't appear in the active people list.
+
+        When a pending family is approved, its people get family positions based on
+        the approved-family enumeration (pending families are skipped).
+        """
+        from app.models import Family, FamilyApprovalStatus, Person, Wish, WishType
+
+        # Approved family (first by id)
+        f1 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved Family",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0000",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        # Pending family (second by id)
+        f2 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Pending Family",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.pending,
+        )
+        # Another approved family (third by id)
+        f3 = Family(
+            referrer_id=referrer_record.id,
+            family_name="Approved Family 2",
+            family_wish="Wish",
+            contact_name="Contact",
+            phone_number="555-000-0002",
+            approval_status=FamilyApprovalStatus.approved,
+        )
+        db.add_all([f1, f2, f3])
+        db.commit()
+        db.refresh(f1)
+        db.refresh(f2)
+        db.refresh(f3)
+
+        # People in each family
+        p1 = Person(family_id=f1.id, given_name="Alice", age=8)
+        p2 = Person(family_id=f2.id, given_name="Bob", age=10)
+        p3 = Person(family_id=f3.id, given_name="Charlie", age=12)
+        db.add_all([p1, p2, p3])
+        db.flush()
+        for p in [p1, p2, p3]:
+            db.add_all(
+                [
+                    Wish(person_id=p.id, type=WishType.practical, description="W"),
+                    Wish(person_id=p.id, type=WishType.fun, description="F"),
+                ]
+            )
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/people")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        # Only people from approved families appear in the active list
+        assert len(body["people"]) == 2
+        # f1 is approved family 1, f3 is approved family 2 (f2 skipped)
+        assert body["people"][0]["display_id"] == f"{referrer_record.id}-1-1"  # Alice in approved family 1
+        assert body["people"][1]["display_id"] == f"{referrer_record.id}-2-1"  # Charlie in approved family 2
+
+        # Now approve the pending family — its people get family position 2
+        # (f2.id < f3.id so f2 slots in between f1 and f3 by id order)
+        db.query(Family).filter(Family.id == f2.id).update(
+            {Family.approval_status: FamilyApprovalStatus.approved}, synchronize_session=False
+        )
+        db.commit()
+
+        resp = test_client.get("/api/admin/people")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["people"]) == 3
+        # f1→pos 1, f2→pos 2 (id between f1 and f3), f3→pos 3
+        assert body["people"][0]["display_id"] == f"{referrer_record.id}-1-1"  # Alice
+        assert body["people"][1]["display_id"] == f"{referrer_record.id}-2-1"  # Bob (family 2)
+        assert body["people"][2]["display_id"] == f"{referrer_record.id}-3-1"  # Charlie (family 3)
 
 
 class TestAdminPeopleDisplayIdScoped:

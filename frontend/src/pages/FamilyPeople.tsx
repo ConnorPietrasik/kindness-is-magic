@@ -130,7 +130,7 @@ export default function FamilyPeople() {
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <Tr key={p.id}>
+                  <Tr key={p.id} data-id={p.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                     <Td className="font-medium text-gray-900">{p.given_name}</Td>
                     <Td>{p.age}</Td>

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Family, Person, User, Wish
 from app.permissions import require_family
-from app.response_builders import build_family_detail, build_person_detail, get_active_or_404, partial_update
+from app.response_builders import build_family_detail, build_person_detail, compute_display_ids, get_active_or_404, partial_update
 from app.schemas import (
     FamilyDetail,
     FamilyUpdate,
@@ -64,17 +64,18 @@ def list_people(
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
     people = db.query(Person).filter(Person.family_id == user.family_id, Person.deleted_at.is_(None)).order_by(Person.id).all()
+    pos_map = compute_display_ids(db, "person", people, scope=user.family_id)
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
-                display_id=str(idx + 1),
+                display_id=pos_map[p.id],
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
             )
-            for idx, p in enumerate(people)
+            for p in people
         ]
     )
 

@@ -8,14 +8,14 @@ import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User, Wish
+from app.models import Family, FamilyApprovalStatus, Person, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     build_person_detail,
+    compute_display_ids,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -63,7 +63,15 @@ def list_people(
     matching the referrer/family's own view. In the flat view, the format
     is {referrer_id_or_0}-{family_position}-{person_position}.
     """
-    query = db.query(Person).filter(Person.deleted_at.is_(None))
+    query = (
+        db.query(Person)
+        .join(Family)
+        .filter(
+            Person.deleted_at.is_(None),
+            Family.deleted_at.is_(None),
+            Family.approval_status == FamilyApprovalStatus.approved,
+        )
+    )
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)
 
@@ -71,76 +79,13 @@ def list_people(
     offset = (page - 1) * page_size
     people = query.order_by(Person.id).offset(offset).limit(page_size).all()
 
-    # Pre-compute family enumeration for flat views
-    family_enum_map: dict[int, tuple[int, int]] = {}  # family_id -> (referrer_id_or_0, family_position)
-    if family_id is None:
-        fam_positions = (
-            db.query(
-                Family.id,
-                Family.referrer_id,
-                func.row_number()
-                .over(
-                    partition_by=func.coalesce(Family.referrer_id, 0),
-                    order_by=Family.id,
-                )
-                .label("rn"),
-            )
-            .filter(Family.deleted_at.is_(None))
-            .all()
-        )
-        family_enum_map = {fid: (ref_id if ref_id is not None else 0, int(rn)) for fid, ref_id, rn in fam_positions}
-
-    # Compute per-person position within their family (1-based, among active people).
-    # Uses ROW_NUMBER for stable IDs that don't depend on pagination.
-    person_pos_map: dict[int, int] = {}
-    if people:
-        if family_id is not None:
-            # Scoped: ROW_NUMBER over active people in this family
-            page_person_ids = [p.id for p in people]
-            positions = (
-                db.query(
-                    Person.id,
-                    func.row_number().over(order_by=Person.id).label("rn"),
-                )
-                .filter(
-                    Person.deleted_at.is_(None),
-                    Person.family_id == family_id,
-                )
-                .all()
-            )
-            full_map = {pid: int(rn) for pid, rn in positions}
-            person_pos_map = {pid: full_map[pid] for pid in page_person_ids if pid in full_map}
-        else:
-            # Flat: ROW_NUMBER per family, scoped to families on this page.
-            page_family_ids = list({p.family_id for p in people})
-            page_person_ids = list({p.id for p in people})
-            if page_family_ids:
-                positions = (
-                    db.query(
-                        Person.id,
-                        func.row_number().over(partition_by=Person.family_id, order_by=Person.id).label("rn"),
-                    )
-                    .filter(
-                        Person.deleted_at.is_(None),
-                        Person.family_id.in_(page_family_ids),
-                    )
-                    .all()
-                )
-                full_map = {pid: int(rn) for pid, rn in positions}
-                person_pos_map = {pid: full_map[pid] for pid in page_person_ids if pid in full_map}
-
-    def _person_display_id(p: Person) -> str:
-        pos = person_pos_map.get(p.id, 0)
-        if family_id is not None:
-            return str(pos)
-        ref_id, fam_n = family_enum_map.get(p.family_id, (0, 0))
-        return f"{ref_id}-{fam_n}-{pos}"
+    pos_map = compute_display_ids(db, "person", people, scope=family_id)
 
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
-                display_id=_person_display_id(p),
+                display_id=pos_map[p.id],
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,

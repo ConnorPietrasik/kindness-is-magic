@@ -79,8 +79,15 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as ExtendedRequestConfig | undefined;
 
-    // Only attempt refresh on 401, skip the refresh endpoint itself
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== "/api/auth/refresh") {
+    // Only attempt refresh on 401, skip the refresh endpoint and the auth check.
+    // A 401 on /api/auth/me simply means "not logged in" — nothing to refresh.
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      originalRequest.url !== "/api/auth/refresh" &&
+      originalRequest.url !== "/api/auth/me"
+    ) {
       originalRequest._retry = true;
 
       try {

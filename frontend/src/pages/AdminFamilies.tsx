@@ -218,7 +218,7 @@ export default function AdminFamilies() {
               </TableHead>
               <TableBody>
                 {families.map((f) => (
-                  <Tr key={f.id}>
+                  <Tr key={f.id} data-id={f.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                     <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                       {f.family_name}

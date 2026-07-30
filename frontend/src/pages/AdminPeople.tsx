@@ -230,7 +230,7 @@ export default function AdminPeople() {
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <Tr key={p.id}>
+                  <Tr key={p.id} data-id={p.id}>
                     <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                     <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
                     <Td>{p.age}</Td>

@@ -1,3 +1,4 @@
+Add display_id to the specific manage views so that the admin won't forget
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Replace family name with their display ID for all public views
 Add more admin views - sort by wishes, sort families by size, etc

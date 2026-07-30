@@ -78,9 +78,8 @@ test.describe("Admin CRUD", () => {
 
     /* Find The Williams Family row and note its ID */
     const williamsRow = page.getByRole("row").filter({ hasText: "The Williams Family" });
-    const idCell = williamsRow.getByRole("cell").first();
-    const idText = await idCell.textContent();
-    const familyId = idText ? parseInt(idText.trim(), 10) : 0;
+    const familyIdRaw = await williamsRow.getAttribute("data-id");
+    const familyId = familyIdRaw ? parseInt(familyIdRaw, 10) : 0;
     /* Store familyId for navigation in subsequent tests. This is a CSV-seeded
        family — do NOT delete it in afterAll (would orphan the family user's FK). */
     testData.familyId = familyId;
@@ -112,10 +111,9 @@ test.describe("Admin CRUD", () => {
 
     /* Capture person ID for cleanup */
     const personRow = page.getByRole("row").filter({ hasText: TEST_PERSON });
-    const personIdCell = personRow.getByRole("cell").first();
-    const personIdText = await personIdCell.textContent();
-    if (personIdText) {
-      testData.personId = parseInt(personIdText.trim(), 10);
+    const personIdRaw = await personRow.getAttribute("data-id");
+    if (personIdRaw) {
+      testData.personId = parseInt(personIdRaw, 10);
     }
   });
 

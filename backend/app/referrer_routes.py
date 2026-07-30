@@ -18,6 +18,7 @@ from app.response_builders import (
     build_family_detail,
     build_person_detail,
     build_referrer_detail,
+    compute_display_ids,
     get_or_404,
     partial_update,
 )
@@ -94,11 +95,13 @@ def list_families(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
+    pos_map = compute_display_ids(db, "family", families, scope=user.referrer_id)
+
     return FamilyListResponse(
         families=[
             FamilySummary(
                 id=f.id,
-                display_id=str(idx + 1),
+                display_id=pos_map[f.id],
                 family_name=f.family_name,
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
@@ -107,7 +110,7 @@ def list_families(
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
-            for idx, f in enumerate(families)
+            for f in families
         ]
     )
 
@@ -339,17 +342,18 @@ def list_family_people(
     db: Session = Depends(get_db),
 ) -> PersonListResponse:
     people = db.query(Person).filter(Person.family_id == fid, Person.deleted_at.is_(None)).order_by(Person.id).all()
+    pos_map = compute_display_ids(db, "person", people, scope=fid)
     return PersonListResponse(
         people=[
             PersonSummary(
                 id=p.id,
-                display_id=str(idx + 1),
+                display_id=pos_map[p.id],
                 family_id=p.family_id,
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
             )
-            for idx, p in enumerate(people)
+            for p in people
         ]
     )
 
