@@ -1,12 +1,11 @@
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Replace family name with their display ID for all public views
-Add a size field for practical / unified wishes: always required to enter a value, but enter 0 if not relevant.
 Add more admin views - sort by wishes, sort families by size, etc
 Links up the chain from person -> family -> referrer, maybe with links to users too
 Have unapproved families hidden by default; same for referrers
 Add button for admins to email families directly
 Add Pickup_window for families
-Add packing slips for families - per pereson: ID, name, age, practical wish, fun wish
+Add packing slips for families - per person: ID, name, age, practical wish, fun wish
 Add family wish_approval status; referrers can approve (which locks families from changing anything aside from their own contact info), and then admins have to approve before it gets shown to donors (admin approval also locks referrer edits)
 Add wish purchasing fields: purchased_by (drop-down in frontend), when (defaults to current date when marked purchased, but can be edited), and where (text field).
 Purchaser user type: Is assigned wishes specifically. Can mark wishes as purchased by themselves (checkbox) as well as editing the date and location fields

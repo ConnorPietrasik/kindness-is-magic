@@ -54,6 +54,7 @@ export default function AdminReferrers() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
+  const [showUnapproved, setShowUnapproved] = useState(false);
 
   const isDeletedView = viewTab === "deleted";
 
@@ -125,9 +126,13 @@ export default function AdminReferrers() {
     pagination.goToPage(1);
   }
 
-  if (listLoading) return <PageSpinner />;
+  const referrers = useMemo(() => {
+    const all = listData?.referrers ?? [];
+    if (showUnapproved || isDeletedView) return all;
+    return all.filter((r) => r.approval_status === "approved");
+  }, [listData, showUnapproved, isDeletedView]);
 
-  const referrers = listData?.referrers ?? [];
+  if (listLoading) return <PageSpinner />;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -135,9 +140,23 @@ export default function AdminReferrers() {
 
       <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
-          {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
+          <div className="flex items-center gap-3">
+            {!isDeletedView && (
+              <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={showUnapproved}
+                  onChange={(e) => setShowUnapproved(e.target.checked)}
+                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  autoComplete="off"
+                />
+                Show unapproved
+              </label>
+            )}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
+          </div>
         </div>
 
         {/* Tabs */}

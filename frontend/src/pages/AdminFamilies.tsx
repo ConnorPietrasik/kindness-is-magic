@@ -48,6 +48,7 @@ export default function AdminFamilies() {
   const pagination = usePagination();
   const [viewTab, setViewTab] = useState<ViewTab>("active");
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
+  const [showUnapproved, setShowUnapproved] = useState(false);
 
   const isDeletedView = viewTab === "deleted";
 
@@ -119,9 +120,13 @@ export default function AdminFamilies() {
     pagination.goToPage(1);
   }
 
-  if (listLoading) return <PageSpinner />;
+  const families = useMemo(() => {
+    const all = listData?.families ?? [];
+    if (showUnapproved || isDeletedView) return all;
+    return all.filter((f) => f.approval_status === "approved");
+  }, [listData, showUnapproved, isDeletedView]);
 
-  const families = listData?.families ?? [];
+  if (listLoading) return <PageSpinner />;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -129,9 +134,23 @@ export default function AdminFamilies() {
 
       <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
-          {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
+          <div className="flex items-center gap-3">
+            {!isDeletedView && (
+              <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={showUnapproved}
+                  onChange={(e) => setShowUnapproved(e.target.checked)}
+                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  autoComplete="off"
+                />
+                Show unapproved
+              </label>
+            )}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
+          </div>
         </div>
 
         {/* Tabs */}
