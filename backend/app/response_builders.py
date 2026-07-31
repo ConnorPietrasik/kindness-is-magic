@@ -212,6 +212,61 @@ def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, li
     return result
 
 
+def create_person_with_wishes(
+    db: Session,
+    family_id: int,
+    given_name: str,
+    age: int,
+    wishes: list[WishCreate],
+    *,
+    title: str | None = None,
+    note: str | None = None,
+) -> Person:
+    """Create a Person and their initial Wish records in a single call.
+
+    Flushes the session so that ``person.id`` is populated.  Does **not**
+    commit — caller owns the transaction.
+    """
+    per = Person(
+        family_id=family_id,
+        given_name=given_name,
+        age=age,
+        title=title,
+        note=note,
+    )
+    db.add(per)
+    db.flush()
+
+    for wish_data in wishes:
+        db.add(
+            Wish(
+                person_id=per.id,
+                type=wish_data.type,
+                description=wish_data.description,
+                size=wish_data.size,
+            )
+        )
+
+    return per
+
+
+def build_wish_detail(wish: Wish, person: Person) -> dict:
+    """Build a dict suitable for WishDetail, including person context."""
+    return {
+        "id": wish.id,
+        "type": wish.type,
+        "description": wish.description,
+        "size": wish.size,
+        "purchased_by_id": wish.purchased_by_id,
+        "purchased_at": wish.purchased_at,
+        "purchased_where": wish.purchased_where,
+        "deleted_at": wish.deleted_at,
+        "person_id": wish.person_id,
+        "person_given_name": person.given_name,
+        "person_family_name": person.family.family_name if person.family else None,
+    }
+
+
 def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 

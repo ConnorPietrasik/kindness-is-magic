@@ -15,7 +15,9 @@ from app.models import Family, FamilyApprovalStatus, Person, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     build_person_detail,
+    build_wish_detail,
     compute_display_ids,
+    create_person_with_wishes,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -155,26 +157,15 @@ def create_person(
     # Validate family exists
     get_or_404(db, Family, body.family_id, "Family not found")
 
-    per = Person(
+    per = create_person_with_wishes(
+        db,
         family_id=body.family_id,
         given_name=body.given_name,
         age=body.age,
+        wishes=body.wishes,
         title=body.title,
         note=body.note,
     )
-    db.add(per)
-    db.flush()
-
-    # Create wishes
-    for wish_data in body.wishes:
-        wish = Wish(
-            person_id=per.id,
-            type=wish_data.type,
-            description=wish_data.description,
-            size=wish_data.size,
-        )
-        db.add(wish)
-
     db.commit()
     db.refresh(per)
     logger.info("Admin %s created person '%s' (id=%s) in family %s", _admin.email, per.given_name, per.id, body.family_id)
@@ -323,19 +314,7 @@ def create_person_wish(
     db.refresh(wish)
     logger.info("Admin %s created wish (id=%s) for person (id=%s)", _admin.email, wish.id, per_id)
 
-    return WishDetail(
-        id=wish.id,
-        type=wish.type,
-        description=wish.description,
-        size=wish.size,
-        purchased_by_id=wish.purchased_by_id,
-        purchased_at=wish.purchased_at,
-        purchased_where=wish.purchased_where,
-        deleted_at=wish.deleted_at,
-        person_id=wish.person_id,
-        person_given_name=per.given_name,
-        person_family_name=per.family.family_name if per.family else None,
-    )
+    return WishDetail(**build_wish_detail(wish, per))
 
 
 @people_admin_router.patch("/{per_id}/wishes/{wish_id}")
@@ -378,19 +357,7 @@ def update_person_wish(
     db.refresh(wish)
     logger.info("Admin %s updated wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
 
-    return WishDetail(
-        id=wish.id,
-        type=wish.type,
-        description=wish.description,
-        size=wish.size,
-        purchased_by_id=wish.purchased_by_id,
-        purchased_at=wish.purchased_at,
-        purchased_where=wish.purchased_where,
-        deleted_at=wish.deleted_at,
-        person_id=wish.person_id,
-        person_given_name=per.given_name,
-        person_family_name=per.family.family_name if per.family else None,
-    )
+    return WishDetail(**build_wish_detail(wish, per))
 
 
 @people_admin_router.delete("/{per_id}/wishes/{wish_id}", status_code=204)
@@ -451,16 +418,4 @@ def restore_person_wish(
     db.refresh(wish)
     logger.info("Admin %s restored wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
 
-    return WishDetail(
-        id=wish.id,
-        type=wish.type,
-        description=wish.description,
-        size=wish.size,
-        purchased_by_id=wish.purchased_by_id,
-        purchased_at=wish.purchased_at,
-        purchased_where=wish.purchased_where,
-        deleted_at=wish.deleted_at,
-        person_id=wish.person_id,
-        person_given_name=per.given_name,
-        person_family_name=per.family.family_name if per.family else None,
-    )
+    return WishDetail(**build_wish_detail(wish, per))

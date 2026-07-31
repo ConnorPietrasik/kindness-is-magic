@@ -8,9 +8,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User, Wish
+from app.models import Family, Person, User
 from app.permissions import require_family
-from app.response_builders import build_family_detail, build_person_detail, compute_display_ids, get_active_or_404, partial_update
+from app.response_builders import (
+    build_family_detail,
+    build_person_detail,
+    compute_display_ids,
+    create_person_with_wishes,
+    get_active_or_404,
+    partial_update,
+)
 from app.schemas import (
     FamilyDetail,
     FamilyUpdate,
@@ -88,26 +95,15 @@ def create_person(
 ) -> PersonDetail:
     family_id = user.family_id
 
-    per = Person(
+    per = create_person_with_wishes(
+        db,
         family_id=family_id,
         given_name=body.given_name,
         age=body.age,
+        wishes=body.wishes,
         title=body.title,
         note=body.note,
     )
-    db.add(per)
-    db.flush()
-
-    # Create wishes
-    for wish_data in body.wishes:
-        wish = Wish(
-            person_id=per.id,
-            type=wish_data.type,
-            description=wish_data.description,
-            size=wish_data.size,
-        )
-        db.add(wish)
-
     db.commit()
     db.refresh(per)
     logger.info(
