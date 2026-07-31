@@ -232,6 +232,9 @@ function InviteGenerator() {
     onSuccess: (data) => {
       setInvite(data);
       queryClient.invalidateQueries({ queryKey: INVITES_KEY });
+      if (data.email_error) {
+        toast.info(data.email_error);
+      }
     },
     onError: (err: unknown) => {
       toast.error(formatApiError(err, "Failed to create invite."));
@@ -270,11 +273,6 @@ function InviteGenerator() {
             <span>Family limit: {invite.family_limit}</span>
             <span>Expires: {formatDateTime(invite.expires_at)}</span>
           </div>
-          {invite.email_sent !== null && (
-            <p className={`mt-2 text-sm ${invite.email_sent ? "text-green-700" : "text-yellow-700"}`}>
-              {invite.email_sent ? "Email sent successfully." : `Email not sent: ${invite.email_send_reason ?? "unknown"}`}
-            </p>
-          )}
         </div>
       )}
 

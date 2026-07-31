@@ -81,7 +81,7 @@ class TestInviteReferrerCreate:
         assert re.match(r"^KRI-[A-Z0-9_-]{6}$", code)
 
     def test_invite_with_email(self, test_client: TestClient, admin_user):
-        """Invite with email sends (suppressed) and returns email_sent=true."""
+        """Invite with email sends (suppressed) and returns 201."""
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/invite-referrer",
@@ -90,11 +90,9 @@ class TestInviteReferrerCreate:
         assert resp.status_code == 201
         body = resp.json()
         assert body["code"].startswith("KRI-")
-        assert body["email_sent"] is True
-        assert body["email_send_reason"] is None
 
     def test_invite_without_email(self, test_client: TestClient, admin_user):
-        """Invite without email skips send; email_sent and reason are null."""
+        """Invite without email skips send and returns 201."""
         login_as(test_client, "admin@test.com", "AdminPass123!")
         resp = test_client.post(
             "/api/auth/invite-referrer",
@@ -102,8 +100,7 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["email_sent"] is None
-        assert body["email_send_reason"] is None
+        assert body["code"].startswith("KRI-")
 
     def test_invite_with_email_sets_locked_email(self, test_client: TestClient, admin_user, db: Session):
         """When email is provided, locked_email is persisted on the invite token."""
@@ -195,8 +192,8 @@ class TestInviteReferrerCreate:
         )
         assert resp.status_code == 422
 
-    def test_invite_email_failure_still_returns_201(self, test_client: TestClient, admin_user):
-        """SMTP failure does not break the endpoint; email_sent=false."""
+    def test_invite_email_smtp_failure_returns_201_with_error(self, test_client: TestClient, admin_user):
+        """SMTP failure returns 201 with email_error; invite token still created."""
         from unittest.mock import patch
 
         login_as(test_client, "admin@test.com", "AdminPass123!")
@@ -211,8 +208,33 @@ class TestInviteReferrerCreate:
             )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["email_sent"] is False
-        assert body["email_send_reason"] == "smtp_error"
+        assert body["code"].startswith("KRI-")
+        assert body["email_error"] is not None
+        assert "SMTP error" in body["email_error"]
+        assert body["code"] in body["email_error"]
+
+    def test_invite_email_unsubscribed_returns_201_with_error(self, test_client: TestClient, admin_user, db: Session):
+        """Unsubscribed recipient returns 201 with email_error."""
+        from app.models import EmailPreference
+        from datetime import datetime, timezone
+
+        pref = EmailPreference(
+            email="unsub@example.com",
+            unsubscribed_at=datetime.now(timezone.utc),
+        )
+        db.add(pref)
+        db.commit()
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email": "unsub@example.com"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["code"].startswith("KRI-")
+        assert body["email_error"] is not None
+        assert "unsubscribed" in body["email_error"].lower()
 
     def test_invite_email_uses_inviter_name(self, test_client: TestClient, admin_user, db):
         """Invite email is built with the inviter's name."""

@@ -254,15 +254,14 @@ export interface ReferrerInviteCreatePayload {
   email?: string | null;
 }
 
-/** Response when admin creates an invite. Mirrors ReferrerInviteResponse. */
+/** Response when admin creates an invite. */
 export interface ReferrerInviteResponse {
   code: string;
   family_limit: number;
   locked_email: string | null;
   expires_at: string;
   created_at: string;
-  email_sent: boolean | null;
-  email_send_reason: string | null;
+  email_error: string | null;
 }
 
 /** Payload for public referrer self-registration via invite. */
@@ -301,10 +300,9 @@ export interface FamilySelfRegisterResponse {
   family: FamilySummary;
 }
 
-/** Response from the send-family-invite endpoint. */
+/** Response from the send-family-invite endpoint (200 = sent, 429/500 = error). */
 export interface ReferrerFamilyInviteResponse {
-  email_sent: boolean;
-  email_send_reason: string | null;
+  message: string;
 }
 
 /** Summary for pending families awaiting referrer approval. */

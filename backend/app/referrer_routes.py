@@ -6,13 +6,21 @@ ownership of the target family in a single dependency.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User
+from app.models import (
+    Family,
+    FamilyApprovalStatus,
+    Person,
+    Referrer,
+    ReferrerApprovalStatus,
+    ReferrerInviteEmail,
+    User,
+)
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
@@ -398,6 +406,12 @@ async def send_family_invite(
 
     The email includes the referrer's family invite code and a link to the
     family self-registration page.
+
+    Rate limits:
+    * A recipient can receive at most one invite email every 7 days (global,
+      across all referrers) to protect SMTP reputation.
+    * A referrer can send at most ``family_limit`` invite emails per 24-hour
+      rolling window.
     """
     from app.mail import build_family_invite_email, send_email
 
@@ -408,6 +422,46 @@ async def send_family_invite(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can send invites once your account is approved.",
+        )
+
+    recipient = body.email.lower()
+    now = datetime.now(timezone.utc)
+
+    # --- Global per-recipient dedup (7-day window) ---
+    seven_days_ago = now - timedelta(days=7)
+    existing = (
+        db.query(ReferrerInviteEmail)
+        .filter(
+            ReferrerInviteEmail.recipient_email == recipient,
+            ReferrerInviteEmail.sent_at >= seven_days_ago,
+        )
+        .first()
+    )
+    if existing:
+        logger.info(
+            "Invite to %s blocked (already sent in last 7 days by referrer %s)",
+            recipient,
+            existing.referrer_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="An invite has already been sent to this email. Try again in 7 days.",
+        )
+
+    # --- Per-referrer daily cap (24-hour rolling window) ---
+    twenty_four_hours_ago = now - timedelta(hours=24)
+    daily_count = (
+        db.query(ReferrerInviteEmail)
+        .filter(
+            ReferrerInviteEmail.referrer_id == ref.id,
+            ReferrerInviteEmail.sent_at >= twenty_four_hours_ago,
+        )
+        .count()
+    )
+    if daily_count >= ref.family_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Daily invite limit of {ref.family_limit} reached. Try again tomorrow.",
         )
 
     html_body = build_family_invite_email(
@@ -421,14 +475,35 @@ async def send_family_invite(
         db=db,
     )
 
+    # Record the send and return the appropriate status
+    if result["sent"]:
+        try:
+            db.add(
+                ReferrerInviteEmail(
+                    referrer_id=ref.id,
+                    recipient_email=recipient,
+                    sent_at=now,
+                )
+            )
+            db.commit()
+        except Exception:
+            logger.exception("Failed to record invite email for referrer %s", ref.id)
+    elif result["reason"] == "unsubscribed":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This email address has unsubscribed.",
+        )
+    else:
+        # smtp_error or other infrastructure failure
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send email. Please try again later.",
+        )
+
     logger.info(
-        "Referrer %s sent family invite to %s (sent=%s)",
+        "Referrer %s sent family invite to %s",
         user.email,
         body.email,
-        result["sent"],
     )
 
-    return SendFamilyInviteResponse(
-        email_sent=result["sent"],
-        email_send_reason=result["reason"],
-    )
+    return SendFamilyInviteResponse()

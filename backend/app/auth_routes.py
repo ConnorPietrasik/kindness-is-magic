@@ -430,8 +430,7 @@ async def invite_referrer(
     logger.info("Invite token created: %s (family_limit=%d)", code, data.family_limit)
 
     # Send invite email if email address provided
-    email_sent: bool | None = None
-    email_send_reason: str | None = None
+    email_error: str | None = None
     if data.email:
         inviter_name = _get_inviter_name(_admin, db)
         html_body = build_invite_email(
@@ -447,8 +446,11 @@ async def invite_referrer(
             html_body=html_body,
             db=db,
         )
-        email_sent = result["sent"]
-        email_send_reason = result["reason"]
+        if not result["sent"]:
+            if result["reason"] == "unsubscribed":
+                email_error = f"Email not sent (recipient unsubscribed). Share code {code} directly."
+            else:
+                email_error = f"Email not sent (SMTP error). Share code {code} directly."
 
     return {
         "code": invite.code,
@@ -456,8 +458,7 @@ async def invite_referrer(
         "locked_email": invite.locked_email,
         "expires_at": invite.expires_at,
         "created_at": invite.created_at,
-        "email_sent": email_sent,
-        "email_send_reason": email_send_reason,
+        "email_error": email_error,
     }
 
 

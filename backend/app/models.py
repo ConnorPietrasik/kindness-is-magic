@@ -272,6 +272,30 @@ class RefreshToken(Base):
     user: Mapped["User"] = relationship("User", backref="refresh_tokens")
 
 
+class ReferrerInviteEmail(Base):
+    """Audit log of invite emails referrers send to families.
+
+    Used to enforce rate limits:
+    * Global per-recipient dedup (7-day window) to protect SMTP reputation.
+    * Per-referrer daily cap tied to ``family_limit``.
+    """
+
+    __tablename__ = "referrer_invite_emails"
+    __table_args__ = (
+        Index("ix_referrer_invite_emails_referrer_sent", "referrer_id", "sent_at"),
+        Index("ix_referrer_invite_emails_recipient_sent", "recipient_email", "sent_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    referrer_id: Mapped[int] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="CASCADE"), nullable=False)
+    recipient_email: Mapped[str] = mapped_column(String(120), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    @validates("recipient_email")
+    def _normalize_email(self, _key: str, value: str) -> str:
+        return value.strip().lower()
+
+
 class EmailPreference(Base):
     """Unsubscribe blocklist — rows created when a user clicks an unsubscribe link."""
 

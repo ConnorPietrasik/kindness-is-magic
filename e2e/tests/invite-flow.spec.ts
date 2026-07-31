@@ -94,11 +94,6 @@ test.describe("Invite and self-registration", () => {
     const inviteCode = (await codeElement.textContent())!.trim();
     expect(inviteCode).toMatch(/^KRI-/);
 
-    /* Verify email sent confirmation is shown (SUPPRESS_SEND=1 in test env) */
-    await expect(adminPage.getByText("Email sent successfully.")).toBeVisible({
-      timeout: 10_000,
-    });
-
     await adminContext.close();
   });
 

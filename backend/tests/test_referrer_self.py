@@ -985,9 +985,6 @@ class TestSendFamilyInvite:
             json={"email": "newfamily@example.com"},
         )
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["email_sent"] is True
-        assert body["email_send_reason"] is None
 
     def test_invalid_email_format(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
@@ -997,7 +994,7 @@ class TestSendFamilyInvite:
         )
         assert resp.status_code == 422
 
-    def test_unsubscribed_email_returns_false(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+    def test_unsubscribed_email_returns_403(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         from app.models import EmailPreference
         from datetime import datetime, timezone
 
@@ -1014,10 +1011,8 @@ class TestSendFamilyInvite:
             "/api/referrer/send-family-invite",
             json={"email": "unsub@example.com"},
         )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["email_sent"] is False
-        assert body["email_send_reason"] == "unsubscribed"
+        assert resp.status_code == 403
+        assert "unsubscribed" in resp.json()["detail"].lower()
 
     def test_email_in_body_is_used(self, test_client: TestClient, referrer_with_full_tree):
         """The email in the request body is passed to send_email."""
@@ -1062,3 +1057,141 @@ class TestSendFamilyInvite:
         assert resp.status_code == 200
         assert captured_kwargs["value"]["code"] == ref.family_invite_code
         assert captured_kwargs["value"]["referrer_name"] == ref.name
+
+    def test_global_per_recipient_block(self, test_client: TestClient, referrer_with_full_tree, another_referrer):
+        """A second referrer cannot send to an address that already received an invite."""
+        from unittest.mock import patch
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        # First referrer sends to the address
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": "family@example.com"},
+            )
+        assert resp.status_code == 200
+
+        # Second referrer tries the same address — 429
+        _another_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
+        assert resp.status_code == 429
+        assert "already been sent" in resp.json()["detail"]
+
+    def test_same_referrer_resend_to_same_address_blocked(self, test_client: TestClient, referrer_with_full_tree):
+        """The same referrer re-sending to the same address is also blocked."""
+        from unittest.mock import patch
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": "family@example.com"},
+            )
+        assert resp.status_code == 200
+
+        # Same referrer, same address — 429
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
+        assert resp.status_code == 429
+        assert "already been sent" in resp.json()["detail"]
+
+    def test_daily_limit_blocks_after_family_limit(self, test_client: TestClient, referrer_with_full_tree):
+        """After sending family_limit invites, further sends return 429."""
+        from unittest.mock import patch
+
+        ref = referrer_with_full_tree["referrer"]
+        limit = ref.family_limit  # 5
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            # Send up to the limit
+            for i in range(limit):
+                resp = test_client.post(
+                    "/api/referrer/send-family-invite",
+                    json={"email": f"user{i}@example.com"},
+                )
+                assert resp.status_code == 200, f"Request {i} should succeed"
+
+        # One past the limit — 429
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "user_past_limit@example.com"},
+        )
+        assert resp.status_code == 429
+
+    def test_daily_limit_resets_after_24h(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """After 24 hours pass, the per-referrer daily limit resets."""
+        from unittest.mock import patch
+        from datetime import datetime, timedelta, timezone
+        from app.models import ReferrerInviteEmail
+
+        ref = referrer_with_full_tree["referrer"]
+        limit = ref.family_limit
+
+        # Seed old records (25 hours ago — should not count)
+        old_time = datetime.now(timezone.utc) - timedelta(hours=25)
+        for i in range(limit):
+            db.add(
+                ReferrerInviteEmail(
+                    referrer_id=ref.id,
+                    recipient_email=f"old{i}@example.com",
+                    sent_at=old_time,
+                )
+            )
+        db.commit()
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            # Should still be able to send (old records expired)
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": "fresh@example.com"},
+            )
+        assert resp.status_code == 200
+
+    def test_seven_day_window_allows_resend(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """After 7 days, the global per-recipient block expires."""
+        from unittest.mock import patch
+        from datetime import datetime, timedelta, timezone
+        from app.models import ReferrerInviteEmail
+
+        ref = referrer_with_full_tree["referrer"]
+
+        # Seed an old record (8 days ago — should not block)
+        old_time = datetime.now(timezone.utc) - timedelta(days=8)
+        db.add(
+            ReferrerInviteEmail(
+                referrer_id=ref.id,
+                recipient_email="stale@example.com",
+                sent_at=old_time,
+            )
+        )
+        db.commit()
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": "stale@example.com"},
+            )
+        assert resp.status_code == 200

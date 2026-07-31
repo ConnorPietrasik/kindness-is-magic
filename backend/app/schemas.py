@@ -199,8 +199,7 @@ class ReferrerInviteResponse(BaseModel):
     locked_email: str | None = None
     expires_at: datetime
     created_at: datetime
-    email_sent: bool | None = None
-    email_send_reason: str | None = None
+    email_error: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -304,10 +303,13 @@ class SendFamilyInviteRequest(BaseModel):
 
 
 class SendFamilyInviteResponse(BaseModel):
-    """Response from the send-family-invite endpoint."""
+    """Response from the send-family-invite endpoint.
 
-    email_sent: bool
-    email_send_reason: str | None = None
+    Failures are communicated via HTTP status codes (429, 500).
+    A 200 response means the email was sent successfully.
+    """
+
+    message: str = "Invite email sent successfully."
 
 
 class ReferrerListResponse(BaseModel):

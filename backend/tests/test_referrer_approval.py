@@ -289,8 +289,6 @@ class TestSendFamilyInviteApprovalGate:
             json={"email": "family@example.com"},
         )
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["email_sent"] is True
 
 
 # ---------------------------------------------------------------------------

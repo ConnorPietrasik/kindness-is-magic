@@ -44,13 +44,9 @@ function InviteSection() {
 
   const sendInviteMut = useMutation({
     mutationFn: sendReferrerFamilyInvite,
-    onSuccess: (data) => {
-      if (data.email_sent) {
-        setSendSuccess(true);
-        setEmail("");
-      } else {
-        setSendError(data.email_send_reason ?? "Email was not sent.");
-      }
+    onSuccess: () => {
+      setSendSuccess(true);
+      setEmail("");
     },
     onError: (err: unknown) => {
       setSendError(formatApiError(err, "Failed to send invite."));
