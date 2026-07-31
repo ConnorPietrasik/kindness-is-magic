@@ -140,6 +140,7 @@ export interface FamilySummary {
   deleted_at: string | null;
   person_count: number;
   approval_status: FamilyApprovalStatus;
+  pickup_window: string | null;
 }
 
 /** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name). */
@@ -157,6 +158,7 @@ export interface FamilyDetail {
   deleted_at: string | null;
   person_count: number;
   approval_status: FamilyApprovalStatus;
+  pickup_window: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +197,7 @@ export interface FamilyPayload {
   family_wish?: string;
   contact_name?: string;
   deleted_at?: string | null;
+  pickup_window?: string | null;
 }
 
 /** Wish type — mirrors backend WishType enum. */
@@ -314,6 +317,7 @@ export interface PendingFamilySummary {
   approval_status: FamilyApprovalStatus;
   person_count: number;
   created_at: string | null;
+  pickup_window: string | null;
 }
 
 // ---------------------------------------------------------------------------

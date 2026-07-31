@@ -1,8 +1,11 @@
 /**
- * NULLABLE_STRING_FIELDS — fields that the backend stores as `NULL` when empty.
+ * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
-const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "title", "note"]);
+const NULLABLE_FIELDS = new Set(["bio", "address", "title", "note", "pickup_window"]);
+
+/** Datetime fields that need canonical comparison in `normalizeUpdatePayload`. */
+const DATETIME_FIELDS = new Set(["pickup_window"]);
 
 /**
  * normalizePayload — convert empty strings to `null` on known nullable fields.
@@ -13,7 +16,7 @@ const NULLABLE_STRING_FIELDS = new Set(["bio", "address", "title", "note"]);
  */
 export function normalizePayload<T>(data: T): T {
   const copy = { ...(data as Record<string, unknown>) } as Record<string, unknown>;
-  for (const key of NULLABLE_STRING_FIELDS) {
+  for (const key of NULLABLE_FIELDS) {
     if (key in copy && copy[key] === "") {
       copy[key] = null;
     }
@@ -43,6 +46,19 @@ export function normalizeUpdatePayload<T, O>(formData: T, original: O | null): P
   for (const key of Object.keys(formRecord)) {
     const formValue = formRecord[key];
     const originalValue = origRecord[key];
+
+    // Datetime fields: normalize to UTC for comparison so that
+    // "2025-02-15T14:30:00+00:00" ≡ "2025-02-15T14:30:00Z" (same instant).
+    if (DATETIME_FIELDS.has(key)) {
+      const formDt = typeof formValue === "string" && formValue ? new Date(formValue).toISOString() : "";
+      const origDt = typeof originalValue === "string" && originalValue ? new Date(originalValue).toISOString() : "";
+      if (formDt === origDt) {
+        continue; // unchanged — omit
+      }
+      result[key] = formValue;
+      continue;
+    }
+
     // Treat null ≡ "" for comparison (forms render null as "")
     const originalStr = originalValue ?? "";
     if (originalStr === formValue) {
@@ -59,6 +75,64 @@ export function normalizeUpdatePayload<T, O>(formData: T, original: O | null): P
 export function humanize(str: string | null | undefined): string {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * formatDateTime — format an ISO datetime string for display.
+ *
+ * Used in list/detail views to show timestamps in a readable format.
+ */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "\u2014";
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+/**
+ * toDatetimeLocalValue — convert an ISO datetime string to the format
+ * expected by `<input type="datetime-local">` (YYYY-MM-DDTHH:MM).
+ *
+ * Converts to the browser's local timezone so the picker shows the correct
+ * time for the user. Use `fromDatetimeLocalValue` to convert back to ISO
+ * and preserve the original instant.
+ *
+ * Returns empty string if input is null/undefined.
+ */
+export function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * fromDatetimeLocalValue — convert a `datetime-local` input value back to
+ * an ISO 8601 UTC string.
+ *
+ * The input value represents local time. `new Date()` interprets it as local,
+ * and `.toISOString()` converts back to UTC — preserving the original instant
+ * that the backend sent.
+ *
+ * Milliseconds are truncated (`.slice(0, -4)`) so the output matches the
+ * backend's `YYYY-MM-DDTHH:MM:SSZ` shape. This prevents `normalizeUpdatePayload`
+ * from treating an untouched field as "changed" (no milliseconds → `.000Z` →
+ * false diff).
+ *
+ * Returns empty string if input is empty.
+ */
+export function fromDatetimeLocalValue(value: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  // toISOString() returns "2025-01-15T14:30:00.000Z" — strip ".000Z" → "2025-01-15T14:30:00Z"
+  return `${date.toISOString().slice(0, -5)}Z`;
 }
 
 /**

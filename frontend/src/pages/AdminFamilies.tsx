@@ -32,7 +32,7 @@ import {
   adminUpdateFamily,
 } from "../lib/api";
 import { route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 
 const FAMILY_KEYS = ["adminFamilies"];
@@ -214,6 +214,7 @@ export default function AdminFamilies() {
                 <Th>Family Name</Th>
                 <Th>Contact</Th>
                 <Th>Referrer</Th>
+                <Th>Pickup Window</Th>
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -248,6 +249,7 @@ export default function AdminFamilies() {
                         "—"
                       )}
                     </Td>
+                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(f.pickup_window)}</Td>
                     <Td>
                       <div className="flex gap-2">
                         {!isDeletedView && f.deleted_at == null && (

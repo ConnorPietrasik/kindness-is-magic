@@ -20,6 +20,7 @@ export const defaultFamilyForm = {
   bio: "",
   address: "",
   phone_number: "",
+  pickup_window: "",
 } as const;
 
 export const defaultReferrerForm = {

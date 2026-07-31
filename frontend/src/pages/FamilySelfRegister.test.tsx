@@ -31,6 +31,7 @@ const mockResponse: FamilySelfRegisterResponse = {
     deleted_at: null,
     person_count: 0,
     approval_status: "approved",
+    pickup_window: null,
   },
 };
 

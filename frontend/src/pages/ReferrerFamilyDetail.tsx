@@ -29,7 +29,7 @@ import {
   updateReferrerFamily,
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -135,7 +135,8 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
             <InfoRow label="Family Wish" value={data.family_wish} />
             <InfoRow label="Bio" value={data.bio} />
             <InfoRow label="Address" value={data.address} />
-            <InfoRow label="Phone" value={data.phone_number} isLast />
+            <InfoRow label="Phone" value={data.phone_number} />
+            <InfoRow label="Pickup Window" value={formatDateTime(data.pickup_window)} isLast />
           </div>
         )
       )}

@@ -19,7 +19,7 @@ import { PageSpinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
 import { getFamilyMe, patchFamilyMe } from "../lib/api";
 import { ROUTES } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload } from "../types";
 
 const FAMILY_ME_KEY = ["familyMe"];
@@ -95,6 +95,7 @@ export default function FamilyDashboard() {
                 <InfoRow label="Bio" value={familyInfo.bio} />
                 <InfoRow label="Address" value={familyInfo.address} />
                 <InfoRow label="Phone" value={familyInfo.phone_number} />
+                <InfoRow label="Pickup Window" value={formatDateTime(familyInfo.pickup_window)} />
                 <InfoRow label="People Count" value={familyInfo.person_count ?? 0} isLast />
               </div>
             )

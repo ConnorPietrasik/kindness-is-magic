@@ -37,7 +37,7 @@ import {
   adminUpdateReferrer,
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload, PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
@@ -259,6 +259,7 @@ export default function AdminReferrerFamilies() {
                 <Th>Family Name</Th>
                 <Th>Contact</Th>
                 <Th>People</Th>
+                <Th>Pickup Window</Th>
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -282,6 +283,7 @@ export default function AdminReferrerFamilies() {
                     </Td>
                     <Td>{f.contact_name}</Td>
                     <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(f.pickup_window)}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
                         {!isDeletedView && f.deleted_at == null && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatApiError, humanize, normalizePayload, normalizeUpdatePayload } from "./utils";
+import { formatApiError, fromDatetimeLocalValue, humanize, normalizePayload, normalizeUpdatePayload, toDatetimeLocalValue } from "./utils";
 
 describe("humanize", () => {
   it("capitalises first letter of a string", () => {
@@ -122,6 +122,69 @@ describe("normalizeUpdatePayload", () => {
     const result = normalizeUpdatePayload(form, original);
     expect(result.name).toBeUndefined();
     expect(result.bio).toBe("");
+  });
+
+  it("treats same-instant datetimes as unchanged despite format differences", () => {
+    const original = { family_name: "Smith", pickup_window: "2025-02-15T14:30:00+00:00" };
+    const form = { family_name: "Smith", pickup_window: "2025-02-15T14:30:00Z" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.pickup_window).toBeUndefined(); // same instant, different format
+    expect(result.family_name).toBeUndefined();
+  });
+
+  it("includes changed datetime fields", () => {
+    const original = { pickup_window: "2025-02-15T14:30:00Z" };
+    const form = { pickup_window: "2025-03-20T10:00:00Z" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.pickup_window).toBe("2025-03-20T10:00:00Z");
+  });
+
+  it("treats null → empty string datetime as unchanged", () => {
+    const original = { pickup_window: null };
+    const form = { pickup_window: "" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.pickup_window).toBeUndefined();
+  });
+
+  it("includes cleared datetime (value → empty string)", () => {
+    const original = { pickup_window: "2025-02-15T14:30:00Z" };
+    const form = { pickup_window: "" };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.pickup_window).toBe("");
+  });
+});
+
+describe("toDatetimeLocalValue / fromDatetimeLocalValue", () => {
+  it("round-trips an ISO datetime through datetime-local format", () => {
+    const iso = "2025-02-15T14:30:00Z";
+    const local = toDatetimeLocalValue(iso);
+    const back = fromDatetimeLocalValue(local);
+    // Both represent the same instant
+    expect(new Date(iso).getTime()).toBe(new Date(back).getTime());
+  });
+
+  it("round-trips an ISO datetime with timezone offset", () => {
+    const iso = "2025-02-15T14:30:00+05:00";
+    const local = toDatetimeLocalValue(iso);
+    const back = fromDatetimeLocalValue(local);
+    expect(new Date(iso).getTime()).toBe(new Date(back).getTime());
+  });
+
+  it("returns empty string for null/undefined input", () => {
+    expect(toDatetimeLocalValue(null)).toBe("");
+    expect(toDatetimeLocalValue(undefined)).toBe("");
+    expect(fromDatetimeLocalValue("")).toBe("");
+  });
+
+  it("returns empty string for invalid date", () => {
+    expect(toDatetimeLocalValue("not-a-date")).toBe("");
+    expect(fromDatetimeLocalValue("not-a-date")).toBe("");
+  });
+
+  it("fromDatetimeLocalValue produces no-milliseconds output", () => {
+    const result = fromDatetimeLocalValue("2025-03-20T10:00");
+    expect(result).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(result).not.toContain(".");
   });
 });
 

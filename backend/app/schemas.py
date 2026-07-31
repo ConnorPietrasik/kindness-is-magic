@@ -356,6 +356,7 @@ class FamilyCreate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
+    pickup_window: Optional[datetime] = None
 
     @field_validator("family_name", "family_wish", "contact_name", "phone_number")
     @classmethod
@@ -383,6 +384,14 @@ class FamilyUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = Field(None, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
+    pickup_window: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("pickup_window", mode="before")
+    @classmethod
+    def _pickup_window_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
 
     @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
     @classmethod
@@ -423,6 +432,7 @@ class FamilyDetail(BaseModel):
     family_wish: str
     contact_name: str
     approval_status: FamilyApprovalStatus
+    pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int
 
@@ -437,6 +447,7 @@ class FamilySummary(BaseModel):
     contact_name: str
     referrer_id: int | None
     approval_status: FamilyApprovalStatus
+    pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int = 0
 
@@ -452,6 +463,7 @@ class PendingFamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     approval_status: FamilyApprovalStatus
+    pickup_window: datetime | None = None
     person_count: int = 0
     created_at: datetime
 

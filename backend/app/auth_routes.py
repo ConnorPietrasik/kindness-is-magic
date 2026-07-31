@@ -637,6 +637,7 @@ async def register_family(
             contact_name=family.contact_name,
             referrer_id=family.referrer_id,
             approval_status=family.approval_status,
+            pickup_window=family.pickup_window,
             deleted_at=family.deleted_at,
             person_count=person_count,
         ),

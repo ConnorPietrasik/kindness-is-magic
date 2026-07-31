@@ -107,6 +107,7 @@ def list_families(
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
                 approval_status=f.approval_status,
+                pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
@@ -231,6 +232,7 @@ def list_pending_families(
             family_wish=f.family_wish,
             contact_name=f.contact_name,
             approval_status=f.approval_status,
+            pickup_window=f.pickup_window,
             person_count=count_map.get(f.id, 0),
             created_at=f.created_at,
         )

@@ -84,6 +84,7 @@ def list_families(
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
                 approval_status=f.approval_status,
+                pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
@@ -126,6 +127,7 @@ def list_deleted_families(
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
                 approval_status=f.approval_status,
+                pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
             )
@@ -166,6 +168,7 @@ def create_family(
         bio=body.bio,
         address=body.address,
         phone_number=body.phone_number,
+        pickup_window=body.pickup_window,
         approval_status=FamilyApprovalStatus.approved,
     )
     db.add(fam)

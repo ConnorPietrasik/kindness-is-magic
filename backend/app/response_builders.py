@@ -243,6 +243,7 @@ def build_family_detail(fam: Family, db: Session, *, person_count: int | None = 
         "family_wish": fam.family_wish,
         "contact_name": fam.contact_name,
         "approval_status": fam.approval_status,
+        "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
     }
@@ -301,7 +302,7 @@ def _resolve_sentinels(obj, update_data: dict) -> dict:
     """Resolve sentinel values in update data before they are applied.
 
     * ``0`` on a nullable FK column → ``_CLEAR`` (clear the FK to NULL).
-    * ``""`` on a nullable string column → ``_CLEAR`` (clear to NULL).
+    * ``""`` on any nullable column → ``_CLEAR`` (clear to NULL).
     * ``None`` is left as-is (means "don't change").
 
     Returns a new dict with resolved values. Callers can inspect the result

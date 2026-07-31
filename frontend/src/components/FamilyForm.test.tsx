@@ -18,6 +18,7 @@ const mockFamilyDetail: FamilyDetail = {
   deleted_at: null,
   person_count: 3,
   approval_status: "approved",
+  pickup_window: "2025-02-15T14:30:00+00:00",
 };
 
 const referrerMap: Record<number, string> = {
@@ -144,5 +145,79 @@ describe("FamilyForm", () => {
     render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} loading={true} />);
 
     expect(screen.getByText("Saving…")).toBeInTheDocument();
+  });
+
+  /* ── Pickup Window (admin only) ─────────────────────────── */
+
+  it("shows pickup window field in admin context", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+
+    expect(screen.getByText("Pickup Window")).toBeInTheDocument();
+    const datetimeInputs = document.querySelectorAll('input[type="datetime-local"]');
+    expect(datetimeInputs.length).toBe(1);
+  });
+
+  it("does not show pickup window field without referrerMap", () => {
+    render(<FamilyForm title="Edit Family Profile" isEdit={true} initial={mockFamilyDetail} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.queryByText("Pickup Window")).not.toBeInTheDocument();
+  });
+
+  it("sends pickup_window in submit payload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} onSubmit={onSubmit} />);
+
+    // Fill required fields
+    await user.selectOptions(screen.getByLabelText("Referrer"), "1");
+    await user.type(screen.getByLabelText("Family Name"), "The Joneses");
+    await user.type(screen.getByLabelText("Family Wish"), "A computer");
+    await user.type(screen.getByLabelText("Contact Name"), "Dad Jones");
+    await user.type(screen.getByLabelText("Phone Number"), "5551234567");
+
+    // Set pickup window (find by type since OptionalLabel uses <span>, not <label>)
+    const pickupInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    expect(pickupInput).toBeTruthy();
+    await user.type(pickupInput!, "2025-03-20T10:00");
+
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // datetime-local value is converted back to ISO UTC on submit (no milliseconds)
+        pickup_window: expect.stringMatching(/^2025-03-20T\d{2}:\d{2}:\d{2}Z$/),
+      })
+    );
+  });
+
+  it("pre-fills pickup window on edit and preserves value when unchanged", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />);
+
+    // Verify the datetime-local input is pre-filled
+    const pickupInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    expect(pickupInput).toBeTruthy();
+    // Value should be in YYYY-MM-DDTHH:MM format (local timezone)
+    expect(pickupInput!.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    // Change only the family name, leave pickup window untouched
+    const nameInput = screen.getByLabelText("Family Name") as HTMLInputElement;
+    await user.clear(nameInput);
+    await user.type(nameInput, "The Updateds");
+
+    await user.click(screen.getByText("Update"));
+
+    // When the datetime-local input is not touched, the form preserves
+    // the original API value. normalizeUpdatePayload (tested in utils.test.ts)
+    // handles the same-instant comparison to omit unchanged datetime fields.
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        family_name: "The Updateds",
+        pickup_window: mockFamilyDetail.pickup_window,
+      })
+    );
   });
 });

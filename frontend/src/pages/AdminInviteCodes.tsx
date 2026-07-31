@@ -20,7 +20,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { usePagination } from "../hooks/usePagination";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite, type InviteListParams } from "../lib/api";
-import { formatApiError } from "../lib/utils";
+import { formatApiError, formatDateTime } from "../lib/utils";
 import type { ReferrerInviteResponse } from "../types";
 
 const INVITES_KEY = ["adminInvites"];
@@ -305,14 +305,4 @@ function InviteGenerator() {
       <p className="mt-3 text-xs text-gray-400">Including an email locks this invite to that address</p>
     </Card>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }

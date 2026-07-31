@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
@@ -38,6 +39,8 @@ export function FamilyForm({
   onCancel,
   loading,
 }: FamilyFormProps) {
+  // Store pickup_window as ISO (matching backend format). Convert to/from
+  // datetime-local only for the <input> value attribute.
   const [form, setForm] = useState(() => ({ ...defaultFamilyForm, ...initial }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
@@ -130,6 +133,21 @@ export function FamilyForm({
               autoComplete: "off",
             }}
           />
+
+          {/* Pickup Window — admin only */}
+          {hasReferrerMap && (
+            <div>
+              <OptionalLabel text="Pickup Window" />
+              <FormField
+                type="datetime-local"
+                fieldProps={{
+                  value: toDatetimeLocalValue(form.pickup_window),
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("pickup_window", fromDatetimeLocalValue(e.target.value)),
+                  autoComplete: "off",
+                }}
+              />
+            </div>
+          )}
 
           {showOptionalFields && (
             <>
