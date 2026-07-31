@@ -191,7 +191,7 @@ export default function AdminFamilies() {
 
           {(showForm || (editingId && detail)) && (
             <FamilyForm
-              title={editingId ? "Edit Family" : "Add Family"}
+              title={editingId ? `Edit Family #${detail?.display_id}` : "Add Family"}
               initial={editingId ? (detail ?? defaultFamilyForm) : defaultFamilyForm}
               isEdit={!!editingId}
               referrerMap={referrerMap}
@@ -236,7 +236,18 @@ export default function AdminFamilies() {
                       )}
                     </Td>
                     <Td>{f.contact_name}</Td>
-                    <Td>{f.referrer_id != null ? referrerMap[f.referrer_id] || `ID ${f.referrer_id}` : "—"}</Td>
+                    <Td>
+                      {f.referrer_id != null ? (
+                        <Link
+                          to={route.adminReferrerFamilies(f.referrer_id)}
+                          className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                        >
+                          {referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
                     <Td>
                       <div className="flex gap-2">
                         {!isDeletedView && f.deleted_at == null && (

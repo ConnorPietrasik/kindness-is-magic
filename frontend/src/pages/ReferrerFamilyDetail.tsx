@@ -106,6 +106,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold text-gray-900">{data ? data.family_name : "\u2014"}</h3>
+          {data && <span className="text-xs font-mono text-gray-400">#{data.display_id}</span>}
           {data && (
             <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
               {data.person_count ?? 0} person{(data.person_count ?? 0) !== 1 ? "s" : ""}

@@ -155,12 +155,23 @@ function FamilyCard(
   return (
     <Card className="mb-6">
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold text-gray-900">{data ? data.family_name : "\u2014"}</h3>
-          {data && (
-            <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
-              {(data.person_count ?? 0) === 1 ? "1 person" : `${data.person_count ?? 0} people`}
-            </span>
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-900">{data ? data.family_name : "\u2014"}</h3>
+            {data && <span className="text-xs font-mono text-gray-400">#{data.display_id}</span>}
+            {data && (
+              <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
+                {(data.person_count ?? 0) === 1 ? "1 person" : `${data.person_count ?? 0} people`}
+              </span>
+            )}
+          </div>
+          {data && data.referrer_id != null && data.referrer_id > 0 && (
+            <Link
+              to={route.adminReferrerFamilies(data.referrer_id)}
+              className="text-xs text-gray-400 transition-colors hover:text-violet-600"
+            >
+              Referrer: {data.referrer_name || `ID ${data.referrer_id}`}
+            </Link>
           )}
         </div>
         <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>

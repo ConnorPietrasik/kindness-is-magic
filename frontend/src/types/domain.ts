@@ -86,6 +86,7 @@ export interface ReferrerSummary {
   id: number;
   name: string;
   family_limit: number;
+  family_count: number;
   family_invite_code: string;
   approval_status: ReferrerApprovalStatus;
   approved_by_admin_name: string | null;
@@ -141,10 +142,12 @@ export interface FamilySummary {
   approval_status: FamilyApprovalStatus;
 }
 
-/** Mirrors FamilyDetail (includes computed person_count). */
+/** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name). */
 export interface FamilyDetail {
   id: number;
   referrer_id: number | null;
+  referrer_name: string | null;
+  display_id: string;
   family_name: string;
   bio: string | null;
   address: string | null;
@@ -342,6 +345,7 @@ export interface FamilyWishListResponse {
 export interface PersonDetail {
   id: number;
   family_id: number;
+  display_id: string;
   given_name: string;
   title: string | null;
   age: number;

@@ -76,12 +76,12 @@ describe("response interceptor — 401 token refresh", () => {
 
     const error = {
       response: { status: 401, data: {} },
-      config: { url: "/api/auth/me", method: "get", _retry: false },
+      config: { url: "/api/admin/families", method: "get", _retry: false },
     };
 
     const result = await rejectedHandler!(error);
     expect(mockApi.post).toHaveBeenCalledWith("/api/auth/refresh");
-    expect(mockApi).toHaveBeenCalledWith(expect.objectContaining({ url: "/api/auth/me" }));
+    expect(mockApi).toHaveBeenCalledWith(expect.objectContaining({ url: "/api/admin/families" }));
     expect(result).toEqual({ data: "recovered" });
   });
 
@@ -105,7 +105,7 @@ describe("response interceptor — 401 token refresh", () => {
 
     const error = {
       response: { status: 401, data: {} },
-      config: { url: "/api/auth/me", method: "get", _retry: false },
+      config: { url: "/api/admin/families", method: "get", _retry: false },
     };
 
     await expect(rejectedHandler!(error)).rejects.toBe(error);
@@ -115,7 +115,7 @@ describe("response interceptor — 401 token refresh", () => {
   it("does not refresh if _retry is already true", async () => {
     const error = {
       response: { status: 401, data: {} },
-      config: { url: "/api/auth/me", method: "get", _retry: true },
+      config: { url: "/api/admin/families", method: "get", _retry: true },
     };
     await expect(rejectedHandler!(error)).rejects.toBe(error);
     expect(mockApi.post).not.toHaveBeenCalled();

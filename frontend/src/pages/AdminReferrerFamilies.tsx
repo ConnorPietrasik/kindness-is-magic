@@ -162,6 +162,7 @@ export default function AdminReferrerFamilies() {
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold text-gray-900">{referrerData ? referrerData.name : "\u2014"}</h3>
+              {referrerData && <span className="text-xs font-mono text-gray-400">#{referrerData.id}</span>}
               {referrerData && (
                 <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
                   {(referrerData.family_count ?? 0) === 1 ? "1 family" : `${referrerData.family_count ?? 0} families`}
@@ -185,7 +186,7 @@ export default function AdminReferrerFamilies() {
               <div className="space-y-0">
                 <InfoRow label="Name" value={referrerData.name} />
                 <InfoRow label="Phone" value={referrerData.phone_number} />
-                <InfoRow label="Family Limit" value={String(referrerData.family_limit)} isLast />
+                <InfoRow label="Family Limit" value={`${referrerData.family_count ?? 0} / ${referrerData.family_limit}`} isLast />
               </div>
             )
           )}

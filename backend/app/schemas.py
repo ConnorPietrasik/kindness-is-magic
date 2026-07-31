@@ -211,6 +211,7 @@ class ReferrerSummary(BaseModel):
     id: int
     name: str
     family_limit: int
+    family_count: int = 0
     family_invite_code: str
     approval_status: ReferrerApprovalStatus
     approved_by_admin_name: str | None = None
@@ -413,6 +414,8 @@ class AdminFamilyUpdate(FamilyUpdate):
 class FamilyDetail(BaseModel):
     id: int
     referrer_id: int | None
+    referrer_name: Optional[str] = None
+    display_id: str
     family_name: str
     bio: Optional[str]
     address: Optional[str]
@@ -639,6 +642,7 @@ class PersonUpdate(BaseModel):
 class PersonDetail(BaseModel):
     id: int
     family_id: int
+    display_id: str
     given_name: str
     title: Optional[str]
     age: int

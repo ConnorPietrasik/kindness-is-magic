@@ -197,7 +197,7 @@ export default function AdminReferrers() {
 
           {(showForm || (editingId && detail)) && (
             <ReferrerForm
-              title={editingId ? "Edit Referrer" : "Add Referrer"}
+              title={editingId ? `Edit Referrer #${editingId}` : "Add Referrer"}
               initial={editingId ? (detail ?? defaultReferrerForm) : defaultReferrerForm}
               isEdit={!!editingId}
               onSubmit={editingId ? handleUpdate : handleCreate}
@@ -225,7 +225,9 @@ export default function AdminReferrers() {
                   <Tr key={r.id}>
                     <Td>{r.id}</Td>
                     <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
-                    <Td>{r.family_limit}</Td>
+                    <Td>
+                      {r.family_count ?? 0} / {r.family_limit}
+                    </Td>
                     <Td>
                       <div className="flex items-center gap-2">
                         <ApprovalBadge status={r.approval_status} />

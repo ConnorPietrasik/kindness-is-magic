@@ -91,14 +91,20 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
 
 
 def build_person_detail(per: Person, db: Session) -> dict:
-    """Build a dict suitable for PersonDetail, including eager-loaded wishes.
+    """Build a dict suitable for PersonDetail, including eager-loaded wishes and display_id.
 
     Only non-deleted wishes are included.
     """
     wishes = db.query(Wish).filter(Wish.person_id == per.id, Wish.deleted_at.is_(None)).all()
+
+    # Compute display_id scoped to the person's family
+    display_id_map = compute_display_ids(db, "person", [per], scope=per.family_id)
+    display_id = display_id_map.get(per.id, "0")
+
     return {
         "id": per.id,
         "family_id": per.family_id,
+        "display_id": display_id,
         "given_name": per.given_name,
         "title": per.title,
         "age": per.age,
@@ -207,15 +213,29 @@ def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, li
 
 
 def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
-    """Build a dict suitable for FamilyDetail, including person_count.
+    """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 
     Pass ``person_count`` to skip the query when it is already known.
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
+
+    # Compute display_id scoped to the family's referrer
+    display_id_map = compute_display_ids(db, "family", [fam], scope=fam.referrer_id)
+    display_id = display_id_map.get(fam.id, "0")
+
+    # Resolve referrer name
+    referrer_name: str | None = None
+    if fam.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref:
+            referrer_name = ref.name
+
     return {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
+        "referrer_name": referrer_name,
+        "display_id": display_id,
         "family_name": fam.family_name,
         "bio": fam.bio,
         "address": fam.address,

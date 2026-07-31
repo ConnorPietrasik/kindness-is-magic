@@ -8,6 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -32,6 +33,7 @@ import {
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
+import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, PersonPayload } from "../types";
 
@@ -203,7 +205,7 @@ export default function AdminPeople() {
 
           {(showForm || (editingId && detail)) && (
             <PersonForm
-              title={editingId ? "Edit Person" : "Add Person"}
+              title={editingId ? `Edit Person #${detail?.display_id}` : "Add Person"}
               initial={editingId ? (detail ?? defaultPersonForm) : defaultPersonForm}
               isEdit={!!editingId}
               familyMap={familyMap}
@@ -234,7 +236,14 @@ export default function AdminPeople() {
                     <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                     <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
                     <Td>{p.age}</Td>
-                    <Td>{familyMap[p.family_id] || `ID ${p.family_id}`}</Td>
+                    <Td>
+                      <Link
+                        to={route.adminFamilyPeople(p.family_id)}
+                        className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                      >
+                        {familyMap[p.family_id] || `ID ${p.family_id}`}
+                      </Link>
+                    </Td>
                     <Td>
                       <div className="flex gap-2">
                         {!isDeletedView && p.deleted_at == null && (

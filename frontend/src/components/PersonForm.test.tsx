@@ -7,6 +7,7 @@ import { PersonForm } from "./PersonForm";
 const mockChildPerson: PersonDetail = {
   id: 1,
   family_id: 5,
+  display_id: "1",
   given_name: "Alice",
   title: null,
   age: 8,
@@ -39,6 +40,7 @@ const mockChildPerson: PersonDetail = {
 const mockAdultPerson: PersonDetail = {
   id: 2,
   family_id: 5,
+  display_id: "2",
   given_name: "Bob",
   title: null,
   age: 25,

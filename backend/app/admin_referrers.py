@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 from app.auth import generate_unique_family_invite_code
 from app.database import get_db
-from app.models import Referrer, ReferrerApprovalStatus, User
+from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -55,12 +57,27 @@ def list_referrers(
         admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
         admin_map = {a.id: (a.display_name or a.email) for a in admins}
 
+    # Resolve family counts in bulk
+    referrer_ids = {r.id for r in referrers}
+    family_counts = (
+        db.query(Family.referrer_id, func.count(Family.id))
+        .filter(
+            Family.referrer_id.in_(referrer_ids),
+            Family.deleted_at.is_(None),
+            Family.approval_status == FamilyApprovalStatus.approved,
+        )
+        .group_by(Family.referrer_id)
+        .all()
+    )
+    family_count_map = {rid: count for rid, count in family_counts}
+
     return ReferrerListResponse(
         referrers=[
             ReferrerSummary(
                 id=r.id,
                 name=r.name,
                 family_limit=r.family_limit,
+                family_count=family_count_map.get(r.id, 0),
                 family_invite_code=r.family_invite_code,
                 approval_status=r.approval_status,
                 approved_by_admin_name=admin_map.get(r.approved_by_admin_id) if r.approved_by_admin_id else None,
@@ -95,12 +112,27 @@ def list_deleted_referrers(
         admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
         admin_map = {a.id: (a.display_name or a.email) for a in admins}
 
+    # Resolve family counts in bulk
+    referrer_ids = {r.id for r in referrers}
+    family_counts = (
+        db.query(Family.referrer_id, func.count(Family.id))
+        .filter(
+            Family.referrer_id.in_(referrer_ids),
+            Family.deleted_at.is_(None),
+            Family.approval_status == FamilyApprovalStatus.approved,
+        )
+        .group_by(Family.referrer_id)
+        .all()
+    )
+    family_count_map = {rid: count for rid, count in family_counts}
+
     return ReferrerListResponse(
         referrers=[
             ReferrerSummary(
                 id=r.id,
                 name=r.name,
                 family_limit=r.family_limit,
+                family_count=family_count_map.get(r.id, 0),
                 family_invite_code=r.family_invite_code,
                 approval_status=r.approval_status,
                 approved_by_admin_name=admin_map.get(r.approved_by_admin_id) if r.approved_by_admin_id else None,
