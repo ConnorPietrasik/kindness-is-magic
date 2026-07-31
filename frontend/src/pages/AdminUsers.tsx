@@ -2,7 +2,7 @@
  * Admin — Manage Users
  *
  * List, create, edit, delete users.
- * Uses manual queries and mutations.
+ * Uses useCrudManager for data fetching and mutations.
  * Separate "Deleted" tab calls the /deleted endpoint.
  * Supports role filter and text search on both tabs.
  */
@@ -16,9 +16,12 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
+import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useCrudManager } from "../hooks/useCrudManager";
+import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminCreateUser,
   adminDeleteUser,
@@ -39,6 +42,7 @@ import type {
   AdminUserUpdate,
   ReferrerSummary,
   UserDetail,
+  UserListResponse,
   UserPasswordReset,
   UserRole,
 } from "../types";
@@ -55,36 +59,55 @@ export default function AdminUsers() {
   const [viewTab, setViewTab] = useState<ViewTab>("active");
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
 
   const isDeletedView = viewTab === "deleted";
+  const pagination = usePagination();
+  const queryClient = useQueryClient();
+  const toast = useToast();
 
   // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
     () => ({
-      page,
-      page_size: pageSize,
+      ...pagination.params,
       role: roleFilter || undefined,
       search: searchQuery || undefined,
     }),
-    [page, pageSize, roleFilter, searchQuery]
+    [pagination.params, roleFilter, searchQuery]
   );
 
-  // Fetch users (switch endpoint based on tab)
-  const { data: listData, isLoading: listLoading } = useQuery({
-    queryKey: [...(isDeletedView ? DELETED_USER_KEYS : USER_KEYS), listParams],
-    queryFn: () => (isDeletedView ? adminListDeletedUsers(listParams) : adminListUsers(listParams)),
-  });
-
-  // Fetch user detail for editing
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const { data: detail, isLoading: detailLoading } = useQuery({
-    queryKey: [...USER_KEYS, "detail", editingId],
-    queryFn: () => adminGetUser(editingId!),
-    enabled: editingId != null,
+  // CRUD manager for users
+  const {
+    listData,
+    listLoading,
+    detail,
+    detailLoading,
+    createMut,
+    updateMut,
+    deleteMut,
+    restoreMut,
+    showForm,
+    editingId,
+    deleteConfirm,
+    openCreate,
+    openEdit,
+    cancelForm,
+    confirmDelete,
+    cancelDelete,
+  } = useCrudManager<UserListResponse, UserDetail, AdminUserCreate | AdminUserUpdate, AdminUsersListParams>({
+    rootKey: isDeletedView ? DELETED_USER_KEYS : USER_KEYS,
+    listFn: isDeletedView ? adminListDeletedUsers : adminListUsers,
+    listParams,
+    detailFn: adminGetUser,
+    createFn: isDeletedView ? undefined : (data: AdminUserCreate | AdminUserUpdate) => adminCreateUser(data as AdminUserCreate),
+    updateFn: isDeletedView
+      ? undefined
+      : (id: number, data: AdminUserCreate | AdminUserUpdate) => adminUpdateUser(id, data as AdminUserUpdate),
+    deleteFn: isDeletedView ? undefined : adminDeleteUser,
+    restoreFn: adminRestoreUser,
+    invalidationKeys: [USER_KEYS, DELETED_USER_KEYS],
+    entityName: "User",
   });
 
   // Fetch referrers for dropdown (only active)
@@ -101,56 +124,12 @@ export default function AdminUsers() {
   });
   const families = useMemo(() => familyListData?.families ?? [], [familyListData]);
 
-  // UI state
-  const [showForm, setShowForm] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
-
-  // Mutations
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const invalidateUsers = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: USER_KEYS });
-    queryClient.invalidateQueries({ queryKey: DELETED_USER_KEYS });
-  }, [queryClient]);
-
-  const createMut = useMutation({
-    mutationFn: (data: AdminUserCreate) => adminCreateUser(data),
-    onSuccess: () => {
-      invalidateUsers();
-      setShowForm(false);
-      toast.success("User created");
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: AdminUserUpdate }) => adminUpdateUser(id, data),
-    onSuccess: () => {
-      invalidateUsers();
-      setEditingId(null);
-      toast.success("User updated");
-    },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (id: number) => adminDeleteUser(id),
-    onSuccess: () => {
-      invalidateUsers();
-      toast.success("User deleted");
-    },
-  });
-
-  const restoreMut = useMutation({
-    mutationFn: (id: number) => adminRestoreUser(id),
-    onSuccess: () => {
-      invalidateUsers();
-      toast.success("User restored");
-    },
-  });
-
+  // Reset password mutation (special — not standard CRUD)
   const resetPasswordMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UserPasswordReset }) => adminResetUserPassword(id, data),
     onSuccess: () => {
-      invalidateUsers();
+      queryClient.invalidateQueries({ queryKey: USER_KEYS });
+      queryClient.invalidateQueries({ queryKey: DELETED_USER_KEYS });
       setResetPasswordId(null);
       toast.success("Password reset");
     },
@@ -166,21 +145,6 @@ export default function AdminUsers() {
     }
   }
 
-  function openCreate() {
-    setEditingId(null);
-    setShowForm(true);
-  }
-
-  function openEdit(id: number) {
-    setEditingId(id);
-    setShowForm(false);
-  }
-
-  function cancelForm() {
-    setShowForm(false);
-    setEditingId(null);
-  }
-
   // Reset password form state
   const [resetForm, setResetForm] = useState({ password: "", confirmPassword: "" });
 
@@ -194,11 +158,15 @@ export default function AdminUsers() {
   // Reset to page 1 when switching tabs
   function handleTabChange(tab: ViewTab) {
     setViewTab(tab);
-    setPage(1);
+    pagination.goToPage(1);
   }
 
+  const pageInfo = useMemo(
+    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
+    [listData?.total, pagination.page, pagination.pageSize]
+  );
+
   const users = listData?.users ?? [];
-  const totalPages = listData ? Math.ceil(listData.total / pageSize) : 0;
 
   if (listLoading) return <PageSpinner />;
 
@@ -247,7 +215,7 @@ export default function AdminUsers() {
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
-                setPage(1);
+                pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             >
@@ -262,7 +230,7 @@ export default function AdminUsers() {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setPage(1);
+                pagination.goToPage(1);
               }}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             />
@@ -355,7 +323,7 @@ export default function AdminUsers() {
                               variant="danger"
                               size="sm"
                               className="px-3 py-1.5 text-xs"
-                              onClick={() => setDeleteConfirm(u.id)}
+                              onClick={() => confirmDelete(u.id)}
                               disabled={deleteMut.isPending}
                             >
                               Delete
@@ -382,24 +350,14 @@ export default function AdminUsers() {
           )}
 
           {/* Pagination */}
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm text-gray-500">
-              {listData?.total ?? 0} user{listData?.total !== 1 ? "s" : ""}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                Prev
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={pagination.page}
+            totalPages={pageInfo.totalPages}
+            total={listData?.total ?? 0}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.goToPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
 
           {/* Delete confirmation */}
           <ConfirmDialog
@@ -413,10 +371,10 @@ export default function AdminUsers() {
             onConfirm={() => {
               if (deleteConfirm != null) {
                 deleteMut.mutate(deleteConfirm);
-                setDeleteConfirm(null);
+                cancelDelete();
               }
             }}
-            onCancel={() => setDeleteConfirm(null)}
+            onCancel={cancelDelete}
             loading={deleteMut.isPending}
           />
 
@@ -649,7 +607,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
 
         <div className="mt-4 flex gap-2">
           <Button type="submit" loading={loading}>
-            {loading ? "Saving…" : isEdit ? "Update" : "Create"}
+            {loading ? "Saving\u2026" : isEdit ? "Update" : "Create"}
           </Button>
           <Button variant="secondary" type="button" onClick={onCancel}>
             Cancel
@@ -709,7 +667,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
           />
           <div className="flex gap-3 pt-1">
             <Button type="submit" className="flex-1" loading={loading}>
-              {loading ? "Resetting…" : "Set Password"}
+              {loading ? "Resetting\u2026" : "Set Password"}
             </Button>
             <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
               Cancel

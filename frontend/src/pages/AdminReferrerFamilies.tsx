@@ -2,9 +2,9 @@
  * Admin — Referrer Detail + Families Management
  *
  * View/edit a specific referrer and manage their families.
- * Thin wrapper around HierarchicalManage.
- * Each family row has a "Manage" link to that family's people page.
+ * Uses useCrudManager for families CRUD.
  * Separate "Deleted" tab calls the /deleted endpoint.
+ * Each family row has a "Manage" link to that family's people page.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,12 +15,11 @@ import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
-import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
-import { PhoneInput } from "../components/PhoneInput";
+import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
@@ -38,7 +37,6 @@ import {
 } from "../lib/api";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
-import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload, PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
@@ -82,7 +80,7 @@ export default function AdminReferrerFamilies() {
     },
   });
 
-  // Families CRUD
+  // Families CRUD via useCrudManager
   const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
 
   const {
@@ -180,6 +178,7 @@ export default function AdminReferrerFamilies() {
               onSubmit={handleUpdateReferrer}
               onCancel={() => setShowEditReferrer(false)}
               loading={referrerUpdateMut.isPending}
+              wrapper={false}
             />
           ) : (
             referrerData && (
@@ -385,78 +384,5 @@ export default function AdminReferrerFamilies() {
         />
       </main>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* ReferrerForm sub-component                                          */
-/* ------------------------------------------------------------------ */
-interface ReferrerFormProps {
-  initial: Partial<ReferrerDetail>;
-  onSubmit: (data: ReferrerPayload) => void;
-  onCancel: () => void;
-  loading: boolean;
-}
-
-function ReferrerForm({ initial, onSubmit, onCancel, loading }: ReferrerFormProps) {
-  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-
-  const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
-
-  return (
-    <form
-      onSubmit={(e: React.FormEvent) => {
-        e.preventDefault();
-        const phoneErr = validatePhoneNumber(form.phone_number || "");
-        if (phoneErr) {
-          setPhoneError(phoneErr);
-          return;
-        }
-        setPhoneError(null);
-        onSubmit(form);
-      }}
-      className="mx-auto max-w-sm space-y-3"
-    >
-      <FormField
-        label="Name"
-        fieldProps={{
-          type: "text",
-          value: form.name,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
-          required: true,
-          maxLength: 60,
-          autoComplete: "off",
-        }}
-      />
-      <PhoneInput
-        value={form.phone_number ?? ""}
-        onChange={(val) => {
-          update("phone_number", val);
-          setPhoneError(null);
-        }}
-        error={phoneError}
-      />
-      <FormField
-        label="Family Limit"
-        type="number"
-        fieldProps={{
-          value: form.family_limit,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_limit", parseInt(e.target.value, 10) || 1),
-          required: true,
-          min: 1,
-          max: 999,
-          autoComplete: "off",
-        }}
-      />
-      <div className="flex gap-3 pt-1">
-        <Button type="submit" loading={loading} className="flex-1">
-          {loading ? "Saving…" : "Save"}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
-          Cancel
-        </Button>
-      </div>
-    </form>
   );
 }

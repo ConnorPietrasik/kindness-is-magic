@@ -7,18 +7,17 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultReferrerForm } from "../components/defaults";
-import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
-import { PhoneInput } from "../components/PhoneInput";
+import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
@@ -36,7 +35,6 @@ import {
 } from "../lib/api";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import { validatePhoneNumber } from "../lib/validators";
 import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 const REFERRER_KEYS = ["adminReferrers"];
@@ -401,92 +399,5 @@ export default function AdminReferrers() {
         />
       </main>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* ReferrerForm sub-component (inline — not shared per spec)           */
-/* ------------------------------------------------------------------ */
-interface ReferrerFormProps {
-  title: string;
-  initial: Partial<ReferrerDetail>;
-  isEdit: boolean;
-  onSubmit: (data: ReferrerPayload) => void;
-  onCancel: () => void;
-  loading: boolean;
-}
-
-function ReferrerForm({ title, initial, isEdit, onSubmit, onCancel, loading }: ReferrerFormProps) {
-  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
-
-  useEffect(() => {
-    setForm({ ...initial });
-  }, [initial]);
-
-  const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
-
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const phoneErr = validatePhoneNumber(form.phone_number || "");
-      if (phoneErr) {
-        setPhoneError(phoneErr);
-        return;
-      }
-      setPhoneError(null);
-      onSubmit(form);
-    },
-    [form, onSubmit]
-  );
-
-  return (
-    <Card className="mb-6 border border-gray-200">
-      <h3 className="mb-4 text-lg font-semibold text-violet-950">{title}</h3>
-      <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <FormField
-            label="Name"
-            fieldProps={{
-              value: form.name,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value),
-              required: true,
-              maxLength: 60,
-              autoComplete: "off",
-            }}
-          />
-          <FormField
-            label="Family Limit"
-            type="number"
-            fieldProps={{
-              value: form.family_limit,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_limit", parseInt(e.target.value, 10) || 1),
-              required: true,
-              min: 1,
-              max: 999,
-              autoComplete: "off",
-            }}
-          />
-          <PhoneInput
-            value={form.phone_number ?? ""}
-            onChange={(val) => {
-              update("phone_number", val);
-              setPhoneError(null);
-            }}
-            error={phoneError}
-          />
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <Button type="submit" loading={loading}>
-            {loading ? "Saving…" : isEdit ? "Update" : "Create"}
-          </Button>
-          <Button variant="secondary" type="button" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Card>
   );
 }

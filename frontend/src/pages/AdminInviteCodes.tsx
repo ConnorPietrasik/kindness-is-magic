@@ -2,10 +2,10 @@
  * Admin — Invite Codes Management
  *
  * List, filter, revoke invite codes. Generate new codes inline.
- * Replaces the standalone /admin/invite-referrer page.
+ * Uses useCrudManager for list query and revoke mutation.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
@@ -18,7 +18,8 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
-import { usePagination } from "../hooks/usePagination";
+import { useCrudManager } from "../hooks/useCrudManager";
+import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite, type InviteListParams } from "../lib/api";
 import { formatApiError, formatDateTime } from "../lib/utils";
 import type { ReferrerInviteResponse } from "../types";
@@ -29,8 +30,6 @@ const INVITES_KEY = ["adminInvites"];
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
-  const queryClient = useQueryClient();
-  const toast = useToast();
   const pagination = usePagination();
 
   const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
@@ -47,23 +46,28 @@ export default function AdminInviteCodes() {
     [pagination.params, showRedeemed, showExpired]
   );
 
-  const { data: listData, isLoading } = useQuery({
-    queryKey: [...INVITES_KEY, listParams],
-    queryFn: () => adminListInvites(listParams),
+  // useCrudManager for list + revoke
+  const {
+    listData,
+    listLoading,
+    deleteMut: revokeMut,
+  } = useCrudManager({
+    rootKey: INVITES_KEY,
+    listFn: adminListInvites,
+    listParams,
+    deleteFn: (id: number) => adminRevokeInvite(id).then(() => undefined),
+    invalidationKeys: [INVITES_KEY],
+    entityName: "Invite code",
   });
 
-  const revokeMut = useMutation({
-    mutationFn: adminRevokeInvite,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: INVITES_KEY });
-      toast.success("Invite code revoked");
-    },
-  });
+  const pageInfo = useMemo(
+    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
+    [listData?.total, pagination.page, pagination.pageSize]
+  );
 
-  const totalPages = listData ? Math.ceil(listData.total / pagination.pageSize) || 0 : 0;
   const invites = listData?.invites ?? [];
 
-  if (isLoading) return <PageSpinner />;
+  if (listLoading) return <PageSpinner />;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -181,7 +185,7 @@ export default function AdminInviteCodes() {
         {/* Pagination */}
         <Pagination
           page={pagination.page}
-          totalPages={totalPages}
+          totalPages={pageInfo.totalPages}
           total={listData?.total ?? 0}
           pageSize={pagination.pageSize}
           onPageChange={pagination.goToPage}
@@ -299,7 +303,7 @@ function InviteGenerator() {
           }}
         />
         <Button type="submit" loading={createMut.isPending} className="sm:ml-auto">
-          {createMut.isPending ? "Generating…" : "Generate"}
+          {createMut.isPending ? "Generating\u2026" : "Generate"}
         </Button>
       </form>
       <p className="mt-3 text-xs text-gray-400">Including an email locks this invite to that address</p>
