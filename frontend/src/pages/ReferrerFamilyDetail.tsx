@@ -61,33 +61,32 @@ export default function ReferrerFamilyDetail() {
         </div>
 
         <HierarchicalManage
-          backLinkTo={ROUTES.REFERRER_FAMILIES}
-          backLinkLabel="My Families"
-          // ── Parent (family) ─────────────────────────────────
-          parentId={famIdNum}
-          parentQueryKey={familyKey}
-          parentFetchFn={getReferrerFamily}
-          parentUpdateApi={updateReferrerFamily}
-          parentNormaliseFn={(formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload}
-          parentFormComponent={FamilyForm}
-          renderParent={(props) => <FamilyCard {...props} />}
-          parentInvalidationKeys={[["referrerFamilies"]]}
-          // ── Children (people) ───────────────────────────────
-          childQueryKey={peopleKey}
-          childListFn={() => listReferrerFamilyPeople(famIdNum)}
-          childDetailFn={getPerson}
-          childCreateApi={(data) => createReferrerFamilyPerson(famIdNum, data)}
-          childUpdateApi={updatePerson}
-          childDeleteApi={deletePerson}
-          childUpdateNormaliseFn={(formData, original) => normalizeUpdatePayload(formData as PersonPayload, original)}
-          childFormDefault={defaultPersonForm as unknown as PersonPayload}
-          childFormComponent={PersonForm}
-          renderChildren={(rows, callbacks) => <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} />}
-          childrenTitle="People"
-          createButtonLabel="+ Add Person"
-          childInvalidationKeys={[peopleKey, familyKey]}
-          parentEntityName="Family"
-          childEntityName="Person"
+          parent={{
+            id: famIdNum,
+            queryKey: familyKey,
+            fetchFn: getReferrerFamily,
+            updateApi: updateReferrerFamily,
+            normaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
+            render: (props) => <FamilyCard {...props} />,
+            invalidationKeys: [["referrerFamilies"]],
+            entityName: "Family",
+          }}
+          child={{
+            queryKey: peopleKey,
+            listFn: () => listReferrerFamilyPeople(famIdNum),
+            detailFn: getPerson,
+            createApi: (data) => createReferrerFamilyPerson(famIdNum, data),
+            updateApi: updatePerson,
+            deleteApi: deletePerson,
+            updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData as PersonPayload, original),
+            formDefault: defaultPersonForm as unknown as PersonPayload,
+            formComponent: PersonForm,
+            render: (rows, callbacks, _ctx) => <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} />,
+            title: "People",
+            createButtonLabel: "+ Add Person",
+            invalidationKeys: [peopleKey, familyKey],
+            entityName: "Person",
+          }}
         />
       </main>
     </div>
