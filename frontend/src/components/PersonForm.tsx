@@ -263,7 +263,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),
                   required: true,
                   maxLength: 20,
-                  placeholder: 'e.g. "M", "8", or "0" if not applicable',
+                  placeholder: 'e.g. "M", "8", or "0" if it does not apply',
                   autoComplete: "off",
                 }}
               />
