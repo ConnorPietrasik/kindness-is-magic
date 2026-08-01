@@ -12,13 +12,11 @@ import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
+import { auth, pendingFamilies as PENDING_FAMILIES_KEY, referrerMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
 import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
-
-const REFERRER_ME_KEY = ["referrerMe"];
-const PENDING_FAMILIES_KEY = ["pendingFamilies"];
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -31,7 +29,7 @@ export default function Dashboard() {
 
   // Referrer-specific queries (only run when role is referrer)
   const { data: referrerInfo, isLoading: referrerLoading } = useQuery({
-    queryKey: REFERRER_ME_KEY,
+    queryKey: referrerMe,
     queryFn: getReferrerMe,
     enabled: user?.role === "referrer",
   });
@@ -114,7 +112,7 @@ function WelcomeCard() {
   const updateProfileMut = useMutation({
     mutationFn: updateMyProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["auth"] });
+      queryClient.invalidateQueries({ queryKey: auth });
     },
   });
 
@@ -216,7 +214,7 @@ function ReferrerInfoCard({ referrerInfo }: ReferrerInfoCardProps) {
   const updateSelfMut = useMutation({
     mutationFn: patchReferrerMe,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REFERRER_ME_KEY });
+      queryClient.invalidateQueries({ queryKey: referrerMe });
       setShowEdit(false);
     },
   });

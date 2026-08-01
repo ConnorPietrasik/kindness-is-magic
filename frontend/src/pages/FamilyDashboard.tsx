@@ -18,11 +18,10 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
 import { getFamilyMe, patchFamilyMe } from "../lib/api";
+import { familyMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload } from "../types";
-
-const FAMILY_ME_KEY = ["familyMe"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -32,14 +31,14 @@ export default function FamilyDashboard() {
   const toast = useToast();
 
   const { data: familyInfo, isLoading } = useQuery({
-    queryKey: FAMILY_ME_KEY,
+    queryKey: familyMe,
     queryFn: getFamilyMe,
   });
 
   const updateSelfMut = useMutation({
     mutationFn: patchFamilyMe,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: FAMILY_ME_KEY });
+      queryClient.invalidateQueries({ queryKey: familyMe });
       setShowEdit(false);
       toast.success("Profile updated");
     },

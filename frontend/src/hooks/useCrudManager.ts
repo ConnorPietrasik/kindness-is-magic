@@ -20,7 +20,7 @@ import { useToast } from "../context/ToastContext";
 
 export interface CrudManagerOptions<ListResponse, Item, Payload = unknown, ListParams = Record<string, unknown>> {
   /** Query key for the list (e.g. `['adminReferrers']`) */
-  rootKey: string[];
+  rootKey: readonly string[];
   /** Fetches the full list response. Receives `listParams` if provided. */
   listFn: (params?: ListParams) => Promise<ListResponse>;
   /** Optional params passed to `listFn` and included in the query key for cache separation. */
@@ -36,7 +36,7 @@ export interface CrudManagerOptions<ListResponse, Item, Payload = unknown, ListP
   /** Restores a soft-deleted item by id (optional) */
   restoreFn?: (id: number) => Promise<Item>;
   /** Keys to invalidate after mutations (defaults to `[rootKey]`) */
-  invalidationKeys?: (string | string[])[];
+  invalidationKeys?: (string | readonly string[])[];
   /** Entity name for success toast messages (e.g. "Referrer", "Family"). Omit to disable success toasts. */
   entityName?: string;
 }

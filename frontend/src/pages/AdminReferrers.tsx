@@ -35,12 +35,10 @@ import {
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
+import { adminDeletedReferrers, adminReferrers } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
-
-const REFERRER_KEYS = ["adminReferrers"];
-const DELETED_REFERRER_KEYS = ["adminDeletedReferrers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -57,14 +55,14 @@ export default function AdminReferrers() {
   const approveMut = useMutation({
     mutationFn: adminApproveReferrer,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REFERRER_KEYS });
+      queryClient.invalidateQueries({ queryKey: adminReferrers });
     },
   });
 
   const rejectMut = useMutation({
     mutationFn: adminRejectReferrer,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REFERRER_KEYS });
+      queryClient.invalidateQueries({ queryKey: adminReferrers });
     },
   });
 
@@ -89,7 +87,7 @@ export default function AdminReferrers() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: isDeletedView ? DELETED_REFERRER_KEYS : REFERRER_KEYS,
+    rootKey: isDeletedView ? adminDeletedReferrers : adminReferrers,
     listFn: isDeletedView ? adminListDeletedReferrers : adminListReferrers,
     listParams,
     detailFn: adminGetReferrer,
@@ -97,7 +95,7 @@ export default function AdminReferrers() {
     updateFn: isDeletedView ? undefined : adminUpdateReferrer,
     deleteFn: isDeletedView ? undefined : adminDeleteReferrer,
     restoreFn: adminRestoreReferrer,
-    invalidationKeys: [REFERRER_KEYS, DELETED_REFERRER_KEYS],
+    invalidationKeys: [adminReferrers, adminDeletedReferrers],
     entityName: "Referrer",
   });
 

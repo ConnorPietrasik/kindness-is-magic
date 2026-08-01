@@ -27,18 +27,15 @@ import {
   listReferrerFamilies,
   updateReferrerFamily,
 } from "../lib/api";
+import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyPayload } from "../types";
 
-const REFERRER_ME_KEY = ["referrerMe"];
-const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
-const PENDING_FAMILIES_KEY = ["pendingFamilies"];
-
 export default function ReferrerFamilies() {
   // Referrer self-info (for family limit)
   const { data: referrerInfo, isLoading: infoLoading } = useQuery({
-    queryKey: REFERRER_ME_KEY,
+    queryKey: referrerMe,
     queryFn: getReferrerMe,
   });
 
@@ -66,13 +63,13 @@ export default function ReferrerFamilies() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: REFERRER_FAMILIES_KEY,
+    rootKey: referrerFamilies,
     listFn: listReferrerFamilies,
     detailFn: getReferrerFamily,
     createFn: createReferrerFamily,
     updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
-    invalidationKeys: [REFERRER_FAMILIES_KEY, REFERRER_ME_KEY],
+    invalidationKeys: [referrerFamilies, referrerMe],
     entityName: "Family",
   });
 

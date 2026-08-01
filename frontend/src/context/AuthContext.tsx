@@ -15,10 +15,9 @@ import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { _registerSetAuthQueryData, fetchCurrentUser, loginRequest, logoutRequest } from "../lib/api";
+import { auth as AUTH_KEY } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import type { AuthContextValue, User } from "../types";
-
-const AUTH_KEY = ["auth"] as const;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 

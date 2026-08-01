@@ -18,19 +18,16 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { approveFamily, getReferrerMe, listPendingFamilies, rejectFamily, sendReferrerFamilyInvite } from "../lib/api";
+import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatApiError } from "../lib/utils";
-
-const REFERRER_ME_KEY = ["referrerMe"];
-const REFERRER_FAMILIES_KEY = ["referrerFamilies"];
-const PENDING_FAMILIES_KEY = ["pendingFamilies"];
 
 /* ------------------------------------------------------------------ */
 /* Invite section — code display + send invite dialog                  */
 /* ------------------------------------------------------------------ */
 function InviteSection() {
   const { data: referrerInfo } = useQuery({
-    queryKey: REFERRER_ME_KEY,
+    queryKey: referrerMe,
     queryFn: getReferrerMe,
   });
 
@@ -163,8 +160,8 @@ export default function ReferrerFamilyInvites() {
     mutationFn: approveFamily,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PENDING_FAMILIES_KEY });
-      queryClient.invalidateQueries({ queryKey: REFERRER_FAMILIES_KEY });
-      queryClient.invalidateQueries({ queryKey: REFERRER_ME_KEY });
+      queryClient.invalidateQueries({ queryKey: referrerFamilies });
+      queryClient.invalidateQueries({ queryKey: referrerMe });
     },
   });
 
@@ -172,7 +169,7 @@ export default function ReferrerFamilyInvites() {
     mutationFn: rejectFamily,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PENDING_FAMILIES_KEY });
-      queryClient.invalidateQueries({ queryKey: REFERRER_ME_KEY });
+      queryClient.invalidateQueries({ queryKey: referrerMe });
     },
   });
 

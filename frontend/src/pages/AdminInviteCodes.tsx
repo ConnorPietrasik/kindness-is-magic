@@ -21,10 +21,9 @@ import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite, type InviteListParams } from "../lib/api";
+import { adminInvites } from "../lib/queryKeys";
 import { formatApiError, formatDateTime } from "../lib/utils";
 import type { ReferrerInviteResponse } from "../types";
-
-const INVITES_KEY = ["adminInvites"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -52,11 +51,11 @@ export default function AdminInviteCodes() {
     listLoading,
     deleteMut: revokeMut,
   } = useCrudManager({
-    rootKey: INVITES_KEY,
+    rootKey: adminInvites,
     listFn: adminListInvites,
     listParams,
     deleteFn: (id: number) => adminRevokeInvite(id).then(() => undefined),
-    invalidationKeys: [INVITES_KEY],
+    invalidationKeys: [adminInvites],
     entityName: "Invite code",
   });
 
@@ -231,7 +230,7 @@ function InviteGenerator() {
     mutationFn: (data: { family_limit: number; email: string | null }) => createReferrerInvite(data),
     onSuccess: (data) => {
       setInvite(data);
-      queryClient.invalidateQueries({ queryKey: INVITES_KEY });
+      queryClient.invalidateQueries({ queryKey: adminInvites });
       if (data.email_error) {
         toast.info(data.email_error);
       }

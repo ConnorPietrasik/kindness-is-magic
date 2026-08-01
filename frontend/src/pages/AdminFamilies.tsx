@@ -33,13 +33,10 @@ import {
   adminRestoreFamily,
   adminUpdateFamily,
 } from "../lib/api";
+import { adminDeletedFamilies, adminDeletedPeople, adminFamilies, adminPeople, adminReferrers } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
-
-const FAMILY_KEYS = ["adminFamilies"];
-const DELETED_FAMILY_KEYS = ["adminDeletedFamilies"];
-const REFERRER_KEYS = ["adminReferrers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -71,7 +68,7 @@ export default function AdminFamilies() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: isDeletedView ? DELETED_FAMILY_KEYS : FAMILY_KEYS,
+    rootKey: isDeletedView ? adminDeletedFamilies : adminFamilies,
     listFn: isDeletedView ? adminListDeletedFamilies : adminListFamilies,
     listParams,
     detailFn: adminGetFamily,
@@ -79,7 +76,7 @@ export default function AdminFamilies() {
     updateFn: isDeletedView ? undefined : adminUpdateFamily,
     deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [FAMILY_KEYS, DELETED_FAMILY_KEYS, ["adminPeople"], ["adminDeletedPeople"]],
+    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople],
     entityName: "Family",
   });
 
@@ -90,7 +87,7 @@ export default function AdminFamilies() {
 
   // Referrers lookup (for dropdown + display)
   const { data: referrerData, isLoading: referrersLoading } = useQuery({
-    queryKey: REFERRER_KEYS,
+    queryKey: adminReferrers,
     queryFn: () => adminListReferrers(),
   });
 

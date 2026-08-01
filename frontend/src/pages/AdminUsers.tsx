@@ -36,6 +36,7 @@ import {
   adminRestoreUser,
   adminUpdateUser,
 } from "../lib/api";
+import { adminDeletedUsers, adminFamiliesDropdown, adminReferrersDropdown, adminUsers } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type {
@@ -48,9 +49,6 @@ import type {
   UserPasswordReset,
   UserRole,
 } from "../types";
-
-const USER_KEYS = ["adminUsers"];
-const DELETED_USER_KEYS = ["adminDeletedUsers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -95,7 +93,7 @@ export default function AdminUsers() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager<UserListResponse, UserDetail, AdminUserCreate, AdminUsersListParams>({
-    rootKey: isDeletedView ? DELETED_USER_KEYS : USER_KEYS,
+    rootKey: isDeletedView ? adminDeletedUsers : adminUsers,
     listFn: isDeletedView ? adminListDeletedUsers : adminListUsers,
     listParams,
     detailFn: adminGetUser,
@@ -103,20 +101,20 @@ export default function AdminUsers() {
     updateFn: isDeletedView ? undefined : adminUpdateUser,
     deleteFn: isDeletedView ? undefined : adminDeleteUser,
     restoreFn: adminRestoreUser,
-    invalidationKeys: [USER_KEYS, DELETED_USER_KEYS],
+    invalidationKeys: [adminUsers, adminDeletedUsers],
     entityName: "User",
   });
 
   // Fetch referrers for dropdown (only active)
   const { data: referrerListData } = useQuery({
-    queryKey: ["adminReferrersDropdown"],
+    queryKey: adminReferrersDropdown,
     queryFn: () => adminListReferrers({ page: 1, page_size: 200 }),
   });
   const referrers = useMemo<ReferrerSummary[]>(() => referrerListData?.referrers ?? [], [referrerListData]);
 
   // Fetch families for dropdown (only active)
   const { data: familyListData } = useQuery({
-    queryKey: ["adminFamiliesDropdown"],
+    queryKey: adminFamiliesDropdown,
     queryFn: () => adminListFamilies({ page: 1, page_size: 200 }),
   });
   const families = useMemo(() => familyListData?.families ?? [], [familyListData]);
@@ -125,8 +123,8 @@ export default function AdminUsers() {
   const resetPasswordMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UserPasswordReset }) => adminResetUserPassword(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: USER_KEYS });
-      queryClient.invalidateQueries({ queryKey: DELETED_USER_KEYS });
+      queryClient.invalidateQueries({ queryKey: adminUsers });
+      queryClient.invalidateQueries({ queryKey: adminDeletedUsers });
       setResetPasswordId(null);
       toast.success("Password reset");
     },

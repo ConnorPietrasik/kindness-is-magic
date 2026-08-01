@@ -16,6 +16,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { adminGetCsvSample, adminImportCsv } from "../lib/api";
 import { isValidCsvFile, parseCsvSections, validateCsvForImport } from "../lib/csv";
+import { adminFamilies, adminPeople, adminReferrers, adminUsers } from "../lib/queryKeys";
 import type { CsvValidationResult } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -36,10 +37,10 @@ export default function CsvUpload() {
     onSuccess: () => {
       setFile(null);
       // Refresh admin list pages so they show newly imported data
-      queryClient.invalidateQueries({ queryKey: ["adminReferrers"] });
-      queryClient.invalidateQueries({ queryKey: ["adminFamilies"] });
-      queryClient.invalidateQueries({ queryKey: ["adminPeople"] });
-      queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: adminReferrers });
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminPeople });
+      queryClient.invalidateQueries({ queryKey: adminUsers });
       toast.success("CSV imported successfully");
     },
   });

@@ -16,12 +16,10 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
+import { familyMe, familyPeople } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PersonPayload } from "../types";
-
-const FAMILY_PEOPLE_KEY = ["familyPeople"];
-const FAMILY_ME_KEY = ["familyMe"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -44,13 +42,13 @@ export default function FamilyPeople() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: FAMILY_PEOPLE_KEY,
+    rootKey: familyPeople,
     listFn: listFamilyPeople,
     detailFn: getPerson,
     createFn: createFamilyPerson,
     updateFn: updatePerson,
     deleteFn: deletePerson,
-    invalidationKeys: [FAMILY_PEOPLE_KEY, FAMILY_ME_KEY],
+    invalidationKeys: [familyPeople, familyMe],
     entityName: "Person",
   });
 

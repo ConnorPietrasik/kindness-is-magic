@@ -35,13 +35,10 @@ import {
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
+import { adminDeletedPeople, adminFamilies, adminPeople } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, PersonPayload } from "../types";
-
-const PEOPLE_KEYS = ["adminPeople"];
-const DELETED_PEOPLE_KEYS = ["adminDeletedPeople"];
-const FAMILY_KEYS = ["adminFamilies"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -72,7 +69,7 @@ export default function AdminPeople() {
     confirmDelete,
     cancelDelete,
   } = useCrudManager({
-    rootKey: isDeletedView ? DELETED_PEOPLE_KEYS : PEOPLE_KEYS,
+    rootKey: isDeletedView ? adminDeletedPeople : adminPeople,
     listFn: isDeletedView ? adminListDeletedPeople : adminListPeople,
     listParams,
     detailFn: adminGetPerson,
@@ -88,8 +85,8 @@ export default function AdminPeople() {
   const personRestoreMut = useMutation({
     mutationFn: (id: number) => adminRestorePerson(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
-      queryClient.invalidateQueries({ queryKey: DELETED_PEOPLE_KEYS });
+      queryClient.invalidateQueries({ queryKey: adminPeople });
+      queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
       toast.success("Person restored");
     },
     onError: (error) => {
@@ -108,9 +105,9 @@ export default function AdminPeople() {
   const familyRestoreMut = useMutation({
     mutationFn: (id: number) => adminRestoreFamily(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PEOPLE_KEYS });
-      queryClient.invalidateQueries({ queryKey: DELETED_PEOPLE_KEYS });
-      queryClient.invalidateQueries({ queryKey: FAMILY_KEYS });
+      queryClient.invalidateQueries({ queryKey: adminPeople });
+      queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
       toast.success("Family restored");
     },
   });
@@ -122,7 +119,7 @@ export default function AdminPeople() {
 
   // Families lookup (for dropdown + display)
   const { data: familyData, isLoading: familiesLoading } = useQuery({
-    queryKey: FAMILY_KEYS,
+    queryKey: adminFamilies,
     queryFn: () => adminListFamilies(),
   });
 

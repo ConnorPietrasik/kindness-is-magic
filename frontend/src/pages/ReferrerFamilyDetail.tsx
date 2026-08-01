@@ -28,6 +28,7 @@ import {
   updatePerson,
   updateReferrerFamily,
 } from "../lib/api";
+import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
@@ -40,8 +41,8 @@ export default function ReferrerFamilyDetail() {
   const famIdNum = parseInt(famId!, 10);
   const famIdStr = String(famIdNum);
 
-  const peopleKey = ["referrerFamilyPeople", famIdStr];
-  const familyKey = ["referrerFamily", famIdStr];
+  const peopleKey = referrerFamilyPeople(famIdStr);
+  const familyKey = referrerFamilyDetail(famIdStr);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -68,7 +69,7 @@ export default function ReferrerFamilyDetail() {
             updateApi: updateReferrerFamily,
             normaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
             render: (props) => <FamilyCard {...props} />,
-            invalidationKeys: [["referrerFamilies"]],
+            invalidationKeys: [referrerFamilies],
             entityName: "Family",
           }}
           child={{

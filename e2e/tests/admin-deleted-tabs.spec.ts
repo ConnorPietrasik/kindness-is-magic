@@ -52,6 +52,9 @@ test.describe("Admin Deleted Tabs", () => {
     await familyRow.getByRole("button", { name: "Delete" }).click();
     await page.getByRole("button", { name: "Yes, delete" }).click();
 
+    /* Wait for the delete mutation to complete before switching tabs */
+    await expect(page.getByText(SEEDED_FAMILY)).not.toBeVisible();
+
     /* Switch to Deleted tab */
     await page.getByRole("tab", { name: "Deleted", exact: true }).click();
     await expect(page.getByRole("table")).toContainText(SEEDED_FAMILY, { timeout: 10_000 });

@@ -8,7 +8,7 @@
  *
  * Rules:
  * - Must not be empty (required check)
- * - Must contain at least 9 digits
+ * - Must contain at least 10 digits
  */
 export function validatePhoneNumber(value: string): string | null {
   const digits = value.replace(/\D/g, "");

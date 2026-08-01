@@ -32,11 +32,10 @@ import {
   adminUpdatePerson,
   getPerson,
 } from "../lib/api";
+import { adminFamilyDetail, adminFamilyPeople, adminReferrers } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
-
-const REFERRER_KEYS = ["adminReferrers"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -46,12 +45,12 @@ export default function AdminFamilyPeople() {
   const famIdNum = parseInt(famId!, 10);
   const famIdStr = String(famIdNum);
 
-  const peopleKey = ["adminFamilyPeople", famIdStr];
-  const familyKey = ["adminFamilies", famIdStr];
+  const peopleKey = adminFamilyPeople(famIdStr);
+  const familyKey = adminFamilyDetail(famIdStr);
 
   // Referrers lookup for the family edit form
   const { data: referrerData, isLoading: referrersLoading } = useQuery({
-    queryKey: REFERRER_KEYS,
+    queryKey: adminReferrers,
     queryFn: () => adminListReferrers(),
   });
 
@@ -69,7 +68,7 @@ export default function AdminFamilyPeople() {
 
   // Family detail (needed only when coming from referrer to build back link)
   const { data: familyDetail } = useQuery({
-    queryKey: ["adminFamilyDetail", famIdStr],
+    queryKey: adminFamilyDetail(famIdStr),
     queryFn: () => adminGetFamily(famIdNum),
     enabled: cameFromReferrer,
   });

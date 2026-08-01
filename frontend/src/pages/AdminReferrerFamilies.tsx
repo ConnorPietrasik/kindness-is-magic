@@ -31,6 +31,13 @@ import {
   adminUpdateFamily,
   adminUpdateReferrer,
 } from "../lib/api";
+import {
+  adminDeletedFamilies,
+  adminDeletedReferrerFamilies,
+  adminFamilies,
+  adminReferrerDetail,
+  adminReferrerFamilies,
+} from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyPayload, FamilySummary, ReferrerDetail } from "../types";
@@ -43,9 +50,9 @@ export default function AdminReferrerFamilies() {
   const refIdNum = parseInt(refId!, 10);
   const refIdStr = String(refIdNum);
 
-  const referrerKey = ["adminReferrers", refIdStr];
-  const familiesKey = ["adminReferrerFamilies", refIdStr];
-  const deletedFamiliesKey = ["adminDeletedReferrerFamilies", refIdStr];
+  const referrerKey = adminReferrerDetail(refIdStr);
+  const familiesKey = adminReferrerFamilies(refIdStr);
+  const deletedFamiliesKey = adminDeletedReferrerFamilies(refIdStr);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -79,7 +86,7 @@ export default function AdminReferrerFamilies() {
             ),
             title: "Families",
             createButtonLabel: "+ Add Family",
-            invalidationKeys: [familiesKey, deletedFamiliesKey, ["adminFamilies"], ["adminDeletedFamilies"]],
+            invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies],
             entityName: "Family",
           }}
           tabs={{

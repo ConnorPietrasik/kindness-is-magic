@@ -11,9 +11,8 @@ import { HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { getFamilyWishList } from "../lib/api";
+import { familyWishList } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-
-const WISH_LIST_KEYS = ["familyWishList"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -23,7 +22,7 @@ export default function FamilyWishList() {
   const familyId = id ? parseInt(id, 10) : NaN;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: [...WISH_LIST_KEYS, familyId],
+    queryKey: familyWishList(familyId),
     queryFn: () => getFamilyWishList(familyId),
     enabled: !Number.isNaN(familyId),
   });
