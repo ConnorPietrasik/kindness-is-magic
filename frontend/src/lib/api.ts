@@ -49,6 +49,32 @@ const api: AxiosInstance = axios.create({
 });
 
 // ---------------------------------------------------------------------------
+// Typed request helpers — auto-extract `res.data`
+// ---------------------------------------------------------------------------
+
+function apiGet<T>(url: string, params?: unknown): Promise<T> {
+  if (params) return api.get<T>(url, { params }).then((res) => res.data);
+  return api.get<T>(url).then((res) => res.data);
+}
+
+function apiPost<T>(url: string, data?: unknown): Promise<T> {
+  if (data !== undefined) return api.post<T>(url, data).then((res) => res.data);
+  return api.post<T>(url).then((res) => res.data);
+}
+
+function apiPatch<T>(url: string, data: unknown): Promise<T> {
+  return api.patch<T>(url, data).then((res) => res.data);
+}
+
+function apiPut<T>(url: string, data: unknown): Promise<T> {
+  return api.put<T>(url, data).then((res) => res.data);
+}
+
+function apiDelete(url: string): Promise<void> {
+  return api.delete(url).then(() => undefined);
+}
+
+// ---------------------------------------------------------------------------
 // Token-refresh coordination (avoids thundering herd)
 // ---------------------------------------------------------------------------
 let refreshPromise: Promise<{ user: User }> | null = null;
@@ -151,20 +177,20 @@ export function logoutRequest(): Promise<void> {
 }
 
 export function forgotPasswordRequest(email: string): Promise<unknown> {
-  return api.post("/api/auth/forgot-password", { email }).then((res) => res.data);
+  return apiPost("/api/auth/forgot-password", { email });
 }
 
 export function resetPasswordRequest(token: string, new_password: string): Promise<unknown> {
-  return api.post("/api/auth/reset-password", { token, new_password }).then((res) => res.data);
+  return apiPost("/api/auth/reset-password", { token, new_password });
 }
 
 export function changePasswordRequest(old_password: string, new_password: string): Promise<unknown> {
-  return api.put("/api/auth/me/password", { old_password, new_password }).then((res) => res.data);
+  return apiPut("/api/auth/me/password", { old_password, new_password });
 }
 
 /** Update the current user's display name. Send `""` to clear it. */
 export function updateMyProfile(displayName: string): Promise<User> {
-  return api.patch("/api/auth/me", { display_name: displayName }).then((res) => res.data);
+  return apiPatch("/api/auth/me", { display_name: displayName });
 }
 
 // ---------------------------------------------------------------------------
@@ -173,137 +199,129 @@ export function updateMyProfile(displayName: string): Promise<User> {
 
 /** Admin creates an invite token for a referrer to self-register. */
 export function createReferrerInvite(data: ReferrerInviteCreatePayload): Promise<ReferrerInviteResponse> {
-  return api.post("/api/auth/invite-referrer", data).then((res) => res.data);
+  return apiPost("/api/auth/invite-referrer", data);
 }
 
 /** Public: redeem an invite code to register as a referrer (auto-logs in). */
 export function registerReferrerViaInvite(data: ReferrerSelfRegisterPayload): Promise<ReferrerSelfRegisterResponse> {
-  return api.post("/api/auth/register-referrer", data).then((res) => res.data);
+  return apiPost("/api/auth/register-referrer", data);
 }
 
 /** Public: redeem an invite code to register as a family (auto-logs in). */
 export function registerFamilyViaInvite(data: FamilySelfRegisterPayload): Promise<FamilySelfRegisterResponse> {
-  return api.post("/api/auth/register-family", data).then((res) => res.data);
+  return apiPost("/api/auth/register-family", data);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — Referrers
 // ---------------------------------------------------------------------------
 export function adminListReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
-  if (params) return api.get("/api/admin/referrers", { params }).then((res) => res.data);
-  return api.get("/api/admin/referrers").then((res) => res.data);
+  return apiGet("/api/admin/referrers", params);
 }
 
 export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
-  return api.get(`/api/admin/referrers/${id}`).then((res) => res.data);
+  return apiGet(`/api/admin/referrers/${id}`);
 }
 
 export function adminCreateReferrer(data: ReferrerPayload): Promise<ReferrerDetail> {
-  return api.post("/api/admin/referrers", normalizePayload(data)).then((res) => res.data);
+  return apiPost("/api/admin/referrers", normalizePayload(data));
 }
 
 export function adminUpdateReferrer(id: number, data: ReferrerPayload): Promise<ReferrerDetail> {
-  return api.patch(`/api/admin/referrers/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/admin/referrers/${id}`, data);
 }
 
 export function adminDeleteReferrer(id: number): Promise<void> {
-  return api.delete(`/api/admin/referrers/${id}`).then(() => undefined);
+  return apiDelete(`/api/admin/referrers/${id}`);
 }
 
 export function adminRestoreReferrer(id: number): Promise<ReferrerDetail> {
-  return api.post(`/api/admin/referrers/${id}/restore`).then((res) => res.data);
+  return apiPost(`/api/admin/referrers/${id}/restore`);
 }
 
 export function adminApproveReferrer(id: number): Promise<ReferrerDetail> {
-  return api.post(`/api/admin/referrers/${id}/approve`).then((res) => res.data);
+  return apiPost(`/api/admin/referrers/${id}/approve`);
 }
 
 export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
-  return api.post(`/api/admin/referrers/${id}/reject`).then((res) => res.data);
+  return apiPost(`/api/admin/referrers/${id}/reject`);
 }
 
 /** Fetch soft-deleted referrers (separate /deleted endpoint). */
 export function adminListDeletedReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
-  if (params) return api.get("/api/admin/referrers/deleted", { params }).then((res) => res.data);
-  return api.get("/api/admin/referrers/deleted").then((res) => res.data);
+  return apiGet("/api/admin/referrers/deleted", params);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
 export function adminListFamilies(params?: PaginationParams): Promise<FamilyListResponse> {
-  if (params) return api.get("/api/admin/families", { params }).then((res) => res.data);
-  return api.get("/api/admin/families").then((res) => res.data);
+  return apiGet("/api/admin/families", params);
 }
 
 export function adminGetFamily(id: number): Promise<FamilyDetail> {
-  return api.get(`/api/admin/families/${id}`).then((res) => res.data);
+  return apiGet(`/api/admin/families/${id}`);
 }
 
 export function adminCreateFamily(data: FamilyPayload): Promise<FamilyDetail> {
-  return api.post("/api/admin/families", normalizePayload(data)).then((res) => res.data);
+  return apiPost("/api/admin/families", normalizePayload(data));
 }
 
 export function adminUpdateFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
-  return api.patch(`/api/admin/families/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/admin/families/${id}`, data);
 }
 
 export function adminDeleteFamily(id: number): Promise<void> {
-  return api.delete(`/api/admin/families/${id}`).then(() => undefined);
+  return apiDelete(`/api/admin/families/${id}`);
 }
 
 export function adminRestoreFamily(id: number): Promise<FamilyDetail> {
-  return api.post(`/api/admin/families/${id}/restore`).then((res) => res.data);
+  return apiPost(`/api/admin/families/${id}/restore`);
 }
 
 export function adminListReferrerFamilies(rid: number, params?: PaginationParams): Promise<FamilyListResponse> {
-  if (params) return api.get("/api/admin/families", { params: { ...params, referrer_id: rid } }).then((res) => res.data);
-  return api.get("/api/admin/families", { params: { referrer_id: rid } }).then((res) => res.data);
+  return apiGet("/api/admin/families", { ...params, referrer_id: rid });
 }
 
 /** Fetch soft-deleted families (separate /deleted endpoint). */
 export function adminListDeletedFamilies(params?: PaginationParams & { referrer_id?: number | null }): Promise<FamilyListResponse> {
-  if (params) return api.get("/api/admin/families/deleted", { params }).then((res) => res.data);
-  return api.get("/api/admin/families/deleted").then((res) => res.data);
+  return apiGet("/api/admin/families/deleted", params);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
 export function adminListPeople(params?: PaginationParams): Promise<PersonListResponse> {
-  if (params) return api.get("/api/admin/people", { params }).then((res) => res.data);
-  return api.get("/api/admin/people").then((res) => res.data);
+  return apiGet("/api/admin/people", params);
 }
 
 export function adminGetPerson(id: number): Promise<PersonDetail> {
-  return api.get(`/api/admin/people/${id}`).then((res) => res.data);
+  return apiGet(`/api/admin/people/${id}`);
 }
 
 export function adminCreatePerson(data: PersonPayload): Promise<PersonDetail> {
-  return api.post("/api/admin/people", normalizePayload(data)).then((res) => res.data);
+  return apiPost("/api/admin/people", normalizePayload(data));
 }
 
 export function adminUpdatePerson(id: number, data: PersonPayload): Promise<PersonDetail> {
-  return api.patch(`/api/admin/people/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/admin/people/${id}`, data);
 }
 
 export function adminDeletePerson(id: number): Promise<void> {
-  return api.delete(`/api/admin/people/${id}`).then(() => undefined);
+  return apiDelete(`/api/admin/people/${id}`);
 }
 
 export function adminRestorePerson(id: number): Promise<PersonDetail> {
-  return api.post(`/api/admin/people/${id}/restore`).then((res) => res.data);
+  return apiPost(`/api/admin/people/${id}/restore`);
 }
 
 export function adminListFamilyPeople(fid: number, params?: PaginationParams): Promise<PersonListResponse> {
-  if (params) return api.get("/api/admin/people", { params: { ...params, family_id: fid } }).then((res) => res.data);
-  return api.get("/api/admin/people", { params: { family_id: fid } }).then((res) => res.data);
+  return apiGet("/api/admin/people", { ...params, family_id: fid });
 }
 
 /** Fetch soft-deleted people (separate /deleted endpoint). */
 export function adminListDeletedPeople(params?: PaginationParams & { family_id?: number | null }): Promise<PersonListResponse> {
-  if (params) return api.get("/api/admin/people/deleted", { params }).then((res) => res.data);
-  return api.get("/api/admin/people/deleted").then((res) => res.data);
+  return apiGet("/api/admin/people/deleted", params);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,35 +334,25 @@ export interface InviteListParams extends PaginationParams {
 }
 
 export function adminListInvites(params?: InviteListParams): Promise<InviteListResponse> {
-  if (params) return api.get("/api/admin/invites", { params }).then((res) => res.data);
-  return api.get("/api/admin/invites").then((res) => res.data);
+  return apiGet("/api/admin/invites", params);
 }
 
 export function adminGetInvite(id: number): Promise<ReferrerInviteSummary> {
-  return api.get(`/api/admin/invites/${id}`).then((res) => res.data);
+  return apiGet(`/api/admin/invites/${id}`);
 }
 
 export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
-  return api.post(`/api/admin/invites/${id}/revoke`).then((res) => res.data);
+  return apiPost(`/api/admin/invites/${id}/revoke`);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — CSV Import
 // ---------------------------------------------------------------------------
 export function adminGetCsvSample(): Promise<string> {
-  return api.get("/api/admin/csv-sample").then((res) => res.data);
+  return apiGet("/api/admin/csv-sample");
 }
 
 export function adminImportCsv(fileOrText: File | string): Promise<unknown> {
-  // Accept a File object or a plain string
-  if (fileOrText instanceof File) {
-    return api
-      .post("/api/admin/import-csv", fileOrText, {
-        headers: { "Content-Type": "text/csv" },
-      })
-      .then((res) => res.data);
-  }
-  // plain string
   return api
     .post("/api/admin/import-csv", fileOrText, {
       headers: { "Content-Type": "text/csv" },
@@ -356,103 +364,101 @@ export function adminImportCsv(fileOrText: File | string): Promise<unknown> {
 // Admin — Users
 // ---------------------------------------------------------------------------
 export function adminListUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
-  if (params) return api.get("/api/admin/users", { params }).then((res) => res.data);
-  return api.get("/api/admin/users").then((res) => res.data);
+  return apiGet("/api/admin/users", params);
 }
 
 export function adminGetUser(id: number): Promise<UserDetail> {
-  return api.get(`/api/admin/users/${id}`).then((res) => res.data);
+  return apiGet(`/api/admin/users/${id}`);
 }
 
 export function adminCreateUser(data: AdminUserCreate): Promise<UserDetail> {
-  return api.post("/api/admin/users", data).then((res) => res.data);
+  return apiPost("/api/admin/users", data);
 }
 
 export function adminUpdateUser(id: number, data: AdminUserUpdate): Promise<UserDetail> {
-  return api.patch(`/api/admin/users/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/admin/users/${id}`, data);
 }
 
 export function adminResetUserPassword(id: number, data: UserPasswordReset): Promise<UserDetail> {
-  return api.post(`/api/admin/users/${id}/reset-password`, data).then((res) => res.data);
+  return apiPost(`/api/admin/users/${id}/reset-password`, data);
 }
 
 export function adminDeleteUser(id: number): Promise<void> {
-  return api.delete(`/api/admin/users/${id}`).then(() => undefined);
+  return apiDelete(`/api/admin/users/${id}`);
 }
 
 export function adminRestoreUser(id: number): Promise<UserDetail> {
-  return api.post(`/api/admin/users/${id}/restore`).then((res) => res.data);
+  return apiPost(`/api/admin/users/${id}/restore`);
 }
 
 /** Fetch soft-deleted users (separate /deleted endpoint). */
 export function adminListDeletedUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
-  if (params) return api.get("/api/admin/users/deleted", { params }).then((res) => res.data);
-  return api.get("/api/admin/users/deleted").then((res) => res.data);
+  return apiGet("/api/admin/users/deleted", params);
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — Self
 // ---------------------------------------------------------------------------
 export function getReferrerMe(): Promise<ReferrerDetail> {
-  return api.get("/api/referrer/me").then((res) => res.data);
+  return apiGet("/api/referrer/me");
 }
 
 export function patchReferrerMe(data: ReferrerPayload): Promise<ReferrerDetail> {
-  return api.patch("/api/referrer/me", data).then((res) => res.data);
+  return apiPatch("/api/referrer/me", data);
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — Families
 // ---------------------------------------------------------------------------
 export function listReferrerFamilies(): Promise<FamilyListResponse> {
-  return api.get("/api/referrer/families").then((res) => res.data);
+  return apiGet("/api/referrer/families");
 }
 
 export function getReferrerFamily(id: number): Promise<FamilyDetail> {
-  return api.get(`/api/referrer/families/${id}`).then((res) => res.data);
+  return apiGet(`/api/referrer/families/${id}`);
 }
 
 export function createReferrerFamily(data: FamilyPayload): Promise<FamilyDetail> {
-  return api.post("/api/referrer/families", normalizePayload(data)).then((res) => res.data);
+  return apiPost("/api/referrer/families", normalizePayload(data));
 }
 
 export function updateReferrerFamily(id: number, data: FamilyPayload): Promise<FamilyDetail> {
-  return api.patch(`/api/referrer/families/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/referrer/families/${id}`, data);
 }
 
 export function deleteReferrerFamily(id: number): Promise<void> {
-  return api.delete(`/api/referrer/families/${id}`).then(() => undefined);
+  return apiDelete(`/api/referrer/families/${id}`);
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — People within a family
 // ---------------------------------------------------------------------------
 export function listReferrerFamilyPeople(fid: number): Promise<PersonListResponse> {
-  return api.get(`/api/referrer/families/${fid}/people`).then((res) => res.data);
+  return apiGet(`/api/referrer/families/${fid}/people`);
 }
 
 export function createReferrerFamilyPerson(fid: number, data: PersonPayload): Promise<PersonDetail> {
-  return api.post(`/api/referrer/families/${fid}/people`, normalizePayload(data)).then((res) => res.data);
+  return apiPost(`/api/referrer/families/${fid}/people`, normalizePayload(data));
 }
 
 // ---------------------------------------------------------------------------
 // Referrer — Pending Families (invite approvals)
 // ---------------------------------------------------------------------------
 export function listPendingFamilies(): Promise<PendingFamilySummary[]> {
-  return api.get("/api/referrer/pending-families").then((res) => res.data);
+  return apiGet("/api/referrer/pending-families");
 }
 
 export function approveFamily(id: number): Promise<FamilyDetail> {
-  return api.post(`/api/referrer/families/${id}/approve`).then((res) => res.data);
+  return apiPost(`/api/referrer/families/${id}/approve`);
 }
 
 export function rejectFamily(id: number): Promise<FamilyDetail> {
-  return api.post(`/api/referrer/families/${id}/reject`).then((res) => res.data);
+  return apiPost(`/api/referrer/families/${id}/reject`);
 }
 
 /** Referrer sends a family invite email to a given address. */
 export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyInviteResponse> {
-  return api.post("/api/referrer/send-family-invite", { email }).then((res) => res.data);
+  return apiPost("/api/referrer/send-family-invite", { email });
 }
 
 // ---------------------------------------------------------------------------
@@ -461,44 +467,44 @@ export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyI
 
 /** Public: fetch the wish list for a family by ID (no auth required). */
 export function getFamilyWishList(familyId: number): Promise<FamilyWishListResponse> {
-  return api.get(`/api/families/${familyId}/wish-list`).then((res) => res.data);
+  return apiGet(`/api/families/${familyId}/wish-list`);
 }
 
 // ---------------------------------------------------------------------------
 // Family — Self
 // ---------------------------------------------------------------------------
 export function getFamilyMe(): Promise<FamilyDetail> {
-  return api.get("/api/family/me").then((res) => res.data);
+  return apiGet("/api/family/me");
 }
 
 export function patchFamilyMe(data: FamilyPayload): Promise<FamilyDetail> {
-  return api.patch("/api/family/me", data).then((res) => res.data);
+  return apiPatch("/api/family/me", data);
 }
 
 // ---------------------------------------------------------------------------
 // Family — People
 // ---------------------------------------------------------------------------
 export function listFamilyPeople(): Promise<PersonListResponse> {
-  return api.get("/api/family/people").then((res) => res.data);
+  return apiGet("/api/family/people");
 }
 
 export function createFamilyPerson(data: PersonPayload): Promise<PersonDetail> {
-  return api.post("/api/family/people", normalizePayload(data)).then((res) => res.data);
+  return apiPost("/api/family/people", normalizePayload(data));
 }
 
 // ---------------------------------------------------------------------------
 // Shared — Individual person (multi-role ownership)
 // ---------------------------------------------------------------------------
 export function getPerson(id: number): Promise<PersonDetail> {
-  return api.get(`/api/people/${id}`).then((res) => res.data);
+  return apiGet(`/api/people/${id}`);
 }
 
 export function updatePerson(id: number, data: PersonPayload): Promise<PersonDetail> {
-  return api.patch(`/api/people/${id}`, data).then((res) => res.data);
+  return apiPatch(`/api/people/${id}`, data);
 }
 
 export function deletePerson(id: number): Promise<void> {
-  return api.delete(`/api/people/${id}`).then(() => undefined);
+  return apiDelete(`/api/people/${id}`);
 }
 
 export default api;

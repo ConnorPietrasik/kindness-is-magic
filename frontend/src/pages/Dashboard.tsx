@@ -391,9 +391,18 @@ function ChangePasswordSection() {
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const changePasswordMut = useMutation({
+    mutationFn: () => changePasswordRequest(oldPass, newPass),
+    onSuccess: () => {
+      toast.success("Password updated successfully!");
+      setOldPass("");
+      setNewPass("");
+      setConfirmPass("");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPass !== confirmPass) {
@@ -401,18 +410,7 @@ function ChangePasswordSection() {
       return;
     }
 
-    setLoading(true);
-    try {
-      await changePasswordRequest(oldPass, newPass);
-      toast.success("Password updated successfully!");
-      setOldPass("");
-      setNewPass("");
-      setConfirmPass("");
-    } catch (err: unknown) {
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to change password.");
-    } finally {
-      setLoading(false);
-    }
+    changePasswordMut.mutate();
   };
 
   return (
@@ -452,10 +450,11 @@ function ChangePasswordSection() {
             minLength: 8,
           }}
         />
-        <Button type="submit" loading={loading}>
-          {loading ? "Updating…" : "Update Password"}
+        <Button type="submit" loading={changePasswordMut.isPending}>
+          {changePasswordMut.isPending ? "Updating…" : "Update Password"}
         </Button>
       </form>
+      <MutationErrors mutations={[changePasswordMut]} />
     </Card>
   );
 }
