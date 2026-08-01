@@ -144,6 +144,19 @@ class FamilyApprovalStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class WishLockLevel(str, enum.Enum):
+    """Three-tier wish approval lock.
+
+    * ``family`` — family can edit freely; referrer/admin can also edit.
+    * ``referrer`` — family is locked out; referrer and admin can edit.
+    * ``admin`` — only admin can edit (family and referrer locked out).
+    """
+
+    family = "family"
+    referrer = "referrer"
+    admin = "admin"
+
+
 class Family(Base):
     __tablename__ = "family"
     __table_args__ = (
@@ -171,6 +184,16 @@ class Family(Base):
         nullable=False,
     )
     pickup_window: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
+    # Wish approval workflow fields
+    wish_lock_level: Mapped[WishLockLevel] = mapped_column(
+        SAEnum(WishLockLevel, name="wish_lock_level", create_constraint=True),
+        server_default="family",
+        nullable=False,
+    )
+    wish_review_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    wish_rejection_reason: Mapped[str | None] = mapped_column(String(400), nullable=True, default=None)
+
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -16,6 +16,7 @@ from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_family_detail,
+    build_family_review_summary,
     compute_display_ids,
     get_active_or_404,
     get_or_404,
@@ -26,6 +27,8 @@ from app.schemas import (
     FamilyCreate,
     FamilyDetail,
     FamilyListResponse,
+    FamilyReviewList,
+    FamilyReviewRequest,
     FamilySummary,
 )
 
@@ -87,6 +90,9 @@ def list_families(
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
+                wish_lock_level=f.wish_lock_level,
+                wish_review_requested_at=f.wish_review_requested_at,
+                wish_rejection_reason=f.wish_rejection_reason,
             )
             for f in families
         ],
@@ -130,6 +136,9 @@ def list_deleted_families(
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
+                wish_lock_level=f.wish_lock_level,
+                wish_review_requested_at=f.wish_review_requested_at,
+                wish_rejection_reason=f.wish_rejection_reason,
             )
             for f in families
         ],
@@ -138,6 +147,30 @@ def list_deleted_families(
         page_size=page_size,
         total_pages=math.ceil(total / page_size) if total else 0,
     )
+
+
+@family_admin_router.get("/review-queue")
+def list_review_queue(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[FamilyReviewList]:
+    """List families awaiting admin wish approval."""
+    families = (
+        db.query(Family)
+        .filter(
+            Family.deleted_at.is_(None),
+            Family.wish_lock_level == "referrer",
+            Family.wish_review_requested_at.isnot(None),
+        )
+        .order_by(Family.wish_review_requested_at.asc())
+        .all()
+    )
+
+    # Batch person counts
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
+    count_map = {fid: cnt for fid, cnt in counts}
+
+    return [FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0))) for f in families]
 
 
 @family_admin_router.get("/{fam_id}")
@@ -229,3 +262,92 @@ def delete_family(
     db.commit()
     logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Admin — Wish Approval Review
+# ---------------------------------------------------------------------------
+
+
+@family_admin_router.post("/{fam_id}/approve-wishes")
+def admin_approve_wishes(
+    fam_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> FamilyDetail:
+    """Admin approves wishes — family moves to admin lock (fully approved)."""
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
+
+    if fam.wish_lock_level != "referrer":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot approve wishes at current lock level.",
+        )
+    if fam.wish_review_requested_at is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending review request to approve.",
+        )
+
+    fam.wish_lock_level = "admin"
+    fam.wish_review_requested_at = None
+    fam.wish_rejection_reason = None
+
+    db.commit()
+    db.refresh(fam)
+    logger.info("Admin %s approved wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
+
+
+@family_admin_router.post("/{fam_id}/reject-wishes")
+def admin_reject_wishes(
+    fam_id: int,
+    body: FamilyReviewRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> FamilyDetail:
+    """Admin rejects wishes — family moves back to referrer lock."""
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
+
+    if fam.wish_lock_level != "referrer":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot reject wishes at current lock level.",
+        )
+    if fam.wish_review_requested_at is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending review request to reject.",
+        )
+
+    fam.wish_lock_level = "referrer"
+    fam.wish_review_requested_at = None
+    fam.wish_rejection_reason = body.reason
+
+    db.commit()
+    db.refresh(fam)
+    logger.info("Admin %s rejected wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
+
+
+@family_admin_router.post("/{fam_id}/reset-wish-state")
+def admin_reset_wish_state(
+    fam_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> FamilyDetail:
+    """Reset a family's wish state back to family-editable.
+
+    Useful when a lock was applied in error or the family needs to revise
+    after admin approval.  Also used by e2e test setup for clean baselines.
+    """
+    fam = get_active_or_404(db, Family, fam_id, "Family not found")
+
+    fam.wish_lock_level = "family"
+    fam.wish_review_requested_at = None
+    fam.wish_rejection_reason = None
+
+    db.commit()
+    db.refresh(fam)
+    logger.info("Admin %s reset wish state for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))

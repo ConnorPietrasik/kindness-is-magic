@@ -22,6 +22,7 @@ export type {
   FamilyApprovalStatus,
   FamilyDetail,
   FamilyPayload,
+  FamilyReviewQueueItem,
   FamilySelfRegisterPayload,
   FamilySelfRegisterResponse,
   FamilySummary,
@@ -47,6 +48,7 @@ export type {
   UserRole,
   UserSummary,
   WishCreate,
+  WishLockLevel,
   WishSummary,
   WishType,
 } from "./domain";

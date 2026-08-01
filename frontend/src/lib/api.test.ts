@@ -647,3 +647,84 @@ describe("shared person API functions", () => {
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/people/7");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Family — Wish Review
+// ---------------------------------------------------------------------------
+describe("family wish review API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("requestFamilyReview — POST /api/family/me/request-review", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 1, wish_lock_level: "family" } });
+    const result = await apiModule.requestFamilyReview();
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/family/me/request-review");
+    expect(result).toEqual({ id: 1, wish_lock_level: "family" });
+  });
+
+  it("cancelFamilyReview — POST /api/family/me/cancel-review", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 1, wish_lock_level: "family" } });
+    const result = await apiModule.cancelFamilyReview();
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/family/me/cancel-review");
+    expect(result).toEqual({ id: 1, wish_lock_level: "family" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Referrer — Wish Review Queue
+// ---------------------------------------------------------------------------
+describe("referrer wish review API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("listReferrerReviewQueue — GET /api/referrer/review-queue", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, family_name: "Smiths" }] });
+    const result = await apiModule.listReferrerReviewQueue();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/referrer/review-queue");
+    expect(result).toEqual([{ id: 1, family_name: "Smiths" }]);
+  });
+
+  it("referrerApproveWishes — POST /api/referrer/families/:id/approve-wishes", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, wish_lock_level: "referrer" } });
+    const result = await apiModule.referrerApproveWishes(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/approve-wishes");
+    expect(result).toEqual({ id: 5, wish_lock_level: "referrer" });
+  });
+
+  it("referrerRejectWishes — POST /api/referrer/families/:id/reject-wishes with reason", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, wish_lock_level: "family" } });
+    const result = await apiModule.referrerRejectWishes(5, "Needs more detail");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/reject-wishes", {
+      reason: "Needs more detail",
+    });
+    expect(result).toEqual({ id: 5, wish_lock_level: "family" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Wish Review Queue
+// ---------------------------------------------------------------------------
+describe("admin wish review API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("listAdminReviewQueue — GET /api/admin/families/review-queue", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, family_name: "Smiths", referrer_name: "Jane" }] });
+    const result = await apiModule.listAdminReviewQueue();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/review-queue");
+    expect(result).toEqual([{ id: 1, family_name: "Smiths", referrer_name: "Jane" }]);
+  });
+
+  it("adminApproveWishes — POST /api/admin/families/:id/approve-wishes", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, wish_lock_level: "admin" } });
+    const result = await apiModule.adminApproveWishes(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/families/5/approve-wishes");
+    expect(result).toEqual({ id: 5, wish_lock_level: "admin" });
+  });
+
+  it("adminRejectWishes — POST /api/admin/families/:id/reject-wishes with reason", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, wish_lock_level: "referrer" } });
+    const result = await apiModule.adminRejectWishes(5, "Wishes too vague");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/families/5/reject-wishes", {
+      reason: "Wishes too vague",
+    });
+    expect(result).toEqual({ id: 5, wish_lock_level: "referrer" });
+  });
+});

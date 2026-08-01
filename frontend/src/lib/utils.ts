@@ -136,6 +136,23 @@ export function fromDatetimeLocalValue(value: string): string {
 }
 
 /**
+ * isFamilyLocked — determine whether a family's wishes are locked for editing.
+ *
+ * A family is locked when:
+ * - wish_lock_level is not "family" (referrer or admin has taken control), or
+ * - a review request is pending (wish_review_requested_at is set).
+ */
+export interface FamilyLockFields {
+  wish_lock_level: string;
+  wish_review_requested_at: string | null;
+}
+
+export function isFamilyLocked(family: FamilyLockFields | null | undefined): boolean {
+  if (family == null) return false;
+  return family.wish_lock_level !== "family" || family.wish_review_requested_at != null;
+}
+
+/**
  * formatApiError — extract a user-facing error string from an axios error.
  *
  * Tries these sources in order:

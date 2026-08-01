@@ -103,6 +103,23 @@ export async function listFamiliesViaApi(
 }
 
 /**
+ * Reset a family's wish state to initial (family lock, no review).
+ * Used by global-setup to ensure clean state after re-seeding.
+ */
+export async function resetFamilyWishState(
+  request: APIRequestContext,
+  familyId: number,
+): Promise<void> {
+  const resp = await request.post(`/api/admin/families/${familyId}/reset-wish-state`, {
+    data: {},
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`resetFamilyWishState(${familyId}) failed (${resp.status()}): ${body}`);
+  }
+}
+
+/**
  * List referrers (admin API).
  */
 export async function listReferrersViaApi(

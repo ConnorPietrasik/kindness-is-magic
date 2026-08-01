@@ -17,6 +17,7 @@ import type {
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
+  FamilyReviewQueueItem,
   FamilySelfRegisterPayload,
   FamilySelfRegisterResponse,
   FamilyWishListResponse,
@@ -289,6 +290,21 @@ export function adminListDeletedFamilies(params?: PaginationParams & { referrer_
 }
 
 // ---------------------------------------------------------------------------
+// Admin — Wish Review Queue
+// ---------------------------------------------------------------------------
+export function listAdminReviewQueue(): Promise<FamilyReviewQueueItem[]> {
+  return apiGet("/api/admin/families/review-queue");
+}
+
+export function adminApproveWishes(id: number): Promise<FamilyDetail> {
+  return apiPost(`/api/admin/families/${id}/approve-wishes`);
+}
+
+export function adminRejectWishes(id: number, reason: string): Promise<FamilyDetail> {
+  return apiPost(`/api/admin/families/${id}/reject-wishes`, { reason });
+}
+
+// ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
 export function adminListPeople(params?: PaginationParams): Promise<PersonListResponse> {
@@ -462,6 +478,21 @@ export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyI
 }
 
 // ---------------------------------------------------------------------------
+// Referrer — Wish Review Queue
+// ---------------------------------------------------------------------------
+export function listReferrerReviewQueue(): Promise<FamilyReviewQueueItem[]> {
+  return apiGet("/api/referrer/review-queue");
+}
+
+export function referrerApproveWishes(id: number): Promise<FamilyDetail> {
+  return apiPost(`/api/referrer/families/${id}/approve-wishes`);
+}
+
+export function referrerRejectWishes(id: number, reason: string): Promise<FamilyDetail> {
+  return apiPost(`/api/referrer/families/${id}/reject-wishes`, { reason });
+}
+
+// ---------------------------------------------------------------------------
 // Public — Family Wish List
 // ---------------------------------------------------------------------------
 
@@ -490,6 +521,17 @@ export function listFamilyPeople(): Promise<PersonListResponse> {
 
 export function createFamilyPerson(data: PersonPayload): Promise<PersonDetail> {
   return apiPost("/api/family/people", normalizePayload(data));
+}
+
+// ---------------------------------------------------------------------------
+// Family — Wish Review Request / Cancel
+// ---------------------------------------------------------------------------
+export function requestFamilyReview(): Promise<FamilyDetail> {
+  return apiPost("/api/family/me/request-review");
+}
+
+export function cancelFamilyReview(): Promise<FamilyDetail> {
+  return apiPost("/api/family/me/cancel-review");
 }
 
 // ---------------------------------------------------------------------------

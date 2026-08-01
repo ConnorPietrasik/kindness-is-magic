@@ -117,6 +117,13 @@ export const referrerFamilyPeople = (id: string) => ["referrerFamilyPeople", id]
 export const pendingFamilies = ["pendingFamilies"] as const;
 
 // ---------------------------------------------------------------------------
+// Referrer — Wish Review Queue
+// ---------------------------------------------------------------------------
+
+/** Families awaiting referrer wish review */
+export const referrerReviewQueue = ["referrerReviewQueue"] as const;
+
+// ---------------------------------------------------------------------------
 // Family — Self
 // ---------------------------------------------------------------------------
 
@@ -129,6 +136,13 @@ export const familyMe = ["familyMe"] as const;
 
 /** People belonging to the current family */
 export const familyPeople = ["familyPeople"] as const;
+
+// ---------------------------------------------------------------------------
+// Admin — Wish Review Queue
+// ---------------------------------------------------------------------------
+
+/** Families awaiting admin wish approval */
+export const adminReviewQueue = ["adminReviewQueue"] as const;
 
 // ---------------------------------------------------------------------------
 // Public — Wish List

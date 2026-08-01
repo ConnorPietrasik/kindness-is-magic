@@ -20,12 +20,14 @@ describe("ROUTES constants", () => {
     expect(ROUTES.ADMIN_FAMILY_PEOPLE).toBe("/admin/families/:id/people");
     expect(ROUTES.ADMIN_PEOPLE).toBe("/admin/people");
     expect(ROUTES.ADMIN_CSV_UPLOAD).toBe("/admin/csv-upload");
+    expect(ROUTES.ADMIN_WISH_REVIEW).toBe("/admin/wish-review");
   });
 
   it("has correct referrer routes", () => {
     expect(ROUTES.REFERRER_FAMILIES).toBe("/referrer/families");
     expect(ROUTES.REFERRER_FAMILY_DETAIL).toBe("/referrer/families/:id");
     expect(ROUTES.REFERRER_FAMILY_INVITES).toBe("/referrer/family-invites");
+    expect(ROUTES.REFERRER_WISH_REVIEW).toBe("/referrer/wish-review");
   });
 
   it("has correct family routes", () => {

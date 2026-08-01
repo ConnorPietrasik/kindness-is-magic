@@ -301,6 +301,36 @@ def build_family_detail(fam: Family, db: Session, *, person_count: int | None = 
         "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
+        "wish_lock_level": fam.wish_lock_level,
+        "wish_review_requested_at": fam.wish_review_requested_at,
+        "wish_rejection_reason": fam.wish_rejection_reason,
+    }
+
+
+def build_family_review_summary(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
+    """Build a dict suitable for FamilyReviewList (review queue items).
+
+    Includes referrer_name resolution.  Pass ``person_count`` to skip the
+    query when it is already known.
+    """
+    if person_count is None:
+        person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
+
+    referrer_name: str | None = None
+    if fam.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref:
+            referrer_name = ref.name
+
+    return {
+        "id": fam.id,
+        "family_name": fam.family_name,
+        "contact_name": fam.contact_name,
+        "referrer_id": fam.referrer_id,
+        "referrer_name": referrer_name,
+        "person_count": person_count,
+        "wish_review_requested_at": fam.wish_review_requested_at,
+        "wish_rejection_reason": fam.wish_rejection_reason,
     }
 
 

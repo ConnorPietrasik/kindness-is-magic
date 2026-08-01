@@ -3,6 +3,14 @@
  *
  * Shows the family's own info and a quick link to manage people.
  * Family users can edit their own family info and navigate to people management.
+ *
+ * Wish lock states:
+ * - family + no request + no rejection → normal editing
+ * - family + no request + rejection → show rejection reason, allow editing
+ * - family + requested → "Awaiting referrer review" + cancel button
+ * - referrer + rejection → admin rejected, contact referrer
+ * - referrer (no rejection) → referrer reviewed, locked
+ * - admin → fully approved and visible to donors
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,15 +20,16 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
+import { FamilyLockBanner } from "../components/FamilyLockBanner";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
-import { getFamilyMe, patchFamilyMe } from "../lib/api";
+import { cancelFamilyReview, getFamilyMe, patchFamilyMe, requestFamilyReview } from "../lib/api";
 import { familyMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, isFamilyLocked, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -44,11 +53,37 @@ export default function FamilyDashboard() {
     },
   });
 
+  const requestReviewMut = useMutation({
+    mutationFn: requestFamilyReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familyMe });
+      toast.success("Review requested");
+    },
+  });
+
+  const cancelReviewMut = useMutation({
+    mutationFn: cancelFamilyReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familyMe });
+      toast.success("Review request cancelled");
+    },
+  });
+
   const [showEdit, setShowEdit] = useState(false);
+
+  const isLocked = isFamilyLocked(familyInfo);
 
   function handleUpdateSelf(formData: FamilyPayload) {
     const payload = normalizeUpdatePayload(formData, familyInfo as FamilyDetail);
     updateSelfMut.mutate(payload as FamilyPayload);
+  }
+
+  function handleRequestReview() {
+    requestReviewMut.mutate();
+  }
+
+  function handleCancelReview() {
+    cancelReviewMut.mutate();
   }
 
   if (isLoading) return <PageSpinner />;
@@ -60,20 +95,35 @@ export default function FamilyDashboard() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Dashboard</h2>
 
-        {/* ── Pending approval banner ───────────────────────── */}
+        {/* ── Pending approval banner (legacy) ────────────────── */}
         {familyInfo?.approval_status === "pending" && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-800 shadow-sm">
             Your family is awaiting approval from your referrer. You can still add and edit family members while you wait.
           </div>
         )}
 
+        {/* ── Wish lock state banner ──────────────────────────── */}
+        {familyInfo && (
+          <FamilyLockBanner
+            lockLevel={familyInfo.wish_lock_level}
+            requestedAt={familyInfo.wish_review_requested_at}
+            rejectionReason={familyInfo.wish_rejection_reason}
+            onRequestReview={handleRequestReview}
+            onCancelReview={handleCancelReview}
+            requestMutPending={requestReviewMut.isPending}
+            cancelMutPending={cancelReviewMut.isPending}
+          />
+        )}
+
         {/* ── Family info card ──────────────────────────────── */}
         <Card className="mb-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-900">My Family Profile</h3>
-            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEdit(!showEdit)}>
-              {showEdit ? "Cancel" : "Edit"}
-            </Button>
+            {!isLocked && (
+              <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setShowEdit(!showEdit)}>
+                {showEdit ? "Cancel" : "Edit"}
+              </Button>
+            )}
           </div>
 
           {showEdit ? (
@@ -105,16 +155,27 @@ export default function FamilyDashboard() {
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
             to={ROUTES.FAMILY_PEOPLE}
-            className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
+            className={`group flex flex-col gap-2 rounded-xl border px-5 py-5 shadow-sm transition-all ${
+              isLocked
+                ? "border-gray-100 bg-gray-50 opacity-60"
+                : "border-gray-200 bg-white hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
+            }`}
+            onClick={(e) => {
+              if (isLocked) e.preventDefault();
+            }}
           >
             <span className="text-2xl">✨</span>
-            <span className="text-sm font-semibold text-gray-900 group-hover:text-btn-start">Manage People</span>
-            <span className="text-xs text-gray-400">Add, edit, and delete family members and their wishes</span>
+            <span className={`text-sm font-semibold ${isLocked ? "text-gray-400" : "text-gray-900 group-hover:text-btn-start"}`}>
+              Manage People
+            </span>
+            <span className="text-xs text-gray-400">
+              {isLocked ? "Locked — contact your referrer to request changes" : "Add, edit, and delete family members and their wishes"}
+            </span>
           </Link>
         </div>
 
         {/* ── Errors ────────────────────────────────────────── */}
-        <MutationErrors mutations={[updateSelfMut]} />
+        <MutationErrors mutations={[updateSelfMut, requestReviewMut, cancelReviewMut]} />
       </main>
     </div>
   );

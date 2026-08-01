@@ -11,8 +11,16 @@ import { PhoneInput } from "../components/PhoneInput";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { changePasswordRequest, getReferrerMe, listPendingFamilies, patchReferrerMe, updateMyProfile } from "../lib/api";
-import { auth, pendingFamilies as PENDING_FAMILIES_KEY, referrerMe } from "../lib/queryKeys";
+import {
+  changePasswordRequest,
+  getReferrerMe,
+  listAdminReviewQueue,
+  listPendingFamilies,
+  listReferrerReviewQueue,
+  patchReferrerMe,
+  updateMyProfile,
+} from "../lib/api";
+import { adminReviewQueue, auth, pendingFamilies as PENDING_FAMILIES_KEY, referrerMe, referrerReviewQueue } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
@@ -38,6 +46,18 @@ export default function Dashboard() {
     queryKey: PENDING_FAMILIES_KEY,
     queryFn: listPendingFamilies,
     enabled: user?.role === "referrer",
+  });
+
+  const { data: referrerReviewQueueData } = useQuery({
+    queryKey: referrerReviewQueue,
+    queryFn: listReferrerReviewQueue,
+    enabled: user?.role === "referrer",
+  });
+
+  const { data: adminReviewQueueData } = useQuery({
+    queryKey: adminReviewQueue,
+    queryFn: listAdminReviewQueue,
+    enabled: user?.role === "admin",
   });
 
   if (user?.role === "referrer" && referrerLoading) {
@@ -68,6 +88,26 @@ export default function Dashboard() {
           </Link>
         )}
 
+        {/* Referrer wish review queue alert */}
+        {user?.role === "referrer" && referrerReviewQueueData && referrerReviewQueueData.length > 0 && (
+          <Link
+            to={ROUTES.REFERRER_WISH_REVIEW}
+            className="mb-6 block rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
+          >
+            {referrerReviewQueueData.length} family{referrerReviewQueueData.length > 1 ? "ies" : ""} awaiting your wish review →
+          </Link>
+        )}
+
+        {/* Admin wish review queue alert */}
+        {user?.role === "admin" && adminReviewQueueData && adminReviewQueueData.length > 0 && (
+          <Link
+            to={ROUTES.ADMIN_WISH_REVIEW}
+            className="mb-6 block rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
+          >
+            {adminReviewQueueData.length} family{adminReviewQueueData.length > 1 ? "ies" : ""} awaiting your wish approval →
+          </Link>
+        )}
+
         {/* Navigation cards */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {user?.role === "admin" && (
@@ -78,6 +118,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />
               <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
               <NavCard to={ROUTES.ADMIN_INVITE_CODES} icon="💌" label="Invite Codes" desc="Manage invite codes for self-registration" />
+              <NavCard to={ROUTES.ADMIN_WISH_REVIEW} icon="📋" label="Wish Approval" desc="Approve or reject family wishes" />
             </>
           )}
 
@@ -85,6 +126,7 @@ export default function Dashboard() {
             <>
               <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your approved families" />
               <NavCard to={ROUTES.REFERRER_FAMILY_INVITES} icon="⏳" label="Family Invites" desc="Invite families & review applications" />
+              <NavCard to={ROUTES.REFERRER_WISH_REVIEW} icon="📋" label="Wish Review" desc="Review and approve family wishes" />
             </>
           )}
 

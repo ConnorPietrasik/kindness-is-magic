@@ -3,11 +3,21 @@
  *
  * View/edit a specific family and manage its people.
  * Thin wrapper around HierarchicalManage.
+ *
+ * Wish lock features:
+ * - Show current wish lock state
+ * - "Submit for Admin Review" when lock_level = "family"
+ * - "Re-submit for Admin Review" when lock_level = "referrer" + rejection_reason
+ * - Show rejection reason banner if present
+ * - Disable family/people edit controls when lock_level = "admin"
  */
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
@@ -19,16 +29,19 @@ import {
 import { InfoRow } from "../components/InfoRow";
 import { PersonForm } from "../components/PersonForm";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishLockBadge } from "../components/WishLockBadge";
+import { useToast } from "../context/ToastContext";
 import {
   createReferrerFamilyPerson,
   deletePerson,
   getPerson,
   getReferrerFamily,
   listReferrerFamilyPeople,
+  referrerApproveWishes,
   updatePerson,
   updateReferrerFamily,
 } from "../lib/api";
-import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople } from "../lib/queryKeys";
+import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople, referrerReviewQueue } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
@@ -68,7 +81,7 @@ export default function ReferrerFamilyDetail() {
             fetchFn: getReferrerFamily,
             updateApi: updateReferrerFamily,
             normaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
-            render: (props) => <FamilyCard {...props} />,
+            render: (props) => <FamilyCard {...props} famId={famIdNum} />,
             invalidationKeys: [referrerFamilies],
             entityName: "Family",
           }}
@@ -82,11 +95,18 @@ export default function ReferrerFamilyDetail() {
             updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData as PersonPayload, original),
             formDefault: defaultPersonForm as unknown as PersonPayload,
             formComponent: PersonForm,
-            render: (rows, callbacks, _ctx) => <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} />,
+            render: (rows, callbacks, ctx) => (
+              <PeopleTable
+                rows={rows as PersonSummary[]}
+                callbacks={callbacks}
+                lockLevel={(ctx?.parentData as FamilyDetail | undefined)?.wish_lock_level}
+              />
+            ),
             title: "People",
             createButtonLabel: "+ Add Person",
             invalidationKeys: [peopleKey, familyKey],
             entityName: "Person",
+            isReadonly: false,
           }}
         />
       </main>
@@ -98,11 +118,52 @@ export default function ReferrerFamilyDetail() {
 /* Parent card render                                                  */
 /* ------------------------------------------------------------------ */
 
-function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
-  const { data, isEditing, onToggleEdit, isSaving, onSave } = props;
+function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & { famId: number }) {
+  const { data, isEditing, onToggleEdit, isSaving, onSave, famId } = props;
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+  const familyKey = referrerFamilyDetail(String(famId));
+
+  const submitForReviewMut = useMutation({
+    mutationFn: referrerApproveWishes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familyKey });
+      queryClient.invalidateQueries({ queryKey: referrerFamilies });
+      queryClient.invalidateQueries({ queryKey: referrerReviewQueue });
+      toast.success("Wishes submitted for admin review");
+    },
+  });
+
+  // Lock state
+  const lockLevel = data?.wish_lock_level ?? "family";
+  const rejectionReason = data?.wish_rejection_reason ?? null;
+  const isLockedByAdmin = lockLevel === "admin";
+
+  // Determine action button
+  const showSubmitButton = lockLevel === "family"; // initial submission
+  const showResubmitButton = lockLevel === "referrer" && rejectionReason != null; // re-submit after admin rejection
 
   return (
     <Card className="mb-6">
+      {/* Wish lock state banner */}
+      {data && lockLevel === "admin" && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+          <span className="font-medium">Admin-approved:</span> This family is fully approved and visible to donors. Editing is locked.
+        </div>
+      )}
+      {data && lockLevel === "referrer" && rejectionReason && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+          <span className="font-medium">Admin rejection:</span> {rejectionReason}
+        </div>
+      )}
+      {data && lockLevel === "referrer" && !rejectionReason && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+          <span className="font-medium">Awaiting admin review:</span> This family's wishes have been submitted for admin approval.
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold text-gray-900">{data ? data.family_name : "\u2014"}</h3>
@@ -112,10 +173,36 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
               {data.person_count ?? 0} person{(data.person_count ?? 0) !== 1 ? "s" : ""}
             </span>
           )}
+          {data && <WishLockBadge level={lockLevel} />}
         </div>
-        <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>
-          {isEditing ? "Cancel" : "Edit"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Submit / Re-submit button */}
+          {showSubmitButton && (
+            <Button
+              variant="success"
+              className="h-8 px-3 text-xs"
+              onClick={() => setShowSubmitConfirm(true)}
+              loading={submitForReviewMut.isPending}
+            >
+              {submitForReviewMut.isPending ? "Submitting…" : "Submit for Admin Review"}
+            </Button>
+          )}
+          {showResubmitButton && (
+            <Button
+              variant="success"
+              className="h-8 px-3 text-xs"
+              onClick={() => setShowSubmitConfirm(true)}
+              loading={submitForReviewMut.isPending}
+            >
+              {submitForReviewMut.isPending ? "Submitting…" : "Re-submit for Admin Review"}
+            </Button>
+          )}
+          {!isLockedByAdmin && (
+            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>
+              {isEditing ? "Cancel" : "Edit"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isEditing ? (
@@ -140,6 +227,26 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
           </div>
         )
       )}
+
+      {/* Submit confirmation dialog */}
+      <ConfirmDialog
+        open={showSubmitConfirm}
+        title="Submit wishes for admin review?"
+        description={
+          showResubmitButton
+            ? "This will re-submit the wishes to the admin after the previous rejection."
+            : "This will lock the family wishes and submit them for admin approval. The admin will then review and either approve or reject."
+        }
+        onConfirm={() => {
+          setShowSubmitConfirm(false);
+          if (famId) submitForReviewMut.mutate(famId);
+        }}
+        onCancel={() => setShowSubmitConfirm(false)}
+        loading={submitForReviewMut.isPending}
+        confirmLabel="Yes, submit"
+        loadingLabel="Submitting…"
+        confirmVariant="success"
+      />
     </Card>
   );
 }
@@ -148,7 +255,17 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail>) {
 /* Children table render                                               */
 /* ------------------------------------------------------------------ */
 
-function PeopleTable({ rows, callbacks }: { rows: PersonSummary[]; callbacks: HierarchicalManageChildCallbacks }) {
+function PeopleTable({
+  rows,
+  callbacks,
+  lockLevel,
+}: {
+  rows: PersonSummary[];
+  callbacks: HierarchicalManageChildCallbacks;
+  lockLevel?: string;
+}) {
+  const isLockedByAdmin = lockLevel === "admin";
+
   return (
     <Table className="mb-6">
       {rows.length === 0 ? (
@@ -173,22 +290,28 @@ function PeopleTable({ rows, callbacks }: { rows: PersonSummary[]; callbacks: Hi
                 <Td>{p.age}</Td>
                 <Td>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onEdit(p.id)}
-                      disabled={callbacks.isEditing(p.id)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="danger"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onDelete(p.id)}
-                      disabled={callbacks.isDeleting}
-                    >
-                      Delete
-                    </Button>
+                    {!isLockedByAdmin ? (
+                      <>
+                        <Button
+                          variant="secondary"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => callbacks.onEdit(p.id)}
+                          disabled={callbacks.isEditing(p.id)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => callbacks.onDelete(p.id)}
+                          disabled={callbacks.isDeleting}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">Locked</span>
+                    )}
                   </div>
                 </Td>
               </Tr>

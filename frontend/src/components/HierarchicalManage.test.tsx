@@ -633,14 +633,15 @@ describe("HierarchicalManage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("children-table")).toHaveTextContent("active");
     });
-    expect(capturedContext).toEqual({ isDeletedView: false });
+    expect(capturedContext).toMatchObject({ isDeletedView: false });
+    expect(capturedContext).toHaveProperty("parentData");
 
     await user.click(screen.getByRole("tab", { name: "Deleted" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("children-table")).toHaveTextContent("deleted");
     });
-    expect(capturedContext).toEqual({ isDeletedView: true });
+    expect(capturedContext).toMatchObject({ isDeletedView: true });
   });
 
   it("hides create button in readonly deleted tab", async () => {

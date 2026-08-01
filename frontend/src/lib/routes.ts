@@ -25,11 +25,13 @@ export const ROUTES = {
   ADMIN_FAMILY_PEOPLE: "/admin/families/:id/people",
   ADMIN_PEOPLE: "/admin/people",
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
+  ADMIN_WISH_REVIEW: "/admin/wish-review",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
   REFERRER_FAMILY_DETAIL: "/referrer/families/:id",
   REFERRER_FAMILY_INVITES: "/referrer/family-invites",
+  REFERRER_WISH_REVIEW: "/referrer/wish-review",
 
   // ── Family self-service ───────────────────────────────────
   FAMILY_DASHBOARD: "/family/dashboard",

@@ -32,6 +32,9 @@ const mockResponse: FamilySelfRegisterResponse = {
     person_count: 0,
     approval_status: "approved",
     pickup_window: null,
+    wish_lock_level: "family",
+    wish_review_requested_at: null,
+    wish_rejection_reason: null,
   },
 };
 

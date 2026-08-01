@@ -62,6 +62,8 @@ export interface HierarchicalManageChildCallbacks {
 export interface HierarchicalManageRenderContext {
   /** Whether the current view is the deleted tab (if tabs are configured) */
   isDeletedView: boolean;
+  /** Current parent data (if available) */
+  parentData?: unknown;
 }
 
 /**
@@ -163,6 +165,8 @@ export interface HierarchicalManageChildConfig<
   invalidationKeys: ReadonlyArray<string | readonly string[]>;
   /** Entity name for child success toast messages (e.g. "Family"). Omit to disable. */
   entityName?: string;
+  /** If true, disable create/edit/delete operations (read-only mode). */
+  isReadonly?: boolean;
 }
 
 /** Optional deleted tab configuration. */
@@ -268,7 +272,7 @@ export function HierarchicalManage<
   const deletedTab = tabs?.deleted;
   const currentRootKey = isDeletedView && deletedTab ? deletedTab.queryKey : childConfig.queryKey;
   const currentListFn = isDeletedView && deletedTab ? deletedTab.listFn : childConfig.listFn;
-  const isReadonly = isDeletedView && deletedTab ? (deletedTab.readonly ?? false) : false;
+  const isReadonly = (isDeletedView && deletedTab ? (deletedTab.readonly ?? false) : false) || (childConfig.isReadonly ?? false);
 
   /* ── Parent query ──────────────────────────────────────── */
   const { data: parentData, isLoading: parentLoading } = useQuery({
@@ -345,6 +349,7 @@ export function HierarchicalManage<
   /* ── Render context ────────────────────────────────────── */
   const renderContext: HierarchicalManageRenderContext = {
     isDeletedView,
+    parentData: parentData,
   };
 
   /* ── Parent render props ───────────────────────────────── */

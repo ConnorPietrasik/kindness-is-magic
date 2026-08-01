@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
-import { listFamiliesViaApi, seedDatabaseViaApi } from "./api";
+import { listFamiliesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -52,6 +52,13 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     if (williamsFamily) {
       fs.writeFileSync("storage/seed-family-id.json", JSON.stringify({ id: williamsFamily.id }));
       console.log(`[globalSetup] Saved seeded family ID ${williamsFamily.id} for wish-list tests.`);
+
+      /* Reset wish state to "family" lock so tests start from a clean baseline.
+       * CSV import is idempotent and does NOT reset wish_lock_level on existing rows,
+       * so a prior run that approved this family would leave it at "admin" lock.
+       */
+      await resetFamilyWishState(apiContext, williamsFamily.id);
+      console.log(`[globalSetup] Reset wish state for family ${williamsFamily.id} to "family" lock.`);
     } else {
       console.warn("[globalSetup] Could not find 'The Williams Family' in seeded data.");
     }

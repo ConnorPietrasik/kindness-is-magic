@@ -21,6 +21,7 @@ from app.models import (  # noqa: F401
     RefreshToken,
     User,
     Wish,
+    WishLockLevel,
 )
 
 # this is the Alembic Config object, which provides

@@ -7,7 +7,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -20,6 +20,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishLockBadge } from "../components/WishLockBadge";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
@@ -46,6 +47,8 @@ export default function AdminFamilies() {
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [showUnapproved, setShowUnapproved] = useState(false);
+  const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
+  const pendingPayload = useRef<FamilyPayload | null>(null);
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
@@ -105,8 +108,22 @@ export default function AdminFamilies() {
 
   function handleUpdate(formData: FamilyPayload) {
     if (!editingId) return;
-    const payload = normalizeUpdatePayload(formData, detail as FamilyDetail);
-    updateMut?.mutate({ id: editingId, data: payload as FamilyPayload });
+    const payload = normalizeUpdatePayload(formData, detail as FamilyDetail) as FamilyPayload;
+    // If family is admin-locked, ask for confirmation
+    if (detail?.wish_lock_level === "admin") {
+      pendingPayload.current = payload;
+      setLockEditConfirm(true);
+      return;
+    }
+    updateMut?.mutate({ id: editingId, data: payload });
+  }
+
+  function handleUpdateConfirmed() {
+    setLockEditConfirm(false);
+    if (editingId && pendingPayload.current) {
+      updateMut?.mutate({ id: editingId, data: pendingPayload.current });
+      pendingPayload.current = null;
+    }
   }
 
   const families = useMemo(() => {
@@ -180,6 +197,7 @@ export default function AdminFamilies() {
                 <Th>Family Name</Th>
                 <Th>Contact</Th>
                 <Th>Referrer</Th>
+                <Th>Lock</Th>
                 <Th>Pickup Window</Th>
                 <Th>Actions</Th>
               </TableHead>
@@ -214,6 +232,9 @@ export default function AdminFamilies() {
                       ) : (
                         "—"
                       )}
+                    </Td>
+                    <Td>
+                      <WishLockBadge level={f.wish_lock_level ?? "family"} />
                     </Td>
                     <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(f.pickup_window)}</Td>
                     <Td>
@@ -306,6 +327,22 @@ export default function AdminFamilies() {
             confirmLabel="Yes, restore"
             loadingLabel="Restoring…"
             confirmVariant="secondary"
+          />
+
+          {/* Lock edit confirmation */}
+          <ConfirmDialog
+            open={lockEditConfirm}
+            title="Edit admin-approved family?"
+            description="This family is fully approved and visible to donors. Changes will be immediately visible. Are you sure you want to proceed?"
+            onConfirm={handleUpdateConfirmed}
+            onCancel={() => {
+              setLockEditConfirm(false);
+              pendingPayload.current = null;
+            }}
+            loading={updateMut?.isPending}
+            confirmLabel="Yes, update"
+            loadingLabel="Updating…"
+            confirmVariant="primary"
           />
 
           {/* Pagination */}

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatApiError, fromDatetimeLocalValue, humanize, normalizePayload, normalizeUpdatePayload, toDatetimeLocalValue } from "./utils";
+import {
+  formatApiError,
+  fromDatetimeLocalValue,
+  humanize,
+  isFamilyLocked,
+  normalizePayload,
+  normalizeUpdatePayload,
+  toDatetimeLocalValue,
+} from "./utils";
 
 describe("humanize", () => {
   it("capitalises first letter of a string", () => {
@@ -271,5 +279,32 @@ describe("formatApiError", () => {
       },
     };
     expect(formatApiError(error)).toBe("Plain error string; Object error");
+  });
+});
+
+describe("isFamilyLocked", () => {
+  it("returns false for null/undefined input", () => {
+    expect(isFamilyLocked(null)).toBe(false);
+    expect(isFamilyLocked(undefined)).toBe(false);
+  });
+
+  it("returns false when lock level is family and no review requested", () => {
+    expect(isFamilyLocked({ wish_lock_level: "family", wish_review_requested_at: null })).toBe(false);
+  });
+
+  it("returns true when lock level is referrer", () => {
+    expect(isFamilyLocked({ wish_lock_level: "referrer", wish_review_requested_at: null })).toBe(true);
+  });
+
+  it("returns true when lock level is admin", () => {
+    expect(isFamilyLocked({ wish_lock_level: "admin", wish_review_requested_at: null })).toBe(true);
+  });
+
+  it("returns true when review is requested even if lock level is family", () => {
+    expect(isFamilyLocked({ wish_lock_level: "family", wish_review_requested_at: "2025-01-01T00:00:00Z" })).toBe(true);
+  });
+
+  it("returns true when both locked and review requested", () => {
+    expect(isFamilyLocked({ wish_lock_level: "admin", wish_review_requested_at: "2025-01-01T00:00:00Z" })).toBe(true);
   });
 });

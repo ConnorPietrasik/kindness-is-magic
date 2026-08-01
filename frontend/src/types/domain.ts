@@ -129,6 +129,9 @@ export interface ReferrerInviteSummary {
 /** Family approval status — mirrors backend FamilyApprovalStatus enum. */
 export type FamilyApprovalStatus = "pending" | "approved" | "rejected";
 
+/** Wish lock level — who has final edit control on a family's wishes. */
+export type WishLockLevel = "family" | "referrer" | "admin";
+
 /** Mirrors FamilySummary. */
 export interface FamilySummary {
   id: number;
@@ -141,6 +144,9 @@ export interface FamilySummary {
   person_count: number;
   approval_status: FamilyApprovalStatus;
   pickup_window: string | null;
+  wish_lock_level: WishLockLevel;
+  wish_review_requested_at: string | null;
+  wish_rejection_reason: string | null;
 }
 
 /** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name). */
@@ -159,6 +165,9 @@ export interface FamilyDetail {
   person_count: number;
   approval_status: FamilyApprovalStatus;
   pickup_window: string | null;
+  wish_lock_level: WishLockLevel;
+  wish_review_requested_at: string | null;
+  wish_rejection_reason: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +325,18 @@ export interface PendingFamilySummary {
   person_count: number;
   created_at: string | null;
   pickup_window: string | null;
+}
+
+/** Item in the review queue list (referrer and admin queues). Mirrors backend FamilyReviewList. */
+export interface FamilyReviewQueueItem {
+  id: number;
+  family_name: string;
+  contact_name: string;
+  referrer_id: number | null;
+  referrer_name: string | null;
+  person_count: number;
+  wish_review_requested_at: string;
+  wish_rejection_reason: string | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,8 +3,11 @@
  *
  * List, create, edit, delete people for the current family.
  * Uses useCrudManager for data fetching and mutations.
+ *
+ * When the family's wish lock level is not "family", editing is disabled.
  */
 
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -15,16 +18,23 @@ import { PersonForm } from "../components/PersonForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
-import { createFamilyPerson, deletePerson, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
+import { createFamilyPerson, deletePerson, getFamilyMe, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { familyMe, familyPeople } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { isFamilyLocked, normalizeUpdatePayload } from "../lib/utils";
 import type { PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function FamilyPeople() {
+  const { data: familyInfo, isLoading: familyLoading } = useQuery({
+    queryKey: familyMe,
+    queryFn: getFamilyMe,
+  });
+
+  const isLocked = isFamilyLocked(familyInfo);
+
   const {
     listData,
     listLoading,
@@ -45,9 +55,9 @@ export default function FamilyPeople() {
     rootKey: familyPeople,
     listFn: listFamilyPeople,
     detailFn: getPerson,
-    createFn: createFamilyPerson,
-    updateFn: updatePerson,
-    deleteFn: deletePerson,
+    createFn: isLocked ? undefined : createFamilyPerson,
+    updateFn: isLocked ? undefined : updatePerson,
+    deleteFn: isLocked ? undefined : deletePerson,
     invalidationKeys: [familyPeople, familyMe],
     entityName: "Person",
   });
@@ -62,7 +72,7 @@ export default function FamilyPeople() {
     updateMut?.mutate({ id: editingId, data: payload });
   }
 
-  if (listLoading) return <PageSpinner />;
+  if (familyLoading || listLoading) return <PageSpinner />;
 
   const people = listData?.people ?? [];
 
@@ -73,8 +83,22 @@ export default function FamilyPeople() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Manage People</h2>
-          <Button onClick={openCreate}>+ Add Person</Button>
+          {!isLocked && <Button onClick={openCreate}>+ Add Person</Button>}
         </div>
+
+        {/* Lock banner */}
+        {isLocked && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-6 py-4 text-sm text-gray-700 shadow-sm">
+            <p className="font-medium">Editing is currently locked.</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {familyInfo?.wish_lock_level === "admin"
+                ? "Your family profile is fully approved and visible to donors. Contact your referrer if changes are needed."
+                : familyInfo?.wish_review_requested_at
+                  ? "Your profile is awaiting referrer review. You'll be able to edit again after review."
+                  : "Contact your referrer to request changes."}
+            </p>
+          </div>
+        )}
 
         {/* Create form */}
         {showForm && (
@@ -134,17 +158,22 @@ export default function FamilyPeople() {
                     <Td>{p.age}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(p.id)} disabled={!!editingId}>
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          className="h-7 border-red-300 bg-white text-xs text-red-600 hover:bg-red-50"
-                          onClick={() => confirmDelete(p.id)}
-                          disabled={deleteMut?.isPending}
-                        >
-                          Delete
-                        </Button>
+                        {!isLocked && (
+                          <>
+                            <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(p.id)} disabled={!!editingId}>
+                              Edit
+                            </Button>
+                            <Button
+                              variant="danger"
+                              className="h-7 border-red-300 bg-white text-xs text-red-600 hover:bg-red-50"
+                              onClick={() => confirmDelete(p.id)}
+                              disabled={deleteMut?.isPending}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {isLocked && <span className="text-xs text-gray-400">Locked</span>}
                       </div>
                     </Td>
                   </Tr>

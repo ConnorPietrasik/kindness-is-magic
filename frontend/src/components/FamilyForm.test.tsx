@@ -19,6 +19,9 @@ const mockFamilyDetail: FamilyDetail = {
   person_count: 3,
   approval_status: "approved",
   pickup_window: "2025-02-15T14:30:00+00:00",
+  wish_lock_level: "family",
+  wish_review_requested_at: null,
+  wish_rejection_reason: null,
 };
 
 const referrerMap: Record<number, string> = {

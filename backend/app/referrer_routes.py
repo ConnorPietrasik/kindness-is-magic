@@ -24,6 +24,7 @@ from app.models import (
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     build_family_detail,
+    build_family_review_summary,
     build_person_detail,
     build_referrer_detail,
     compute_display_ids,
@@ -35,6 +36,8 @@ from app.schemas import (
     FamilyCreateByReferrer,
     FamilyDetail,
     FamilyListResponse,
+    FamilyReviewList,
+    FamilyReviewRequest,
     FamilySummary,
     FamilyUpdate,
     PendingFamilySummary,
@@ -119,6 +122,9 @@ def list_families(
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
                 person_count=count_map.get(f.id, 0),
+                wish_lock_level=f.wish_lock_level,
+                wish_review_requested_at=f.wish_review_requested_at,
+                wish_rejection_reason=f.wish_rejection_reason,
             )
             for f in families
         ]
@@ -185,6 +191,7 @@ def update_family(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
+    _check_referrer_edit_lock(owner.family)
     partial_update(owner.family, body)
     db.commit()
     db.refresh(owner.family)
@@ -198,6 +205,7 @@ def delete_family(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> Response:
+    _check_referrer_edit_lock(owner.family)
     fam = owner.family
     # Soft-delete all persons in the family first to avoid orphans.
     now = datetime.now(timezone.utc)
@@ -320,6 +328,113 @@ def reject_family(
     return FamilyDetail(**build_family_detail(fam, db))
 
 
+# ---------------------------------------------------------------------------
+# Referrer — Wish Approval Review
+# ---------------------------------------------------------------------------
+
+_REFERRER_LOCKED_MSG = "This family is locked (admin-approved). Contact an admin to make changes."
+
+
+def _check_referrer_edit_lock(fam: Family) -> None:
+    """Raise 403 if the referrer cannot edit at the current lock level."""
+    if fam.wish_lock_level == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_REFERRER_LOCKED_MSG,
+        )
+
+
+@router.get("/review-queue")
+def list_review_queue(
+    user: User = Depends(require_referrer),
+    db: Session = Depends(get_db),
+) -> list[FamilyReviewList]:
+    """List families awaiting this referrer's wish review."""
+    families = (
+        db.query(Family)
+        .filter(
+            Family.referrer_id == user.referrer_id,
+            Family.deleted_at.is_(None),
+            Family.wish_lock_level == "family",
+            Family.wish_review_requested_at.isnot(None),
+        )
+        .order_by(Family.wish_review_requested_at.asc())
+        .all()
+    )
+
+    # Batch person counts
+    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
+    count_map = {fid: cnt for fid, cnt in counts}
+
+    return [FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0))) for f in families]
+
+
+@router.post("/families/{fam_id}/approve-wishes")
+def referrer_approve_wishes(
+    fam_id: int,
+    owner: FamilyOwner = Depends(require_family_owner),
+    db: Session = Depends(get_db),
+) -> FamilyDetail:
+    """Referrer approves (or re-submits) wishes for admin review.
+
+    * At ``lock=family``: promotes to ``lock=referrer`` (initial submission).
+    * At ``lock=referrer``: clears rejection_reason and sets requested_at
+      (re-submission after admin rejection).
+    """
+    fam = owner.family
+    now = datetime.now(timezone.utc)
+
+    if fam.wish_lock_level == "family":
+        # Initial approval — promote to referrer lock
+        fam.wish_lock_level = "referrer"
+        fam.wish_review_requested_at = now
+        fam.wish_rejection_reason = None
+    elif fam.wish_lock_level == "referrer":
+        # Re-submission after admin rejection
+        fam.wish_rejection_reason = None
+        fam.wish_review_requested_at = now
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot approve wishes at current lock level.",
+        )
+
+    db.commit()
+    db.refresh(fam)
+    logger.info("Referrer %s approved wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
+
+
+@router.post("/families/{fam_id}/reject-wishes")
+def referrer_reject_wishes(
+    fam_id: int,
+    body: FamilyReviewRequest,
+    owner: FamilyOwner = Depends(require_family_owner),
+    db: Session = Depends(get_db),
+) -> FamilyDetail:
+    """Referrer rejects wishes, sending them back to the family for revision."""
+    fam = owner.family
+
+    if fam.wish_lock_level != "family":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only reject wishes at family lock level.",
+        )
+    if fam.wish_review_requested_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pending review request to reject.",
+        )
+
+    fam.wish_review_requested_at = None
+    fam.wish_rejection_reason = body.reason
+
+    db.commit()
+    db.refresh(fam)
+    logger.info("Referrer %s rejected wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    return FamilyDetail(**build_family_detail(fam, db))
+
+
 async def _send_family_approved_email(
     fam: Family,
     db: Session,
@@ -376,6 +491,7 @@ def create_family_person(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
+    _check_referrer_edit_lock(owner.family)
     per = create_person_with_wishes(
         db,
         family_id=fid,

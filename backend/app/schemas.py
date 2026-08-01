@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole, WishType
+from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole, WishLockLevel, WishType
 from app.user_validation import sanitize_plain_text, validate_email, validate_phone_number
 
 
@@ -437,6 +437,9 @@ class FamilyDetail(BaseModel):
     pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int
+    wish_lock_level: WishLockLevel
+    wish_review_requested_at: datetime | None = None
+    wish_rejection_reason: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -452,8 +455,35 @@ class FamilySummary(BaseModel):
     pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int = 0
+    wish_lock_level: WishLockLevel
+    wish_review_requested_at: datetime | None = None
+    wish_rejection_reason: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class FamilyReviewRequest(BaseModel):
+    """Body for reject-wishes endpoints carrying the rejection reason."""
+
+    reason: str = Field(..., min_length=1, max_length=400)
+
+    @field_validator("reason")
+    @classmethod
+    def clean_reason(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+
+class FamilyReviewList(BaseModel):
+    """Review queue item for referrer and admin review list endpoints."""
+
+    id: int
+    family_name: str
+    contact_name: str
+    referrer_id: int | None = None
+    referrer_name: Optional[str] = None
+    person_count: int = 0
+    wish_review_requested_at: datetime
+    wish_rejection_reason: Optional[str] = None
 
 
 class PendingFamilySummary(BaseModel):

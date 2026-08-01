@@ -64,10 +64,10 @@ export default defineConfig({
         storageState: "storage/family.json",
       },
     },
-    /* Unauthenticated project for auth, invite, and password-reset flows */
+    /* Unauthenticated project for auth, invite, password-reset, wish-list, and core-flow */
     {
       name: "guest",
-      testMatch: /tests\/(auth|invite-flow|password-reset|wish-list)\.spec\.ts/,
+      testMatch: /tests\/(auth|invite-flow|password-reset|wish-list|core-flow)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },

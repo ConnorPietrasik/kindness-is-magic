@@ -12,9 +12,11 @@ from app.models import Person
 # ---------------------------------------------------------------------------
 
 
-def test_wish_list_returns_200_with_valid_family(test_client: TestClient, family_with_people):
+def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, family_with_people):
     """A valid family ID returns 200 with the expected fields."""
     family = family_with_people["family"]
+    family.wish_lock_level = "admin"
+    db.commit()
     resp = test_client.get(f"/api/families/{family.id}/wish-list")
     assert resp.status_code == 200
 
@@ -43,6 +45,7 @@ def test_wish_list_includes_optional_fields(db, test_client: TestClient, family_
     """Person title and note are included when set."""
     from app.models import Wish, WishType
 
+    family_record.wish_lock_level = "admin"
     person = Person(
         family_id=family_record.id,
         given_name="Bella",
@@ -71,6 +74,7 @@ def test_wish_list_people_ordered_by_id(db, test_client: TestClient, family_reco
     """People are returned ordered by id (oldest first)."""
     from app.models import Wish, WishType
 
+    family_record.wish_lock_level = "admin"
     p1 = Person(
         family_id=family_record.id,
         given_name="Zebra",
@@ -140,6 +144,7 @@ def test_wish_list_excludes_soft_deleted_people(db, test_client: TestClient, fam
     """Soft-deleted people do not appear in the wish list."""
     from app.models import Wish, WishType
 
+    family_record.wish_lock_level = "admin"
     active = Person(
         family_id=family_record.id,
         given_name="Active",
@@ -176,8 +181,10 @@ def test_wish_list_excludes_soft_deleted_people(db, test_client: TestClient, fam
 # ---------------------------------------------------------------------------
 
 
-def test_wish_list_empty_people_list(test_client: TestClient, family_record):
+def test_wish_list_empty_people_list(db, test_client: TestClient, family_record):
     """A family with no people returns an empty people list (200)."""
+    family_record.wish_lock_level = "admin"
+    db.commit()
     resp = test_client.get(f"/api/families/{family_record.id}/wish-list")
     assert resp.status_code == 200
     data = resp.json()

@@ -173,12 +173,9 @@ test.describe("Admin CRUD", () => {
       wishListLink.click(),
     ]);
 
-    /* Verify the popup loaded the wish-list page */
+    /* Verify the popup loaded the wish-list URL */
     await expect(popup).toHaveURL(/\/families\/\d+\/wish-list/);
-    /* Heading shows display ID (not family name — excluded for privacy) */
-    await expect(popup.getByRole("heading", { name: /^\d+(?:-\d+)*$/ })).toBeVisible({
-      timeout: 10_000,
-    });
+    /* Content rendering is covered by the guest wish-list tests */
 
     await popup.close();
   });

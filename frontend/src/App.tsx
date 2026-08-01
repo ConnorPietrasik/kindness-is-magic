@@ -27,7 +27,9 @@ const AdminInviteCodes: LazyExoticComponent<ComponentType<unknown>> = lazy(() =>
 const ReferrerSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerSelfRegister"));
 const FamilySelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilySelfRegister"));
 const ReferrerFamilyInvites: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerFamilyInvites"));
+const ReferrerReviewQueue: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerReviewQueue"));
 const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
+const AdminWishReview: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishReview"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 
 /* ------------------------------------------------------------------ */
@@ -132,6 +134,14 @@ export default function App() {
           }
         />
         <Route
+          path={ROUTES.ADMIN_WISH_REVIEW}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminWishReview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path={ROUTES.ADMIN_REFERRERS}
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
@@ -210,6 +220,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["referrer"] as UserRole[]}>
               <ReferrerFamilyInvites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.REFERRER_WISH_REVIEW}
+          element={
+            <ProtectedRoute roles={["referrer"] as UserRole[]}>
+              <ReferrerReviewQueue />
             </ProtectedRoute>
           }
         />

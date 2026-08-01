@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person
+from app.models import Family, Person, WishLockLevel
 from app.response_builders import batch_load_person_wishes, compute_display_ids
 from app.schemas import FamilyWishListResponse, PersonWishItem, WishSummary
 
@@ -36,8 +36,16 @@ def get_family_wish_list(
     * Soft-deleted families return 404.
     * Soft-deleted people are excluded from the people list.
     """
-    # Look up family (skip soft-deleted)
-    fam = db.query(Family).filter(Family.id == family_id, Family.deleted_at.is_(None)).first()
+    # Look up family (skip soft-deleted and non-admin-locked)
+    fam = (
+        db.query(Family)
+        .filter(
+            Family.id == family_id,
+            Family.deleted_at.is_(None),
+            Family.wish_lock_level == WishLockLevel.admin,
+        )
+        .first()
+    )
     if fam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,9 +1,9 @@
+Add frontend for the admin wish reset - not totally sure where it would fit best
 Add admin view for wishes - filter by locked status and include links to the person or family
 Add more info to the displayed list views
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Add more admin views - sort by wishes, sort families by size, etc
 Add packing slips for families - per person: ID, name, age, practical wish, fun wish
-Add family wish_approval status; referrers can approve (which locks families from changing anything aside from their own contact info), and then admins have to approve before it gets shown to donors (admin approval also locks referrer edits)
 Add wish purchasing fields: purchased_by (drop-down in frontend), when (defaults to current date when marked purchased, but can be edited), and where (text field).
 Purchaser user type: Is assigned wishes specifically. Can mark wishes as purchased by themselves (checkbox) as well as editing the date and location fields
 Maybe make the edit field pop up under the selected item instead of at the top of the list?
@@ -16,3 +16,4 @@ EVENTUALLY - Email "opened" tracking via a logo
 
 Things that need clarification:
 DONOR - Filter granularity? Family size, contains a person with age in range?
+Should families get emails on referrer rejection / admin approval?

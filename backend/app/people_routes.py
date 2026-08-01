@@ -8,11 +8,11 @@ Ownership is enforced via ``require_person_owner()`` which checks:
 
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Person
+from app.models import Family, Person, User, UserRole
 from app.permissions import PersonOwner, require_person_owner
 from app.response_builders import (
     build_person_detail,
@@ -29,6 +29,36 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/people", tags=["people"])
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+def _check_person_edit_lock(user: User, family: Family) -> None:
+    """Raise 403 if the user's role is blocked by the current wish lock level.
+
+    - Admin: never blocked
+    - Referrer: blocked at ``admin`` lock
+    - Family: blocked at ``referrer`` or ``admin`` lock
+    """
+    if user.role == UserRole.admin:
+        return
+
+    if user.role == UserRole.family:
+        if family.wish_lock_level != "family":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your family profile is locked for editing. Contact your referrer to request changes.",
+            )
+
+    elif user.role == UserRole.referrer:
+        if family.wish_lock_level == "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This family is locked (admin-approved). Contact an admin to make changes.",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Shared Person endpoints (multi-role ownership)
@@ -60,6 +90,12 @@ def update_person(
     if per is None:
         per = get_active_or_404(db, Person, per_id, "Person not found")
 
+    # Resolve family for lock check
+    family = per.family if per.family else db.query(Family).get(per.family_id)
+    if family is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
+    _check_person_edit_lock(owner.user, family)
+
     # Validate wishes against age if both are provided
     if body.wishes is not None:
         effective_age = body.age if body.age is not None else per.age
@@ -88,6 +124,13 @@ def delete_person(
     per = owner.person
     if per is None:
         per = get_active_or_404(db, Person, per_id, "Person not found")
+
+    # Resolve family for lock check
+    family = per.family if per.family else db.query(Family).get(per.family_id)
+    if family is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
+    _check_person_edit_lock(owner.user, family)
+
     now = datetime.now(timezone.utc)
     per.deleted_at = now
     soft_delete_person_wishes(db, per_id, now)

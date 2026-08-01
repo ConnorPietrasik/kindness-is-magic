@@ -641,5 +641,8 @@ async def register_family(
             pickup_window=family.pickup_window,
             deleted_at=family.deleted_at,
             person_count=person_count,
+            wish_lock_level=family.wish_lock_level,
+            wish_review_requested_at=family.wish_review_requested_at,
+            wish_rejection_reason=family.wish_rejection_reason,
         ),
     )
