@@ -13,6 +13,7 @@ import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { CrudTabs } from "../components/CrudTabs";
 import { defaultReferrerForm } from "../components/defaults";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -21,6 +22,7 @@ import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminApproveReferrer,
@@ -40,21 +42,17 @@ import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types
 const REFERRER_KEYS = ["adminReferrers"];
 const DELETED_REFERRER_KEYS = ["adminDeletedReferrers"];
 
-type ViewTab = "active" | "deleted";
-
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
   const queryClient = useQueryClient();
   const pagination = usePagination();
-  const [viewTab, setViewTab] = useState<ViewTab>("active");
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
   const [showUnapproved, setShowUnapproved] = useState(false);
-
-  const isDeletedView = viewTab === "deleted";
 
   const approveMut = useMutation({
     mutationFn: adminApproveReferrer,
@@ -118,12 +116,6 @@ export default function AdminReferrers() {
     updateMut?.mutate({ id: editingId, data: payload as ReferrerPayload });
   }
 
-  // Reset to page 1 when switching tabs
-  function handleTabChange(tab: ViewTab) {
-    setViewTab(tab);
-    pagination.goToPage(1);
-  }
-
   const referrers = useMemo(() => {
     const all = listData?.referrers ?? [];
     if (showUnapproved || isDeletedView) return all;
@@ -158,30 +150,7 @@ export default function AdminReferrers() {
         </div>
 
         {/* Tabs */}
-        <div role="tablist" className="mb-6 flex gap-4 border-b border-gray-200">
-          <button
-            role="tab"
-            type="button"
-            aria-selected={viewTab === "active"}
-            onClick={() => handleTabChange("active")}
-            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-              viewTab === "active" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Active
-          </button>
-          <button
-            role="tab"
-            type="button"
-            aria-selected={viewTab === "deleted"}
-            onClick={() => handleTabChange("deleted")}
-            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-              viewTab === "deleted" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Deleted
-          </button>
-        </div>
+        <CrudTabs viewTab={viewTab} onChange={handleTabChange} />
 
         {/* Tab panel content */}
         <div role="tabpanel">

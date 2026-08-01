@@ -28,12 +28,14 @@ import type { ComponentType, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import type { PaginationParams } from "../types";
 import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { CrudTabs } from "./CrudTabs";
 import { MutationErrors } from "./MutationErrors";
 import { Pagination } from "./Pagination";
 import { PageSpinner, Spinner } from "./Spinner";
@@ -250,16 +252,17 @@ export function HierarchicalManage<
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  /* ── Tab state ─────────────────────────────────────────── */
-  const hasDeletedTab = !!tabs?.deleted;
-  const [viewTab, setViewTab] = useState<"active" | "deleted">("active");
-  const isDeletedView = viewTab === "deleted";
-
   /* ── Pagination ────────────────────────────────────────── */
   const usePaginationControls = pagination?.enabled ?? false;
   const paginationCtrl = usePagination({
     defaultPageSize: pagination?.defaultPageSize,
   });
+
+  /* ── Tab state ─────────────────────────────────────────── */
+  const hasDeletedTab = !!tabs?.deleted;
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs(
+    usePaginationControls ? { pagination: { goToPage: paginationCtrl.goToPage } } : undefined
+  );
 
   /* ── Derived CRUD config based on active tab ───────────── */
   const deletedTab = tabs?.deleted;
@@ -377,14 +380,6 @@ export function HierarchicalManage<
         } as ChildFormProps)
       : ({} as ChildFormProps);
 
-  /* ── Tab switch handler (resets pagination) ────────────── */
-  function handleTabChange(tab: "active" | "deleted") {
-    setViewTab(tab);
-    if (usePaginationControls) {
-      paginationCtrl.goToPage(1);
-    }
-  }
-
   /* ── Loading gate ──────────────────────────────────────── */
   if (parentLoading || crud.listLoading) {
     return <PageSpinner />;
@@ -403,32 +398,7 @@ export function HierarchicalManage<
       </div>
 
       {/* ── Tabs (optional) ───────────────────────────────── */}
-      {hasDeletedTab && (
-        <div role="tablist" className="mb-4 flex gap-4 border-b border-gray-200">
-          <button
-            role="tab"
-            type="button"
-            aria-selected={viewTab === "active"}
-            onClick={() => handleTabChange("active")}
-            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-              viewTab === "active" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Active
-          </button>
-          <button
-            role="tab"
-            type="button"
-            aria-selected={viewTab === "deleted"}
-            onClick={() => handleTabChange("deleted")}
-            className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-              viewTab === "deleted" ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Deleted
-          </button>
-        </div>
-      )}
+      {hasDeletedTab && <CrudTabs viewTab={viewTab} onChange={handleTabChange} />}
 
       {/* ── Tab panel content ─────────────────────────────── */}
       <div role="tabpanel">
