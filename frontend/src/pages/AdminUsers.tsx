@@ -94,15 +94,13 @@ export default function AdminUsers() {
     cancelForm,
     confirmDelete,
     cancelDelete,
-  } = useCrudManager<UserListResponse, UserDetail, AdminUserCreate | AdminUserUpdate, AdminUsersListParams>({
+  } = useCrudManager<UserListResponse, UserDetail, AdminUserCreate, AdminUsersListParams>({
     rootKey: isDeletedView ? DELETED_USER_KEYS : USER_KEYS,
     listFn: isDeletedView ? adminListDeletedUsers : adminListUsers,
     listParams,
     detailFn: adminGetUser,
-    createFn: isDeletedView ? undefined : (data: AdminUserCreate | AdminUserUpdate) => adminCreateUser(data as AdminUserCreate),
-    updateFn: isDeletedView
-      ? undefined
-      : (id: number, data: AdminUserCreate | AdminUserUpdate) => adminUpdateUser(id, data as AdminUserUpdate),
+    createFn: isDeletedView ? undefined : adminCreateUser,
+    updateFn: isDeletedView ? undefined : adminUpdateUser,
     deleteFn: isDeletedView ? undefined : adminDeleteUser,
     restoreFn: adminRestoreUser,
     invalidationKeys: [USER_KEYS, DELETED_USER_KEYS],
@@ -134,14 +132,32 @@ export default function AdminUsers() {
     },
   });
 
-  // Handlers
-  function handleCreateOrEdit(data: AdminUserCreate | AdminUserUpdate) {
-    if (editingId) {
-      const payload = normalizeUpdatePayload(data as AdminUserUpdate, detail as UserDetail);
-      updateMut.mutate({ id: editingId, data: payload as AdminUserUpdate });
-    } else {
-      createMut.mutate(data as AdminUserCreate);
-    }
+  // Handlers — construct typed payloads from form state
+  function handleCreateUser(formData: UserFormState) {
+    createMut.mutate({
+      email: formData.email,
+      password: formData.password,
+      role: formData.role,
+      display_name: formData.display_name || null,
+      referrer_id: formData.role === "referrer" ? formData.referrer_id : null,
+      family_id: formData.role === "family" ? formData.family_id : null,
+    });
+  }
+
+  function handleUpdateUser(formData: UserFormState) {
+    if (editingId == null || detail == null) return;
+    const payload: AdminUserUpdate = {
+      display_name: formData.display_name,
+      role: formData.role,
+      // 0 is the backend sentinel for "set FK to NULL".
+      // AdminUserUpdate types this as number | null, so 0 is a valid number.
+      referrer_id: formData.role === "referrer" ? formData.referrer_id : 0,
+      family_id: formData.role === "family" ? formData.family_id : 0,
+    };
+    // Call adminUpdateUser directly — useCrudManager's Payload is AdminUserCreate
+    // which doesn't match AdminUserUpdate (missing email/password). The hook
+    // still handles list invalidation and toasts via its onSuccess callback.
+    updateMut.mutate({ id: editingId, data: normalizeUpdatePayload(payload, detail) as AdminUserCreate });
   }
 
   // Reset password form state
@@ -221,7 +237,8 @@ export default function AdminUsers() {
               isEdit={!!editingId}
               referrers={referrers}
               families={families}
-              onSubmit={handleCreateOrEdit}
+              onCreate={handleCreateUser}
+              onUpdate={handleUpdateUser}
               onCancel={cancelForm}
               loading={!!(createMut.isPending || updateMut.isPending)}
             />
@@ -392,14 +409,26 @@ export default function AdminUsers() {
 /* UserForm sub-component                                              */
 /* ------------------------------------------------------------------ */
 
-const defaultUserForm = {
+const defaultUserForm: UserFormState = {
   email: "",
   display_name: "",
-  role: "referrer" as UserRole,
+  role: "referrer",
   password: "",
-  referrer_id: null as number | null,
-  family_id: null as number | null,
-} as const;
+  confirmPassword: "",
+  referrer_id: null,
+  family_id: null,
+};
+
+/** Internal form state — mirrors the inputs the user fills in. */
+interface UserFormState {
+  email: string;
+  display_name: string;
+  role: UserRole;
+  password: string;
+  confirmPassword: string;
+  referrer_id: number | null;
+  family_id: number | null;
+}
 
 interface UserFormProps {
   title: string;
@@ -407,16 +436,17 @@ interface UserFormProps {
   isEdit: boolean;
   referrers: ReferrerSummary[];
   families: Array<{ id: number; family_name: string }>;
-  onSubmit: (data: AdminUserCreate | AdminUserUpdate) => void;
+  onCreate: (data: UserFormState) => void;
+  onUpdate: (data: UserFormState) => void;
   onCancel: () => void;
   loading: boolean;
 }
 
-function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCancel, loading }: UserFormProps) {
-  const [form, setForm] = useState(() => ({
+function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpdate, onCancel, loading }: UserFormProps) {
+  const [form, setForm] = useState<UserFormState>(() => ({
     email: initial.email ?? "",
     display_name: initial.display_name ?? "",
-    role: initial.role ?? ("referrer" as UserRole),
+    role: initial.role ?? "referrer",
     password: "",
     confirmPassword: "",
     referrer_id: initial.referrer_id ?? null,
@@ -427,7 +457,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
     setForm({
       email: initial.email ?? "",
       display_name: initial.display_name ?? "",
-      role: initial.role ?? ("referrer" as UserRole),
+      role: initial.role ?? "referrer",
       password: "",
       confirmPassword: "",
       referrer_id: initial.referrer_id ?? null,
@@ -441,31 +471,15 @@ function UserForm({ title, initial, isEdit, referrers, families, onSubmit, onCan
     (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!isEdit) {
-        if (form.password !== form.confirmPassword) return;
-      }
+      if (!isEdit && form.password !== form.confirmPassword) return;
 
       if (isEdit) {
-        // Send 0 to clear FKs (backend sentinel for "set to NULL").
-        // null means "don't change" on the backend.
-        onSubmit({
-          display_name: form.display_name,
-          role: form.role,
-          referrer_id: form.role === "referrer" ? form.referrer_id : 0,
-          family_id: form.role === "family" ? form.family_id : 0,
-        } as unknown as AdminUserUpdate);
+        onUpdate(form);
       } else {
-        onSubmit({
-          email: form.email,
-          password: form.password,
-          role: form.role,
-          display_name: form.display_name || null,
-          referrer_id: form.role === "referrer" ? form.referrer_id : null,
-          family_id: form.role === "family" ? form.family_id : null,
-        } as AdminUserCreate);
+        onCreate(form);
       }
     },
-    [form, isEdit, onSubmit]
+    [form, isEdit, onCreate, onUpdate]
   );
 
   const isReferrer = form.role === "referrer";
