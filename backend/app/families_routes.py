@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, Person
-from app.response_builders import batch_load_person_wishes
+from app.response_builders import batch_load_person_wishes, compute_display_ids
 from app.schemas import FamilyWishListResponse, PersonWishItem, WishSummary
 
 logger = logging.getLogger(__name__)
@@ -51,8 +51,12 @@ def get_family_wish_list(
     person_ids = [p.id for p in people]
     wishes_by_person = batch_load_person_wishes(db, person_ids)
 
+    # Compute display_id (unscoped — flat format for public view)
+    display_id_map = compute_display_ids(db, "family", [fam], scope=None)
+    display_id = display_id_map.get(fam.id, "0")
+
     return FamilyWishListResponse(
-        family_name=fam.family_name,
+        display_id=display_id,
         bio=fam.bio,
         family_wish=fam.family_wish,
         people=[

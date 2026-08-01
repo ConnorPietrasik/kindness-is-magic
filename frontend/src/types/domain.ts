@@ -331,9 +331,9 @@ export interface PersonWishItem {
   wishes: WishSummary[];
 }
 
-/** Mirrors FamilyWishListResponse. */
+/** Mirrors FamilyWishListResponse (family_name excluded for privacy). */
 export interface FamilyWishListResponse {
-  family_name: string;
+  display_id: string;
   bio: string | null;
   family_wish: string;
   people: PersonWishItem[];

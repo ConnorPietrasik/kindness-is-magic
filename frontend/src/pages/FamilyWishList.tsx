@@ -52,7 +52,7 @@ export default function FamilyWishList() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* Family header */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">{data.family_name}</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">{data.display_id}</h2>
           {data.bio && <p className="mt-2 text-gray-600">{data.bio}</p>}
           <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>

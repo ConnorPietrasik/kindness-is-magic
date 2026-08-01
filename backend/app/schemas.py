@@ -783,9 +783,13 @@ class PersonWishItem(BaseModel):
 
 
 class FamilyWishListResponse(BaseModel):
-    """Public family wish list (family info + per-person wishes)."""
+    """Public family wish list (family info + per-person wishes).
 
-    family_name: str
+    Note: ``family_name`` is intentionally excluded for privacy / legal compliance.
+    Only ``display_id`` is exposed so donors can identify the family anonymously.
+    """
+
+    display_id: str
     bio: str | None = None
     family_wish: str
     people: list[PersonWishItem]

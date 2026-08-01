@@ -19,7 +19,9 @@ def test_wish_list_returns_200_with_valid_family(test_client: TestClient, family
     assert resp.status_code == 200
 
     data = resp.json()
-    assert data["family_name"] == family.family_name
+    assert "display_id" in data
+    assert data["display_id"] != "0"  # valid position assigned
+    assert "family_name" not in data  # intentionally excluded for privacy
     assert data["family_wish"] == family.family_wish
     assert data["bio"] == family.bio
     assert len(data["people"]) == len(family_with_people["people"])

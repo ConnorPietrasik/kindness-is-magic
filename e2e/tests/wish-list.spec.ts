@@ -20,8 +20,8 @@ test.describe("Family Wish List (public)", () => {
     const familyId = getSeedFamilyId();
     await page.goto(`/families/${familyId}/wish-list`);
 
-    /* Page heading shows the family name */
-    await expect(page.getByRole("heading", { name: "The Williams Family" })).toBeVisible({
+    /* Page heading shows the display ID (e.g. "1" or "2-3") — family name is excluded for privacy */
+    await expect(page.getByRole("heading", { name: /^\d+(?:-\d+)*$/ })).toBeVisible({
       timeout: 10_000,
     });
 
