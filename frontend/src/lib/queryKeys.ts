@@ -58,6 +58,8 @@ export const adminDeletedPeople = ["adminDeletedPeople"] as const;
 
 /** People belonging to a specific family */
 export const adminFamilyPeople = (id: string) => ["adminFamilyPeople", id] as const;
+/** Soft-deleted people belonging to a specific family */
+export const adminDeletedFamilyPeople = (id: string) => ["adminDeletedFamilyPeople", id] as const;
 
 // ---------------------------------------------------------------------------
 // Admin — Users

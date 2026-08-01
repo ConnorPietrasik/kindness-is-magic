@@ -25,6 +25,7 @@ import {
   adminCreatePerson,
   adminDeletePerson,
   adminGetFamily,
+  adminListDeletedPeople,
   adminListFamilyPeople,
   adminListReferrers,
   adminRestorePerson,
@@ -32,7 +33,7 @@ import {
   adminUpdatePerson,
   getPerson,
 } from "../lib/api";
-import { adminFamilyDetail, adminFamilyPeople, adminReferrers } from "../lib/queryKeys";
+import { adminDeletedFamilyPeople, adminFamilyDetail, adminFamilyPeople, adminReferrers } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
@@ -46,6 +47,7 @@ export default function AdminFamilyPeople() {
   const famIdStr = String(famIdNum);
 
   const peopleKey = adminFamilyPeople(famIdStr);
+  const deletedPeopleKey = adminDeletedFamilyPeople(famIdStr);
   const familyKey = adminFamilyDetail(famIdStr);
 
   // Referrers lookup for the family edit form
@@ -126,11 +128,25 @@ export default function AdminFamilyPeople() {
             updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData as PersonPayload, original),
             formDefault: defaultPersonForm as unknown as PersonPayload,
             formComponent: PersonForm,
-            render: (rows, callbacks, _ctx) => <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} />,
+            render: (rows, callbacks, ctx) => (
+              <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} isDeletedView={ctx.isDeletedView} />
+            ),
             title: "People",
             createButtonLabel: "+ Add Person",
-            invalidationKeys: [peopleKey, familyKey],
+            invalidationKeys: [peopleKey, deletedPeopleKey, familyKey],
             entityName: "Person",
+          }}
+          tabs={{
+            deleted: {
+              queryKey: deletedPeopleKey,
+              listFn: (params) =>
+                adminListDeletedPeople({
+                  page: params?.page ?? 1,
+                  page_size: params?.page_size ?? 20,
+                  family_id: famIdNum,
+                }),
+              readonly: true,
+            },
           }}
         />
       </main>
@@ -208,13 +224,23 @@ function FamilyCard(
 /* Children table render                                               */
 /* ------------------------------------------------------------------ */
 
-function PeopleTable({ rows, callbacks }: { rows: PersonSummary[]; callbacks: HierarchicalManageChildCallbacks }) {
+function PeopleTable({
+  rows,
+  callbacks,
+  isDeletedView,
+}: {
+  rows: PersonSummary[];
+  callbacks: HierarchicalManageChildCallbacks;
+  isDeletedView: boolean;
+}) {
   return (
     <Table className="mb-6">
       {rows.length === 0 ? (
         <TableBody>
           <Tr>
-            <Td className="!text-center !text-gray-400 py-12">No people in this family yet.</Td>
+            <Td className="!text-center !text-gray-400 py-12">
+              {isDeletedView ? "No deleted people in this family." : "No people in this family yet."}
+            </Td>
           </Tr>
         </TableBody>
       ) : (
@@ -233,15 +259,17 @@ function PeopleTable({ rows, callbacks }: { rows: PersonSummary[]; callbacks: Hi
                 <Td>{p.age}</Td>
                 <Td>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onEdit(p.id)}
-                      disabled={callbacks.isEditing(p.id)}
-                    >
-                      Edit
-                    </Button>
-                    {p.deleted_at != null ? (
+                    {!isDeletedView && (
+                      <Button
+                        variant="secondary"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => callbacks.onEdit(p.id)}
+                        disabled={callbacks.isEditing(p.id)}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    {isDeletedView ? (
                       <Button
                         variant="secondary"
                         className="h-7 px-2 text-xs"
