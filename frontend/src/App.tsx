@@ -30,6 +30,7 @@ const ReferrerFamilyInvites: LazyExoticComponent<ComponentType<unknown>> = lazy(
 const ReferrerReviewQueue: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/ReferrerReviewQueue"));
 const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
 const AdminWishReview: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishReview"));
+const AdminPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminPackingSlips"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 
 /* ------------------------------------------------------------------ */
@@ -138,6 +139,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
               <AdminWishReview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_PACKING_SLIPS}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminPackingSlips />
             </ProtectedRoute>
           }
         />

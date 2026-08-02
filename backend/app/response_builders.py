@@ -260,7 +260,6 @@ def build_wish_detail(wish: Wish, person: Person) -> dict:
         "purchased_by_id": wish.purchased_by_id,
         "purchased_at": wish.purchased_at,
         "purchased_where": wish.purchased_where,
-        "deleted_at": wish.deleted_at,
         "person_id": wish.person_id,
         "person_given_name": person.given_name,
         "person_family_name": person.family.family_name if person.family else None,

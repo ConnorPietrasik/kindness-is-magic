@@ -22,6 +22,7 @@ import type {
   FamilySelfRegisterResponse,
   FamilyWishListResponse,
   InviteListResponse,
+  PackingSlipItem,
   PaginationParams,
   PendingFamilySummary,
   PersonDetail,
@@ -307,6 +308,12 @@ export function adminRejectWishes(id: number, reason: string): Promise<FamilyDet
 /** Reset a family's wish state back to family-editable (clears lock + review flags). */
 export function adminResetWishState(id: number): Promise<FamilyDetail> {
   return apiPost(`/api/admin/families/${id}/reset-wish-state`);
+}
+
+/** Fetch packing slips for admin-locked (fully approved) families. */
+export function adminGetPackingSlips(familyIds?: number[]): Promise<PackingSlipItem[]> {
+  const params = familyIds && familyIds.length > 0 ? { family_ids: familyIds.join(",") } : undefined;
+  return apiGet("/api/admin/families/packing-slips", params);
 }
 
 // ---------------------------------------------------------------------------

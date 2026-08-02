@@ -26,6 +26,7 @@ export const ROUTES = {
   ADMIN_PEOPLE: "/admin/people",
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
   ADMIN_WISH_REVIEW: "/admin/wish-review",
+  ADMIN_PACKING_SLIPS: "/admin/packing-slips",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
@@ -54,4 +55,6 @@ export const route = {
   adminReferrerFamilies: (id: number | string) => `/admin/referrers/${id}/families`,
   adminFamilyPeople: (id: number | string) => `/admin/families/${id}/people`,
   familyWishList: (id: number | string) => `/families/${id}/wish-list`,
+  adminPackingSlips: (familyIds?: number[]) =>
+    familyIds && familyIds.length > 0 ? `/admin/packing-slips?family_ids=${familyIds.join(",")}` : "/admin/packing-slips",
 };

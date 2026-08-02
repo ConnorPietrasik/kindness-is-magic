@@ -39,6 +39,7 @@ import {
   adminDeletedFamilies,
   adminDeletedReferrerFamilies,
   adminFamilies,
+  adminPackingSlips,
   adminReferrerDetail,
   adminReferrerFamilies,
   adminReviewQueue,
@@ -68,6 +69,7 @@ export default function AdminReferrerFamilies() {
       queryClient.invalidateQueries({ queryKey: familiesKey });
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       toast.success("Wish lock reset — family can now edit their wishes");
     },
   });

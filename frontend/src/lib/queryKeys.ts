@@ -145,6 +145,13 @@ export const familyPeople = ["familyPeople"] as const;
 export const adminReviewQueue = ["adminReviewQueue"] as const;
 
 // ---------------------------------------------------------------------------
+// Admin — Packing Slips
+// ---------------------------------------------------------------------------
+
+/** Packing slips for printing (static key — params handled inline) */
+export const adminPackingSlips = ["adminPackingSlips"] as const;
+
+// ---------------------------------------------------------------------------
 // Public — Wish List
 // ---------------------------------------------------------------------------
 

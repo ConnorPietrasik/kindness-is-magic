@@ -10,13 +10,13 @@ import { useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ErrorBox } from "../components/ErrorBox";
-import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { adminGetCsvSample, adminImportCsv } from "../lib/api";
 import { isValidCsvFile, parseCsvSections, validateCsvForImport } from "../lib/csv";
-import { adminFamilies, adminPeople, adminReferrers, adminUsers } from "../lib/queryKeys";
+import { adminFamilies, adminPackingSlips, adminPeople, adminReferrers, adminUsers } from "../lib/queryKeys";
 import type { CsvValidationResult } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -40,6 +40,7 @@ export default function CsvUpload() {
       queryClient.invalidateQueries({ queryKey: adminReferrers });
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminPeople });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       queryClient.invalidateQueries({ queryKey: adminUsers });
       toast.success("CSV imported successfully");
     },
@@ -126,7 +127,7 @@ export default function CsvUpload() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
+      <HeaderBar title="Kindness is Magic" />
 
       <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
         {/* Header */}

@@ -15,7 +15,7 @@ import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { defaultPersonForm } from "../components/defaults";
-import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PersonForm } from "../components/PersonForm";
@@ -36,7 +36,7 @@ import {
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
-import { adminDeletedPeople, adminFamilies, adminPeople } from "../lib/queryKeys";
+import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, PersonPayload } from "../types";
@@ -77,6 +77,7 @@ export default function AdminPeople() {
     createFn: isDeletedView ? undefined : adminCreatePerson,
     updateFn: isDeletedView ? undefined : adminUpdatePerson,
     deleteFn: isDeletedView ? undefined : adminDeletePerson,
+    invalidationKeys: [isDeletedView ? adminDeletedPeople : adminPeople, adminPackingSlips],
     entityName: "Person",
   });
 
@@ -88,6 +89,7 @@ export default function AdminPeople() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminPeople });
       queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       toast.success("Person restored");
     },
     onError: (error) => {
@@ -109,6 +111,7 @@ export default function AdminPeople() {
       queryClient.invalidateQueries({ queryKey: adminPeople });
       queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
       queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       toast.success("Family restored");
     },
   });
@@ -148,7 +151,7 @@ export default function AdminPeople() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
+      <HeaderBar title="Kindness is Magic" />
 
       <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
         {/* Header */}

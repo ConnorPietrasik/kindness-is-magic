@@ -12,9 +12,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, WishLockLevel
 from app.permissions import require_admin
 from app.response_builders import (
+    batch_load_person_wishes,
     build_family_detail,
     build_family_review_summary,
     compute_display_ids,
@@ -30,6 +31,9 @@ from app.schemas import (
     FamilyReviewList,
     FamilyReviewRequest,
     FamilySummary,
+    PackingSlipItem,
+    PackingSlipPersonItem,
+    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,6 +175,120 @@ def list_review_queue(
     count_map = {fid: cnt for fid, cnt in counts}
 
     return [FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0))) for f in families]
+
+
+# ---------------------------------------------------------------------------
+# Packing slips (must be defined BEFORE /{fam_id} to avoid path collision)
+# ---------------------------------------------------------------------------
+
+
+@family_admin_router.get("/packing-slips")
+def get_packing_slips(
+    family_ids: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[PackingSlipItem]:
+    """Return packing-slip data for families with admin-locked wishes.
+
+    * No ``family_ids`` param → all approved, non-deleted families where
+      ``wish_lock_level == admin``.
+    * With ``family_ids`` → only the specified families (404 for any ID that
+      is deleted or does not exist).
+    """
+    # --- Resolve families --------------------------------------------------- #
+    if family_ids is not None:
+        # Parse comma-separated IDs
+        try:
+            requested_ids = [int(x.strip()) for x in family_ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid family_ids parameter")
+
+        if not requested_ids:
+            return []
+
+        families = db.query(Family).filter(Family.id.in_(requested_ids)).all()
+        found_ids = {f.id for f in families}
+        for rid in requested_ids:
+            if rid not in found_ids:
+                raise HTTPException(status_code=404, detail=f"Family {rid} not found or deleted")
+
+        # Reject any deleted families
+        for f in families:
+            if f.deleted_at is not None:
+                raise HTTPException(status_code=404, detail=f"Family {f.id} not found or deleted")
+
+        # Filter to approved only (among the requested)
+        families = [f for f in families if f.approval_status == FamilyApprovalStatus.approved]
+    else:
+        # Default: all admin-locked, approved, non-deleted families
+        families = (
+            db.query(Family)
+            .filter(
+                Family.deleted_at.is_(None),
+                Family.approval_status == FamilyApprovalStatus.approved,
+                Family.wish_lock_level == WishLockLevel.admin,
+            )
+            .order_by(Family.id)
+            .all()
+        )
+
+    if not families:
+        return []
+
+    # --- Compute family display IDs ----------------------------------------- #
+    fam_display_map = compute_display_ids(db, "family", families, scope=None)
+
+    # --- Collect people across all families --------------------------------- #
+    family_ids_set = [f.id for f in families]
+    people = (
+        db.query(Person)
+        .filter(
+            Person.family_id.in_(family_ids_set),
+            Person.deleted_at.is_(None),
+        )
+        .order_by(Person.family_id, Person.id)
+        .all()
+    )
+
+    # --- Batch-load wishes -------------------------------------------------- #
+    person_ids = [p.id for p in people]
+    wishes_by_person = batch_load_person_wishes(db, person_ids)
+
+    # --- Group people by family --------------------------------------------- #
+    people_by_family: dict[int, list[Person]] = {fid: [] for fid in family_ids_set}
+    for p in people:
+        people_by_family.setdefault(p.family_id, []).append(p)
+
+    # --- Compute person display IDs scoped to each family ------------------- #
+    person_display_map: dict[int, str] = {}
+    for fid, fam_people in people_by_family.items():
+        if fam_people:
+            person_display_map.update(compute_display_ids(db, "person", fam_people, scope=fid))
+
+    # --- Assemble response -------------------------------------------------- #
+    result: list[PackingSlipItem] = []
+    for fam in families:
+        fam_people = people_by_family.get(fam.id, [])
+        result.append(
+            PackingSlipItem(
+                id=fam.id,
+                display_id=fam_display_map.get(fam.id, "0"),
+                family_wish=fam.family_wish,
+                people=[
+                    PackingSlipPersonItem(
+                        display_id=person_display_map.get(p.id, "0"),
+                        given_name=p.given_name,
+                        title=p.title,
+                        age=p.age,
+                        note=p.note,
+                        wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                    )
+                    for p in fam_people
+                ],
+            )
+        )
+
+    return result
 
 
 @family_admin_router.get("/{fam_id}")

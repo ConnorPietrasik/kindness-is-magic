@@ -361,7 +361,29 @@ export interface FamilyWishListResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Person
+// Packing Slips
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend PackingSlipPersonItem (no family/contact/bio — volunteer-safe). */
+export interface PackingSlipPersonItem {
+  display_id: string;
+  given_name: string;
+  title: string | null;
+  age: number;
+  note: string | null;
+  wishes: WishSummary[];
+}
+
+/** Mirrors backend PackingSlipItem. */
+export interface PackingSlipItem {
+  id: number;
+  display_id: string;
+  family_wish: string;
+  people: PackingSlipPersonItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Person (detail)
 // ---------------------------------------------------------------------------
 
 /** Mirrors PersonDetail. */

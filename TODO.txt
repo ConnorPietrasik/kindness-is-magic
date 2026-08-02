@@ -1,12 +1,14 @@
+Improve the demo.csv test data
 Add admin view for wishes - filter by locked status and include links to the person or family
 Add more info to the displayed list views
+Add internal notes; referrer-level, purchaser-level, and admin-only. Probably per-gift
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Add more admin views - sort by wishes, sort families by size, etc
-Add packing slips for families - per person: ID, name, age, practical wish, fun wish
 Add wish purchasing fields: purchased_by (drop-down in frontend), when (defaults to current date when marked purchased, but can be edited), and where (text field).
 Purchaser user type: Is assigned wishes specifically. Can mark wishes as purchased by themselves (checkbox) as well as editing the date and location fields
 Maybe make the edit field pop up under the selected item instead of at the top of the list?
 DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
+Delivery slips for delivery people
 EVENTUALLY - More detailed audit logs? They said not important, but I feel like it could be helpful
 EVENTUALLY - Automated database backups
 EVENTUALLY - Email families a week before their pickup window

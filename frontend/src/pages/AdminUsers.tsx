@@ -16,7 +16,7 @@ import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { FormField } from "../components/FormField";
-import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
@@ -180,7 +180,7 @@ export default function AdminUsers() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
+      <HeaderBar title="Kindness is Magic" />
 
       <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
         {/* Header */}

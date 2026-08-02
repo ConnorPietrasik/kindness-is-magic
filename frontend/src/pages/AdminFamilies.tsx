@@ -8,7 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -16,7 +16,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
-import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
@@ -37,7 +37,15 @@ import {
   adminRestoreFamily,
   adminUpdateFamily,
 } from "../lib/api";
-import { adminDeletedFamilies, adminDeletedPeople, adminFamilies, adminPeople, adminReferrers, adminReviewQueue } from "../lib/queryKeys";
+import {
+  adminDeletedFamilies,
+  adminDeletedPeople,
+  adminFamilies,
+  adminPackingSlips,
+  adminPeople,
+  adminReferrers,
+  adminReviewQueue,
+} from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
@@ -48,6 +56,7 @@ import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 export default function AdminFamilies() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const navigate = useNavigate();
   const pagination = usePagination();
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
@@ -85,7 +94,7 @@ export default function AdminFamilies() {
     updateFn: isDeletedView ? undefined : adminUpdateFamily,
     deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople],
+    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople, adminPackingSlips],
     entityName: "Family",
   });
 
@@ -114,6 +123,7 @@ export default function AdminFamilies() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       toast.success("Wish lock reset — family can now edit their wishes");
     },
   });
@@ -152,7 +162,7 @@ export default function AdminFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink />} />
+      <HeaderBar title="Kindness is Magic" />
 
       <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
         {/* Header */}
@@ -276,6 +286,10 @@ export default function AdminFamilies() {
                             </Button>
                             <ActionsDropdown
                               items={[
+                                {
+                                  label: "View Packing Slip",
+                                  onClick: () => navigate(route.adminPackingSlips([f.id])),
+                                },
                                 ...(f.wish_lock_level !== "family"
                                   ? [
                                       {

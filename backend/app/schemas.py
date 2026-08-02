@@ -578,7 +578,6 @@ class WishSummary(BaseModel):
     purchased_by_id: int | None = None
     purchased_at: datetime | None = None
     purchased_where: str | None = None
-    deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -823,6 +822,31 @@ class FamilyWishListResponse(BaseModel):
     bio: str | None = None
     family_wish: str
     people: list[PersonWishItem]
+
+
+# ---------------------------------------------------------------------------
+# Packing slip schemas
+# ---------------------------------------------------------------------------
+
+
+class PackingSlipPersonItem(BaseModel):
+    """Single person on a packing slip (no PII beyond given_name)."""
+
+    display_id: str
+    given_name: str
+    title: str | None = None
+    age: int
+    note: str | None = None
+    wishes: list[WishSummary] = []
+
+
+class PackingSlipItem(BaseModel):
+    """One family on a packing slip (no family_name/contact_name/bio)."""
+
+    id: int
+    display_id: str
+    family_wish: str
+    people: list[PackingSlipPersonItem] = []
 
 
 # ---------------------------------------------------------------------------

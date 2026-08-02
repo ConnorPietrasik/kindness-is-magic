@@ -28,6 +28,31 @@ interface LogoutButtonProps {
 /**
  * LogoutButton — ghost-style sign-out button for the header.
  */
+interface BackLinkProps {
+  /** Destination path — always required (no defaults). */
+  to: string;
+  label?: string;
+}
+
+/**
+ * BackLink — arrow link to a known parent page.
+ * Always requires an explicit `to` prop so navigation is deterministic.
+ */
+export function BackLink({ to, label = "Back" }: BackLinkProps) {
+  return (
+    <Link to={to} className="text-sm text-white/80 transition-colors hover:text-white">
+      ← {label}
+    </Link>
+  );
+}
+
+interface LogoutButtonProps {
+  onClick: () => void;
+}
+
+/**
+ * LogoutButton — ghost-style sign-out button for the header.
+ */
 export function LogoutButton({ onClick }: LogoutButtonProps) {
   return (
     <button
@@ -37,21 +62,5 @@ export function LogoutButton({ onClick }: LogoutButtonProps) {
     >
       Sign out
     </button>
-  );
-}
-
-interface BackLinkProps {
-  to?: string;
-  label?: string;
-}
-
-/**
- * BackLink — arrow link back to the dashboard or a custom path.
- */
-export function BackLink({ to = ROUTES.DASHBOARD, label = "Back" }: BackLinkProps) {
-  return (
-    <Link to={to} className="text-sm text-white/80 transition-colors hover:text-white">
-      ← {label}
-    </Link>
   );
 }

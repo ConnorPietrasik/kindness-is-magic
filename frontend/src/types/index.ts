@@ -27,6 +27,8 @@ export type {
   FamilySelfRegisterResponse,
   FamilySummary,
   FamilyWishListResponse,
+  PackingSlipItem,
+  PackingSlipPersonItem,
   PendingFamilySummary,
   PersonDetail,
   PersonPayload,
