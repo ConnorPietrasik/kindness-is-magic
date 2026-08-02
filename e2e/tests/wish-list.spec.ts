@@ -74,7 +74,7 @@ test.describe("Family Wish List (public)", () => {
     });
 
     /* Family wish card is visible */
-    await expect(page.getByText("A complete holiday dinner for everyone")).toBeVisible();
+    await expect(page.getByText("A fleece throw blanket set")).toBeVisible();
 
     /* People table shows seeded members */
     await expect(page.getByRole("table")).toContainText("Emma");
@@ -82,7 +82,7 @@ test.describe("Family Wish List (public)", () => {
     await expect(page.getByRole("table")).toContainText("Oliver");
 
     /* Practical and fun wishes are visible */
-    await expect(page.getByRole("table")).toContainText("New coat and mittens");
+    await expect(page.getByRole("table")).toContainText("A navy blue puffer coat");
     await expect(page.getByRole("table")).toContainText("Barbie Dreamhouse doll");
   });
 

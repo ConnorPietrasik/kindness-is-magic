@@ -52,14 +52,17 @@ Jane Doe,15,555-0002
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-John Smith,The Johnsons,A warm blanket,Mom Johnson,,,555-1111
-Jane Doe,The Smiths,A computer,Dad Smith,,123 Main St,
+John Smith,The Johnsons,A fleece blanket,Mom Johnson,Family of four,123 Oak St,555-1111
+Jane Doe,The Smiths,A coffee maker,Dad Smith,Young family,456 Main St,555-2222
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
-The Johnsons,Alice,8,Backpack,,Doll,,
-The Johnsons,Bob,12,New shoes,,Game,,Allergic to peanuts
-The Smiths,Charlie,5,Winter coat,,Puzzle,,
+The Johnsons,Mom,34,Black bathrobe,M,,,mother
+The Johnsons,Dad,36,Electric shaving kit,,,father,
+The Johnsons,Alice,8,Backpack,,Doll set,daughter,
+The Johnsons,Bob,12,Tennis shoes,3Y,Board game,son,Allergic to peanuts
+The Smiths,Dad,38,Home tool kit,,,father,
+The Smiths,Charlie,5,Winter coat,5,Puzzle,son,
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id,display_name

@@ -82,6 +82,6 @@ Bad Family,Test Person,not_a_number,Bike,,Lego
     await expect(page.getByText("Users", { exact: true })).toBeVisible();
 
     /* The skipped counts (amber =) should be non-zero */
-    await expect(page.getByText("=4", { exact: true })).toBeVisible(); /* 4 referrers skipped */
+    await expect(page.getByText("=5", { exact: true })).toBeVisible(); /* 5 referrers skipped */
   });
 });

@@ -1,6 +1,8 @@
-Improve the demo.csv test data
 Add admin view for wishes - filter by locked status and include links to the person or family
 Add more info to the displayed list views
+Hide approval status since unapproved is hidden by default
+Hide the wishlist button when they aren't locked
+Hide the lock and pickup windows since they're a bit of a waste of space; the admin filters should cover the cases when they're meaningful
 Add internal notes; referrer-level, purchaser-level, and admin-only. Probably per-gift
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Add more admin views - sort by wishes, sort families by size, etc
