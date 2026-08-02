@@ -94,17 +94,7 @@ export default function AdminFamilyPeople() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
-          <Link
-            to={route.familyWishList(famIdNum)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            Wish List
-          </Link>
-        </div>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
 
         <HierarchicalManage
           parent={{
@@ -113,7 +103,7 @@ export default function AdminFamilyPeople() {
             fetchFn: adminGetFamily,
             updateApi: adminUpdateFamily,
             normaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
-            render: (props) => <FamilyCard {...props} referrerMap={referrerMap} referrersLoading={referrersLoading} />,
+            render: (props) => <FamilyCard {...props} famId={famIdNum} referrerMap={referrerMap} referrersLoading={referrersLoading} />,
             invalidationKeys: [familyKey],
             entityName: "Family",
           }}
@@ -161,11 +151,13 @@ export default function AdminFamilyPeople() {
 
 function FamilyCard(
   props: HierarchicalManageParentRenderProps<FamilyDetail> & {
+    famId: number;
     referrerMap: Record<number, string>;
     referrersLoading: boolean;
   }
 ) {
-  const { data, isEditing, onToggleEdit, isSaving, onSave, referrerMap, referrersLoading } = props;
+  const { data, isEditing, onToggleEdit, isSaving, onSave, famId, referrerMap, referrersLoading } = props;
+  const lockLevel = data?.wish_lock_level ?? "family";
 
   return (
     <Card className="mb-6">
@@ -189,9 +181,21 @@ function FamilyCard(
             </Link>
           )}
         </div>
-        <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>
-          {isEditing ? "Cancel" : "Edit"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {lockLevel === "admin" && (
+            <Link
+              to={route.familyWishList(famId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              Wish List
+            </Link>
+          )}
+          <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>
+            {isEditing ? "Cancel" : "Edit"}
+          </Button>
+        </div>
       </div>
 
       {isEditing ? (

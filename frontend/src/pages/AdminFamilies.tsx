@@ -21,7 +21,6 @@ import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
-import { WishLockBadge } from "../components/WishLockBadge";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -47,7 +46,7 @@ import {
   adminReviewQueue,
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
-import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
+import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -223,8 +222,6 @@ export default function AdminFamilies() {
                 <Th>Family Name</Th>
                 <Th>Contact</Th>
                 <Th>Referrer</Th>
-                <Th>Lock</Th>
-                <Th>Pickup Window</Th>
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -233,7 +230,7 @@ export default function AdminFamilies() {
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                     <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                       {f.family_name}
-                      {f.deleted_at == null && !isDeletedView && (
+                      {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                         <Link
                           to={route.familyWishList(f.id)}
                           target="_blank"
@@ -259,10 +256,6 @@ export default function AdminFamilies() {
                         "—"
                       )}
                     </Td>
-                    <Td>
-                      <WishLockBadge level={f.wish_lock_level ?? "family"} />
-                    </Td>
-                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(f.pickup_window)}</Td>
                     <Td>
                       <div className="flex gap-2">
                         {!isDeletedView && f.deleted_at == null && (

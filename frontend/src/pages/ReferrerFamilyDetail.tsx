@@ -43,7 +43,7 @@ import {
 } from "../lib/api";
 import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople, referrerReviewQueue } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
+import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -62,17 +62,7 @@ export default function ReferrerFamilyDetail() {
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.REFERRER_FAMILIES} label="My Families" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Detail</h2>
-          <Link
-            to={route.familyWishList(famIdNum)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-          >
-            Wish List
-          </Link>
-        </div>
+        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Detail</h2>
 
         <HierarchicalManage
           parent={{
@@ -176,6 +166,17 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
           {data && <WishLockBadge level={lockLevel} />}
         </div>
         <div className="flex items-center gap-2">
+          {/* Wish List link (only when locked) */}
+          {lockLevel === "admin" && (
+            <Link
+              to={route.familyWishList(famId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              Wish List
+            </Link>
+          )}
           {/* Submit / Re-submit button */}
           {showSubmitButton && (
             <Button
@@ -222,8 +223,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
             <InfoRow label="Family Wish" value={data.family_wish} />
             <InfoRow label="Bio" value={data.bio} />
             <InfoRow label="Address" value={data.address} />
-            <InfoRow label="Phone" value={data.phone_number} />
-            <InfoRow label="Pickup Window" value={formatDateTime(data.pickup_window)} isLast />
+            <InfoRow label="Phone" value={data.phone_number} isLast />
           </div>
         )
       )}

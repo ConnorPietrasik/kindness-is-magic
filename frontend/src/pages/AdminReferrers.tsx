@@ -183,7 +183,7 @@ export default function AdminReferrers() {
                 <Th>ID</Th>
                 <Th>Name</Th>
                 <Th>Family Limit</Th>
-                <Th>Approval</Th>
+                {showUnapproved && <Th>Approval</Th>}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -194,33 +194,35 @@ export default function AdminReferrers() {
                     <Td>
                       {r.family_count ?? 0} / {r.family_limit}
                     </Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <ApprovalBadge status={r.approval_status} />
-                        {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
-                          <>
-                            <Button
-                              variant="success"
-                              size="sm"
-                              className="px-2 py-1 text-xs"
-                              onClick={() => setApproveConfirm(r.id)}
-                              disabled={approveMut.isPending || rejectMut.isPending}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="px-2 py-1 text-xs"
-                              onClick={() => setRejectConfirm(r.id)}
-                              disabled={approveMut.isPending || rejectMut.isPending}
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </Td>
+                    {showUnapproved && (
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <ApprovalBadge status={r.approval_status} />
+                          {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
+                            <>
+                              <Button
+                                variant="success"
+                                size="sm"
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setApproveConfirm(r.id)}
+                                disabled={approveMut.isPending || rejectMut.isPending}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setRejectConfirm(r.id)}
+                                disabled={approveMut.isPending || rejectMut.isPending}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </Td>
+                    )}
                     <Td>
                       <div className="flex flex-wrap gap-2">
                         {!isDeletedView && !r.deleted_at && (
@@ -244,13 +246,26 @@ export default function AdminReferrers() {
                             </Button>
                             <ActionsDropdown
                               items={[
+                                ...(!showUnapproved && !isDeletedView && !r.deleted_at && r.approval_status === "pending"
+                                  ? [
+                                      {
+                                        label: "Approve",
+                                        onClick: () => setApproveConfirm(r.id),
+                                      },
+                                      {
+                                        label: "Reject",
+                                        variant: "danger" as const,
+                                        onClick: () => setRejectConfirm(r.id),
+                                      },
+                                    ]
+                                  : []),
                                 {
                                   label: "Delete",
                                   variant: "danger" as const,
                                   onClick: () => confirmDelete(r.id),
                                 },
                               ]}
-                              disabled={deleteMut?.isPending}
+                              disabled={deleteMut?.isPending || approveMut.isPending || rejectMut.isPending}
                             />
                           </>
                         )}

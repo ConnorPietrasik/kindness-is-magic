@@ -45,7 +45,7 @@ import {
   adminReviewQueue,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
+import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyPayload, FamilySummary, ReferrerDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -218,7 +218,6 @@ function FamiliesTable({
         <Th>Family Name</Th>
         <Th>Contact</Th>
         <Th>People</Th>
-        <Th>Pickup Window</Th>
         <Th>Actions</Th>
       </TableHead>
       <TableBody>
@@ -227,7 +226,7 @@ function FamiliesTable({
             <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
             <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
               {f.family_name}
-              {f.deleted_at == null && !isDeletedView && (
+              {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                 <Link
                   to={route.familyWishList(f.id)}
                   target="_blank"
@@ -242,7 +241,6 @@ function FamiliesTable({
             </Td>
             <Td>{f.contact_name}</Td>
             <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-            <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(f.pickup_window)}</Td>
             <Td>
               <div className="flex items-center gap-2">
                 {!isDeletedView && f.deleted_at == null && (
