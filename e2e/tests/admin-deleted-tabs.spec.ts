@@ -11,6 +11,13 @@
  * data is intact for any other tests.
  */
 import { test, expect } from "@playwright/test";
+import type { Locator } from "@playwright/test";
+
+/** Open the kebab-menu dropdown and click a menu item by label. */
+async function clickAction(row: Locator, actionLabel: string) {
+  await row.getByRole("button", { name: "More actions" }).click();
+  await row.getByRole("menuitem", { name: actionLabel }).click();
+}
 
 const SEEDED_FAMILY = "The Lee Family";
 
@@ -22,10 +29,10 @@ test.describe("Admin Deleted Tabs", () => {
     /* Verify Active tab is visible and selected */
     await expect(page.getByRole("tab", { name: "Active", exact: true })).toBeVisible();
 
-    /* Find the seeded family row and delete it */
+    /* Find the seeded family row and delete it (inside actions dropdown) */
     const familyRow = page.getByRole("row").filter({ hasText: SEEDED_FAMILY });
     await expect(familyRow).toBeVisible();
-    await familyRow.getByRole("button", { name: "Delete" }).click();
+    await clickAction(familyRow, "Delete");
     await page.getByRole("button", { name: "Yes, delete" }).click();
 
     /* Verify it's gone from the Active view */
@@ -47,9 +54,9 @@ test.describe("Admin Deleted Tabs", () => {
   test("admin restores a family from the Deleted tab", async ({ page }) => {
     await page.goto("/admin/families");
 
-    /* Delete the seeded family first so it lands in the Deleted tab */
+    /* Delete the seeded family first so it lands in the Deleted tab (inside actions dropdown) */
     const familyRow = page.getByRole("row").filter({ hasText: SEEDED_FAMILY });
-    await familyRow.getByRole("button", { name: "Delete" }).click();
+    await clickAction(familyRow, "Delete");
     await page.getByRole("button", { name: "Yes, delete" }).click();
 
     /* Wait for the delete mutation to complete before switching tabs */
@@ -117,7 +124,7 @@ test.describe("Admin Deleted Tabs", () => {
     await page.getByRole("tab", { name: "Active", exact: true }).click();
 
     const familyRowActive = page.getByRole("row").filter({ hasText: familyWithPerson });
-    await familyRowActive.getByRole("button", { name: "Delete" }).click();
+    await clickAction(familyRowActive, "Delete");
     await page.getByRole("button", { name: "Yes, delete" }).click();
 
     /* Navigate to the people page and check the Deleted tab */

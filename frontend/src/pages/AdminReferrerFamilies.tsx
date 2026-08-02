@@ -6,7 +6,9 @@
  * tabs (active/deleted), pagination, restore confirmation, dialogs.
  */
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
@@ -20,6 +22,7 @@ import {
 import { InfoRow } from "../components/InfoRow";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import {
   adminCreateFamily,
   adminDeleteFamily,
@@ -27,6 +30,7 @@ import {
   adminGetReferrer,
   adminListDeletedFamilies,
   adminListReferrerFamilies,
+  adminResetWishState,
   adminRestoreFamily,
   adminUpdateFamily,
   adminUpdateReferrer,
@@ -37,6 +41,7 @@ import {
   adminFamilies,
   adminReferrerDetail,
   adminReferrerFamilies,
+  adminReviewQueue,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
@@ -46,6 +51,8 @@ import type { FamilyPayload, FamilySummary, ReferrerDetail } from "../types";
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrerFamilies() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const { id: refId } = useParams<{ id: string }>();
   const refIdNum = parseInt(refId!, 10);
   const refIdStr = String(refIdNum);
@@ -53,6 +60,17 @@ export default function AdminReferrerFamilies() {
   const referrerKey = adminReferrerDetail(refIdStr);
   const familiesKey = adminReferrerFamilies(refIdStr);
   const deletedFamiliesKey = adminDeletedReferrerFamilies(refIdStr);
+
+  // Reset wish state mutation
+  const resetMut = useMutation({
+    mutationFn: adminResetWishState,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familiesKey });
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      toast.success("Wish lock reset — family can now edit their wishes");
+    },
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -82,7 +100,13 @@ export default function AdminReferrerFamilies() {
             formDefault: defaultFamilyForm as unknown as FamilyPayload,
             formComponent: FamilyForm,
             render: (rows, callbacks, ctx) => (
-              <FamiliesTable rows={rows as FamilySummary[]} callbacks={callbacks} isDeletedView={ctx.isDeletedView} />
+              <FamiliesTable
+                rows={rows as FamilySummary[]}
+                callbacks={callbacks}
+                isDeletedView={ctx.isDeletedView}
+                onResetWishState={(id) => resetMut.mutate(id)}
+                isResetting={resetMut.isPending}
+              />
             ),
             title: "Families",
             createButtonLabel: "+ Add Family",
@@ -166,10 +190,14 @@ function FamiliesTable({
   rows,
   callbacks,
   isDeletedView,
+  onResetWishState,
+  isResetting,
 }: {
   rows: FamilySummary[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
+  onResetWishState: (id: number) => void;
+  isResetting: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -233,14 +261,25 @@ function FamiliesTable({
                     >
                       Edit
                     </Button>
-                    <Button
-                      variant="danger"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onDelete(f.id)}
-                      disabled={callbacks.isDeleting}
-                    >
-                      Delete
-                    </Button>
+                    <ActionsDropdown
+                      items={[
+                        ...(f.wish_lock_level !== "family"
+                          ? [
+                              {
+                                label: "Reset Lock",
+                                variant: "secondary" as const,
+                                onClick: () => onResetWishState(f.id),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Delete",
+                          variant: "danger" as const,
+                          onClick: () => callbacks.onDelete(f.id),
+                        },
+                      ]}
+                      disabled={callbacks.isDeleting || isResetting}
+                    />
                   </>
                 )}
                 {isDeletedView && (

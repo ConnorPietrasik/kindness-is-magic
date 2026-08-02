@@ -304,6 +304,11 @@ export function adminRejectWishes(id: number, reason: string): Promise<FamilyDet
   return apiPost(`/api/admin/families/${id}/reject-wishes`, { reason });
 }
 
+/** Reset a family's wish state back to family-editable (clears lock + review flags). */
+export function adminResetWishState(id: number): Promise<FamilyDetail> {
+  return apiPost(`/api/admin/families/${id}/reset-wish-state`);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------

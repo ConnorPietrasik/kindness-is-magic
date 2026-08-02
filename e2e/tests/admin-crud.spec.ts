@@ -6,7 +6,14 @@
  * Uses unique names per run so re-runs without DB wipe don't collide.
  */
 import { test, expect } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { deleteReferrerViaApi, deletePersonViaApi } from "../helpers/api";
+
+/** Open the kebab-menu dropdown and click a menu item by label. */
+async function clickAction(row: Locator, actionLabel: string) {
+  await row.getByRole("button", { name: "More actions" }).click();
+  await row.getByRole("menuitem", { name: actionLabel }).click();
+}
 
 const TEST_REFERRER = `Test E2E Org ${Math.random().toString(36).slice(2, 6)}`;
 const TEST_PERSON = `E2E Test ${Math.random().toString(36).slice(2, 6)}`;
@@ -148,9 +155,9 @@ test.describe("Admin CRUD", () => {
       timeout: 10_000,
     });
 
-    /* Find the test person row and click Delete */
+    /* Find the test person row and click Delete (inside actions dropdown) */
     const row = page.getByRole("row").filter({ hasText: TEST_PERSON });
-    await row.getByRole("button", { name: "Delete" }).click();
+    await clickAction(row, "Delete");
 
     /* Confirm the deletion in the dialog */
     await page.getByRole("button", { name: "Yes, delete" }).click();

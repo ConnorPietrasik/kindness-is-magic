@@ -6,9 +6,10 @@
  * Separate "Deleted" tab calls the /deleted endpoint.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -21,6 +22,7 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishLockBadge } from "../components/WishLockBadge";
+import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
@@ -31,10 +33,11 @@ import {
   adminListDeletedFamilies,
   adminListFamilies,
   adminListReferrers,
+  adminResetWishState,
   adminRestoreFamily,
   adminUpdateFamily,
 } from "../lib/api";
-import { adminDeletedFamilies, adminDeletedPeople, adminFamilies, adminPeople, adminReferrers } from "../lib/queryKeys";
+import { adminDeletedFamilies, adminDeletedPeople, adminFamilies, adminPeople, adminReferrers, adminReviewQueue } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
@@ -43,9 +46,12 @@ import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminFamilies() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const pagination = usePagination();
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<number | null>(null);
   const [showUnapproved, setShowUnapproved] = useState(false);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
@@ -101,6 +107,16 @@ export default function AdminFamilies() {
     });
     return map;
   }, [referrerData]);
+
+  // Reset wish state mutation
+  const resetMut = useMutation({
+    mutationFn: adminResetWishState,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      toast.success("Wish lock reset — family can now edit their wishes");
+    },
+  });
 
   function handleCreate(formData: FamilyPayload) {
     createMut?.mutate(formData);
@@ -258,15 +274,25 @@ export default function AdminFamilies() {
                             >
                               Edit
                             </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => confirmDelete(f.id)}
-                              disabled={deleteMut?.isPending}
-                            >
-                              Delete
-                            </Button>
+                            <ActionsDropdown
+                              items={[
+                                ...(f.wish_lock_level !== "family"
+                                  ? [
+                                      {
+                                        label: "Reset Lock",
+                                        variant: "secondary" as const,
+                                        onClick: () => setResetConfirm(f.id),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "Delete",
+                                  variant: "danger" as const,
+                                  onClick: () => confirmDelete(f.id),
+                                },
+                              ]}
+                              disabled={deleteMut?.isPending || resetMut.isPending}
+                            />
                           </>
                         )}
                         {isDeletedView && (
@@ -345,6 +371,28 @@ export default function AdminFamilies() {
             confirmVariant="primary"
           />
 
+          {/* Reset wish lock confirmation */}
+          <ConfirmDialog
+            open={resetConfirm !== null}
+            title={
+              <>
+                Reset wish lock for family <strong>#{resetConfirm}</strong>?
+              </>
+            }
+            description="This will unlock the family's wishes so they can edit them again. Any admin approval will be removed."
+            onConfirm={() => {
+              if (resetConfirm != null) {
+                resetMut.mutate(resetConfirm);
+                setResetConfirm(null);
+              }
+            }}
+            onCancel={() => setResetConfirm(null)}
+            loading={resetMut.isPending}
+            confirmLabel="Yes, reset"
+            loadingLabel="Resetting…"
+            confirmVariant="secondary"
+          />
+
           {/* Pagination */}
           <Pagination
             page={pagination.page}
@@ -357,7 +405,9 @@ export default function AdminFamilies() {
         </div>
 
         {/* Errors */}
-        <MutationErrors mutations={[createMut, updateMut, deleteMut, restoreMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[createMut, updateMut, deleteMut, restoreMut, resetMut].filter((m): m is NonNullable<typeof m> => m != null)}
+        />
       </main>
     </div>
   );

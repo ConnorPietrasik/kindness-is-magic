@@ -727,4 +727,11 @@ describe("admin wish review API functions", () => {
     });
     expect(result).toEqual({ id: 5, wish_lock_level: "referrer" });
   });
+
+  it("adminResetWishState — POST /api/admin/families/:id/reset-wish-state", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, wish_lock_level: "family" } });
+    const result = await apiModule.adminResetWishState(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/families/5/reset-wish-state");
+    expect(result).toEqual({ id: 5, wish_lock_level: "family" });
+  });
 });

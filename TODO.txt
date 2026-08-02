@@ -1,4 +1,3 @@
-Add frontend for the admin wish reset - not totally sure where it would fit best
 Add admin view for wishes - filter by locked status and include links to the person or family
 Add more info to the displayed list views
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number

@@ -9,6 +9,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -241,15 +242,16 @@ export default function AdminReferrers() {
                             >
                               Edit
                             </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => confirmDelete(r.id)}
+                            <ActionsDropdown
+                              items={[
+                                {
+                                  label: "Delete",
+                                  variant: "danger" as const,
+                                  onClick: () => confirmDelete(r.id),
+                                },
+                              ]}
                               disabled={deleteMut?.isPending}
-                            >
-                              Delete
-                            </Button>
+                            />
                           </>
                         )}
                         {isDeletedView && (

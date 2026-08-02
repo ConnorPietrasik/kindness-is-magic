@@ -8,6 +8,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
@@ -279,14 +280,16 @@ function PeopleTable({
                         Restore
                       </Button>
                     ) : (
-                      <Button
-                        variant="danger"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => callbacks.onDelete(p.id)}
+                      <ActionsDropdown
+                        items={[
+                          {
+                            label: "Delete",
+                            variant: "danger" as const,
+                            onClick: () => callbacks.onDelete(p.id),
+                          },
+                        ]}
                         disabled={callbacks.isDeleting}
-                      >
-                        Delete
-                      </Button>
+                      />
                     )}
                   </div>
                 </Td>

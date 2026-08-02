@@ -10,6 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -292,27 +293,25 @@ export default function AdminUsers() {
                             >
                               Edit
                             </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => {
-                                setResetPasswordId(u.id);
-                                setResetForm({ password: "", confirmPassword: "" });
-                              }}
-                              disabled={!!editingId}
-                            >
-                              Reset Pw
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => confirmDelete(u.id)}
+                            <ActionsDropdown
+                              items={[
+                                {
+                                  label: "Reset Pw",
+                                  variant: "secondary" as const,
+                                  onClick: () => {
+                                    setResetPasswordId(u.id);
+                                    setResetForm({ password: "", confirmPassword: "" });
+                                  },
+                                  disabled: !!editingId,
+                                },
+                                {
+                                  label: "Delete",
+                                  variant: "danger" as const,
+                                  onClick: () => confirmDelete(u.id),
+                                },
+                              ]}
                               disabled={deleteMut.isPending}
-                            >
-                              Delete
-                            </Button>
+                            />
                           </>
                         )}
                         {isDeletedView && (
