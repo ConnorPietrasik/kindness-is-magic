@@ -168,3 +168,12 @@ export const familyWishList = (id: number) => ["familyWishList", id] as const;
 export const adminWishes = ["adminWishes"] as const;
 /** Single admin wish detail (pass id at call site) */
 export const adminWishDetail = (id: number) => ["adminWishes", id] as const;
+
+// ---------------------------------------------------------------------------
+// Purchaser — Wishes
+// ---------------------------------------------------------------------------
+
+/** Purchaser's assigned wishes list */
+export const purchaserWishes = ["purchaserWishes"] as const;
+/** Single purchaser wish detail (pass id at call site) */
+export const purchaserWishDetail = (id: number) => ["purchaserWishes", id] as const;

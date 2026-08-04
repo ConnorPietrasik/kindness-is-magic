@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 /** Mirrors backend UserRole enum. */
-export type UserRole = "admin" | "referrer" | "family";
+export type UserRole = "admin" | "referrer" | "family" | "purchaser";
 
 /** Mirrors UserResponse — the shape returned by /api/auth/me. */
 export interface User {
@@ -448,4 +448,30 @@ export interface PersonDetail {
   note: string | null;
   deleted_at: string | null;
   wishes: WishSummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Purchaser
+// ---------------------------------------------------------------------------
+
+/** Mirrors PurchaserWishSummary — wish with person/family context for purchaser views. */
+export interface PurchaserWishSummary {
+  id: number;
+  type: WishType;
+  description: string;
+  size: string | null;
+  person_id: number;
+  person_given_name: string;
+  family_id: number;
+  assigned_to_id: number | null;
+  purchased_at: string | null;
+  purchased_where: string | null;
+  received_at: string | null;
+  purchaser_note: string | null;
+}
+
+/** Partial update for a wish by a purchaser — only purchaser_note and received_at. */
+export interface PurchaserWishUpdate {
+  purchaser_note?: string | null;
+  received_at?: string | null;
 }

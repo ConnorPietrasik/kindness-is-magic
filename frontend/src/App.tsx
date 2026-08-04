@@ -33,6 +33,7 @@ const AdminWishReview: LazyExoticComponent<ComponentType<unknown>> = lazy(() => 
 const AdminPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminPackingSlips"));
 const AdminWishes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishes"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
+const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -53,6 +54,9 @@ function DashboardRedirect() {
   }
   if (user?.role === "family") {
     return <Navigate to={ROUTES.FAMILY_DASHBOARD} replace />;
+  }
+  if (user?.role === "purchaser") {
+    return <Navigate to={ROUTES.PURCHASER_ASSIGNED_GIFTS} replace />;
   }
 
   return <Navigate to={ROUTES.LOGIN} replace />;
@@ -120,7 +124,7 @@ export default function App() {
         <Route
           path={ROUTES.DASHBOARD}
           element={
-            <ProtectedRoute roles={["admin", "referrer", "family"] as UserRole[]}>
+            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser"] as UserRole[]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -264,6 +268,16 @@ export default function App() {
           element={
             <ProtectedRoute roles={["family"] as UserRole[]}>
               <FamilyPeople />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Purchaser self-service ───────────────────────────── */}
+        <Route
+          path={ROUTES.PURCHASER_ASSIGNED_GIFTS}
+          element={
+            <ProtectedRoute roles={["purchaser"] as UserRole[]}>
+              <PurchaserAssignedGifts />
             </ProtectedRoute>
           }
         />

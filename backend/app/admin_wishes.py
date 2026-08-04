@@ -242,7 +242,7 @@ def mark_purchased(
     # purchased_where always overwrites (null sets to None)
     wish.purchased_where = body.purchased_where
 
-    # Always assign to the calling admin
+    # Assign to the calling admin
     wish.assigned_to_id = admin.id
 
     # purchaser_note and received_at follow partial-update convention

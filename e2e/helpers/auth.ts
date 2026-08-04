@@ -17,6 +17,10 @@ export const CREDENTIALS = {
     email: "emily.williams@example.com",
     password: "Password123!",
   },
+  purchaser: {
+    email: "purchaser.e2e@example.com",
+    password: "Password123!",
+  },
 } as const;
 
 /**
@@ -43,7 +47,7 @@ export async function loginAs(
 }
 
 /**
- * Convenience wrappers for the three roles.
+ * Convenience wrappers for the roles.
  */
 import { expect } from "@playwright/test";
 
@@ -62,6 +66,12 @@ export async function loginAsFamily(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.family);
   /* Families land on /family/dashboard which has "Family Dashboard" heading */
   await expect(page.getByRole("heading", { name: "Family Dashboard" })).toBeVisible();
+}
+
+export async function loginAsPurchaser(page: Page): Promise<void> {
+  await loginAs(page, CREDENTIALS.purchaser);
+  /* Purchasers land on /purchaser/assigned-gifts which has "Assigned Gifts" heading */
+  await expect(page.getByRole("heading", { name: "Assigned Gifts" })).toBeVisible();
 }
 
 /**

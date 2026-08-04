@@ -653,6 +653,7 @@ def _process_users(
         "admin": UserRole.admin,
         "referrer": UserRole.referrer,
         "family": UserRole.family,
+        "purchaser": UserRole.purchaser,
     }
 
     for i, rec in enumerate(records):

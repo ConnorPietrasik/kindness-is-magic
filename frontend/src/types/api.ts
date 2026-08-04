@@ -1,6 +1,14 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
-import type { FamilySummary, PersonSummary, ReferrerInviteSummary, ReferrerSummary, UserSummary, WishListSummary } from "./domain";
+import type {
+  FamilySummary,
+  PersonSummary,
+  PurchaserWishSummary,
+  ReferrerInviteSummary,
+  ReferrerSummary,
+  UserSummary,
+  WishListSummary,
+} from "./domain";
 
 // ---------------------------------------------------------------------------
 // Pagination
@@ -15,6 +23,7 @@ export interface PaginationParams {
 /** Query params for the admin users list endpoint. */
 export interface AdminUsersListParams extends PaginationParams {
   role?: string;
+  roles?: string;
   search?: string;
 }
 
@@ -79,6 +88,15 @@ export interface AdminWishesListParams extends PaginationParams {
 /** Mirrors WishListResponse — paginated admin wish list. */
 export interface WishListResponse {
   wishes: WishListSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Mirrors PurchaserWishListResponse — paginated purchaser wish list. */
+export interface PurchaserWishListResponse {
+  wishes: PurchaserWishSummary[];
   total: number;
   page: number;
   page_size: number;

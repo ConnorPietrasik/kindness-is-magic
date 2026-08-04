@@ -668,6 +668,7 @@ const roleColors: Record<UserRole, string> = {
   admin: "bg-red-100 text-red-700",
   referrer: "bg-blue-100 text-blue-700",
   family: "bg-green-100 text-green-700",
+  purchaser: "bg-orange-100 text-orange-700",
 };
 
 function RoleBadge({ role }: { role: UserRole }) {

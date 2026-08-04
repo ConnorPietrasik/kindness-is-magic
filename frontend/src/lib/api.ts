@@ -30,6 +30,8 @@ import type {
   PersonDetail,
   PersonListResponse,
   PersonPayload,
+  PurchaserWishListResponse,
+  PurchaserWishUpdate,
   ReferrerDetail,
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
@@ -588,6 +590,34 @@ export function updatePerson(id: number, data: PersonPayload): Promise<PersonDet
 
 export function deletePerson(id: number): Promise<void> {
   return apiDelete(`/api/people/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Purchaser — Assigned Wishes
+// ---------------------------------------------------------------------------
+
+export interface PurchaserWishesListParams extends PaginationParams {
+  purchased?: string;
+}
+
+/** List wishes assigned to the current purchaser. */
+export function purchaserListWishes(params?: PurchaserWishesListParams): Promise<PurchaserWishListResponse> {
+  return apiGet("/api/purchaser/wishes", params);
+}
+
+/** Get detail of a single wish assigned to the current purchaser. */
+export function purchaserGetWish(wishId: number): Promise<WishDetail> {
+  return apiGet(`/api/purchaser/wishes/${wishId}`);
+}
+
+/** Mark a wish as purchased (sets purchased_at=now + optional fields). */
+export function purchaserMarkPurchased(wishId: number, payload: WishPurchaseMark): Promise<WishDetail> {
+  return apiPost(`/api/purchaser/wishes/${wishId}/mark-purchased`, payload);
+}
+
+/** Partial update of purchaser_note and/or received_at on an assigned wish. */
+export function purchaserUpdateWish(wishId: number, payload: Partial<PurchaserWishUpdate>): Promise<WishDetail> {
+  return apiPatch(`/api/purchaser/wishes/${wishId}`, payload);
 }
 
 export default api;

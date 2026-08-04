@@ -236,6 +236,13 @@ from app.families_routes import router as families_router  # noqa: E402
 
 app.include_router(families_router)
 
+# ---------------------------------------------------------------------------
+# Include purchaser self-service routes
+# ---------------------------------------------------------------------------
+from app.purchaser_routes import purchaser_router  # noqa: E402
+
+app.include_router(purchaser_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

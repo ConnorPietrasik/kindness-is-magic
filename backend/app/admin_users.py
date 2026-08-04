@@ -126,19 +126,39 @@ user_admin_router = APIRouter(
 )
 
 
+def _apply_role_filter(query, role: str | None, roles: str | None):
+    """Apply role filtering to a user query.
+
+    Supports single ``role`` (backward-compatible) or comma-separated
+    ``roles`` for multi-role filtering (e.g. ``roles=admin,purchaser``).
+    If both are provided, ``roles`` takes precedence.
+    """
+    if roles is not None:
+        role_values = [r.strip() for r in roles.split(",") if r.strip()]
+        if role_values:
+            query = query.filter(User.role.in_(role_values))
+    elif role is not None:
+        query = query.filter(User.role == role)
+    return query
+
+
 @user_admin_router.get("")
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     role: str | None = Query(None),
+    roles: str | None = Query(None),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> UserListResponse:
-    """List active (non-deleted) users with stable display IDs."""
+    """List active (non-deleted) users with stable display IDs.
+
+    Supports single ``role`` filter (backward-compatible) or
+    comma-separated ``roles`` for multi-role filtering.
+    """
     query = db.query(User).filter(User.deleted_at.is_(None))
-    if role is not None:
-        query = query.filter(User.role == role)
+    query = _apply_role_filter(query, role, roles)
     if search is not None:
         pattern = f"%{search}%"
         query = query.filter(
@@ -156,8 +176,7 @@ def list_users(
         user_ids = [u.id for u in users]
         # Rebuild the same filtered query for ROW_NUMBER
         pos_query = db.query(User).filter(User.deleted_at.is_(None))
-        if role is not None:
-            pos_query = pos_query.filter(User.role == role)
+        pos_query = _apply_role_filter(pos_query, role, roles)
         if search is not None:
             pattern = f"%{search}%"
             pos_query = pos_query.filter(

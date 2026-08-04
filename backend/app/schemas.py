@@ -710,6 +710,64 @@ class WishListResponse(BaseModel):
     total_pages: int = 0
 
 
+class PurchaserWishSummary(BaseModel):
+    """Wish summary for purchaser self-service views.
+
+    Includes wish details, person context, and family_id for wishlist linking.
+    No PII (family_name, contact_name, phone_number excluded).
+    """
+
+    id: int
+    type: WishType
+    description: str
+    size: str | None = None
+    person_id: int
+    person_given_name: str
+    family_id: int
+    assigned_to_id: int | None = None
+    purchased_at: datetime | None = None
+    purchased_where: str | None = None
+    received_at: datetime | None = None
+    purchaser_note: str | None = None
+
+
+class PurchaserWishUpdate(BaseModel):
+    """Partial update for a wish by a purchaser.
+
+    Purchasers can only update purchaser_note and received_at.
+    Uses exclude_unset=True so omitted fields are no-ops.
+    """
+
+    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchaser_note", mode="before")
+    @classmethod
+    def _purchaser_note_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+    @field_validator("received_at", mode="before")
+    @classmethod
+    def _received_at_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
+
+
+class PurchaserWishListResponse(BaseModel):
+    """Paginated wish list response for purchaser views."""
+
+    wishes: list[PurchaserWishSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
 def validate_wish_list(wishes: list[WishCreate]) -> None:
     """Validate non-empty wish list with no duplicate types."""
     if not wishes:

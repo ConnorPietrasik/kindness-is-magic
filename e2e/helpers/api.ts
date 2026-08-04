@@ -131,3 +131,55 @@ export async function listReferrersViaApi(
   }
   return resp.json() as Promise<{ referrers: Array<{ id: number; name: string }>; total: number }>;
 }
+
+/**
+ * List users (admin API) with optional role filter.
+ */
+export async function listUsersViaApi(
+  request: APIRequestContext,
+  role?: string,
+): Promise<{ users: Array<{ id: number; email: string; role: string }>; total: number }> {
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
+  const resp = await request.get(`/api/admin/users?${params.toString()}`);
+  if (!resp.ok()) {
+    throw new Error(`listUsersViaApi failed: ${resp.status()}`);
+  }
+  return resp.json() as Promise<{ users: Array<{ id: number; email: string; role: string }>; total: number }>;
+}
+
+/**
+ * List wishes (admin API) with optional filters.
+ * Use assignedToId=0 for unassigned wishes (clear-FK sentinel).
+ * Use purchased="false" for unpurchased wishes.
+ */
+export async function listWishesViaApi(
+  request: APIRequestContext,
+  opts?: { assignedToId?: number; purchased?: string },
+): Promise<{ wishes: Array<{ id: number; assigned_to_id: number | null; purchased_at: string | null }>; total: number }> {
+  const params = new URLSearchParams();
+  if (opts?.assignedToId !== undefined) params.set("assigned_to_id", String(opts.assignedToId));
+  if (opts?.purchased) params.set("purchased", opts.purchased);
+  const resp = await request.get(`/api/admin/wishes?${params.toString()}`);
+  if (!resp.ok()) {
+    throw new Error(`listWishesViaApi failed: ${resp.status()}`);
+  }
+  return resp.json() as Promise<{ wishes: Array<{ id: number; assigned_to_id: number | null; purchased_at: string | null }>; total: number }>;
+}
+
+/**
+ * Batch-assign wishes to a user (admin API).
+ */
+export async function batchAssignWishesViaApi(
+  request: APIRequestContext,
+  wishIds: number[],
+  assignedToId: number,
+): Promise<void> {
+  const resp = await request.post("/api/admin/wishes/batch-assign", {
+    data: { wish_ids: wishIds, assigned_to_id: assignedToId },
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`batchAssignWishesViaApi failed (${resp.status()}): ${body}`);
+  }
+}

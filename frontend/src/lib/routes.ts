@@ -39,6 +39,9 @@ export const ROUTES = {
   FAMILY_DASHBOARD: "/family/dashboard",
   FAMILY_PEOPLE: "/family/people",
 
+  // ── Purchaser self-service ────────────────────────────────
+  PURCHASER_ASSIGNED_GIFTS: "/purchaser/assigned-gifts",
+
   // ── Public ────────────────────────────────────────────────
   FAMILY_WISH_LIST: "/families/:id/wish-list",
 

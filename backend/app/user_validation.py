@@ -76,9 +76,10 @@ def validate_user_role_consistency(
 
     Rules::
 
-        admin    → must NOT have referrer_id or family_id
-        referrer → MUST  have referrer_id, must NOT have family_id
-        family   → MUST  have family_id, must NOT have referrer_id
+        admin     → must NOT have referrer_id or family_id
+        referrer  → MUST  have referrer_id, must NOT have family_id
+        family    → MUST  have family_id, must NOT have referrer_id
+        purchaser → must NOT have referrer_id or family_id
     """
     errors: list[str] = []
 
@@ -99,5 +100,11 @@ def validate_user_role_consistency(
             errors.append("Family users must have a family_id")
         if referrer_id is not None:
             errors.append("Family users must not have a referrer_id")
+
+    elif role == UserRole.purchaser:
+        if referrer_id is not None:
+            errors.append("Purchaser users must not have referrer_id")
+        if family_id is not None:
+            errors.append("Purchaser users must not have family_id")
 
     return errors

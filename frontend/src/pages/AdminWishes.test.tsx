@@ -403,30 +403,37 @@ describe("AdminWishes", () => {
 
   it("clears checkbox selection when search query changes", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListWishes")
-      .mockResolvedValueOnce(mockWishListResponse)
-      .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    // Auto-advance time so debounce fires quickly without freezing waitFor/userEvent
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      vi.spyOn(api, "adminListWishes")
+        .mockResolvedValueOnce(mockWishListResponse)
+        .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
+      vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
+      vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
 
-    wrap(<AdminWishes />);
+      wrap(<AdminWishes />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Alice")).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
 
-    // Select all wishes
-    const selectAllCheckbox = screen.getByLabelText("Select all wishes on this page");
-    await user.click(selectAllCheckbox);
-    expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
+      // Select all wishes
+      const selectAllCheckbox = screen.getByLabelText("Select all wishes on this page");
+      await user.click(selectAllCheckbox);
+      expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
 
-    // Change search — selection should reset
-    const searchInput = screen.getByPlaceholderText("Search wishes…");
-    await user.type(searchInput, "test");
+      // Change search — debounce fires after 1000ms (accelerated by shouldAdvanceTime)
+      const searchInput = screen.getByPlaceholderText("Search wishes…");
+      await user.type(searchInput, "test");
 
-    await waitFor(() => {
-      expect(screen.getByText("Batch Assign (0)")).toBeInTheDocument();
-    });
+      // Wait for debounce + refetch to settle
+      await waitFor(() => {
+        expect(screen.getByText("Batch Assign (0)")).toBeInTheDocument();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("clears purchaser_note by sending empty string sentinel", async () => {

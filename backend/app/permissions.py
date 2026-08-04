@@ -52,6 +52,16 @@ def require_family(current_user: User = Depends(_get_user_or_raise)) -> User:
     return current_user
 
 
+def require_purchaser(current_user: User = Depends(_get_user_or_raise)) -> User:
+    """Raise 403 unless the user is a purchaser. Admins are excluded because they have their own routes."""
+    if current_user.role != UserRole.purchaser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Purchaser access required",
+        )
+    return current_user
+
+
 # ---------------------------------------------------------------------------
 # Ownership guard
 # ---------------------------------------------------------------------------

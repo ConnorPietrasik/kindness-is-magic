@@ -55,7 +55,7 @@ function wrap() {
 interface MakeUserOptions {
   id?: number;
   email?: string;
-  role?: "admin" | "referrer" | "family";
+  role?: "admin" | "referrer" | "family" | "purchaser";
   referrer_id?: number | null;
   family_id?: number | null;
   created_at?: string;

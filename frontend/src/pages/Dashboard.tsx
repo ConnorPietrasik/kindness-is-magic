@@ -135,6 +135,10 @@ export default function Dashboard() {
           {user?.role === "family" && (
             <NavCard to={ROUTES.FAMILY_DASHBOARD} icon="✨" label="My Family" desc="View your profile and manage people" />
           )}
+
+          {user?.role === "purchaser" && (
+            <NavCard to={ROUTES.PURCHASER_ASSIGNED_GIFTS} icon="🎁" label="Assigned Gifts" desc="View and manage your assigned gifts" />
+          )}
         </div>
 
         {/* Change password */}
@@ -164,6 +168,7 @@ function WelcomeCard() {
     admin: "bg-red-600",
     referrer: "bg-blue-600",
     family: "bg-green-600",
+    purchaser: "bg-orange-600",
   };
   const badgeClass = `${roleColors[user?.role as UserRole] ?? "bg-gray-500"} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
 

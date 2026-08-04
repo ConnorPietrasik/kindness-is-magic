@@ -115,10 +115,10 @@ export default function AdminWishes() {
   });
   const families = useMemo<FamilySummary[]>(() => familyListData?.families ?? [], [familyListData]);
 
-  // Fetch users for dropdown (assigned-to / batch-assign)
+  // Fetch users for dropdown (assigned-to / batch-assign) — admins + purchasers
   const { data: userListData } = useQuery({
     queryKey: adminUsersDropdown,
-    queryFn: () => adminListUsers({ page: 1, page_size: 200, role: "admin" }),
+    queryFn: () => adminListUsers({ page: 1, page_size: 200, roles: "admin,purchaser" }),
   });
   const users = useMemo<UserSummary[]>(() => userListData?.users ?? [], [userListData]);
 

@@ -37,6 +37,7 @@ export default defineConfig({
    *   - admin  → seed, admin-crud, csv-upload
    *   - referrer → referrer-flow
    *   - family → family-flow
+   *   - purchaser → purchaser-flow
    *   - guest → auth, invite-flow, password-reset (need unauthenticated state)
    */
   projects: [
@@ -62,6 +63,14 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "storage/family.json",
+      },
+    },
+    {
+      name: "purchaser",
+      testMatch: /tests\/purchaser-flow\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "storage/purchaser.json",
       },
     },
     /* Unauthenticated project for auth, invite, password-reset, wish-list, and core-flow */

@@ -27,6 +27,7 @@ class UserRole(str, enum.Enum):
     admin = "admin"
     referrer = "referrer"
     family = "family"
+    purchaser = "purchaser"
 
 
 class User(Base):

@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
-import { listFamiliesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
+import { batchAssignWishesViaApi, listFamiliesViaApi, listUsersViaApi, listWishesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -63,7 +63,26 @@ async function globalSetup(_config: FullConfig): Promise<void> {
       console.warn("[globalSetup] Could not find 'The Williams Family' in seeded data.");
     }
 
-    /* 3. Generate storageState files for each role */
+    /* 3. Assign some wishes to the purchaser user so e2e tests have data to work with */
+    const purchasers = await listUsersViaApi(apiContext, "purchaser");
+    if (purchasers.users.length > 0) {
+      const purchaserUser = purchasers.users[0];
+      console.log(`[globalSetup] Found purchaser user: ${purchaserUser.email} (id=${purchaserUser.id})`);
+
+      // Find unpurchased wishes (prior runs may have purchased previously-assigned ones)
+      const unpurchasedWishes = await listWishesViaApi(apiContext, { purchased: "false" });
+      const wishIds = unpurchasedWishes.wishes.slice(0, 3).map((w) => w.id);
+      if (wishIds.length > 0) {
+        await batchAssignWishesViaApi(apiContext, wishIds, purchaserUser.id);
+        console.log(`[globalSetup] Assigned ${wishIds.length} unpurchased wishes to purchaser (id=${purchaserUser.id})`);
+      } else {
+        console.warn("[globalSetup] No unpurchased wishes found for purchaser.");
+      }
+    } else {
+      console.warn("[globalSetup] No purchaser user found in seeded data.");
+    }
+
+    /* 4. Generate storageState files for each role */
     await saveStorageState(browser, "admin", {
       email: getAdminEmail(),
       password: getAdminPassword(),
@@ -74,6 +93,10 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     });
     await saveStorageState(browser, "family", {
       email: "emily.williams@example.com",
+      password: "Password123!",
+    });
+    await saveStorageState(browser, "purchaser", {
+      email: "purchaser.e2e@example.com",
       password: "Password123!",
     });
 
@@ -105,7 +128,7 @@ async function saveStorageState(
   await page.getByRole("button", { name: "Sign in" }).click();
 
   /* Wait for the role-specific dashboard to load */
-  await page.waitForURL(/\/(dashboard|referrer\/dashboard|family\/dashboard)/);
+  await page.waitForURL(/\/(dashboard|referrer\/dashboard|family\/dashboard|purchaser\/assigned-gifts)/);
   await page.waitForTimeout(1000);
 
   /* Save the storage state */
