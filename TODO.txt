@@ -17,3 +17,4 @@ EVENTUALLY - Email "opened" tracking via a logo
 Things that need clarification:
 DONOR - Filter granularity? Family size, contains a person with age in range?
 Should families get emails on referrer rejection / admin approval?
+Would it be helpful to use the display_id as links instead of a separate column? Would save a lot of space, but might be small

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { fromDatetimeLocalValue, toDatetimeLocalValue } from "../lib/utils";
+
 import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { DatePicker } from "./DatePicker";
 import { defaultFamilyForm } from "./defaults";
 import { FormField } from "./FormField";
 import { OptionalLabel } from "./OptionalLabel";
@@ -136,17 +137,7 @@ export function FamilyForm({
 
           {/* Pickup Window — admin only */}
           {hasReferrerMap && (
-            <div>
-              <OptionalLabel text="Pickup Window" />
-              <FormField
-                type="datetime-local"
-                fieldProps={{
-                  value: toDatetimeLocalValue(form.pickup_window),
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("pickup_window", fromDatetimeLocalValue(e.target.value)),
-                  autoComplete: "off",
-                }}
-              />
-            </div>
+            <DatePicker label="Pickup Window" isOptional value={form.pickup_window} onChange={(val) => update("pickup_window", val)} />
           )}
 
           {showOptionalFields && (
