@@ -216,7 +216,7 @@ class TestWish:
         assert wish.type == WishType.practical
         assert wish.description == "A backpack"
         assert wish.size == "Medium"
-        assert wish.purchased_by_id is None
+        assert wish.assigned_to_id is None
         assert wish.purchased_at is None
 
     def test_wish_nullable_size(self, db: Session):
@@ -299,7 +299,7 @@ class TestWish:
         types = {w.type for w in person.wishes}
         assert types == {WishType.practical, WishType.fun}
 
-    def test_wish_purchased_by_relationship(self, db: Session):
+    def test_wish_assigned_to_relationship(self, db: Session):
         from app.auth import get_password_hash
 
         person = self._create_person(db)
@@ -316,14 +316,14 @@ class TestWish:
             person_id=person.id,
             type=WishType.practical,
             description="A backpack",
-            purchased_by_id=user.id,
+            assigned_to_id=user.id,
         )
         db.add(wish)
         db.commit()
         db.refresh(wish)
 
-        assert wish.purchased_by_id == user.id
-        assert wish.purchased_by.email == "buyer@test.com"
+        assert wish.assigned_to_id == user.id
+        assert wish.assigned_to.email == "buyer@test.com"
 
 
 class TestPasswordResetToken:

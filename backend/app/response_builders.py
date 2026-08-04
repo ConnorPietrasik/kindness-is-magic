@@ -116,9 +116,11 @@ def build_person_detail(per: Person, db: Session) -> dict:
                 "type": w.type,
                 "description": w.description,
                 "size": w.size,
-                "purchased_by_id": w.purchased_by_id,
+                "assigned_to_id": w.assigned_to_id,
                 "purchased_at": w.purchased_at,
                 "purchased_where": w.purchased_where,
+                "received_at": w.received_at,
+                "purchaser_note": w.purchaser_note,
                 "deleted_at": w.deleted_at,
             }
             for w in wishes
@@ -257,12 +259,44 @@ def build_wish_detail(wish: Wish, person: Person) -> dict:
         "type": wish.type,
         "description": wish.description,
         "size": wish.size,
-        "purchased_by_id": wish.purchased_by_id,
+        "assigned_to_id": wish.assigned_to_id,
         "purchased_at": wish.purchased_at,
         "purchased_where": wish.purchased_where,
+        "received_at": wish.received_at,
+        "purchaser_note": wish.purchaser_note,
         "person_id": wish.person_id,
         "person_given_name": person.given_name,
         "person_family_name": person.family.family_name if person.family else None,
+    }
+
+
+def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int, User] | None = None) -> dict:
+    """Build a dict suitable for WishListSummary (flat admin list view).
+
+    Pass *assigned_users* as a pre-loaded {user_id: User} map to avoid N+1
+    queries.  If omitted the caller is responsible for populating the
+    relationship via joinedload.
+    """
+    assigned_to_name: str | None = None
+    if wish.assigned_to_id is not None:
+        user = assigned_users.get(wish.assigned_to_id) if assigned_users is not None else wish.assigned_to
+        if user is not None and user.deleted_at is None:
+            assigned_to_name = user.display_name or user.email
+
+    return {
+        "id": wish.id,
+        "type": wish.type,
+        "description": wish.description,
+        "size": wish.size,
+        "person_id": wish.person_id,
+        "person_given_name": person.given_name,
+        "family_id": person.family_id,
+        "assigned_to_id": wish.assigned_to_id,
+        "assigned_to_name": assigned_to_name,
+        "purchased_at": wish.purchased_at,
+        "purchased_where": wish.purchased_where,
+        "received_at": wish.received_at,
+        "purchaser_note": wish.purchaser_note,
     }
 
 

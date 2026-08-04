@@ -262,14 +262,16 @@ class Wish(Base):
     type: Mapped[WishType] = mapped_column(SAEnum(WishType, name="wish_type", create_constraint=True), nullable=False)
     description: Mapped[str] = mapped_column(String(60), nullable=False)
     size: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    purchased_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     purchased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purchased_where: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    purchaser_note: Mapped[str | None] = mapped_column(String(400), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     person: Mapped["Person"] = relationship("Person", back_populates="wishes")
-    purchased_by: Mapped["User | None"] = relationship("User", foreign_keys=[purchased_by_id])
+    assigned_to: Mapped["User | None"] = relationship("User", foreign_keys=[assigned_to_id])
 
 
 class RefreshToken(Base):

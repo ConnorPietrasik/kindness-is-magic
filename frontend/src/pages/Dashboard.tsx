@@ -119,6 +119,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
               <NavCard to={ROUTES.ADMIN_INVITE_CODES} icon="💌" label="Invite Codes" desc="Manage invite codes for self-registration" />
               <NavCard to={ROUTES.ADMIN_WISH_REVIEW} icon="📋" label="Wish Approval" desc="Approve or reject family wishes" />
+              <NavCard to={ROUTES.ADMIN_WISHES} icon="🎁" label="Manage Wishes" desc="Assign & track gift purchases" />
               <NavCard to={ROUTES.ADMIN_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for volunteers" />
             </>
           )}

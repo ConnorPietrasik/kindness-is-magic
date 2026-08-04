@@ -575,9 +575,11 @@ class WishSummary(BaseModel):
     type: WishType
     description: str
     size: str | None = None
-    purchased_by_id: int | None = None
+    assigned_to_id: int | None = None
     purchased_at: datetime | None = None
     purchased_where: str | None = None
+    received_at: datetime | None = None
+    purchaser_note: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -588,6 +590,124 @@ class WishDetail(WishSummary):
     person_id: int
     person_given_name: str | None = None
     person_family_name: str | None = None
+
+
+class AdminWishUpdate(BaseModel):
+    """Admin-only partial update for a wish.
+
+    Includes definition fields (type, description, size) and
+    purchase-tracking fields (assigned_to_id, purchased_at, purchased_where,
+    received_at, purchaser_note).
+    """
+
+    type: WishType | None = None
+    description: Optional[str] = Field(None, min_length=1, max_length=60)
+    size: Optional[str] = Field(None, max_length=20)
+    assigned_to_id: int | None | object = Field(default=None)  # type: ignore[assignment]
+    purchased_at: datetime | None = None
+    purchased_where: str | None = None
+    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def normalize_size(cls, v: str | None) -> str | None:
+        """Map empty string or '0' to None (N/A size)."""
+        if v is None or v == "" or v == "0":
+            return None
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+    @field_validator("assigned_to_id", mode="before")
+    @classmethod
+    def _assigned_to_id_validate(cls, v):
+        if isinstance(v, int) and v == 0:
+            return _CLEAR
+        return v
+
+    @field_validator("received_at", mode="before")
+    @classmethod
+    def _received_at_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
+
+    @field_validator("purchaser_note", mode="before")
+    @classmethod
+    def _purchaser_note_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
+
+
+class WishPurchaseMark(BaseModel):
+    """Body for the mark-purchased endpoint."""
+
+    purchased_where: str | None = None
+    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchaser_note", mode="before")
+    @classmethod
+    def _purchaser_note_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+    @field_validator("received_at", mode="before")
+    @classmethod
+    def _received_at_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
+
+
+class WishBatchAssign(BaseModel):
+    """Batch-assign multiple wishes to a user.
+
+    Set *assigned_to_id* to ``0`` to unassign the selected wishes.
+    """
+
+    wish_ids: list[int] = Field(..., min_length=1)
+    assigned_to_id: int
+
+
+class WishListSummary(BaseModel):
+    """Flat wish summary for the admin list view."""
+
+    id: int
+    type: WishType
+    description: str
+    size: str | None = None
+    person_id: int
+    person_given_name: str
+    family_id: int
+    assigned_to_id: int | None = None
+    assigned_to_name: str | None = None
+    purchased_at: datetime | None = None
+    purchased_where: str | None = None
+    received_at: datetime | None = None
+    purchaser_note: str | None = None
+
+
+class WishListResponse(BaseModel):
+    """Paginated wish list response."""
+
+    wishes: list[WishListSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
 
 
 def validate_wish_list(wishes: list[WishCreate]) -> None:

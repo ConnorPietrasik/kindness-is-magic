@@ -46,6 +46,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_families.py` | Admin CRUD for families |
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |
+| `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
 | `families_routes.py` | Public family resource endpoints |

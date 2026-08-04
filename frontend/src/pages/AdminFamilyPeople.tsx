@@ -34,7 +34,14 @@ import {
   adminUpdatePerson,
   getPerson,
 } from "../lib/api";
-import { adminDeletedFamilyPeople, adminFamilyDetail, adminFamilyPeople, adminPackingSlips, adminReferrers } from "../lib/queryKeys";
+import {
+  adminDeletedFamilyPeople,
+  adminFamilyDetail,
+  adminFamilyPeople,
+  adminPackingSlips,
+  adminReferrers,
+  adminWishes,
+} from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
@@ -124,7 +131,7 @@ export default function AdminFamilyPeople() {
             ),
             title: "People",
             createButtonLabel: "+ Add Person",
-            invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips],
+            invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips, adminWishes],
             entityName: "Person",
           }}
           tabs={{

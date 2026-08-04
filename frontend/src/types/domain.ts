@@ -225,10 +225,61 @@ export interface WishSummary {
   type: WishType;
   description: string;
   size: string | null;
-  purchased_by_id: number | null;
+  assigned_to_id: number | null;
   purchased_at: string | null;
   purchased_where: string | null;
+  received_at: string | null;
+  purchaser_note: string | null;
   deleted_at: string | null;
+}
+
+/** Mirrors WishListSummary — wish with person/family/assignee context for admin list. */
+export interface WishListSummary {
+  id: number;
+  type: WishType;
+  description: string;
+  size: string | null;
+  person_id: number;
+  person_given_name: string;
+  family_id: number;
+  assigned_to_id: number | null;
+  assigned_to_name: string | null;
+  purchased_at: string | null;
+  purchased_where: string | null;
+  received_at: string | null;
+  purchaser_note: string | null;
+}
+
+/** Payload for marking a wish as purchased. */
+export interface WishPurchaseMark {
+  purchased_where?: string | null;
+  purchaser_note?: string | null;
+  received_at?: string | null;
+}
+
+/** Payload for batch-assigning wishes to a user. */
+export interface WishBatchAssign {
+  wish_ids: number[];
+  assigned_to_id: number;
+}
+
+/** Admin-only wish update schema (includes purchase-tracking fields). */
+export interface AdminWishUpdate {
+  type?: WishType;
+  description?: string;
+  size?: string | null;
+  assigned_to_id?: number | null;
+  purchased_at?: string | null;
+  purchased_where?: string | null;
+  received_at?: string | null;
+  purchaser_note?: string | null;
+}
+
+/** Mirrors WishDetail — full wish with person context (returned by detail endpoint). */
+export interface WishDetail extends WishSummary {
+  person_id: number;
+  person_given_name: string | null;
+  person_family_name: string | null;
 }
 
 /** Payload for creating a single wish (person_id inferred from route). */

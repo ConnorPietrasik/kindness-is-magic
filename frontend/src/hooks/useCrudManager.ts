@@ -47,6 +47,11 @@ export interface CrudManagerReturn<ListResponse, Item, Payload = unknown> {
   listLoading: boolean;
   detail: Item | null;
   detailLoading: boolean;
+  // Capability flags — true when the corresponding fn was provided
+  hasCreate: boolean;
+  hasUpdate: boolean;
+  hasDelete: boolean;
+  hasRestore: boolean;
   // Mutations (always created to satisfy Rules of Hooks; no-op when fn not provided)
   createMut: UseMutationResult<Item, Error, Payload>;
   updateMut: UseMutationResult<Item, Error, { id: number; data: Payload }>;
@@ -181,6 +186,11 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
     listLoading,
     detail,
     detailLoading,
+    // Capability flags
+    hasCreate: createFn != null,
+    hasUpdate: updateFn != null,
+    hasDelete: deleteFn != null,
+    hasRestore: restoreFn != null,
     // Mutations
     createMut,
     updateMut,

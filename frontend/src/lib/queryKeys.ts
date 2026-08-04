@@ -85,6 +85,8 @@ export const adminInvites = ["adminInvites"] as const;
 export const adminReferrersDropdown = ["adminReferrersDropdown"] as const;
 /** Families for dropdown selects */
 export const adminFamiliesDropdown = ["adminFamiliesDropdown"] as const;
+/** Users for dropdown selects */
+export const adminUsersDropdown = ["adminUsersDropdown"] as const;
 
 // ---------------------------------------------------------------------------
 // Referrer — Self
@@ -157,3 +159,12 @@ export const adminPackingSlips = ["adminPackingSlips"] as const;
 
 /** Public wish list for a family (pass id at call site) */
 export const familyWishList = (id: number) => ["familyWishList", id] as const;
+
+// ---------------------------------------------------------------------------
+// Admin — Wishes
+// ---------------------------------------------------------------------------
+
+/** Admin wishes list */
+export const adminWishes = ["adminWishes"] as const;
+/** Single admin wish detail (pass id at call site) */
+export const adminWishDetail = (id: number) => ["adminWishes", id] as const;

@@ -28,12 +28,6 @@ export function ActionsDropdown({ items, disabled: propDisabled, triggerTitle = 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Hide trigger when there are no usable items
-  const visibleItems = items.filter((item) => !item.disabled);
-  if (visibleItems.length === 0) {
-    return <>{children}</>;
-  }
-
   // Close on click outside
   useEffect(() => {
     if (!open) return;
@@ -59,6 +53,12 @@ export function ActionsDropdown({ items, disabled: propDisabled, triggerTitle = 
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [open]);
+
+  // Hide trigger when there are no usable items
+  const visibleItems = items.filter((item) => !item.disabled);
+  if (visibleItems.length === 0) {
+    return <>{children}</>;
+  }
 
   function handleTriggerClick() {
     setOpen((prev) => !prev);

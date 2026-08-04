@@ -2,12 +2,14 @@
 
 export type {
   AdminUsersListParams,
+  AdminWishesListParams,
   FamilyListResponse,
   InviteListResponse,
   PaginationParams,
   PersonListResponse,
   ReferrerListResponse,
   UserListResponse,
+  WishListResponse,
 } from "./api";
 export type { AuthContextValue } from "./auth";
 export type {
@@ -19,6 +21,7 @@ export type {
 export type {
   AdminUserCreate,
   AdminUserUpdate,
+  AdminWishUpdate,
   FamilyApprovalStatus,
   FamilyDetail,
   FamilyPayload,
@@ -49,8 +52,12 @@ export type {
   UserPasswordReset,
   UserRole,
   UserSummary,
+  WishBatchAssign,
   WishCreate,
+  WishDetail,
+  WishListSummary,
   WishLockLevel,
+  WishPurchaseMark,
   WishSummary,
   WishType,
 } from "./domain";

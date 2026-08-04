@@ -44,6 +44,7 @@ import {
   adminPeople,
   adminReferrers,
   adminReviewQueue,
+  adminWishes,
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
@@ -93,7 +94,7 @@ export default function AdminFamilies() {
     updateFn: isDeletedView ? undefined : adminUpdateFamily,
     deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople, adminPackingSlips],
+    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople, adminPackingSlips, adminWishes],
     entityName: "Family",
   });
 
@@ -123,6 +124,7 @@ export default function AdminFamilies() {
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Wish lock reset — family can now edit their wishes");
     },
   });

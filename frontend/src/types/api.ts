@@ -1,6 +1,6 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
-import type { FamilySummary, PersonSummary, ReferrerInviteSummary, ReferrerSummary, UserSummary } from "./domain";
+import type { FamilySummary, PersonSummary, ReferrerInviteSummary, ReferrerSummary, UserSummary, WishListSummary } from "./domain";
 
 // ---------------------------------------------------------------------------
 // Pagination
@@ -61,6 +61,24 @@ export interface UserListResponse {
 /** Mirrors InviteListResponse. */
 export interface InviteListResponse {
   invites: ReferrerInviteSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Query params for the admin wishes list endpoint. */
+export interface AdminWishesListParams extends PaginationParams {
+  family_id?: number;
+  person_id?: number;
+  assigned_to_id?: number;
+  purchased?: string;
+  search?: string;
+}
+
+/** Mirrors WishListResponse — paginated admin wish list. */
+export interface WishListResponse {
+  wishes: WishListSummary[];
   total: number;
   page: number;
   page_size: number;

@@ -43,6 +43,7 @@ import {
   adminReferrerDetail,
   adminReferrerFamilies,
   adminReviewQueue,
+  adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
@@ -70,6 +71,7 @@ export default function AdminReferrerFamilies() {
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Wish lock reset — family can now edit their wishes");
     },
   });
@@ -112,7 +114,7 @@ export default function AdminReferrerFamilies() {
             ),
             title: "Families",
             createButtonLabel: "+ Add Family",
-            invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies],
+            invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies, adminWishes],
             entityName: "Family",
           }}
           tabs={{

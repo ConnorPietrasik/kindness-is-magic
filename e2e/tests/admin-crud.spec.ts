@@ -5,9 +5,10 @@
  * Most tests use CSV-seeded data by name; a few create new records.
  * Uses unique names per run so re-runs without DB wipe don't collide.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, request as playwrightRequest } from "@playwright/test";
 import type { Locator } from "@playwright/test";
 import { deleteReferrerViaApi, deletePersonViaApi } from "../helpers/api";
+import { getAdminEmail, getAdminPassword } from "../helpers/env";
 
 /** Open the kebab-menu dropdown and click a menu item by label. */
 async function clickAction(row: Locator, actionLabel: string) {
@@ -166,7 +167,23 @@ test.describe("Admin CRUD", () => {
     await expect(page.getByText(TEST_PERSON)).not.toBeVisible();
   });
 
-  test("wish list link on families page opens in new tab", async ({ page, context }) => {
+  test("wish list link on families page opens in new tab", async ({ page, context, request }) => {
+    /* The "Wish List" link only renders when wish_lock_level === "admin".
+     * CSV-seeded families start at "family", so we must approve through the chain:
+     *   family → referrer (referrer approves) → admin (admin approves). */
+    const fs = await import("node:fs");
+    const raw = fs.readFileSync("storage/seed-family-id.json", "utf-8");
+    const familyId = JSON.parse(raw).id as number;
+
+    // Referrer approves (family → referrer lock) — need a fresh context for referrer auth
+    const referrerApi = await playwrightRequest.newContext({ baseURL: "http://localhost" });
+    await referrerApi.post("/api/auth/login", { data: { email: "sarah.chen@example.com", password: "Password123!" } });
+    await referrerApi.post(`/api/referrer/families/${familyId}/approve-wishes`);
+    await referrerApi.dispose();
+
+    // Admin approves (referrer → admin lock) — request fixture is already admin-authenticated
+    await request.post(`/api/admin/families/${familyId}/approve-wishes`);
+
     await page.goto("/admin/families");
     await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
 
@@ -185,5 +202,8 @@ test.describe("Admin CRUD", () => {
     /* Content rendering is covered by the guest wish-list tests */
 
     await popup.close();
+
+    /* Reset wish state so later tests (referrer, family, wish-list) start clean */
+    await request.post(`/api/admin/families/${familyId}/reset-wish-state`);
   });
 });

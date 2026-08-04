@@ -27,6 +27,7 @@ export const ROUTES = {
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
   ADMIN_WISH_REVIEW: "/admin/wish-review",
   ADMIN_PACKING_SLIPS: "/admin/packing-slips",
+  ADMIN_WISHES: "/admin/wishes",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",

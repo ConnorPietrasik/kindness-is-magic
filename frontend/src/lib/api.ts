@@ -14,6 +14,8 @@ import type {
   AdminUserCreate,
   AdminUsersListParams,
   AdminUserUpdate,
+  AdminWishesListParams,
+  AdminWishUpdate,
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
@@ -41,6 +43,10 @@ import type {
   UserDetail,
   UserListResponse,
   UserPasswordReset,
+  WishBatchAssign,
+  WishDetail,
+  WishListResponse,
+  WishPurchaseMark,
 } from "../types";
 import { normalizePayload } from "./utils";
 
@@ -422,6 +428,29 @@ export function adminRestoreUser(id: number): Promise<UserDetail> {
 /** Fetch soft-deleted users (separate /deleted endpoint). */
 export function adminListDeletedUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
   return apiGet("/api/admin/users/deleted", params);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Wishes
+// ---------------------------------------------------------------------------
+export function adminListWishes(params?: AdminWishesListParams): Promise<WishListResponse> {
+  return apiGet("/api/admin/wishes", params);
+}
+
+export function adminGetWish(wishId: number): Promise<WishDetail> {
+  return apiGet(`/api/admin/wishes/${wishId}`);
+}
+
+export function adminUpdateWish(wishId: number, payload: Partial<AdminWishUpdate>): Promise<WishDetail> {
+  return apiPatch(`/api/admin/wishes/${wishId}`, payload);
+}
+
+export function adminMarkPurchased(wishId: number, payload: WishPurchaseMark): Promise<WishDetail> {
+  return apiPost(`/api/admin/wishes/${wishId}/mark-purchased`, payload);
+}
+
+export function adminBatchAssignWishes(payload: WishBatchAssign): Promise<{ assigned_count: number }> {
+  return apiPost("/api/admin/wishes/batch-assign", payload);
 }
 
 // ---------------------------------------------------------------------------

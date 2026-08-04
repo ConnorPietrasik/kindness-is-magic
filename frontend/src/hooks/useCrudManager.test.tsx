@@ -407,6 +407,59 @@ describe("useCrudManager", () => {
     expect(result.current.restoreMut.status).toBe("idle");
   });
 
+  /* ── Capability flags ───────────────────────────────────── */
+
+  it("capability flags are true when all fns are provided", () => {
+    const fns = makeFns();
+    const { result } = renderHook(
+      () =>
+        useCrudManager({
+          rootKey: ["test"],
+          listFn: fns.listFn,
+          detailFn: fns.detailFn,
+          createFn: fns.createFn,
+          updateFn: fns.updateFn,
+          deleteFn: fns.deleteFn,
+          restoreFn: undefined,
+        }),
+      { wrapper: wrap() }
+    );
+
+    expect(result.current.hasCreate).toBe(true);
+    expect(result.current.hasUpdate).toBe(true);
+    expect(result.current.hasDelete).toBe(true);
+    expect(result.current.hasRestore).toBe(false);
+  });
+
+  it("capability flags are false when fns are omitted", () => {
+    const listFn = vi.fn().mockResolvedValue({ list: [] });
+    const updateFn = vi.fn().mockResolvedValue({ id: 1 });
+    const { result } = renderHook(
+      () =>
+        useCrudManager({
+          rootKey: ["test"],
+          listFn,
+          updateFn,
+          createFn: undefined,
+          deleteFn: undefined,
+          restoreFn: undefined,
+        }),
+      { wrapper: wrap() }
+    );
+
+    expect(result.current.hasCreate).toBe(false);
+    expect(result.current.hasUpdate).toBe(true);
+    expect(result.current.hasDelete).toBe(false);
+    expect(result.current.hasRestore).toBe(false);
+  });
+
+  it("hasRestore is true when restoreFn is provided", () => {
+    const fns = makeFns();
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns, restoreFn: fns.restoreFn }), { wrapper: wrap() });
+
+    expect(result.current.hasRestore).toBe(true);
+  });
+
   /* ── Mutations — restore ────────────────────────────────── */
 
   it("restoreMut calls restoreFn on execute", async () => {

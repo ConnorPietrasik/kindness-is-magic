@@ -17,7 +17,7 @@ import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { adminApproveWishes, adminRejectWishes, listAdminReviewQueue } from "../lib/api";
-import { adminPackingSlips, adminReviewQueue } from "../lib/queryKeys";
+import { adminPackingSlips, adminReviewQueue, adminWishes } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
 import type { FamilyReviewQueueItem } from "../types";
@@ -39,6 +39,7 @@ export default function AdminWishReview() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Wishes approved — family is now visible to donors");
     },
   });
@@ -47,6 +48,7 @@ export default function AdminWishReview() {
     mutationFn: ({ id, reason }: { id: number; reason: string }) => adminRejectWishes(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Wishes sent back to referrer");
     },
   });

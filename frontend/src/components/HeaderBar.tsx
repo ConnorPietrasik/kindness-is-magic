@@ -21,13 +21,6 @@ export const HeaderBar = memo(({ title, left, right }: HeaderBarProps) => (
   </header>
 ));
 
-interface LogoutButtonProps {
-  onClick: () => void;
-}
-
-/**
- * LogoutButton — ghost-style sign-out button for the header.
- */
 interface BackLinkProps {
   /** Destination path — always required (no defaults). */
   to: string;
