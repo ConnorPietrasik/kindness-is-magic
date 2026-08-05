@@ -348,13 +348,41 @@ class TestAdminApproveReject:
         assert data["wish_review_requested_at"] is None
         assert data["wish_rejection_reason"] == "Please add more details"
 
-    def test_admin_cannot_approve_at_wrong_lock(self, test_client, admin, family, db):
+    def test_admin_can_approve_at_family_lock_no_request(self, test_client, admin, family, db):
+        """Admin can fully approve a family at lock=family with no requested_at — skips the review flow."""
         family.wish_lock_level = "family"
-        family.wish_review_requested_at = datetime.now(timezone.utc)
+        family.wish_review_requested_at = None
+        db.commit()
+        _login(test_client, admin.email, "AdminPass123!")
+        resp = test_client.post(f"/api/admin/families/{family.id}/approve-wishes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["wish_lock_level"] == "admin"
+        assert data["wish_review_requested_at"] is None
+        assert data["wish_rejection_reason"] is None
+
+    def test_admin_cannot_approve_already_admin_locked(self, test_client, admin, family, db):
+        """Admin cannot approve wishes that are already fully approved."""
+        family.wish_lock_level = "admin"
         db.commit()
         _login(test_client, admin.email, "AdminPass123!")
         resp = test_client.post(f"/api/admin/families/{family.id}/approve-wishes")
         assert resp.status_code == 400
+
+    def test_fully_approved_family_appears_in_packing_slips(self, test_client, admin, family, person_in_family, db):
+        """A fully-approved family shows up in packing slips."""
+        family.wish_lock_level = "family"
+        family.wish_review_requested_at = None
+        db.commit()
+        _login(test_client, admin.email, "AdminPass123!")
+        resp = test_client.post(f"/api/admin/families/{family.id}/approve-wishes")
+        assert resp.status_code == 200
+        # Now check packing slips
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        slips = resp.json()
+        assert len(slips) == 1
+        assert slips[0]["id"] == family.id
 
     def test_admin_cannot_reject_at_wrong_lock(self, test_client, admin, family, db):
         family.wish_lock_level = "family"

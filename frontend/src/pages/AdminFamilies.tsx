@@ -26,6 +26,7 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
+  adminApproveWishes,
   adminCreateFamily,
   adminDeleteFamily,
   adminGetFamily,
@@ -51,6 +52,17 @@ import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
 
 /* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function getLockLevelRowClass(deletedAt: string | null, wishLockLevel: string): string {
+  if (deletedAt != null) return "";
+  if (wishLockLevel === "admin") return "bg-emerald-50";
+  if (wishLockLevel === "referrer") return "bg-amber-50";
+  return "";
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminFamilies() {
@@ -61,6 +73,7 @@ export default function AdminFamilies() {
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState<number | null>(null);
+  const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
   const [showUnapproved, setShowUnapproved] = useState(false);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
@@ -126,6 +139,18 @@ export default function AdminFamilies() {
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Wish lock reset — family can now edit their wishes");
+    },
+  });
+
+  // Fully approve mutation (skips review flow)
+  const fullyApproveMut = useMutation({
+    mutationFn: adminApproveWishes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
+      toast.success("Family fully approved and visible to donors");
     },
   });
 
@@ -223,7 +248,7 @@ export default function AdminFamilies() {
               <TableBody>
                 {families.map((f) => (
                   <>
-                    <Tr key={f.id} data-id={f.id}>
+                    <Tr key={f.id} data-id={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
                       <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                       <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                         {f.family_name}
@@ -293,13 +318,21 @@ export default function AdminFamilies() {
                                         },
                                       ]
                                     : []),
+                                  ...(f.wish_lock_level !== "admin"
+                                    ? [
+                                        {
+                                          label: "Fully Approve",
+                                          onClick: () => setFullyApproveConfirm(f.id),
+                                        },
+                                      ]
+                                    : []),
                                   {
                                     label: "Delete",
                                     variant: "danger" as const,
                                     onClick: () => confirmDelete(f.id),
                                   },
                                 ]}
-                                disabled={deleteMut?.isPending || resetMut.isPending}
+                                disabled={deleteMut?.isPending || resetMut.isPending || fullyApproveMut.isPending}
                               />
                             </>
                           )}
@@ -428,6 +461,28 @@ export default function AdminFamilies() {
             confirmVariant="secondary"
           />
 
+          {/* Fully approve confirmation */}
+          <ConfirmDialog
+            open={fullyApproveConfirm !== null}
+            title={
+              <>
+                Fully approve family <strong>#{fullyApproveConfirm}</strong>?
+              </>
+            }
+            description="This will make the family's wishes visible to donors immediately, skipping referrer review."
+            onConfirm={() => {
+              if (fullyApproveConfirm != null) {
+                fullyApproveMut.mutate(fullyApproveConfirm);
+                setFullyApproveConfirm(null);
+              }
+            }}
+            onCancel={() => setFullyApproveConfirm(null)}
+            loading={fullyApproveMut.isPending}
+            confirmLabel="Yes, fully approve"
+            loadingLabel="Approving…"
+            confirmVariant="primary"
+          />
+
           {/* Pagination */}
           <Pagination
             page={pagination.page}
@@ -441,7 +496,9 @@ export default function AdminFamilies() {
 
         {/* Errors */}
         <MutationErrors
-          mutations={[createMut, updateMut, deleteMut, restoreMut, resetMut].filter((m): m is NonNullable<typeof m> => m != null)}
+          mutations={[createMut, updateMut, deleteMut, restoreMut, resetMut, fullyApproveMut].filter(
+            (m): m is NonNullable<typeof m> => m != null
+          )}
         />
       </main>
     </div>

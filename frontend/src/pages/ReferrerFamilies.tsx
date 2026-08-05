@@ -29,7 +29,13 @@ import {
 import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyPayload } from "../types";
+import type { FamilyPayload, WishLockLevel } from "../types";
+
+function getLockLevelRowClass(wishLockLevel: WishLockLevel): string {
+  if (wishLockLevel === "admin") return "bg-emerald-50";
+  if (wishLockLevel === "referrer") return "bg-amber-50";
+  return "";
+}
 
 export default function ReferrerFamilies() {
   // Referrer self-info (for family limit)
@@ -148,7 +154,7 @@ export default function ReferrerFamilies() {
               <TableBody>
                 {families.map((f) => (
                   <>
-                    <Tr key={f.id}>
+                    <Tr key={f.id} className={getLockLevelRowClass(f.wish_lock_level)}>
                       <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                       <Td className="font-medium text-gray-900">
                         {f.family_name}

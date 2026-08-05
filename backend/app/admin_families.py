@@ -395,18 +395,18 @@ def admin_approve_wishes(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
-    """Admin approves wishes — family moves to admin lock (fully approved)."""
+    """Admin fully approves wishes — family moves to admin lock (visible to donors).
+
+    Accepts families at any lock level except ``admin`` (already fully approved).
+    This lets admins skip the normal review flow and make a family's wishes
+    donor-visible immediately.
+    """
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
 
-    if fam.wish_lock_level != "referrer":
+    if fam.wish_lock_level == "admin":
         raise HTTPException(
             status_code=400,
-            detail="Cannot approve wishes at current lock level.",
-        )
-    if fam.wish_review_requested_at is None:
-        raise HTTPException(
-            status_code=400,
-            detail="No pending review request to approve.",
+            detail="Wishes are already fully approved.",
         )
 
     fam.wish_lock_level = "admin"
@@ -415,7 +415,7 @@ def admin_approve_wishes(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s approved wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin %s fully approved wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 

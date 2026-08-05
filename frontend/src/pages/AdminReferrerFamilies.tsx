@@ -7,10 +7,12 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
@@ -25,6 +27,7 @@ import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import {
+  adminApproveWishes,
   adminCreateFamily,
   adminDeleteFamily,
   adminGetFamily,
@@ -49,6 +52,17 @@ import {
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyPayload, FamilySummary, ReferrerDetail } from "../types";
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function getLockLevelRowClass(deletedAt: string | null, wishLockLevel: string): string {
+  if (deletedAt != null) return "";
+  if (wishLockLevel === "admin") return "bg-emerald-50";
+  if (wishLockLevel === "referrer") return "bg-amber-50";
+  return "";
+}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -76,6 +90,21 @@ export default function AdminReferrerFamilies() {
       toast.success("Wish lock reset — family can now edit their wishes");
     },
   });
+
+  // Fully approve mutation (skips review flow)
+  const fullyApproveMut = useMutation({
+    mutationFn: adminApproveWishes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familiesKey });
+      queryClient.invalidateQueries({ queryKey: adminFamilies });
+      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
+      toast.success("Family fully approved and visible to donors");
+    },
+  });
+
+  const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -112,6 +141,8 @@ export default function AdminReferrerFamilies() {
                 isDeletedView={ctx.isDeletedView}
                 onResetWishState={(id) => resetMut.mutate(id)}
                 isResetting={resetMut.isPending}
+                onFullyApprove={(id) => fullyApproveMut.mutate(id)}
+                isFullyApproving={fullyApproveMut.isPending}
               />
             ),
             title: "Families",
@@ -136,6 +167,28 @@ export default function AdminReferrerFamilies() {
             deleteDescription: "This will also soft-delete all people in the family.",
             restoreDescription: "This will also restore all people in the family.",
           }}
+        />
+
+        {/* Fully approve confirmation */}
+        <ConfirmDialog
+          open={fullyApproveConfirm !== null}
+          title={
+            <>
+              Fully approve family <strong>#{fullyApproveConfirm}</strong>?
+            </>
+          }
+          description="This will make the family's wishes visible to donors immediately, skipping referrer review."
+          onConfirm={() => {
+            if (fullyApproveConfirm != null) {
+              fullyApproveMut.mutate(fullyApproveConfirm);
+              setFullyApproveConfirm(null);
+            }
+          }}
+          onCancel={() => setFullyApproveConfirm(null)}
+          loading={fullyApproveMut.isPending}
+          confirmLabel="Yes, fully approve"
+          loadingLabel="Approving…"
+          confirmVariant="primary"
         />
       </main>
     </div>
@@ -198,12 +251,16 @@ function FamiliesTable({
   isDeletedView,
   onResetWishState,
   isResetting,
+  onFullyApprove,
+  isFullyApproving,
 }: {
   rows: FamilySummary[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
   onResetWishState: (id: number) => void;
   isResetting: boolean;
+  onFullyApprove: (id: number) => void;
+  isFullyApproving: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -227,7 +284,7 @@ function FamiliesTable({
       <TableBody>
         {rows.map((f) => (
           <>
-            <Tr key={f.id}>
+            <Tr key={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
               <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
               <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                 {f.family_name}
@@ -281,13 +338,21 @@ function FamiliesTable({
                                 },
                               ]
                             : []),
+                          ...(f.wish_lock_level !== "admin"
+                            ? [
+                                {
+                                  label: "Fully Approve",
+                                  onClick: () => onFullyApprove(f.id),
+                                },
+                              ]
+                            : []),
                           {
                             label: "Delete",
                             variant: "danger" as const,
                             onClick: () => callbacks.onDelete(f.id),
                           },
                         ]}
-                        disabled={callbacks.isDeleting || isResetting}
+                        disabled={callbacks.isDeleting || isResetting || isFullyApproving}
                       />
                     </>
                   )}
