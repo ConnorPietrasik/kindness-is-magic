@@ -153,22 +153,15 @@ export default function AdminReferrers() {
 
         {/* Tab panel content */}
         <div role="tabpanel">
-          {/* Create / Edit form (active tab only) */}
-          {editingId && detailLoading && (
-            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span>Loading…</span>
-            </Card>
-          )}
-
-          {(showForm || (editingId && detail)) && (
+          {/* Create form (active tab only) */}
+          {showForm && (
             <ReferrerForm
-              title={editingId ? `Edit Referrer #${editingId}` : "Add Referrer"}
-              initial={editingId ? (detail ?? defaultReferrerForm) : defaultReferrerForm}
-              isEdit={!!editingId}
-              onSubmit={editingId ? handleUpdate : handleCreate}
+              title="Add Referrer"
+              initial={defaultReferrerForm}
+              isEdit={false}
+              onSubmit={handleCreate}
               onCancel={cancelForm}
-              loading={!!(createMut?.isPending || updateMut?.isPending)}
+              loading={!!createMut?.isPending}
             />
           )}
 
@@ -188,101 +181,125 @@ export default function AdminReferrers() {
               </TableHead>
               <TableBody>
                 {referrers.map((r) => (
-                  <Tr key={r.id}>
-                    <Td>{r.id}</Td>
-                    <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
-                    <Td>
-                      {r.family_count ?? 0} / {r.family_limit}
-                    </Td>
-                    {showUnapproved && (
+                  <>
+                    <Tr key={r.id}>
+                      <Td>{r.id}</Td>
+                      <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
                       <Td>
-                        <div className="flex items-center gap-2">
-                          <ApprovalBadge status={r.approval_status} />
-                          {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
+                        {r.family_count ?? 0} / {r.family_limit}
+                      </Td>
+                      {showUnapproved && (
+                        <Td>
+                          <div className="flex items-center gap-2">
+                            <ApprovalBadge status={r.approval_status} />
+                            {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
+                              <>
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  className="px-2 py-1 text-xs"
+                                  onClick={() => setApproveConfirm(r.id)}
+                                  disabled={approveMut.isPending || rejectMut.isPending}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  className="px-2 py-1 text-xs"
+                                  onClick={() => setRejectConfirm(r.id)}
+                                  disabled={approveMut.isPending || rejectMut.isPending}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </Td>
+                      )}
+                      <Td>
+                        <div className="flex flex-wrap gap-2">
+                          {!isDeletedView && !r.deleted_at && (
+                            <Link
+                              to={route.adminReferrerFamilies(r.id)}
+                              className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                            >
+                              Manage
+                            </Link>
+                          )}
+                          {!isDeletedView && !r.deleted_at && (
                             <>
                               <Button
-                                variant="success"
+                                variant="secondary"
                                 size="sm"
-                                className="px-2 py-1 text-xs"
-                                onClick={() => setApproveConfirm(r.id)}
-                                disabled={approveMut.isPending || rejectMut.isPending}
+                                className="px-3 py-1.5 text-xs"
+                                onClick={() => (editingId === r.id ? cancelForm() : openEdit(r.id))}
                               >
-                                Approve
+                                {editingId === r.id ? "Done" : "Edit"}
                               </Button>
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                className="px-2 py-1 text-xs"
-                                onClick={() => setRejectConfirm(r.id)}
-                                disabled={approveMut.isPending || rejectMut.isPending}
-                              >
-                                Reject
-                              </Button>
+                              <ActionsDropdown
+                                items={[
+                                  ...(!showUnapproved && !isDeletedView && !r.deleted_at && r.approval_status === "pending"
+                                    ? [
+                                        {
+                                          label: "Approve",
+                                          onClick: () => setApproveConfirm(r.id),
+                                        },
+                                        {
+                                          label: "Reject",
+                                          variant: "danger" as const,
+                                          onClick: () => setRejectConfirm(r.id),
+                                        },
+                                      ]
+                                    : []),
+                                  {
+                                    label: "Delete",
+                                    variant: "danger" as const,
+                                    onClick: () => confirmDelete(r.id),
+                                  },
+                                ]}
+                                disabled={deleteMut?.isPending || approveMut.isPending || rejectMut.isPending}
+                              />
                             </>
                           )}
-                        </div>
-                      </Td>
-                    )}
-                    <Td>
-                      <div className="flex flex-wrap gap-2">
-                        {!isDeletedView && !r.deleted_at && (
-                          <Link
-                            to={route.adminReferrerFamilies(r.id)}
-                            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                          >
-                            Manage
-                          </Link>
-                        )}
-                        {!isDeletedView && !r.deleted_at && (
-                          <>
+                          {isDeletedView && (
                             <Button
                               variant="secondary"
                               size="sm"
                               className="px-3 py-1.5 text-xs"
-                              onClick={() => openEdit(r.id)}
-                              disabled={!!editingId}
+                              onClick={() => setRestoreConfirm(r.id)}
+                              disabled={restoreMut?.isPending}
                             >
-                              Edit
+                              Restore
                             </Button>
-                            <ActionsDropdown
-                              items={[
-                                ...(!showUnapproved && !isDeletedView && !r.deleted_at && r.approval_status === "pending"
-                                  ? [
-                                      {
-                                        label: "Approve",
-                                        onClick: () => setApproveConfirm(r.id),
-                                      },
-                                      {
-                                        label: "Reject",
-                                        variant: "danger" as const,
-                                        onClick: () => setRejectConfirm(r.id),
-                                      },
-                                    ]
-                                  : []),
-                                {
-                                  label: "Delete",
-                                  variant: "danger" as const,
-                                  onClick: () => confirmDelete(r.id),
-                                },
-                              ]}
-                              disabled={deleteMut?.isPending || approveMut.isPending || rejectMut.isPending}
-                            />
-                          </>
-                        )}
-                        {isDeletedView && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => setRestoreConfirm(r.id)}
-                            disabled={restoreMut?.isPending}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
+                          )}
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === r.id && (
+                      <Tr key={`${r.id}-edit`}>
+                        <Td colSpan={showUnapproved ? 5 : 4} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <ReferrerForm
+                                title={`Edit Referrer #${r.id}`}
+                                initial={detail}
+                                isEdit={true}
+                                onSubmit={handleUpdate}
+                                onCancel={cancelForm}
+                                loading={!!updateMut?.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>

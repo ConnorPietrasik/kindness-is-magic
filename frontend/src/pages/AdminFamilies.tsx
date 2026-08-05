@@ -191,25 +191,18 @@ export default function AdminFamilies() {
 
         {/* Tab panel content */}
         <div role="tabpanel">
-          {/* Create / Edit form (active tab only) */}
-          {editingId && detailLoading && (
-            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span>Loading…</span>
-            </Card>
-          )}
-
-          {(showForm || (editingId && detail)) && (
+          {/* Create form (active tab only) */}
+          {showForm && (
             <FamilyForm
-              title={editingId ? `Edit Family #${detail?.display_id}` : "Add Family"}
-              initial={editingId ? (detail ?? defaultFamilyForm) : defaultFamilyForm}
-              isEdit={!!editingId}
+              title="Add Family"
+              initial={defaultFamilyForm}
+              isEdit={false}
               referrerMap={referrerMap}
               referrerOptionsLoading={referrersLoading}
               showReferrerNotes
-              onSubmit={editingId ? handleUpdate : handleCreate}
+              onSubmit={handleCreate}
               onCancel={cancelForm}
-              loading={createMut?.isPending || updateMut?.isPending}
+              loading={!!createMut?.isPending}
             />
           )}
 
@@ -229,101 +222,128 @@ export default function AdminFamilies() {
               </TableHead>
               <TableBody>
                 {families.map((f) => (
-                  <Tr key={f.id} data-id={f.id}>
-                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
-                    <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-                      {f.family_name}
-                      {f.deleted_at == null && f.has_notes && (
-                        <span className="ml-1 text-xs" title="Has internal notes">
-                          📝
-                        </span>
-                      )}
-                      {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-                        <Link
-                          to={route.familyWishList(f.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="Wish List"
-                          className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                          title="Wish List"
-                        >
-                          📄
-                        </Link>
-                      )}
-                    </Td>
-                    <Td>{f.contact_name}</Td>
-                    <Td>
-                      {f.referrer_id != null ? (
-                        <Link
-                          to={route.adminReferrerFamilies(f.referrer_id)}
-                          className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                        >
-                          {referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </Td>
-                    <Td>
-                      <div className="flex gap-2">
-                        {!isDeletedView && f.deleted_at == null && (
+                  <>
+                    <Tr key={f.id} data-id={f.id}>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+                      <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                        {f.family_name}
+                        {f.deleted_at == null && f.has_notes && (
+                          <span className="ml-1 text-xs" title="Has internal notes">
+                            📝
+                          </span>
+                        )}
+                        {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                           <Link
-                            to={route.adminFamilyPeople(f.id)}
-                            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                            to={route.familyWishList(f.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Wish List"
+                            className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                            title="Wish List"
                           >
-                            Manage
+                            📄
                           </Link>
                         )}
-                        {!isDeletedView && f.deleted_at == null && (
-                          <>
+                      </Td>
+                      <Td>{f.contact_name}</Td>
+                      <Td>
+                        {f.referrer_id != null ? (
+                          <Link
+                            to={route.adminReferrerFamilies(f.referrer_id)}
+                            className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                          >
+                            {referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </Td>
+                      <Td>
+                        <div className="flex gap-2">
+                          {!isDeletedView && f.deleted_at == null && (
+                            <Link
+                              to={route.adminFamilyPeople(f.id)}
+                              className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                            >
+                              Manage
+                            </Link>
+                          )}
+                          {!isDeletedView && f.deleted_at == null && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="px-3 py-1.5 text-xs"
+                                onClick={() => (editingId === f.id ? cancelForm() : openEdit(f.id))}
+                              >
+                                {editingId === f.id ? "Done" : "Edit"}
+                              </Button>
+                              <ActionsDropdown
+                                items={[
+                                  {
+                                    label: "View Packing Slip",
+                                    onClick: () => navigate(route.adminPackingSlips([f.id])),
+                                  },
+                                  ...(f.wish_lock_level !== "family"
+                                    ? [
+                                        {
+                                          label: "Reset Lock",
+                                          variant: "secondary" as const,
+                                          onClick: () => setResetConfirm(f.id),
+                                        },
+                                      ]
+                                    : []),
+                                  {
+                                    label: "Delete",
+                                    variant: "danger" as const,
+                                    onClick: () => confirmDelete(f.id),
+                                  },
+                                ]}
+                                disabled={deleteMut?.isPending || resetMut.isPending}
+                              />
+                            </>
+                          )}
+                          {isDeletedView && (
                             <Button
                               variant="secondary"
                               size="sm"
                               className="px-3 py-1.5 text-xs"
-                              onClick={() => openEdit(f.id)}
-                              disabled={!!editingId}
+                              onClick={() => setRestoreConfirm(f.id)}
+                              disabled={restoreMut?.isPending}
                             >
-                              Edit
+                              Restore
                             </Button>
-                            <ActionsDropdown
-                              items={[
-                                {
-                                  label: "View Packing Slip",
-                                  onClick: () => navigate(route.adminPackingSlips([f.id])),
-                                },
-                                ...(f.wish_lock_level !== "family"
-                                  ? [
-                                      {
-                                        label: "Reset Lock",
-                                        variant: "secondary" as const,
-                                        onClick: () => setResetConfirm(f.id),
-                                      },
-                                    ]
-                                  : []),
-                                {
-                                  label: "Delete",
-                                  variant: "danger" as const,
-                                  onClick: () => confirmDelete(f.id),
-                                },
-                              ]}
-                              disabled={deleteMut?.isPending || resetMut.isPending}
-                            />
-                          </>
-                        )}
-                        {isDeletedView && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => setRestoreConfirm(f.id)}
-                            disabled={restoreMut?.isPending}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
+                          )}
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === f.id && (
+                      <Tr key={`${f.id}-edit`}>
+                        <Td colSpan={5} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <FamilyForm
+                                title={`Edit Family #${detail.display_id}`}
+                                initial={detail}
+                                isEdit={true}
+                                referrerMap={referrerMap}
+                                referrerOptionsLoading={referrersLoading}
+                                showReferrerNotes
+                                onSubmit={handleUpdate}
+                                onCancel={cancelForm}
+                                loading={!!updateMut?.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>

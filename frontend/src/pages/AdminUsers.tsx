@@ -221,25 +221,18 @@ export default function AdminUsers() {
             />
           </div>
 
-          {/* Create / Edit form (active tab only) */}
-          {editingId && detailLoading && (
-            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span>Loading…</span>
-            </Card>
-          )}
-
-          {(showForm || (editingId && detail)) && (
+          {/* Create form (active tab only) */}
+          {showForm && (
             <UserForm
-              title={editingId ? "Edit User" : "Add User"}
-              initial={editingId ? (detail ?? defaultUserForm) : defaultUserForm}
-              isEdit={!!editingId}
+              title="Add User"
+              initial={defaultUserForm}
+              isEdit={false}
               referrers={referrers}
               families={families}
               onCreate={handleCreateUser}
               onUpdate={handleUpdateUser}
               onCancel={cancelForm}
-              loading={!!(createMut.isPending || updateMut.isPending)}
+              loading={!!createMut.isPending}
             />
           )}
 
@@ -260,74 +253,101 @@ export default function AdminUsers() {
               </TableHead>
               <TableBody>
                 {users.map((u) => (
-                  <Tr key={u.id}>
-                    <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
-                    <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name ?? "—"}</Td>
-                    <Td>
-                      <RoleBadge role={u.role} />
-                    </Td>
-                    <Td>
-                      {u.referrer_id ? (
-                        <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
-                          {u.referrer_name}
-                        </Link>
-                      ) : u.family_id ? (
-                        <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
-                          {u.family_name}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </Td>
-                    <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
-                    <Td>
-                      <div className="flex gap-2">
-                        {!isDeletedView && u.deleted_at == null && (
-                          <>
+                  <>
+                    <Tr key={u.id}>
+                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
+                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name ?? "—"}</Td>
+                      <Td>
+                        <RoleBadge role={u.role} />
+                      </Td>
+                      <Td>
+                        {u.referrer_id ? (
+                          <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
+                            {u.referrer_name}
+                          </Link>
+                        ) : u.family_id ? (
+                          <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
+                            {u.family_name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </Td>
+                      <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
+                      <Td>
+                        <div className="flex gap-2">
+                          {!isDeletedView && u.deleted_at == null && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="px-3 py-1.5 text-xs"
+                                onClick={() => (editingId === u.id ? cancelForm() : openEdit(u.id))}
+                              >
+                                {editingId === u.id ? "Done" : "Edit"}
+                              </Button>
+                              <ActionsDropdown
+                                items={[
+                                  {
+                                    label: "Reset Pw",
+                                    variant: "secondary" as const,
+                                    onClick: () => {
+                                      setResetPasswordId(u.id);
+                                      setResetForm({ password: "", confirmPassword: "" });
+                                    },
+                                    disabled: !!editingId,
+                                  },
+                                  {
+                                    label: "Delete",
+                                    variant: "danger" as const,
+                                    onClick: () => confirmDelete(u.id),
+                                  },
+                                ]}
+                                disabled={deleteMut.isPending}
+                              />
+                            </>
+                          )}
+                          {isDeletedView && (
                             <Button
                               variant="secondary"
                               size="sm"
                               className="px-3 py-1.5 text-xs"
-                              onClick={() => openEdit(u.id)}
-                              disabled={!!editingId}
+                              onClick={() => setRestoreConfirm(u.id)}
+                              disabled={restoreMut.isPending}
                             >
-                              Edit
+                              Restore
                             </Button>
-                            <ActionsDropdown
-                              items={[
-                                {
-                                  label: "Reset Pw",
-                                  variant: "secondary" as const,
-                                  onClick: () => {
-                                    setResetPasswordId(u.id);
-                                    setResetForm({ password: "", confirmPassword: "" });
-                                  },
-                                  disabled: !!editingId,
-                                },
-                                {
-                                  label: "Delete",
-                                  variant: "danger" as const,
-                                  onClick: () => confirmDelete(u.id),
-                                },
-                              ]}
-                              disabled={deleteMut.isPending}
-                            />
-                          </>
-                        )}
-                        {isDeletedView && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => setRestoreConfirm(u.id)}
-                            disabled={restoreMut.isPending}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
+                          )}
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === u.id && (
+                      <Tr key={`${u.id}-edit`}>
+                        <Td colSpan={6} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <UserForm
+                                title="Edit User"
+                                initial={detail}
+                                isEdit={true}
+                                referrers={referrers}
+                                families={families}
+                                onCreate={handleCreateUser}
+                                onUpdate={handleUpdateUser}
+                                onCancel={cancelForm}
+                                loading={!!updateMut.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>

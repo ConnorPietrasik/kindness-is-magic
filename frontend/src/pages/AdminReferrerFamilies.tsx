@@ -21,6 +21,7 @@ import {
 } from "../components/HierarchicalManage";
 import { InfoRow } from "../components/InfoRow";
 import { ReferrerForm } from "../components/ReferrerForm";
+import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import {
@@ -225,84 +226,101 @@ function FamiliesTable({
       </TableHead>
       <TableBody>
         {rows.map((f) => (
-          <Tr key={f.id}>
-            <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
-            <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-              {f.family_name}
-              {f.deleted_at == null && f.has_notes && (
-                <span className="ml-1 text-xs" title="Has internal notes">
-                  📝
-                </span>
-              )}
-              {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-                <Link
-                  to={route.familyWishList(f.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Wish List"
-                  className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                  title="Wish List"
-                >
-                  📄
-                </Link>
-              )}
-            </Td>
-            <Td>{f.contact_name}</Td>
-            <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-            <Td>
-              <div className="flex items-center gap-2">
-                {!isDeletedView && f.deleted_at == null && (
+          <>
+            <Tr key={f.id}>
+              <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+              <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                {f.family_name}
+                {f.deleted_at == null && f.has_notes && (
+                  <span className="ml-1 text-xs" title="Has internal notes">
+                    📝
+                  </span>
+                )}
+                {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                   <Link
-                    to={`${route.adminFamilyPeople(f.id)}?from=referrer`}
-                    className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                    to={route.familyWishList(f.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Wish List"
+                    className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                    title="Wish List"
                   >
-                    Manage
+                    📄
                   </Link>
                 )}
-                {!isDeletedView && f.deleted_at == null && (
-                  <>
+              </Td>
+              <Td>{f.contact_name}</Td>
+              <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+              <Td>
+                <div className="flex items-center gap-2">
+                  {!isDeletedView && f.deleted_at == null && (
+                    <Link
+                      to={`${route.adminFamilyPeople(f.id)}?from=referrer`}
+                      className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                    >
+                      Manage
+                    </Link>
+                  )}
+                  {!isDeletedView && f.deleted_at == null && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => (callbacks.isEditing(f.id) ? callbacks.cancelForm?.() : callbacks.onEdit(f.id))}
+                      >
+                        {callbacks.isEditing(f.id) ? "Done" : "Edit"}
+                      </Button>
+                      <ActionsDropdown
+                        items={[
+                          ...(f.wish_lock_level !== "family"
+                            ? [
+                                {
+                                  label: "Reset Lock",
+                                  variant: "secondary" as const,
+                                  onClick: () => onResetWishState(f.id),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: "Delete",
+                            variant: "danger" as const,
+                            onClick: () => callbacks.onDelete(f.id),
+                          },
+                        ]}
+                        disabled={callbacks.isDeleting || isResetting}
+                      />
+                    </>
+                  )}
+                  {isDeletedView && (
                     <Button
                       variant="secondary"
                       className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onEdit(f.id)}
-                      disabled={callbacks.isEditing(f.id)}
+                      onClick={() => callbacks.onRestore(f.id)}
+                      disabled={callbacks.isRestoring}
                     >
-                      Edit
+                      Restore
                     </Button>
-                    <ActionsDropdown
-                      items={[
-                        ...(f.wish_lock_level !== "family"
-                          ? [
-                              {
-                                label: "Reset Lock",
-                                variant: "secondary" as const,
-                                onClick: () => onResetWishState(f.id),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: "Delete",
-                          variant: "danger" as const,
-                          onClick: () => callbacks.onDelete(f.id),
-                        },
-                      ]}
-                      disabled={callbacks.isDeleting || isResetting}
-                    />
-                  </>
-                )}
-                {isDeletedView && (
-                  <Button
-                    variant="secondary"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => callbacks.onRestore(f.id)}
-                    disabled={callbacks.isRestoring}
-                  >
-                    Restore
-                  </Button>
-                )}
-              </div>
-            </Td>
-          </Tr>
+                  )}
+                </div>
+              </Td>
+            </Tr>
+            {callbacks.editingId === f.id && (
+              <Tr key={`${f.id}-edit`}>
+                <Td colSpan={5} className="!py-3">
+                  <div className="rounded-xl bg-gray-50 p-4">
+                    {callbacks.detailLoading ? (
+                      <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                        <Spinner size="sm" />
+                        <span className="text-sm font-medium">Loading…</span>
+                      </div>
+                    ) : callbacks.editFormComponent && callbacks.editFormProps ? (
+                      <callbacks.editFormComponent {...callbacks.editFormProps} />
+                    ) : null}
+                  </div>
+                </Td>
+              </Tr>
+            )}
+          </>
         ))}
       </TableBody>
     </Table>

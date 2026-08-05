@@ -29,6 +29,7 @@ import {
 import { InfoRow } from "../components/InfoRow";
 import { InternalNotesSection } from "../components/InternalNotesSection";
 import { PersonForm } from "../components/PersonForm";
+import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishLockBadge } from "../components/WishLockBadge";
 import { useToast } from "../context/ToastContext";
@@ -303,37 +304,54 @@ function PeopleTable({
           </TableHead>
           <TableBody>
             {rows.map((p) => (
-              <Tr key={p.id} data-id={p.id}>
-                <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
-                <Td className="font-medium text-gray-900">{p.given_name}</Td>
-                <Td>{p.age}</Td>
-                <Td>
-                  <div className="flex items-center gap-2">
-                    {!isLockedByAdmin ? (
-                      <>
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => callbacks.onEdit(p.id)}
-                          disabled={callbacks.isEditing(p.id)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => callbacks.onDelete(p.id)}
-                          disabled={callbacks.isDeleting}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-xs text-gray-400">Locked</span>
-                    )}
-                  </div>
-                </Td>
-              </Tr>
+              <>
+                <Tr key={p.id} data-id={p.id}>
+                  <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
+                  <Td className="font-medium text-gray-900">{p.given_name}</Td>
+                  <Td>{p.age}</Td>
+                  <Td>
+                    <div className="flex items-center gap-2">
+                      {!isLockedByAdmin ? (
+                        <>
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => (callbacks.isEditing(p.id) ? callbacks.cancelForm?.() : callbacks.onEdit(p.id))}
+                          >
+                            {callbacks.isEditing(p.id) ? "Done" : "Edit"}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => callbacks.onDelete(p.id)}
+                            disabled={callbacks.isDeleting}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400">Locked</span>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+                {callbacks.editingId === p.id && (
+                  <Tr key={`${p.id}-edit`}>
+                    <Td colSpan={4} className="!py-3">
+                      <div className="rounded-xl bg-gray-50 p-4">
+                        {callbacks.detailLoading ? (
+                          <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                            <Spinner size="sm" />
+                            <span className="text-sm font-medium">Loading…</span>
+                          </div>
+                        ) : callbacks.editFormComponent && callbacks.editFormProps ? (
+                          <callbacks.editFormComponent {...callbacks.editFormProps} />
+                        ) : null}
+                      </div>
+                    </Td>
+                  </Tr>
+                )}
+              </>
             ))}
           </TableBody>
         </>

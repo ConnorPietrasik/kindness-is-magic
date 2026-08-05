@@ -9,7 +9,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
@@ -129,25 +128,6 @@ export default function ReferrerFamilies() {
           />
         )}
 
-        {editingId && detailLoading && (
-          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-gray-400">
-            <Spinner size="sm" />
-            <span className="text-sm">Loading…</span>
-          </Card>
-        )}
-
-        {editingId && detail && (
-          <FamilyForm
-            title="Edit Family"
-            initial={detail}
-            isEdit={true}
-            showReferrerNotes
-            onSubmit={handleUpdateFam}
-            onCancel={cancelForm}
-            loading={updateFamMut?.isPending}
-          />
-        )}
-
         <Table className="mb-6">
           {families.length === 0 ? (
             <TableBody>
@@ -167,53 +147,84 @@ export default function ReferrerFamilies() {
               </TableHead>
               <TableBody>
                 {families.map((f) => (
-                  <Tr key={f.id}>
-                    <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
-                    <Td className="font-medium text-gray-900">
-                      {f.family_name}
-                      {f.has_notes && (
-                        <span className="ml-1 text-xs" title="Has internal notes">
-                          📝
-                        </span>
-                      )}
-                      {f.wish_lock_level === "admin" && (
-                        <Link
-                          to={route.familyWishList(f.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="Wish List"
-                          className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                          title="Wish List"
-                        >
-                          📄
-                        </Link>
-                      )}
-                    </Td>
-                    <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
-                    <Td>{f.contact_name}</Td>
-                    <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          to={route.referrerFamilyDetail(f.id)}
-                          className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                        >
-                          Manage
-                        </Link>
-                        <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(f.id)} disabled={!!editingId}>
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => confirmDelete(f.id)}
-                          disabled={deleteFamMut?.isPending}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </Td>
-                  </Tr>
+                  <>
+                    <Tr key={f.id}>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+                      <Td className="font-medium text-gray-900">
+                        {f.family_name}
+                        {f.has_notes && (
+                          <span className="ml-1 text-xs" title="Has internal notes">
+                            📝
+                          </span>
+                        )}
+                        {f.wish_lock_level === "admin" && (
+                          <Link
+                            to={route.familyWishList(f.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Wish List"
+                            className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                            title="Wish List"
+                          >
+                            📄
+                          </Link>
+                        )}
+                      </Td>
+                      <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
+                      <Td>{f.contact_name}</Td>
+                      <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={route.referrerFamilyDetail(f.id)}
+                            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                          >
+                            {" "}
+                            Manage
+                          </Link>
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => (editingId === f.id ? cancelForm() : openEdit(f.id))}
+                          >
+                            {editingId === f.id ? "Done" : "Edit"}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => confirmDelete(f.id)}
+                            disabled={deleteFamMut?.isPending}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === f.id && (
+                      <Tr key={`${f.id}-edit`}>
+                        <Td colSpan={6} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-gray-400">
+                                <Spinner size="sm" />
+                                <span className="text-sm">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <FamilyForm
+                                title="Edit Family"
+                                initial={detail}
+                                isEdit={true}
+                                showReferrerNotes
+                                onSubmit={handleUpdateFam}
+                                onCancel={cancelForm}
+                                loading={updateFamMut?.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </>

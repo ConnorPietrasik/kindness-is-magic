@@ -21,7 +21,7 @@ import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { OptionalLabel } from "../components/OptionalLabel";
 import { Pagination } from "../components/Pagination";
-import { PageSpinner } from "../components/Spinner";
+import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
@@ -143,18 +143,6 @@ export default function PurchaserAssignedGifts() {
           </select>
         </div>
 
-        {/* Edit form */}
-        {editingId && detailLoading && (
-          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-            <span className="animate-spin">⏳</span>
-            <span>Loading…</span>
-          </Card>
-        )}
-
-        {editingId && detail && (
-          <PurchaserEditForm wish={detail} onSave={handleUpdateWish} onCancel={cancelForm} loading={updateMut.isPending} />
-        )}
-
         {/* Table */}
         {wishes.length === 0 ? (
           <Card>
@@ -173,50 +161,72 @@ export default function PurchaserAssignedGifts() {
             </TableHead>
             <TableBody>
               {wishes.map((w) => (
-                <Tr key={w.id}>
-                  <Td>{w.person_given_name}</Td>
-                  <Td>
-                    <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
-                      Family #{w.family_id}
-                    </Link>
-                  </Td>
-                  <Td>
-                    <WishTypeBadge type={w.type} />
-                  </Td>
-                  <Td className="max-w-xs truncate">{w.description}</Td>
-                  <Td>{w.size ?? "—"}</Td>
-                  <Td>
-                    {w.purchased_at ? (
-                      <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
-                        ✓ {formatDateTime(w.purchased_at)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => openEdit(w.id)}
-                        disabled={!!editingId && editingId !== w.id}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => setMarkPurchasedId(w.id)}
-                        disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                      >
-                        Mark Purchased
-                      </Button>
-                    </div>
-                  </Td>
-                </Tr>
+                <>
+                  <Tr key={w.id}>
+                    <Td>{w.person_given_name}</Td>
+                    <Td>
+                      <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
+                        Family #{w.family_id}
+                      </Link>
+                    </Td>
+                    <Td>
+                      <WishTypeBadge type={w.type} />
+                    </Td>
+                    <Td className="max-w-xs truncate">{w.description}</Td>
+                    <Td>{w.size ?? "—"}</Td>
+                    <Td>
+                      {w.purchased_at ? (
+                        <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
+                          ✓ {formatDateTime(w.purchased_at)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
+                        >
+                          {editingId === w.id ? "Done" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setMarkPurchasedId(w.id)}
+                          disabled={w.purchased_at != null || markPurchasedMut.isPending}
+                        >
+                          Mark Purchased
+                        </Button>
+                      </div>
+                    </Td>
+                  </Tr>
+                  {editingId === w.id && (
+                    <Tr key={`${w.id}-edit`}>
+                      <Td colSpan={7} className="!py-3">
+                        <div className="rounded-xl bg-gray-50 p-4">
+                          {detailLoading ? (
+                            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                              <Spinner size="sm" />
+                              <span className="text-sm font-medium">Loading…</span>
+                            </div>
+                          ) : detail ? (
+                            <PurchaserEditForm
+                              wish={detail}
+                              onSave={handleUpdateWish}
+                              onCancel={cancelForm}
+                              loading={updateMut.isPending}
+                            />
+                          ) : null}
+                        </div>
+                      </Td>
+                    </Tr>
+                  )}
+                </>
               ))}
             </TableBody>
           </Table>

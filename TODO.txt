@@ -1,8 +1,6 @@
 Add more info to the displayed list views
-Add referrer notes for families
 Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
 Add more admin views - sort by wishes, sort families by size, etc
-Maybe make the edit field pop up under the selected item instead of at the top of the list?
 DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
 Delivery slips for delivery people
 EVENTUALLY - More detailed audit logs? They said not important, but I feel like it could be helpful

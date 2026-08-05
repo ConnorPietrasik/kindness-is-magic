@@ -91,7 +91,7 @@ export default function AdminWishes() {
   );
 
   // CRUD manager — no create/delete (wishes managed via person CRUD)
-  const { listData, listLoading, detail, detailLoading, updateMut, showForm, editingId, openEdit, cancelForm } = useCrudManager<
+  const { listData, listLoading, detail, detailLoading, updateMut, editingId, openEdit, cancelForm } = useCrudManager<
     WishListResponse,
     WishDetail,
     Partial<AdminWishUpdate>,
@@ -281,18 +281,6 @@ export default function AdminWishes() {
           />
         </div>
 
-        {/* Edit form */}
-        {editingId && detailLoading && (
-          <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-            <Spinner size="sm" />
-            <span>Loading…</span>
-          </Card>
-        )}
-
-        {(showForm || (editingId && detail)) && (
-          <WishEditForm wish={detail!} users={users} onSave={handleUpdateWish} onCancel={cancelForm} loading={updateMut.isPending} />
-        )}
-
         {/* Table */}
         {wishes.length === 0 ? (
           <Card>
@@ -321,88 +309,111 @@ export default function AdminWishes() {
             </TableHead>
             <TableBody>
               {wishes.map((w) => (
-                <Tr key={w.id}>
-                  <Td>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(w.id)}
-                      onChange={() => toggleSelect(w.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
-                      aria-label={`Select wish for ${w.person_given_name}`}
-                    />
-                  </Td>
-                  <Td>
-                    <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                      {w.person_given_name}
-                    </Link>
-                  </Td>
-                  <Td>
-                    <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                      {getFamilyName(families, w.family_id)}
-                    </Link>
-                  </Td>
-                  <Td>
-                    <WishTypeBadge type={w.type} />
-                  </Td>
-                  <Td className="max-w-xs truncate">{w.description}</Td>
-                  <Td>{w.size ?? "—"}</Td>
-                  <Td>{w.assigned_to_name ?? "—"}</Td>
-                  <Td>
-                    {w.purchased_at ? (
-                      <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
-                        ✓ {formatDateTime(w.purchased_at)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => openEdit(w.id)}
-                        disabled={!!editingId && editingId !== w.id}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => setMarkPurchasedId(w.id)}
-                        disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                      >
-                        Mark Purchased
-                      </Button>
-                      <ActionsDropdown
-                        items={[
-                          {
-                            label: "Assign…",
-                            variant: "secondary" as const,
-                            onClick: () => {
-                              setSelectedIds(new Set([w.id]));
-                              setBatchAssignOpen(true);
-                            },
-                            disabled: batchAssignMut.isPending,
-                          },
-                          ...(w.assigned_to_id != null
-                            ? [
-                                {
-                                  label: "Unassign",
-                                  variant: "secondary" as const,
-                                  onClick: () => openEdit(w.id),
-                                  disabled: !!editingId && editingId !== w.id,
-                                },
-                              ]
-                            : []),
-                        ]}
-                        disabled={updateMut.isPending}
+                <>
+                  <Tr key={w.id}>
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(w.id)}
+                        onChange={() => toggleSelect(w.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
+                        aria-label={`Select wish for ${w.person_given_name}`}
                       />
-                    </div>
-                  </Td>
-                </Tr>
+                    </Td>
+                    <Td>
+                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                        {w.person_given_name}
+                      </Link>
+                    </Td>
+                    <Td>
+                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                        {getFamilyName(families, w.family_id)}
+                      </Link>
+                    </Td>
+                    <Td>
+                      <WishTypeBadge type={w.type} />
+                    </Td>
+                    <Td className="max-w-xs truncate">{w.description}</Td>
+                    <Td>{w.size ?? "—"}</Td>
+                    <Td>{w.assigned_to_name ?? "—"}</Td>
+                    <Td>
+                      {w.purchased_at ? (
+                        <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
+                          ✓ {formatDateTime(w.purchased_at)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
+                        >
+                          {editingId === w.id ? "Done" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setMarkPurchasedId(w.id)}
+                          disabled={w.purchased_at != null || markPurchasedMut.isPending}
+                        >
+                          Mark Purchased
+                        </Button>
+                        <ActionsDropdown
+                          items={[
+                            {
+                              label: "Assign…",
+                              variant: "secondary" as const,
+                              onClick: () => {
+                                setSelectedIds(new Set([w.id]));
+                                setBatchAssignOpen(true);
+                              },
+                              disabled: batchAssignMut.isPending,
+                            },
+                            ...(w.assigned_to_id != null
+                              ? [
+                                  {
+                                    label: "Unassign",
+                                    variant: "secondary" as const,
+                                    onClick: () => openEdit(w.id),
+                                    disabled: !!editingId && editingId !== w.id,
+                                  },
+                                ]
+                              : []),
+                          ]}
+                          disabled={updateMut.isPending}
+                        />
+                      </div>
+                    </Td>
+                  </Tr>
+                  {editingId === w.id && (
+                    <Tr key={`${w.id}-edit`}>
+                      <Td colSpan={9} className="!py-3">
+                        <div className="rounded-xl bg-gray-50 p-4">
+                          {detailLoading ? (
+                            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                              <Spinner size="sm" />
+                              <span className="text-sm font-medium">Loading…</span>
+                            </div>
+                          ) : detail ? (
+                            <WishEditForm
+                              wish={detail}
+                              users={users}
+                              onSave={handleUpdateWish}
+                              onCancel={cancelForm}
+                              loading={updateMut.isPending}
+                            />
+                          ) : null}
+                        </div>
+                      </Td>
+                    </Tr>
+                  )}
+                </>
               ))}
             </TableBody>
           </Table>

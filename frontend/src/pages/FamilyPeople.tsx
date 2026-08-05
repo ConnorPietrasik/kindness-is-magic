@@ -9,7 +9,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultPersonForm } from "../components/defaults";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
@@ -112,28 +111,6 @@ export default function FamilyPeople() {
           />
         )}
 
-        {/* Edit loading */}
-        {editingId && detailLoading && (
-          <Card className="mb-6 border border-gray-200">
-            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span className="text-sm font-medium">Loading person details…</span>
-            </div>
-          </Card>
-        )}
-
-        {/* Edit form */}
-        {editingId && detail && (
-          <PersonForm
-            title="Edit Person"
-            initial={detail}
-            isEdit={true}
-            onSubmit={handleUpdate}
-            onCancel={cancelForm}
-            loading={updateMut?.isPending}
-          />
-        )}
-
         {/* Table */}
         <Table className="mb-6">
           {people.length === 0 ? (
@@ -152,31 +129,60 @@ export default function FamilyPeople() {
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <Tr key={p.id} data-id={p.id}>
-                    <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
-                    <Td className="font-medium text-gray-900">{p.given_name}</Td>
-                    <Td>{p.age}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        {!isLocked && (
-                          <>
-                            <Button variant="secondary" className="h-7 px-2 text-xs" onClick={() => openEdit(p.id)} disabled={!!editingId}>
-                              Edit
-                            </Button>
-                            <Button
-                              variant="danger"
-                              className="h-7 border-red-300 bg-white text-xs text-red-600 hover:bg-red-50"
-                              onClick={() => confirmDelete(p.id)}
-                              disabled={deleteMut?.isPending}
-                            >
-                              Delete
-                            </Button>
-                          </>
-                        )}
-                        {isLocked && <span className="text-xs text-gray-400">Locked</span>}
-                      </div>
-                    </Td>
-                  </Tr>
+                  <>
+                    <Tr key={p.id} data-id={p.id}>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
+                      <Td className="font-medium text-gray-900">{p.given_name}</Td>
+                      <Td>{p.age}</Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          {!isLocked && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => (editingId === p.id ? cancelForm() : openEdit(p.id))}
+                              >
+                                {editingId === p.id ? "Done" : "Edit"}
+                              </Button>
+                              <Button
+                                variant="danger"
+                                className="h-7 border-red-300 bg-white text-xs text-red-600 hover:bg-red-50"
+                                onClick={() => confirmDelete(p.id)}
+                                disabled={deleteMut?.isPending}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                          {isLocked && <span className="text-xs text-gray-400">Locked</span>}
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === p.id && (
+                      <Tr key={`${p.id}-edit`}>
+                        <Td colSpan={4} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading person details…</span>
+                              </div>
+                            ) : detail ? (
+                              <PersonForm
+                                title="Edit Person"
+                                initial={detail}
+                                isEdit={true}
+                                onSubmit={handleUpdate}
+                                onCancel={cancelForm}
+                                loading={updateMut?.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </>

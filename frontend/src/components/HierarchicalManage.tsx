@@ -33,12 +33,11 @@ import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import type { PaginationParams } from "../types";
 import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
-import { Card } from "./Card";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CrudTabs } from "./CrudTabs";
 import { MutationErrors } from "./MutationErrors";
 import { Pagination } from "./Pagination";
-import { PageSpinner, Spinner } from "./Spinner";
+import { PageSpinner } from "./Spinner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +53,18 @@ export interface HierarchicalManageChildCallbacks {
   isEditing: (id: number) => boolean;
   isDeleting: boolean;
   isRestoring: boolean;
+  /** Currently editing entity id (for inline row expansion). Undefined in non-HierarchicalManage usage. */
+  editingId?: number | null;
+  /** Whether the edit detail is still loading. */
+  detailLoading?: boolean;
+  /** Edit detail data (typed as unknown — cast in the render callback). */
+  detail?: unknown;
+  /** Form component to render inside the expanded row. */
+  editFormComponent?: ComponentType<unknown>;
+  /** Props to spread into the edit form component. */
+  editFormProps?: unknown;
+  /** Cancel editing (close the expanded row). */
+  cancelForm?: () => void;
 }
 
 /**
@@ -336,31 +347,6 @@ export function HierarchicalManage<
     crud.updateMut?.mutate({ id: crud.editingId, data: payload as ChildPayload });
   }
 
-  /* ── Child callbacks for child.render ──────────────────── */
-  const childCallbacks: HierarchicalManageChildCallbacks = {
-    onEdit: crud.openEdit,
-    onDelete: crud.confirmDelete,
-    onRestore: (id: number) => setRestoreConfirm(id),
-    isEditing: (id: number) => crud.editingId === id,
-    isDeleting: crud.deleteMut?.isPending ?? false,
-    isRestoring: crud.restoreMut?.isPending ?? false,
-  };
-
-  /* ── Render context ────────────────────────────────────── */
-  const renderContext: HierarchicalManageRenderContext = {
-    isDeletedView,
-    parentData: parentData,
-  };
-
-  /* ── Parent render props ───────────────────────────────── */
-  const parentRenderProps: HierarchicalManageParentRenderProps<ParentDetail> = {
-    data: parentData ?? null,
-    isEditing: showEditParent,
-    onToggleEdit: () => setShowEditParent((v) => !v),
-    isSaving: parentUpdateMut.isPending,
-    onSave: (formData: unknown) => parentUpdateMut.mutate(formData as ParentPayload),
-  };
-
   /* ── Child form props (built internally) ───────────────── */
   const childCreateFormProps: ChildFormProps = {
     title: childConfig.createButtonLabel.replace(/^\+ /, "Add "),
@@ -384,6 +370,37 @@ export function HierarchicalManage<
           ...(childConfig.formExtra ?? {}),
         } as ChildFormProps)
       : ({} as ChildFormProps);
+
+  /* ── Child callbacks for child.render ──────────────────── */
+  const childCallbacks: HierarchicalManageChildCallbacks = {
+    onEdit: crud.openEdit,
+    onDelete: crud.confirmDelete,
+    onRestore: (id: number) => setRestoreConfirm(id),
+    isEditing: (id: number) => crud.editingId === id,
+    isDeleting: crud.deleteMut?.isPending ?? false,
+    isRestoring: crud.restoreMut?.isPending ?? false,
+    editingId: crud.editingId,
+    detailLoading: crud.detailLoading,
+    detail: crud.detail,
+    editFormComponent: childConfig.formComponent as ComponentType<unknown>,
+    editFormProps: childEditFormProps,
+    cancelForm: crud.cancelForm,
+  };
+
+  /* ── Render context ────────────────────────────────────── */
+  const renderContext: HierarchicalManageRenderContext = {
+    isDeletedView,
+    parentData: parentData,
+  };
+
+  /* ── Parent render props ───────────────────────────────── */
+  const parentRenderProps: HierarchicalManageParentRenderProps<ParentDetail> = {
+    data: parentData ?? null,
+    isEditing: showEditParent,
+    onToggleEdit: () => setShowEditParent((v) => !v),
+    isSaving: parentUpdateMut.isPending,
+    onSave: (formData: unknown) => parentUpdateMut.mutate(formData as ParentPayload),
+  };
 
   /* ── Loading gate ──────────────────────────────────────── */
   if (parentLoading || crud.listLoading) {
@@ -410,20 +427,7 @@ export function HierarchicalManage<
         {/* Create form */}
         {crud.showForm && <childConfig.formComponent {...childCreateFormProps} />}
 
-        {/* Edit form — loading spinner */}
-        {crud.editingId != null && crud.detailLoading && (
-          <Card className="mb-6 border border-gray-200">
-            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span className="text-sm font-medium">Loading…</span>
-            </div>
-          </Card>
-        )}
-
-        {/* Edit form */}
-        {crud.editingId != null && crud.detail != null && <childConfig.formComponent {...childEditFormProps} />}
-
-        {/* Children table */}
+        {/* Children table — edit form renders inline inside expanded rows */}
         {childConfig.render(childrenList, childCallbacks, renderContext)}
 
         {/* Pagination (optional) */}

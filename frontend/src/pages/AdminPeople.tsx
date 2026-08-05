@@ -166,24 +166,17 @@ export default function AdminPeople() {
 
         {/* Tab panel content */}
         <div role="tabpanel">
-          {/* Create / Edit form (active tab only) */}
-          {editingId && detailLoading && (
-            <Card className="mb-6 flex items-center justify-center gap-2 border border-gray-200 py-6 text-btn-start">
-              <Spinner size="sm" />
-              <span>Loading…</span>
-            </Card>
-          )}
-
-          {(showForm || (editingId && detail)) && (
+          {/* Create form (active tab only) */}
+          {showForm && (
             <PersonForm
-              title={editingId ? `Edit Person #${detail?.display_id}` : "Add Person"}
-              initial={editingId ? (detail ?? defaultPersonForm) : defaultPersonForm}
-              isEdit={!!editingId}
+              title="Add Person"
+              initial={defaultPersonForm}
+              isEdit={false}
               familyMap={familyMap}
               familyOptionsLoading={familiesLoading}
-              onSubmit={editingId ? handleUpdate : handleCreate}
+              onSubmit={handleCreate}
               onCancel={cancelForm}
-              loading={createMut?.isPending || updateMut?.isPending}
+              loading={!!createMut?.isPending}
             />
           )}
 
@@ -203,57 +196,83 @@ export default function AdminPeople() {
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <Tr key={p.id} data-id={p.id}>
-                    <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
-                    <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
-                    <Td>{p.age}</Td>
-                    <Td>
-                      <Link
-                        to={route.adminFamilyPeople(p.family_id)}
-                        className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                      >
-                        {familyMap[p.family_id] || `ID ${p.family_id}`}
-                      </Link>
-                    </Td>
-                    <Td>
-                      <div className="flex gap-2">
-                        {!isDeletedView && p.deleted_at == null && (
-                          <>
+                  <>
+                    <Tr key={p.id} data-id={p.id}>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
+                      <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
+                      <Td>{p.age}</Td>
+                      <Td>
+                        <Link
+                          to={route.adminFamilyPeople(p.family_id)}
+                          className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                        >
+                          {familyMap[p.family_id] || `ID ${p.family_id}`}
+                        </Link>
+                      </Td>
+                      <Td>
+                        <div className="flex gap-2">
+                          {!isDeletedView && p.deleted_at == null && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="px-3 py-1.5 text-xs"
+                                onClick={() => (editingId === p.id ? cancelForm() : openEdit(p.id))}
+                              >
+                                {editingId === p.id ? "Done" : "Edit"}
+                              </Button>
+                              <ActionsDropdown
+                                items={[
+                                  {
+                                    label: "Delete",
+                                    variant: "danger" as const,
+                                    onClick: () => confirmDelete(p.id),
+                                  },
+                                ]}
+                                disabled={deleteMut?.isPending}
+                              />
+                            </>
+                          )}
+                          {isDeletedView && (
                             <Button
                               variant="secondary"
                               size="sm"
                               className="px-3 py-1.5 text-xs"
-                              onClick={() => openEdit(p.id)}
-                              disabled={!!editingId}
+                              onClick={() => setRestoreConfirm(p.id)}
+                              disabled={personRestoreMut.isPending || familyRestoreMut.isPending}
                             >
-                              Edit
+                              Restore
                             </Button>
-                            <ActionsDropdown
-                              items={[
-                                {
-                                  label: "Delete",
-                                  variant: "danger" as const,
-                                  onClick: () => confirmDelete(p.id),
-                                },
-                              ]}
-                              disabled={deleteMut?.isPending}
-                            />
-                          </>
-                        )}
-                        {isDeletedView && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => setRestoreConfirm(p.id)}
-                            disabled={personRestoreMut.isPending || familyRestoreMut.isPending}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </div>
-                    </Td>
-                  </Tr>
+                          )}
+                        </div>
+                      </Td>
+                    </Tr>
+                    {editingId === p.id && (
+                      <Tr key={`${p.id}-edit`}>
+                        <Td colSpan={5} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <PersonForm
+                                title={`Edit Person #${detail.display_id}`}
+                                initial={detail}
+                                isEdit={true}
+                                familyMap={familyMap}
+                                familyOptionsLoading={familiesLoading}
+                                onSubmit={handleUpdate}
+                                onCancel={cancelForm}
+                                loading={!!updateMut?.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>
