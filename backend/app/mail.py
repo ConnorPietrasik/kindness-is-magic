@@ -166,11 +166,14 @@ def build_invite_email(
     family_word = "family" if family_limit == 1 else "families"
     # Build the register link — include email query param when locked
     register_path = "/register-referrer"
+    email_locked_note = ""
     if email:
         register_path += f"?code={code}&email={email}"
+        email_locked_note = f'<p style="font-size:14px;color:#666666;">This invite is locked to <strong>{email}</strong>. You\'ll register using this email address.</p>'
     return f"""{from_line}
 <p>We'd love your help connecting {family_word} in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
+{email_locked_note}
 <p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most.</p>
 <p>This invite expires on <strong>{expires_str}</strong>.</p>
 <p style="text-align:center;"><a href="{base}{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
