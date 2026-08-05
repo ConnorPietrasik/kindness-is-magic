@@ -940,6 +940,7 @@ class PersonSummary(BaseModel):
     given_name: str
     age: int
     deleted_at: datetime | None
+    wishes: list[WishSummary] = []
 
     model_config = {"from_attributes": True}
 

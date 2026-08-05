@@ -205,6 +205,7 @@ export interface PersonSummary {
   given_name: string;
   age: number;
   deleted_at: string | null;
+  wishes: WishSummary[];
 }
 
 // ---------------------------------------------------------------------------

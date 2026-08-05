@@ -89,12 +89,18 @@ export default function FamilyWishList() {
                     <Td>{person.age}</Td>
                     {isAdult ? (
                       <Td colSpan={2} className="max-w-xs">
-                        {practicalOrAdult?.description ?? "—"}
+                        {practicalOrAdult
+                          ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}`
+                          : "—"}
                       </Td>
                     ) : (
                       <>
-                        <Td className="max-w-xs">{practicalOrAdult?.description ?? "—"}</Td>
-                        <Td className="max-w-xs">{fun?.description ?? "—"}</Td>
+                        <Td className="max-w-xs">
+                          {practicalOrAdult
+                            ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}`
+                            : "—"}
+                        </Td>
+                        <Td className="max-w-xs">{fun ? `${fun.description}${fun.size ? ` (${fun.size})` : ""}` : "—"}</Td>
                       </>
                     )}
                     {hasNotes(data.people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}

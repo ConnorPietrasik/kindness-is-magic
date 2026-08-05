@@ -16,6 +16,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PersonForm } from "../components/PersonForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getFamilyMe, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { familyMe, familyPeople } from "../lib/queryKeys";
@@ -125,6 +126,8 @@ export default function FamilyPeople() {
                 <Th>ID</Th>
                 <Th>Name</Th>
                 <Th>Age</Th>
+                <Th>Practical Wish</Th>
+                <Th>Fun Wish</Th>
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -134,6 +137,14 @@ export default function FamilyPeople() {
                       <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                       <Td className="font-medium text-gray-900">{p.given_name}</Td>
                       <Td>{p.age}</Td>
+                      {p.age >= 18 ? (
+                        <WishCellAdult wishes={p.wishes} />
+                      ) : (
+                        <>
+                          <WishCellType wishes={p.wishes} type="practical" />
+                          <WishCellType wishes={p.wishes} type="fun" />
+                        </>
+                      )}
                       <Td>
                         <div className="flex items-center gap-2">
                           {!isLocked && (
@@ -161,7 +172,7 @@ export default function FamilyPeople() {
                     </Tr>
                     {editingId === p.id && (
                       <Tr key={`${p.id}-edit`}>
-                        <Td colSpan={4} className="!py-3">
+                        <Td colSpan={6} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

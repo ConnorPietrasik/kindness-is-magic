@@ -21,6 +21,7 @@ import { Pagination } from "../components/Pagination";
 import { PersonForm } from "../components/PersonForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -191,6 +192,8 @@ export default function AdminPeople() {
                 <Th>ID</Th>
                 <Th>Name</Th>
                 <Th>Age</Th>
+                <Th>Practical Wish</Th>
+                <Th>Fun Wish</Th>
                 <Th>Family</Th>
                 <Th>Actions</Th>
               </TableHead>
@@ -201,6 +204,14 @@ export default function AdminPeople() {
                       <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                       <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
                       <Td>{p.age}</Td>
+                      {p.age >= 18 ? (
+                        <WishCellAdult wishes={p.wishes} />
+                      ) : (
+                        <>
+                          <WishCellType wishes={p.wishes} type="practical" />
+                          <WishCellType wishes={p.wishes} type="fun" />
+                        </>
+                      )}
                       <Td>
                         <Link
                           to={route.adminFamilyPeople(p.family_id)}
@@ -249,7 +260,7 @@ export default function AdminPeople() {
                     </Tr>
                     {editingId === p.id && (
                       <Tr key={`${p.id}-edit`}>
-                        <Td colSpan={5} className="!py-3">
+                        <Td colSpan={7} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

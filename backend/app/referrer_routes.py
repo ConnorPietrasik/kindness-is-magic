@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
+    batch_load_person_wishes,
     build_family_detail,
     build_family_review_summary,
     build_person_detail,
@@ -50,6 +51,7 @@ from app.schemas import (
     ReferrerUpdate,
     SendFamilyInviteRequest,
     SendFamilyInviteResponse,
+    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -481,6 +483,7 @@ def list_family_people(
 ) -> PersonListResponse:
     people = db.query(Person).filter(Person.family_id == fid, Person.deleted_at.is_(None)).order_by(Person.id).all()
     pos_map = compute_display_ids(db, "person", people, scope=fid)
+    wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -490,6 +493,7 @@ def list_family_people(
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
+                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
             )
             for p in people
         ]

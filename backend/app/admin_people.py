@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Person, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
+    batch_load_person_wishes,
     build_person_detail,
     build_wish_detail,
     compute_display_ids,
@@ -83,6 +84,8 @@ def list_people(
 
     pos_map = compute_display_ids(db, "person", people, scope=family_id)
 
+    wish_map = batch_load_person_wishes(db, [p.id for p in people])
+
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -92,6 +95,7 @@ def list_people(
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
+                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
             )
             for p in people
         ],

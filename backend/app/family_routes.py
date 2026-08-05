@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models import Family, Person, User
 from app.permissions import require_family
 from app.response_builders import (
+    batch_load_person_wishes,
     build_family_detail,
     build_person_detail,
     compute_display_ids,
@@ -26,6 +27,7 @@ from app.schemas import (
     PersonDetail,
     PersonListResponse,
     PersonSummary,
+    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -150,6 +152,7 @@ def list_people(
 ) -> PersonListResponse:
     people = db.query(Person).filter(Person.family_id == user.family_id, Person.deleted_at.is_(None)).order_by(Person.id).all()
     pos_map = compute_display_ids(db, "person", people, scope=user.family_id)
+    wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
         people=[
             PersonSummary(
@@ -159,6 +162,7 @@ def list_people(
                 given_name=p.given_name,
                 age=p.age,
                 deleted_at=p.deleted_at,
+                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
             )
             for p in people
         ]
