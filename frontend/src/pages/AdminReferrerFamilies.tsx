@@ -277,6 +277,7 @@ function FamiliesTable({
       <TableHead>
         <Th>ID</Th>
         <Th>Family Name</Th>
+        <Th>Family Wish</Th>
         <Th>Contact</Th>
         <Th>People</Th>
         <Th>Actions</Th>
@@ -306,6 +307,7 @@ function FamiliesTable({
                   </Link>
                 )}
               </Td>
+              <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
               <Td>{f.contact_name}</Td>
               <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
               <Td>
@@ -371,7 +373,7 @@ function FamiliesTable({
             </Tr>
             {callbacks.editingId === f.id && (
               <Tr key={`${f.id}-edit`}>
-                <Td colSpan={5} className="!py-3">
+                <Td colSpan={6} className="!py-3">
                   <div className="rounded-xl bg-gray-50 p-4">
                     {callbacks.detailLoading ? (
                       <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

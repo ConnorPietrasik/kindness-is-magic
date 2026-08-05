@@ -241,6 +241,7 @@ export default function AdminFamilies() {
               <TableHead>
                 <Th>ID</Th>
                 <Th>Family Name</Th>
+                <Th>Family Wish</Th>
                 <Th>Contact</Th>
                 <Th>Referrer</Th>
                 <Th>Actions</Th>
@@ -270,6 +271,7 @@ export default function AdminFamilies() {
                           </Link>
                         )}
                       </Td>
+                      <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
                       <Td>{f.contact_name}</Td>
                       <Td>
                         {f.referrer_id != null ? (
@@ -352,7 +354,7 @@ export default function AdminFamilies() {
                     </Tr>
                     {editingId === f.id && (
                       <Tr key={`${f.id}-edit`}>
-                        <Td colSpan={5} className="!py-3">
+                        <Td colSpan={6} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
