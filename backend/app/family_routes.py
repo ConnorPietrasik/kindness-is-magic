@@ -20,7 +20,7 @@ from app.response_builders import (
     partial_update,
 )
 from app.schemas import (
-    FamilyDetail,
+    FamilySelfServiceDetail,
     FamilyUpdate,
     PersonCreateInFamily,
     PersonDetail,
@@ -56,9 +56,9 @@ def _check_family_edit_lock(fam: Family) -> None:
 def get_self(
     user: User = Depends(require_family),
     db: Session = Depends(get_db),
-) -> FamilyDetail:
+) -> FamilySelfServiceDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db))
 
 
 @router.patch("/me")
@@ -66,7 +66,7 @@ def update_self(
     body: FamilyUpdate,
     user: User = Depends(require_family),
     db: Session = Depends(get_db),
-) -> FamilyDetail:
+) -> FamilySelfServiceDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
     _check_family_edit_lock(fam)
 
@@ -75,7 +75,7 @@ def update_self(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s updated own profile (family id=%s)", user.email, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db))
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ def update_self(
 def request_review(
     user: User = Depends(require_family),
     db: Session = Depends(get_db),
-) -> FamilyDetail:
+) -> FamilySelfServiceDetail:
     """Family requests referrer review of their wishes."""
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
 
@@ -108,14 +108,14 @@ def request_review(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s requested review (family id=%s)", user.email, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db))
 
 
 @router.post("/me/cancel-review")
 def cancel_review(
     user: User = Depends(require_family),
     db: Session = Depends(get_db),
-) -> FamilyDetail:
+) -> FamilySelfServiceDetail:
     """Family cancels a pending review request."""
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
 
@@ -135,7 +135,7 @@ def cancel_review(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s cancelled review request (family id=%s)", user.email, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db))
 
 
 # ---------------------------------------------------------------------------

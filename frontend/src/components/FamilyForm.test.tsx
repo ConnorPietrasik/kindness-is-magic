@@ -22,6 +22,7 @@ const mockFamilyDetail: FamilyDetail = {
   wish_lock_level: "family",
   wish_review_requested_at: null,
   wish_rejection_reason: null,
+  referrer_notes: "Called twice, prefers email",
 };
 
 const referrerMap: Record<number, string> = {
@@ -222,5 +223,58 @@ describe("FamilyForm", () => {
         pickup_window: mockFamilyDetail.pickup_window,
       })
     );
+  });
+
+  /* ── Referrer Notes (admin only) ─────────────────────────── */
+
+  it("does not show referrer notes field by default", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+
+    expect(screen.queryByText("Referrer Notes")).not.toBeInTheDocument();
+  });
+
+  it("shows referrer notes field when showReferrerNotes is true", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+
+    expect(screen.getByText("Referrer Notes")).toBeInTheDocument();
+  });
+
+  it("pre-fills referrer notes from initial data", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+
+    const textareas = screen.getAllByRole("textbox") as HTMLTextAreaElement[];
+    const notesTextarea = textareas.find((t) => t.value === mockFamilyDetail.referrer_notes);
+    expect(notesTextarea).toBeTruthy();
+  });
+
+  it("sends referrer_notes in submit payload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes onSubmit={onSubmit} />
+    );
+
+    // Find the referrer notes textarea and change it
+    const textareas = screen.getAllByRole("textbox") as HTMLTextAreaElement[];
+    const notesTextarea = textareas.find((t) => t.value === mockFamilyDetail.referrer_notes);
+    expect(notesTextarea).toBeTruthy();
+    await user.clear(notesTextarea!);
+    await user.type(notesTextarea!, "New note text");
+
+    await user.click(screen.getByText("Update"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        referrer_notes: "New note text",
+      })
+    );
+  });
+
+  it("shows character counter for referrer notes", () => {
+    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+
+    // Character counter should show current length / 1000
+    expect(screen.getByText(new RegExp(`${mockFamilyDetail.referrer_notes!.length}/1000`))).toBeInTheDocument();
   });
 });

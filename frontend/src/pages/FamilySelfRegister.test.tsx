@@ -35,6 +35,7 @@ const mockResponse: FamilySelfRegisterResponse = {
     wish_lock_level: "family",
     wish_review_requested_at: null,
     wish_rejection_reason: null,
+    has_notes: false,
   },
 };
 

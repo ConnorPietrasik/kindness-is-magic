@@ -82,6 +82,7 @@ const mockFamily: FamilySummary = {
   wish_lock_level: "admin",
   wish_review_requested_at: null,
   wish_rejection_reason: null,
+  has_notes: false,
 };
 
 const mockUser: UserSummary = {

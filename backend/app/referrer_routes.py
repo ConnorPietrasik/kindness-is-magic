@@ -33,19 +33,20 @@ from app.response_builders import (
     partial_update,
 )
 from app.schemas import (
+    _CLEAR,
     FamilyCreateByReferrer,
     FamilyDetail,
     FamilyListResponse,
     FamilyReviewList,
     FamilyReviewRequest,
     FamilySummary,
-    FamilyUpdate,
     PendingFamilySummary,
     PersonCreateInFamily,
     PersonDetail,
     PersonListResponse,
     PersonSummary,
     ReferrerDetail,
+    ReferrerFamilyUpdate,
     ReferrerUpdate,
     SendFamilyInviteRequest,
     SendFamilyInviteResponse,
@@ -125,6 +126,7 @@ def list_families(
                 wish_lock_level=f.wish_lock_level,
                 wish_review_requested_at=f.wish_review_requested_at,
                 wish_rejection_reason=f.wish_rejection_reason,
+                has_notes=f.referrer_notes is not None,
             )
             for f in families
         ]
@@ -137,7 +139,7 @@ def get_family(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    return FamilyDetail(**build_family_detail(owner.family, db))
+    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True))
 
 
 @router.post("/families", status_code=201)
@@ -181,22 +183,32 @@ def create_family(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s created family '%s' (id=%s)", user.email, fam.family_name, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @router.patch("/families/{fam_id}")
 def update_family(
     fam_id: int,
-    body: FamilyUpdate,
+    body: ReferrerFamilyUpdate,
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    _check_referrer_edit_lock(owner.family)
-    partial_update(owner.family, body)
+    # Notes are internal metadata and bypass the wish edit lock.
+    # Lock check applies only to standard family edits.
+    standard_data = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "referrer_notes"}
+    if standard_data:
+        _check_referrer_edit_lock(owner.family)
+        partial_update(owner.family, body, exclude={"referrer_notes"})
+
+    # Apply notes separately (always allowed, even on locked families)
+    notes_value = body.referrer_notes
+    if notes_value is not None:
+        owner.family.referrer_notes = None if notes_value is _CLEAR else notes_value
+
     db.commit()
     db.refresh(owner.family)
     logger.info("Referrer %s updated family (id=%s)", owner.user.email, fam_id)
-    return FamilyDetail(**build_family_detail(owner.family, db))
+    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True))
 
 
 @router.delete("/families/{fam_id}", status_code=204)
@@ -302,7 +314,7 @@ async def approve_family(
         referrer_display_name=owner.user.display_name or "",
     )
 
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @router.post("/families/{fam_id}/reject", status_code=200)
@@ -325,7 +337,7 @@ def reject_family(
     db.refresh(fam)
     logger.info("Referrer %s rejected family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
 
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +414,7 @@ def referrer_approve_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s approved wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @router.post("/families/{fam_id}/reject-wishes")
@@ -432,7 +444,7 @@ def referrer_reject_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s rejected wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 async def _send_family_approved_email(

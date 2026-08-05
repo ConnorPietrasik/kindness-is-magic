@@ -413,16 +413,74 @@ class FamilyUpdate(BaseModel):
         return v
 
 
+class ReferrerFamilyUpdate(FamilyUpdate):
+    """Referrer: extends FamilyUpdate with referrer_notes.
+
+    Referrer notes are internal metadata visible only to referrers and admins.
+    Sending ``""`` clears the notes to NULL.
+    """
+
+    referrer_notes: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("referrer_notes", mode="before")
+    @classmethod
+    def _referrer_notes_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 1000:
+            raise ValueError("referrer_notes must be 1000 characters or fewer")
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+
 class AdminFamilyUpdate(FamilyUpdate):
-    """Admin-only: extends FamilyUpdate with referrer_id.
+    """Admin-only: extends FamilyUpdate with referrer_id and referrer_notes.
 
     Send ``0`` to unassign a referrer (set referrer_id to NULL).
     """
 
     referrer_id: Optional[int] = None
+    referrer_notes: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("referrer_notes", mode="before")
+    @classmethod
+    def _referrer_notes_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 1000:
+            raise ValueError("referrer_notes must be 1000 characters or fewer")
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
 
 
 class FamilyDetail(BaseModel):
+    id: int
+    referrer_id: int | None
+    referrer_name: Optional[str] = None
+    display_id: str
+    family_name: str
+    bio: Optional[str]
+    address: Optional[str]
+    phone_number: str
+    family_wish: str
+    contact_name: str
+    approval_status: FamilyApprovalStatus
+    pickup_window: datetime | None = None
+    deleted_at: datetime | None
+    person_count: int
+    wish_lock_level: WishLockLevel
+    wish_review_requested_at: datetime | None = None
+    wish_rejection_reason: Optional[str] = None
+    referrer_notes: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FamilySelfServiceDetail(BaseModel):
+    """Family detail for family self-service — excludes referrer_notes."""
+
     id: int
     referrer_id: int | None
     referrer_name: Optional[str] = None
@@ -458,6 +516,7 @@ class FamilySummary(BaseModel):
     wish_lock_level: WishLockLevel
     wish_review_requested_at: datetime | None = None
     wish_rejection_reason: Optional[str] = None
+    has_notes: bool = False
 
     model_config = {"from_attributes": True}
 

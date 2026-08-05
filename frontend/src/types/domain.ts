@@ -147,10 +147,33 @@ export interface FamilySummary {
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
+  has_notes: boolean;
 }
 
 /** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name). */
 export interface FamilyDetail {
+  id: number;
+  referrer_id: number | null;
+  referrer_name: string | null;
+  display_id: string;
+  family_name: string;
+  bio: string | null;
+  address: string | null;
+  phone_number: string;
+  family_wish: string;
+  contact_name: string;
+  deleted_at: string | null;
+  person_count: number;
+  approval_status: FamilyApprovalStatus;
+  pickup_window: string | null;
+  wish_lock_level: WishLockLevel;
+  wish_review_requested_at: string | null;
+  wish_rejection_reason: string | null;
+  referrer_notes: string | null;
+}
+
+/** Family detail returned to family self-service endpoints (no referrer_notes). */
+export interface FamilySelfServiceDetail {
   id: number;
   referrer_id: number | null;
   referrer_name: string | null;
@@ -207,6 +230,17 @@ export interface FamilyPayload {
   contact_name?: string;
   deleted_at?: string | null;
   pickup_window?: string | null;
+  referrer_notes?: string | null;
+}
+
+/** Payload for family self-service update — no referrer_notes. */
+export interface FamilySelfPayload {
+  family_name?: string;
+  bio?: string | null;
+  address?: string | null;
+  phone_number?: string;
+  family_wish?: string;
+  contact_name?: string;
 }
 
 /** Wish type — mirrors backend WishType enum. */

@@ -27,6 +27,7 @@ import {
   type HierarchicalManageParentRenderProps,
 } from "../components/HierarchicalManage";
 import { InfoRow } from "../components/InfoRow";
+import { InternalNotesSection } from "../components/InternalNotesSection";
 import { PersonForm } from "../components/PersonForm";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishLockBadge } from "../components/WishLockBadge";
@@ -123,6 +124,15 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
       queryClient.invalidateQueries({ queryKey: referrerFamilies });
       queryClient.invalidateQueries({ queryKey: referrerReviewQueue });
       toast.success("Wishes submitted for admin review");
+    },
+  });
+
+  const saveNotesMut = useMutation({
+    mutationFn: (payload: { referrer_notes: string | null }) => updateReferrerFamily(famId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familyKey });
+      queryClient.invalidateQueries({ queryKey: referrerFamilies });
+      toast.success("Notes saved");
     },
   });
 
@@ -226,6 +236,15 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
             <InfoRow label="Phone" value={data.phone_number} isLast />
           </div>
         )
+      )}
+
+      {/* Internal Notes section (always available, bypasses wish lock) */}
+      {data && (
+        <InternalNotesSection
+          initialNotes={data.referrer_notes}
+          onSave={(notes) => saveNotesMut.mutate({ referrer_notes: notes })}
+          isSaving={saveNotesMut.isPending}
+        />
       )}
 
       {/* Submit confirmation dialog */}

@@ -23,6 +23,7 @@
 - **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides ownership and admin-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
+- **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked.
 - **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `response_builders.py` — see its docstring for format and enumeration rules.
 
 ## Project Structure

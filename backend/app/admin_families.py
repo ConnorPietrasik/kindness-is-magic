@@ -97,6 +97,7 @@ def list_families(
                 wish_lock_level=f.wish_lock_level,
                 wish_review_requested_at=f.wish_review_requested_at,
                 wish_rejection_reason=f.wish_rejection_reason,
+                has_notes=f.referrer_notes is not None,
             )
             for f in families
         ],
@@ -143,6 +144,7 @@ def list_deleted_families(
                 wish_lock_level=f.wish_lock_level,
                 wish_review_requested_at=f.wish_review_requested_at,
                 wish_rejection_reason=f.wish_rejection_reason,
+                has_notes=f.referrer_notes is not None,
             )
             for f in families
         ],
@@ -298,7 +300,7 @@ def get_family(
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.post("", status_code=201)
@@ -326,7 +328,7 @@ def create_family(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s created family '%s' (id=%s)", _admin.email, fam.family_name, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.patch("/{fam_id}")
@@ -345,7 +347,7 @@ def update_family(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s updated family (id=%s)", _admin.email, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.post("/{fam_id}/restore", status_code=200)
@@ -363,7 +365,7 @@ def restore_family(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s restored family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.delete("/{fam_id}", status_code=204)
@@ -414,7 +416,7 @@ def admin_approve_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s approved wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.post("/{fam_id}/reject-wishes")
@@ -445,7 +447,7 @@ def admin_reject_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s rejected wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
 @family_admin_router.post("/{fam_id}/reset-wish-state")
@@ -468,4 +470,4 @@ def admin_reset_wish_state(
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s reset wish state for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))

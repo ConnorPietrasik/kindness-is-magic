@@ -2,7 +2,7 @@
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
-const NULLABLE_FIELDS = new Set(["bio", "address", "title", "note", "pickup_window"]);
+const NULLABLE_FIELDS = new Set(["bio", "address", "title", "note", "pickup_window", "referrer_notes"]);
 
 /** Datetime fields that need canonical comparison in `normalizeUpdatePayload`. */
 const DATETIME_FIELDS = new Set(["pickup_window"]);

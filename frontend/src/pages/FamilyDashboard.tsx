@@ -30,7 +30,7 @@ import { cancelFamilyReview, getFamilyMe, patchFamilyMe, requestFamilyReview } f
 import { familyMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime, isFamilyLocked, normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload } from "../types";
+import type { FamilyDetail, FamilyPayload, FamilySelfPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -74,8 +74,10 @@ export default function FamilyDashboard() {
   const isLocked = isFamilyLocked(familyInfo);
 
   function handleUpdateSelf(formData: FamilyPayload) {
-    const payload = normalizeUpdatePayload(formData, familyInfo as FamilyDetail);
-    updateSelfMut.mutate(payload as FamilyPayload);
+    const normalized = normalizeUpdatePayload(formData, familyInfo as FamilyDetail);
+    // Strip referrer_notes — family self-service endpoints don't accept it
+    const { referrer_notes: _rn, ...safe } = normalized as { referrer_notes?: string | null };
+    updateSelfMut.mutate(safe as FamilySelfPayload);
   }
 
   function handleRequestReview() {

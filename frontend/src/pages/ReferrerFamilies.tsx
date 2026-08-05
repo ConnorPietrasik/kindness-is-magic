@@ -69,7 +69,7 @@ export default function ReferrerFamilies() {
     createFn: createReferrerFamily,
     updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
-    invalidationKeys: [referrerFamilies, referrerMe],
+    invalidationKeys: [referrerFamilies, referrerMe, ["referrerFamily"]],
     entityName: "Family",
   });
 
@@ -141,6 +141,7 @@ export default function ReferrerFamilies() {
             title="Edit Family"
             initial={detail}
             isEdit={true}
+            showReferrerNotes
             onSubmit={handleUpdateFam}
             onCancel={cancelForm}
             loading={updateFamMut?.isPending}
@@ -170,6 +171,11 @@ export default function ReferrerFamilies() {
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                     <Td className="font-medium text-gray-900">
                       {f.family_name}
+                      {f.has_notes && (
+                        <span className="ml-1 text-xs" title="Has internal notes">
+                          📝
+                        </span>
+                      )}
                       {f.wish_lock_level === "admin" && (
                         <Link
                           to={route.familyWishList(f.id)}
@@ -179,7 +185,7 @@ export default function ReferrerFamilies() {
                           className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
                           title="Wish List"
                         >
-                          📝
+                          📄
                         </Link>
                       )}
                     </Td>

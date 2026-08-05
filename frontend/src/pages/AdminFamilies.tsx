@@ -206,6 +206,7 @@ export default function AdminFamilies() {
               isEdit={!!editingId}
               referrerMap={referrerMap}
               referrerOptionsLoading={referrersLoading}
+              showReferrerNotes
               onSubmit={editingId ? handleUpdate : handleCreate}
               onCancel={cancelForm}
               loading={createMut?.isPending || updateMut?.isPending}
@@ -232,6 +233,11 @@ export default function AdminFamilies() {
                     <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                     <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                       {f.family_name}
+                      {f.deleted_at == null && f.has_notes && (
+                        <span className="ml-1 text-xs" title="Has internal notes">
+                          📝
+                        </span>
+                      )}
                       {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                         <Link
                           to={route.familyWishList(f.id)}
@@ -241,7 +247,7 @@ export default function AdminFamilies() {
                           className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
                           title="Wish List"
                         >
-                          📝
+                          📄
                         </Link>
                       )}
                     </Td>

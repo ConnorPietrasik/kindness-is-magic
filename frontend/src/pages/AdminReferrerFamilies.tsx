@@ -103,6 +103,7 @@ export default function AdminReferrerFamilies() {
             updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
             formDefault: defaultFamilyForm as unknown as FamilyPayload,
             formComponent: FamilyForm,
+            formExtra: { showReferrerNotes: true } as Partial<React.ComponentProps<typeof FamilyForm>>,
             render: (rows, callbacks, ctx) => (
               <FamiliesTable
                 rows={rows as FamilySummary[]}
@@ -228,6 +229,11 @@ function FamiliesTable({
             <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
             <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
               {f.family_name}
+              {f.deleted_at == null && f.has_notes && (
+                <span className="ml-1 text-xs" title="Has internal notes">
+                  📝
+                </span>
+              )}
               {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
                 <Link
                   to={route.familyWishList(f.id)}
@@ -237,7 +243,7 @@ function FamiliesTable({
                   className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
                   title="Wish List"
                 >
-                  📝
+                  📄
                 </Link>
               )}
             </Td>

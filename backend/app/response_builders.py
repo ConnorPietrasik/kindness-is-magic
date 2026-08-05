@@ -300,10 +300,12 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
     }
 
 
-def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
+def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None, include_referrer_notes: bool = False) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 
     Pass ``person_count`` to skip the query when it is already known.
+    Pass ``include_referrer_notes=True`` to include the referrer_notes field
+    (for referrer and admin views; omit for family self-service).
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
@@ -319,7 +321,7 @@ def build_family_detail(fam: Family, db: Session, *, person_count: int | None = 
         if ref:
             referrer_name = ref.name
 
-    return {
+    result: dict = {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
         "referrer_name": referrer_name,
@@ -338,6 +340,11 @@ def build_family_detail(fam: Family, db: Session, *, person_count: int | None = 
         "wish_review_requested_at": fam.wish_review_requested_at,
         "wish_rejection_reason": fam.wish_rejection_reason,
     }
+
+    if include_referrer_notes:
+        result["referrer_notes"] = fam.referrer_notes
+
+    return result
 
 
 def build_family_review_summary(fam: Family, db: Session, *, person_count: int | None = None) -> dict:

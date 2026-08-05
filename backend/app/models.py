@@ -195,6 +195,9 @@ class Family(Base):
     wish_review_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     wish_rejection_reason: Mapped[str | None] = mapped_column(String(400), nullable=True, default=None)
 
+    # Internal notes visible only to referrers and admins
+    referrer_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True, default=None)
+
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

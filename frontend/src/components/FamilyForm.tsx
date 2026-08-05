@@ -5,7 +5,7 @@ import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { DatePicker } from "./DatePicker";
-import { defaultFamilyForm } from "./defaults";
+import { defaultFamilyForm, type FamilyFormState } from "./defaults";
 import { FormField } from "./FormField";
 import { OptionalLabel } from "./OptionalLabel";
 import { PhoneInput } from "./PhoneInput";
@@ -18,6 +18,8 @@ interface FamilyFormProps {
   referrerMap?: Record<number, string>;
   referrerOptionsLoading?: boolean;
   showOptionalFields?: boolean;
+  /** When true, show the referrer notes field (admin mode) */
+  showReferrerNotes?: boolean;
   onSubmit: (formData: FamilyPayload) => void;
   onCancel: () => void;
   loading?: boolean;
@@ -36,20 +38,21 @@ export function FamilyForm({
   referrerMap,
   referrerOptionsLoading,
   showOptionalFields = true,
+  showReferrerNotes,
   onSubmit,
   onCancel,
   loading,
 }: FamilyFormProps) {
   // Store pickup_window as ISO (matching backend format). Convert to/from
   // datetime-local only for the <input> value attribute.
-  const [form, setForm] = useState(() => ({ ...defaultFamilyForm, ...initial }));
+  const [form, setForm] = useState<FamilyFormState>(() => ({ ...defaultFamilyForm, ...initial }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({ ...defaultFamilyForm, ...initial });
   }, [initial]);
 
-  const update = (key: string, val: string | number | boolean | null) => setForm((prev) => ({ ...prev, [key]: val }));
+  const update = (key: keyof FamilyFormState, val: string | number | null) => setForm((prev) => ({ ...prev, [key]: val }));
 
   // Referrer select options
   const referrerOptions = referrerMap ? Object.entries(referrerMap) : [];
@@ -85,9 +88,7 @@ export function FamilyForm({
               label={isEdit ? "Referrer" : "Referrer"}
               as="select"
               fieldProps={{
-                value: isEdit
-                  ? String((form as Record<string, unknown>).referrer_id ?? 0)
-                  : String((form as Record<string, unknown>).referrer_id) || "",
+                value: isEdit ? String(form.referrer_id ?? 0) : String(form.referrer_id) || "",
                 onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("referrer_id", parseInt(e.target.value, 10)),
                 required: true,
               }}
@@ -177,6 +178,26 @@ export function FamilyForm({
                 error={phoneError}
               />
             </>
+          )}
+
+          {/* Referrer Notes — admin only */}
+          {showReferrerNotes && (
+            <div>
+              <OptionalLabel text="Referrer Notes" />
+              <FormField
+                as="textarea"
+                fieldProps={{
+                  value: form.referrer_notes || "",
+                  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("referrer_notes", e.target.value),
+                  rows: 3,
+                  maxLength: 1000,
+                  autoComplete: "off",
+                }}
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Internal notes visible only to referrers and admins. {form.referrer_notes?.length ?? 0}/1000
+              </p>
+            </div>
           )}
         </div>
 

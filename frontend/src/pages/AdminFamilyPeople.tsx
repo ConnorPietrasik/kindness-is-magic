@@ -5,7 +5,7 @@
  * Thin wrapper around HierarchicalManage.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
@@ -20,8 +20,10 @@ import {
   type HierarchicalManageParentRenderProps,
 } from "../components/HierarchicalManage";
 import { InfoRow } from "../components/InfoRow";
+import { InternalNotesSection } from "../components/InternalNotesSection";
 import { PersonForm } from "../components/PersonForm";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import {
   adminCreatePerson,
   adminDeletePerson,
@@ -164,7 +166,19 @@ function FamilyCard(
   }
 ) {
   const { data, isEditing, onToggleEdit, isSaving, onSave, famId, referrerMap, referrersLoading } = props;
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const lockLevel = data?.wish_lock_level ?? "family";
+  const familyKey = adminFamilyDetail(String(famId));
+
+  const saveNotesMut = useMutation({
+    mutationFn: (payload: { referrer_notes: string | null }) => adminUpdateFamily(famId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: familyKey });
+      queryClient.invalidateQueries({ queryKey: adminFamilyPeople(String(famId)) });
+      toast.success("Notes saved");
+    },
+  });
 
   return (
     <Card className="mb-6">
@@ -212,6 +226,7 @@ function FamilyCard(
           isEdit={true}
           referrerMap={referrerMap}
           referrerOptionsLoading={referrersLoading}
+          showReferrerNotes
           onSubmit={onSave}
           onCancel={() => onToggleEdit()}
           loading={isSaving}
@@ -227,6 +242,15 @@ function FamilyCard(
             <InfoRow label="Phone" value={data.phone_number} isLast />
           </div>
         )
+      )}
+
+      {/* Internal Notes section (always available) */}
+      {data && (
+        <InternalNotesSection
+          initialNotes={data.referrer_notes}
+          onSave={(notes) => saveNotesMut.mutate({ referrer_notes: notes })}
+          isSaving={saveNotesMut.isPending}
+        />
       )}
     </Card>
   );

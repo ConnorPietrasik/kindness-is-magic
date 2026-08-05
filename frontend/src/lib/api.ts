@@ -20,8 +20,10 @@ import type {
   FamilyListResponse,
   FamilyPayload,
   FamilyReviewQueueItem,
+  FamilySelfPayload,
   FamilySelfRegisterPayload,
   FamilySelfRegisterResponse,
+  FamilySelfServiceDetail,
   FamilyWishListResponse,
   InviteListResponse,
   PackingSlipItem,
@@ -547,11 +549,11 @@ export function getFamilyWishList(familyId: number): Promise<FamilyWishListRespo
 // ---------------------------------------------------------------------------
 // Family — Self
 // ---------------------------------------------------------------------------
-export function getFamilyMe(): Promise<FamilyDetail> {
+export function getFamilyMe(): Promise<FamilySelfServiceDetail> {
   return apiGet("/api/family/me");
 }
 
-export function patchFamilyMe(data: FamilyPayload): Promise<FamilyDetail> {
+export function patchFamilyMe(data: FamilySelfPayload): Promise<FamilySelfServiceDetail> {
   return apiPatch("/api/family/me", data);
 }
 
@@ -569,11 +571,11 @@ export function createFamilyPerson(data: PersonPayload): Promise<PersonDetail> {
 // ---------------------------------------------------------------------------
 // Family — Wish Review Request / Cancel
 // ---------------------------------------------------------------------------
-export function requestFamilyReview(): Promise<FamilyDetail> {
+export function requestFamilyReview(): Promise<FamilySelfServiceDetail> {
   return apiPost("/api/family/me/request-review");
 }
 
-export function cancelFamilyReview(): Promise<FamilyDetail> {
+export function cancelFamilyReview(): Promise<FamilySelfServiceDetail> {
   return apiPost("/api/family/me/cancel-review");
 }
 
