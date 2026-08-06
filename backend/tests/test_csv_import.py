@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from tests.conftest import login_as
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -85,7 +84,6 @@ email,password,role,referrer_name_or_id,family_name_or_id
 byid_ref@test.com,Password123!,referrer,ID Ref,
 byid_fam@test.com,Password123!,family,,ID Fam
 """
-
 
 # =========================================================================
 #  CSV sample template endpoint
@@ -502,8 +500,8 @@ csv_ref@test.com,Password123!,referrer,Csv Ref,
         user = db.query(User).filter(User.email == "csv_ref@test.com").first()
         assert user.display_name == "Csv Ref"
 
-    def test_family_user_no_display_name_default(self, test_client: TestClient, admin_user, db: Session):
-        """Family users imported via CSV get no display_name default."""
+    def test_family_user_display_name_email_prefix_default(self, test_client: TestClient, admin_user, db: Session):
+        """Family users imported via CSV get email-prefix display_name as fallback."""
         from app.models import User
 
         csv_data = """# referrers
@@ -525,4 +523,4 @@ csv_fam@test.com,Password123!,family,,Fam Csv
 
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_fam@test.com").first()
-        assert user.display_name is None
+        assert user.display_name == "csv_fam"

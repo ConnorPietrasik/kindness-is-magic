@@ -93,6 +93,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
                     email=admin_email,
                     hashed_password=get_password_hash(admin_password),
                     role=UserRole.admin,
+                    display_name=admin_email.split("@")[0],
                     referrer_id=None,
                     family_id=None,
                 )

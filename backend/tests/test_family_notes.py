@@ -349,6 +349,7 @@ class TestFamilyCannotAccessNotes:
             email="note_family@test.com",
             hashed_password=get_password_hash("NoteFam1234!"),
             role=UserRole.family,
+            display_name=None,
             family_id=fam.id,
         )
         db.add(user)
@@ -402,6 +403,7 @@ class TestFamilyCannotAccessNotes:
             email="absent_family@test.com",
             hashed_password=get_password_hash("AbsentFam1234!"),
             role=UserRole.family,
+            display_name=None,
             family_id=fam.id,
         )
         db.add(user)

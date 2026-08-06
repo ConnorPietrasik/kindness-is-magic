@@ -86,7 +86,7 @@ def list_families(
     delivery_user_map: dict[int, str] = {}
     if delivery_user_ids:
         for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
-            delivery_user_map[u.id] = u.display_name or u.email
+            delivery_user_map[u.id] = u.display_name
 
     return FamilyListResponse(
         families=[
@@ -142,7 +142,7 @@ def list_deleted_families(
     delivery_user_map: dict[int, str] = {}
     if delivery_user_ids:
         for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
-            delivery_user_map[u.id] = u.display_name or u.email
+            delivery_user_map[u.id] = u.display_name
 
     return FamilyListResponse(
         families=[

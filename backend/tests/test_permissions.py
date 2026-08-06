@@ -55,6 +55,7 @@ class TestInactiveUserAuth:
             email="inactive@test.com",
             hashed_password="dummy",
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(user)

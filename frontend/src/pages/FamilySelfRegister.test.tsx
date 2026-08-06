@@ -13,7 +13,7 @@ const mockUser: User = {
   id: 10,
   email: "family@example.com",
   role: "family",
-  display_name: null,
+  display_name: "family",
   referrer_id: 1,
   family_id: 10,
   created_at: "2025-01-14T12:00:00Z",

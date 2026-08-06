@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from app.models import Person
 
-
 # ---------------------------------------------------------------------------
 # 200 — valid family, correct fields returned
 # ---------------------------------------------------------------------------

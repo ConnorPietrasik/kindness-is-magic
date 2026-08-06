@@ -57,6 +57,7 @@ class TestFamilyGetSelf:
             email="orphan_family@test.com",
             hashed_password=get_password_hash("OrphanFam1234!"),
             role=UserRole.family,
+            display_name=None,
             family_id=fam.id,
         )
         db.add(user)
@@ -119,6 +120,7 @@ class TestFamilyUpdateSelf:
             email="orphan_update@test.com",
             hashed_password=get_password_hash("OrphanUp1234!"),
             role=UserRole.family,
+            display_name=None,
             family_id=fam.id,
         )
         db.add(user)

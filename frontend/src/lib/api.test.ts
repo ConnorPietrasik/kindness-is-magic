@@ -133,10 +133,10 @@ describe("auth API functions", () => {
   });
 
   it("updateMyProfile — PATCH /api/auth/me with empty string to clear", async () => {
-    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 1, email: "a@b.com", display_name: null } });
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 1, email: "a@b.com", display_name: "a" } });
     const result = await apiModule.updateMyProfile("");
     expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/auth/me", { display_name: "" });
-    expect(result).toEqual({ id: 1, email: "a@b.com", display_name: null });
+    expect(result).toEqual({ id: 1, email: "a@b.com", display_name: "a" });
   });
 });
 

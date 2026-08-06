@@ -313,7 +313,7 @@ async def approve_family(
     await _send_family_approved_email(
         fam=fam,
         db=db,
-        referrer_display_name=owner.user.display_name or "",
+        referrer_display_name=owner.user.display_name,
     )
 
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))

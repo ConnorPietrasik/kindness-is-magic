@@ -21,7 +21,6 @@ from app.schemas import (
 from app.models import UserRole, WishType
 from app.user_validation import sanitize_plain_text
 
-
 # ---------------------------------------------------------------------------
 # Unit tests for sanitize_plain_text
 # ---------------------------------------------------------------------------
@@ -72,7 +71,6 @@ class TestSanitizePlainText:
 # ---------------------------------------------------------------------------
 # Integration tests — Pydantic schema validators reject HTML
 # ---------------------------------------------------------------------------
-
 
 HTML_PAYLOAD = '<script>alert("xss")</script>'
 

@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User, UserRole, Wish, WishType
 from app.auth import get_password_hash
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -18,6 +17,7 @@ def admin(db):
         email="admin@test.com",
         hashed_password=get_password_hash("AdminPass123!"),
         role=UserRole.admin,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -46,6 +46,7 @@ def referrer_user(db, referrer):
         email="referrer@test.com",
         hashed_password=get_password_hash("RefPass1234!"),
         role=UserRole.referrer,
+        display_name=None,
         referrer_id=referrer.id,
     )
     db.add(user)
@@ -76,6 +77,7 @@ def family_user(db, family):
         email="family@test.com",
         hashed_password=get_password_hash("FamPass1234!"),
         role=UserRole.family,
+        display_name=None,
         family_id=family.id,
     )
     db.add(user)
@@ -138,6 +140,7 @@ def another_referrer_user(db, another_referrer):
         email="another_referrer@test.com",
         hashed_password=get_password_hash("AnotherRef1234!"),
         role=UserRole.referrer,
+        display_name=None,
         referrer_id=another_referrer.id,
     )
     db.add(user)
@@ -399,7 +402,6 @@ class TestAdminApproveReject:
 # ---------------------------------------------------------------------------
 # 5. Referrer approve without prior family request (covered above)
 # ---------------------------------------------------------------------------
-
 
 # ---------------------------------------------------------------------------
 # 6. Referrer re-submit after admin rejection

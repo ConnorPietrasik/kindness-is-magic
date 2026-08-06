@@ -111,7 +111,7 @@ class UpdateProfile(BaseModel):
         if v is None:
             return v  # null → no-op (handled in to_update_dict)
         if isinstance(v, str) and v == "":
-            return _CLEAR  # "" → clear to NULL
+            raise ValueError("display_name cannot be empty")
         if isinstance(v, str) and len(v) > 40:
             raise ValueError("display_name must be 40 characters or fewer")
         if isinstance(v, str):
@@ -123,14 +123,12 @@ class UpdateProfile(BaseModel):
 
         * Field omitted → excluded (no-op)
         * Field sent as ``null`` → excluded (no-op)
-        * Field sent as ``""`` → included as ``None`` (clear)
         * Field sent as ``"Name"`` → included as the string
+        * Field sent as ``""`` → rejected (display_name is non-nullable)
         """
         result: dict[str, str | None] = {}
         dn = self.display_name
-        if dn is _CLEAR:
-            result["display_name"] = None
-        elif dn is not _NOT_PROVIDED and dn is not None:
+        if dn is not _NOT_PROVIDED and dn is not None:
             result["display_name"] = dn  # type: ignore[assignment]
         return result
 
@@ -183,7 +181,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     role: UserRole
-    display_name: Optional[str] = None
+    display_name: str
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
     created_at: datetime
@@ -990,6 +988,7 @@ class AdminUserUpdate(BaseModel):
     """Admin-only: partial update for a user.
 
     No password field — password changes go through the dedicated reset endpoint.
+    ``display_name`` cannot be cleared (non-nullable column).
     """
 
     display_name: Optional[str] = Field(None, max_length=40)
@@ -1002,6 +1001,8 @@ class AdminUserUpdate(BaseModel):
     def clean_display_name(cls, v: str | None) -> str | None:
         if v is None:
             return v
+        if v == "":
+            raise ValueError("display_name cannot be empty")
         return sanitize_plain_text(v)
 
 
@@ -1017,7 +1018,7 @@ class UserDetail(BaseModel):
     id: int
     display_id: Optional[str] = None
     email: str
-    display_name: Optional[str] = None
+    display_name: str
     role: UserRole
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None

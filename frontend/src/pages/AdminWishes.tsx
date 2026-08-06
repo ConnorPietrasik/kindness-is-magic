@@ -251,7 +251,7 @@ export default function AdminWishes() {
             <option value="">All assignees</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.display_name || u.email}
+                {u.display_name}
               </option>
             ))}
           </select>
@@ -572,7 +572,7 @@ function WishEditForm({ wish, users, onSave, onCancel, loading }: WishEditFormPr
               <option value="">Unassigned</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.display_name || u.email}
+                  {u.display_name}
                 </option>
               ))}
             </select>
@@ -758,7 +758,7 @@ function BatchAssignDialog({
               <option value="0">Unassigned</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.display_name || u.email}
+                  {u.display_name}
                 </option>
               ))}
             </select>

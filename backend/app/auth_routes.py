@@ -598,6 +598,7 @@ async def register_family(
         email=data.email,
         hashed_password=get_password_hash(data.password),
         role=UserRole.family,
+        display_name=data.email.split("@")[0],
         family_id=family.id,
     )
     db.add(user)

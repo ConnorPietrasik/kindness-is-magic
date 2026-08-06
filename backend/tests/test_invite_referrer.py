@@ -259,11 +259,12 @@ class TestInviteReferrerCreate:
         assert resp.status_code == 201
         assert captured_from_name["value"] == "Jane Admin"
 
-    def test_invite_email_defaults_to_kindness_fairy(self, test_client: TestClient, admin_user):
-        """Admin with no display_name defaults to 'Kindness Fairy' in invite."""
+    def test_invite_email_uses_admin_display_name(self, test_client: TestClient, admin_user):
+        """Invite email uses the admin's display_name as the sender name."""
         from unittest.mock import patch
 
-        assert admin_user.display_name is None
+        # display_name is now non-nullable; defaults to email prefix
+        assert admin_user.display_name == "admin"
         login_as(test_client, "admin@test.com", "AdminPass123!")
 
         captured_from_name = {}
@@ -278,7 +279,7 @@ class TestInviteReferrerCreate:
                 json={"family_limit": 10, "email": "newref@example.com"},
             )
         assert resp.status_code == 201
-        assert captured_from_name["value"] == "Kindness Fairy"
+        assert captured_from_name["value"] == "admin"
 
 
 # ---------------------------------------------------------------------------
@@ -582,6 +583,7 @@ class TestInviteRedemptionAtomicity:
             email="existing@test.com",
             hashed_password=get_password_hash("ExistingPass1!"),
             role="admin",
+            display_name=None,
         )
         db.add(existing)
         db.commit()

@@ -442,6 +442,7 @@ class TestAdminFamilyDisplayIdScoped:
             email="scoped_referrer@test.com",
             hashed_password=get_password_hash("RefPass1234!"),
             role=UserRole.referrer,
+            display_name=None,
             referrer_id=ref.id,
         )
         db.add(ref_user)

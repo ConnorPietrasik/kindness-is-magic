@@ -65,6 +65,7 @@ def purchaser_wish_tree(db: Session):
         email="purchaser@test.com",
         hashed_password=get_password_hash("PurchPass123!"),
         role=UserRole.purchaser,
+        display_name=None,
     )
     db.add(purchaser)
     db.commit()
@@ -93,6 +94,7 @@ def second_purchaser(db: Session):
         email="purchaser2@test.com",
         hashed_password=get_password_hash("Purch2Pass123!"),
         role=UserRole.purchaser,
+        display_name=None,
     )
     db.add(purchaser2)
     db.commit()
@@ -445,6 +447,7 @@ class TestAdminMarkPurchasedSkipRedundantWrite:
             email="admin2_mark@test.com",
             hashed_password=get_password_hash("Admin2Pass123!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(admin2)
         db.commit()

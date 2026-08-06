@@ -203,7 +203,7 @@ function WelcomeCard() {
     setValue(user?.display_name ?? "");
   };
 
-  const displayName = user?.display_name ?? user?.email ?? "?";
+  const displayName = user?.display_name ?? "?";
 
   return (
     <Card className="mb-6">

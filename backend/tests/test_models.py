@@ -25,6 +25,7 @@ class TestUser:
             email="test@example.com",
             hashed_password=get_password_hash("Pass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(user)
         db.commit()
@@ -43,6 +44,7 @@ class TestUser:
                 email="unique@test.com",
                 hashed_password=get_password_hash("Pass1234!"),
                 role=UserRole.admin,
+                display_name=None,
             )
         )
         db.commit()
@@ -53,6 +55,7 @@ class TestUser:
                     email="unique@test.com",
                     hashed_password=get_password_hash("Pass1234!"),
                     role=UserRole.admin,
+                    display_name=None,
                 )
             )
             db.commit()
@@ -65,6 +68,7 @@ class TestUser:
                 email=f"{role.value}@test.com",
                 hashed_password=get_password_hash("Pass1234!"),
                 role=role,
+                display_name=None,
             )
             db.add(user)
         db.commit()
@@ -308,6 +312,7 @@ class TestWish:
             email="buyer@test.com",
             hashed_password=get_password_hash("Pass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(user)
         db.flush()
@@ -334,6 +339,7 @@ class TestPasswordResetToken:
             email="token@test.com",
             hashed_password=get_password_hash("Pass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(user)
         db.commit()
@@ -359,6 +365,7 @@ class TestPasswordResetToken:
             email="rel@test.com",
             hashed_password=get_password_hash("Pass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(user)
         db.commit()

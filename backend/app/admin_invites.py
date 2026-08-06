@@ -59,7 +59,7 @@ def _resolve_invite_relations(invite: ReferrerInviteToken, db: Session):
     if invite.created_by_admin_id is not None:
         admin = db.query(User).filter(User.id == invite.created_by_admin_id, User.deleted_at.is_(None)).first()
         if admin:
-            admin_map[invite.created_by_admin_id] = admin.display_name or admin.email
+            admin_map[invite.created_by_admin_id] = admin.display_name
 
     referrer_map: dict[int, tuple[str, "Referrer.approval_status"]] = {}
     if invite.redeemed_by_referrer_id is not None:
@@ -103,7 +103,7 @@ def list_invites(
     admin_map: dict[int, str] = {}
     if admin_ids:
         admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: (a.display_name or a.email) for a in admins}
+        admin_map = {a.id: a.display_name for a in admins}
 
     referrer_ids = {inv.redeemed_by_referrer_id for inv in invites if inv.redeemed_by_referrer_id is not None}
     referrer_map: dict[int, tuple[str, Referrer.approval_status]] = {}

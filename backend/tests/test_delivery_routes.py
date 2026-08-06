@@ -14,6 +14,7 @@ def delivery_user(db):
         email="delivery@test.com",
         hashed_password=get_password_hash("DelPass1234!"),
         role=UserRole.delivery,
+        display_name=None,
     )
     db.add(user)
     db.commit()

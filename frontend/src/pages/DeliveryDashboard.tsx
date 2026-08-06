@@ -40,7 +40,7 @@ export default function DeliveryDashboard() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Welcome */}
         <Card className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Welcome, {user?.display_name ?? user?.email ?? "Delivery Person"}!</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Welcome, {user?.display_name ?? "Delivery Person"}!</h2>
           <p className="mt-1 text-sm text-gray-500">
             You are assigned to <strong>{families?.length ?? 0}</strong> family{families?.length !== 1 ? "ies" : ""}.
           </p>

@@ -258,7 +258,7 @@ export default function AdminUsers() {
                   <>
                     <Tr key={u.id}>
                       <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
-                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name ?? "—"}</Td>
+                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name}</Td>
                       <Td>
                         <RoleBadge role={u.role} />
                       </Td>

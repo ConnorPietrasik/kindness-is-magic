@@ -30,7 +30,7 @@ export function useDeliveryUsers(): {
   const deliveryUserMap = useMemo((): Record<number, string> => {
     const map: Record<number, string> = {};
     (data?.users ?? []).forEach((u) => {
-      map[u.id] = u.display_name || u.email;
+      map[u.id] = u.display_name;
     });
     return map;
   }, [data]);

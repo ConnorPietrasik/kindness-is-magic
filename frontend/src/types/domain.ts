@@ -12,7 +12,7 @@ export interface User {
   id: number;
   email: string;
   role: UserRole;
-  display_name: string | null;
+  display_name: string;
   referrer_id: number | null;
   family_id: number | null;
   created_at: string;
@@ -49,7 +49,7 @@ export interface UserPasswordReset {
 export interface UserSummary {
   id: number;
   email: string;
-  display_name: string | null;
+  display_name: string;
   role: UserRole;
   referrer_id: number | null;
   family_id: number | null;
@@ -64,7 +64,7 @@ export interface UserDetail {
   id: number;
   display_id: string | null;
   email: string;
-  display_name: string | null;
+  display_name: string;
   role: UserRole;
   referrer_id: number | null;
   family_id: number | null;

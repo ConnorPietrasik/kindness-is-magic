@@ -59,6 +59,7 @@ class TestAdminListUsers:
                 email=f"page{i}@test.com",
                 hashed_password=get_password_hash("PagePass123!"),
                 role=UserRole.admin,
+                display_name=None,
             )
             db.add(u)
         db.commit()
@@ -121,6 +122,7 @@ class TestAdminListUsers:
             email="deleted@test.com",
             hashed_password=get_password_hash("DeletedPass123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(u)
@@ -141,6 +143,7 @@ class TestAdminListUsers:
             email="deleted2@test.com",
             hashed_password=get_password_hash("DeletedPass123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(u)
@@ -200,6 +203,7 @@ class TestAdminGetUser:
             email="gone@test.com",
             hashed_password=get_password_hash("GonePass123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(u)
@@ -495,6 +499,7 @@ class TestAdminUpdateUser:
             email="softdel_update@test.com",
             hashed_password=get_password_hash("SoftDelPass123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(target)
@@ -548,6 +553,7 @@ class TestAdminUpdateUser:
             email="fam_to_admin@test.com",
             hashed_password=get_password_hash("FamPass1234!"),
             role=UserRole.family,
+            display_name=None,
             family_id=family_record.id,
         )
         db.add(target)
@@ -604,6 +610,7 @@ class TestAdminRestoreUser:
             email="softdel_restore@test.com",
             hashed_password=get_password_hash("SoftDelPass123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(target)
@@ -652,6 +659,7 @@ class TestAdminResetPassword:
             email="resetme@test.com",
             hashed_password=get_password_hash("OldPass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(u)
         db.commit()
@@ -697,6 +705,7 @@ class TestAdminDeleteUser:
             email="deleteme@test.com",
             hashed_password=get_password_hash("DeletePass123!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(u)
         db.commit()
@@ -718,6 +727,7 @@ class TestAdminDeleteUser:
             email="excluded@test.com",
             hashed_password=get_password_hash("Excluded123!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(u)
         db.commit()
@@ -741,6 +751,7 @@ class TestAdminDeleteUser:
             email="reappear@test.com",
             hashed_password=get_password_hash("Reappear123!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(u)
         db.commit()
@@ -769,6 +780,7 @@ class TestAdminDeleteUser:
             email="alreadygone@test.com",
             hashed_password=get_password_hash("AlreadyGone123!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(u)
@@ -782,7 +794,6 @@ class TestAdminDeleteUser:
 # =========================================================================
 #  Auth guards
 # =========================================================================
-
 
 ADMIN_USER_ENDPOINTS = [
     ("GET", "/api/admin/users", {}),

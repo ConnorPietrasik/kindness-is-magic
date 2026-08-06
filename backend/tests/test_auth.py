@@ -52,6 +52,7 @@ class TestLogin:
             email="disabled@test.com",
             hashed_password=get_password_hash("Pass12345!"),
             role=UserRole.admin,
+            display_name=None,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(user)
@@ -429,6 +430,7 @@ class TestResetPassword:
             email="userb@test.com",
             hashed_password=get_password_hash("UserBPass1234!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(user_b)
         db.commit()
@@ -581,8 +583,8 @@ class TestUpdateProfile:
         user = db.query(User).filter(User.email == "admin@test.com").first()
         assert user.display_name == "My New Name"
 
-    def test_patch_display_name_empty_string_sets_null(self, test_client: TestClient, admin_user, db: Session):
-        """Sending an empty string for display_name sets it to null."""
+    def test_patch_display_name_empty_string_rejected(self, test_client: TestClient, admin_user, db: Session):
+        """Sending an empty string for display_name is rejected (non-nullable column)."""
         from app.models import User
 
         # First set a name
@@ -594,12 +596,12 @@ class TestUpdateProfile:
             "/api/auth/me",
             json={"display_name": ""},
         )
-        assert resp.status_code == 200
-        assert resp.json()["display_name"] is None
+        assert resp.status_code == 422
 
+        # Display name should remain unchanged
         db.expire_all()
         user = db.query(User).filter(User.email == "admin@test.com").first()
-        assert user.display_name is None
+        assert user.display_name == "Existing Name"
 
     def test_patch_display_name_null_means_no_op(self, test_client: TestClient, admin_user, db: Session):
         """Sending null for display_name is a no-op (field stays unchanged)."""

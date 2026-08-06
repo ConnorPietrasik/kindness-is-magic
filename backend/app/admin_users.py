@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.database import get_db
-from app.models import Family, Referrer, User, Wish
+from app.models import Family, Referrer, User, UserRole, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     _CLEAR,
@@ -321,6 +321,14 @@ def create_user(
         deleted_at=None,
     )
     db.add(user)
+    db.flush()
+
+    # Override with referrer name if this is a referrer user and no explicit display_name
+    if body.role == UserRole.referrer and body.referrer_id and not body.display_name:
+        ref = db.query(Referrer).filter(Referrer.id == body.referrer_id).first()
+        if ref:
+            user.display_name = ref.name
+
     db.commit()
     db.refresh(user)
     logger.info("Admin %s created user '%s' (id=%s)", _admin.email, user.email, user.id)

@@ -55,7 +55,7 @@ def list_referrers(
     admin_map: dict[int, str] = {}
     if admin_ids:
         admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: (a.display_name or a.email) for a in admins}
+        admin_map = {a.id: a.display_name for a in admins}
 
     # Resolve family counts in bulk
     referrer_ids = {r.id for r in referrers}
@@ -110,7 +110,7 @@ def list_deleted_referrers(
     admin_map: dict[int, str] = {}
     if admin_ids:
         admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: (a.display_name or a.email) for a in admins}
+        admin_map = {a.id: a.display_name for a in admins}
 
     # Resolve family counts in bulk
     referrer_ids = {r.id for r in referrers}

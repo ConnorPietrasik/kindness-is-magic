@@ -156,6 +156,7 @@ class TestRejectedReferrerAuth:
             email="rejected@test.com",
             hashed_password=get_password_hash("RejectPass1234!"),
             role=UserRole.referrer,
+            display_name=None,
             referrer_id=ref.id,
         )
         db.add(user)
@@ -245,6 +246,7 @@ class TestSendFamilyInviteApprovalGate:
             email="pending_send@test.com",
             hashed_password=get_password_hash("PendSend1234!"),
             role=UserRole.referrer,
+            display_name=None,
             referrer_id=ref.id,
         )
         db.add(user)
@@ -278,6 +280,7 @@ class TestSendFamilyInviteApprovalGate:
             email="approved_send@test.com",
             hashed_password=get_password_hash("ApprSend1234!"),
             role=UserRole.referrer,
+            display_name=None,
             referrer_id=ref.id,
         )
         db.add(user)
@@ -318,6 +321,7 @@ class TestAdminApproveReject:
             email="approveme@test.com",
             hashed_password=get_password_hash("ApproveMe1234!"),
             role=UserRole.referrer,
+            display_name=None,
             referrer_id=ref.id,
         )
         db.add(user)

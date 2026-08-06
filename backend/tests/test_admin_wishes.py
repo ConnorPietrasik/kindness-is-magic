@@ -65,6 +65,7 @@ def wish_tree(db: Session):
         email="wish_admin@test.com",
         hashed_password=get_password_hash("AdminPass123!"),
         role=UserRole.admin,
+        display_name=None,
     )
     db.add(admin)
     db.commit()
@@ -563,6 +564,7 @@ class TestMarkPurchased:
             email="other_admin@test.com",
             hashed_password=get_password_hash("OtherPass123!"),
             role=UserRole.admin,
+            display_name=None,
         )
         db.add(other_user)
         db.commit()

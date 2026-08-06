@@ -66,7 +66,6 @@ if _engine_schema:
         conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{_engine_schema}"'))
         conn.commit()
 
-
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -242,6 +241,7 @@ def admin_user(db: Session):
         email="admin@test.com",
         hashed_password=get_password_hash("AdminPass123!"),
         role=UserRole.admin,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -278,6 +278,7 @@ def referrer_user(db: Session, referrer_record):
         hashed_password=get_password_hash("RefPass1234!"),
         role=UserRole.referrer,
         referrer_id=referrer_record.id,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -314,6 +315,7 @@ def family_user(db: Session, family_record):
         hashed_password=get_password_hash("FamPass1234!"),
         role=UserRole.family,
         family_id=family_record.id,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -451,6 +453,7 @@ def referrer_with_full_tree(db: Session):
         hashed_password=get_password_hash("TreeRef1234!"),
         role=UserRole.referrer,
         referrer_id=ref.id,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -484,6 +487,7 @@ def another_referrer(db: Session):
         hashed_password=get_password_hash("AnotherRef1234!"),
         role=UserRole.referrer,
         referrer_id=ref.id,
+        display_name=None,
     )
     db.add(user)
     db.commit()
@@ -518,6 +522,7 @@ def another_family(db: Session, referrer_record):
         hashed_password=get_password_hash("AnotherFam1234!"),
         role=UserRole.family,
         family_id=fam.id,
+        display_name=None,
     )
     db.add(user)
     db.commit()

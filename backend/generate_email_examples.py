@@ -17,7 +17,6 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.mail import (
-    _BRAND_COLOR,
     _wrap_email,
     build_family_approved_email,
     build_family_invite_email,
@@ -59,9 +58,7 @@ EXAMPLES = [
     {
         "filename": "03-password-reset.html",
         "label": "Password Reset",
-        "body": build_password_reset_email(
-            reset_link="https://kindnessismagic.love/reset-password?token=eyJhbGciOiJIUzI1NiJ9.example"
-        ),
+        "body": build_password_reset_email(reset_link="https://kindnessismagic.love/reset-password?token=eyJhbGciOiJIUzI1NiJ9.example"),
         "unsubscribe": False,  # exempt from unsubscribe
     },
     {
@@ -131,7 +128,7 @@ def main():
         filepath.write_text(full_html, encoding="utf-8")
         print(f"  ✓ {example['filename']}  —  {example['label']}")
 
-    print(f"\nDone. Open the files in a browser to preview.")
+    print("\nDone. Open the files in a browser to preview.")
     print(f"  Example: open {output_dir / '01-referrer-invite.html'}")
 
 

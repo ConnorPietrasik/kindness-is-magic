@@ -69,7 +69,7 @@ function makeUser({
   family_id = null,
   created_at = "2024-01-01T00:00:00",
 }: MakeUserOptions = {}): User {
-  return { id, email, role, display_name: null, referrer_id, family_id, created_at };
+  return { id, email, role, display_name: email.split("@")[0] ?? "test", referrer_id, family_id, created_at };
 }
 
 // ---------------------------------------------------------------------------

@@ -74,7 +74,7 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
     if ref.approved_by_admin_id is not None:
         admin = db.query(User).filter(User.id == ref.approved_by_admin_id).first()
         if admin and admin.deleted_at is None:
-            approved_by_name = admin.display_name or admin.email
+            approved_by_name = admin.display_name
 
     return {
         "id": ref.id,
@@ -281,7 +281,7 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
     if wish.assigned_to_id is not None:
         user = assigned_users.get(wish.assigned_to_id) if assigned_users is not None else wish.assigned_to
         if user is not None and user.deleted_at is None:
-            assigned_to_name = user.display_name or user.email
+            assigned_to_name = user.display_name
 
     return {
         "id": wish.id,
@@ -330,7 +330,7 @@ def build_family_detail(
     if include_delivery and fam.delivery_user_id is not None:
         del_user = db.query(User).filter(User.id == fam.delivery_user_id, User.deleted_at.is_(None)).first()
         if del_user:
-            delivery_user_name = del_user.display_name or del_user.email
+            delivery_user_name = del_user.display_name
 
     result: dict = {
         "id": fam.id,
