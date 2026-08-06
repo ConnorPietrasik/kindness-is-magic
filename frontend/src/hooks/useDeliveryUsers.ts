@@ -13,8 +13,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { adminListUsers } from "../lib/api";
-import { adminUsers } from "../lib/queryKeys";
+import { adminGetUsersDropdown } from "../lib/api";
+import { adminUsersDropdown } from "../lib/queryKeys";
 
 export function useDeliveryUsers(): {
   /** Map of delivery user id → display name (or email as fallback) */
@@ -23,13 +23,13 @@ export function useDeliveryUsers(): {
   deliveryUsersLoading: boolean;
 } {
   const { data, isLoading } = useQuery({
-    queryKey: adminUsers,
-    queryFn: () => adminListUsers({ page: 1, page_size: 200, roles: "delivery" }),
+    queryKey: adminUsersDropdown,
+    queryFn: () => adminGetUsersDropdown("delivery"),
   });
 
   const deliveryUserMap = useMemo((): Record<number, string> => {
     const map: Record<number, string> = {};
-    (data?.users ?? []).forEach((u) => {
+    (data ?? []).forEach((u) => {
       map[u.id] = u.display_name;
     });
     return map;

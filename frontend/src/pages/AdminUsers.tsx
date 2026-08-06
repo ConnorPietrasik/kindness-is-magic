@@ -28,10 +28,10 @@ import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminCreateUser,
   adminDeleteUser,
+  adminGetFamiliesDropdown,
+  adminGetReferrersDropdown,
   adminGetUser,
   adminListDeletedUsers,
-  adminListFamilies,
-  adminListReferrers,
   adminListUsers,
   adminResetUserPassword,
   adminRestoreUser,
@@ -44,7 +44,8 @@ import type {
   AdminUserCreate,
   AdminUsersListParams,
   AdminUserUpdate,
-  ReferrerSummary,
+  FamilyDropdownItem,
+  ReferrerDropdownItem,
   UserDetail,
   UserListResponse,
   UserPasswordReset,
@@ -107,18 +108,16 @@ export default function AdminUsers() {
   });
 
   // Fetch referrers for dropdown (only active)
-  const { data: referrerListData } = useQuery({
+  const { data: referrers } = useQuery({
     queryKey: adminReferrersDropdown,
-    queryFn: () => adminListReferrers({ page: 1, page_size: 200 }),
+    queryFn: () => adminGetReferrersDropdown(),
   });
-  const referrers = useMemo<ReferrerSummary[]>(() => referrerListData?.referrers ?? [], [referrerListData]);
 
   // Fetch families for dropdown (only active)
-  const { data: familyListData } = useQuery({
+  const { data: families } = useQuery({
     queryKey: adminFamiliesDropdown,
-    queryFn: () => adminListFamilies({ page: 1, page_size: 200 }),
+    queryFn: () => adminGetFamiliesDropdown(),
   });
-  const families = useMemo(() => familyListData?.families ?? [], [familyListData]);
 
   // Reset password mutation (special — not standard CRUD)
   const resetPasswordMut = useMutation({
@@ -229,8 +228,8 @@ export default function AdminUsers() {
               title="Add User"
               initial={defaultUserForm}
               isEdit={false}
-              referrers={referrers}
-              families={families}
+              referrers={referrers ?? []}
+              families={families ?? []}
               onCreate={handleCreateUser}
               onUpdate={handleUpdateUser}
               onCancel={cancelForm}
@@ -337,8 +336,8 @@ export default function AdminUsers() {
                                 title="Edit User"
                                 initial={detail}
                                 isEdit={true}
-                                referrers={referrers}
-                                families={families}
+                                referrers={referrers ?? []}
+                                families={families ?? []}
                                 onCreate={handleCreateUser}
                                 onUpdate={handleUpdateUser}
                                 onCancel={cancelForm}
@@ -453,8 +452,8 @@ interface UserFormProps {
   title: string;
   initial: Partial<UserDetail>;
   isEdit: boolean;
-  referrers: ReferrerSummary[];
-  families: Array<{ id: number; family_name: string }>;
+  referrers: ReferrerDropdownItem[];
+  families: FamilyDropdownItem[];
   onCreate: (data: UserFormState) => void;
   onUpdate: (data: UserFormState) => void;
   onCancel: () => void;

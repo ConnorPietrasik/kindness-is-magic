@@ -27,9 +27,9 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminBatchAssignWishes,
+  adminGetFamiliesDropdown,
+  adminGetUsersDropdown,
   adminGetWish,
-  adminListFamilies,
-  adminListUsers,
   adminListWishes,
   adminMarkPurchased,
   adminUpdateWish,
@@ -40,8 +40,8 @@ import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type {
   AdminWishesListParams,
   AdminWishUpdate,
-  FamilySummary,
-  UserSummary,
+  FamilyDropdownItem,
+  UserDropdownItem,
   WishBatchAssign,
   WishDetail,
   WishListResponse,
@@ -109,18 +109,16 @@ export default function AdminWishes() {
   });
 
   // Fetch families for dropdown
-  const { data: familyListData } = useQuery({
+  const { data: families } = useQuery({
     queryKey: adminFamiliesDropdown,
-    queryFn: () => adminListFamilies({ page: 1, page_size: 200 }),
+    queryFn: () => adminGetFamiliesDropdown(),
   });
-  const families = useMemo<FamilySummary[]>(() => familyListData?.families ?? [], [familyListData]);
 
   // Fetch users for dropdown (assigned-to / batch-assign) — admins + purchasers
-  const { data: userListData } = useQuery({
+  const { data: users } = useQuery({
     queryKey: adminUsersDropdown,
-    queryFn: () => adminListUsers({ page: 1, page_size: 200, roles: "admin,purchaser" }),
+    queryFn: () => adminGetUsersDropdown("admin,purchaser"),
   });
-  const users = useMemo<UserSummary[]>(() => userListData?.users ?? [], [userListData]);
 
   // Mark-purchased mutation
   const markPurchasedMut = useMutation({
@@ -233,7 +231,7 @@ export default function AdminWishes() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           >
             <option value="">All families</option>
-            {families.map((f) => (
+            {(families ?? []).map((f) => (
               <option key={f.id} value={f.id}>
                 {f.family_name}
               </option>
@@ -249,7 +247,7 @@ export default function AdminWishes() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           >
             <option value="">All assignees</option>
-            {users.map((u) => (
+            {(users ?? []).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.display_name}
               </option>
@@ -327,7 +325,7 @@ export default function AdminWishes() {
                     </Td>
                     <Td>
                       <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                        {getFamilyName(families, w.family_id)}
+                        {getFamilyName(families ?? [], w.family_id)}
                       </Link>
                     </Td>
                     <Td>
@@ -403,7 +401,7 @@ export default function AdminWishes() {
                           ) : detail ? (
                             <WishEditForm
                               wish={detail}
-                              users={users}
+                              users={users ?? []}
                               onSave={handleUpdateWish}
                               onCancel={cancelForm}
                               loading={updateMut.isPending}
@@ -446,7 +444,7 @@ export default function AdminWishes() {
         <BatchAssignDialog
           open={batchAssignOpen}
           selectedCount={selectedIds.size}
-          users={users}
+          users={users ?? []}
           assignedToId={assignUserId}
           onAssignToChange={setAssignUserId}
           onSubmit={() => {
@@ -476,7 +474,7 @@ export default function AdminWishes() {
 
 interface WishEditFormProps {
   wish: WishDetail;
-  users: UserSummary[];
+  users: UserDropdownItem[];
   onSave: (data: WishFormState) => void;
   onCancel: () => void;
   loading: boolean;
@@ -710,7 +708,7 @@ function MarkPurchasedDialog({ open, wish, onSubmit, onCancel, loading }: MarkPu
 interface BatchAssignDialogProps {
   open: boolean;
   selectedCount: number;
-  users: UserSummary[];
+  users: UserDropdownItem[];
   assignedToId: number | null;
   onAssignToChange: (id: number | null) => void;
   onSubmit: () => void;
@@ -796,7 +794,7 @@ function WishTypeBadge({ type }: { type: WishType }) {
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-function getFamilyName(families: FamilySummary[], familyId: number): string {
+function getFamilyName(families: FamilyDropdownItem[], familyId: number): string {
   const family = families.find((f) => f.id === familyId);
   return family?.family_name ?? `Family #${familyId}`;
 }

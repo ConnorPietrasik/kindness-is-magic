@@ -26,6 +26,7 @@ from app.schemas import (
     AdminReferrerUpdate,
     ReferrerCreate,
     ReferrerDetail,
+    ReferrerDropdownItem,
     ReferrerListResponse,
     ReferrerSummary,
 )
@@ -36,6 +37,16 @@ referrer_admin_router = APIRouter(
     prefix="/api/admin/referrers",
     tags=["admin-referrers"],
 )
+
+
+@referrer_admin_router.get("/dropdown")
+def get_referrers_dropdown(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[ReferrerDropdownItem]:
+    """Return all active referrers as minimal {id, name} entries."""
+    referrers = db.query(Referrer).filter(Referrer.deleted_at.is_(None)).order_by(Referrer.id).all()
+    return [ReferrerDropdownItem(id=r.id, name=r.name) for r in referrers]
 
 
 @referrer_admin_router.get("")

@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { FamilySummary, UserSummary, WishDetail, WishListResponse, WishListSummary } from "../types";
+import type { FamilyDropdownItem, UserDropdownItem, WishDetail, WishListResponse, WishListSummary } from "../types";
 import AdminWishes from "./AdminWishes";
 
 /* ------------------------------------------------------------------ */
@@ -68,36 +68,14 @@ const mockWishDetail: WishDetail = {
   person_family_name: "The Johnsons",
 };
 
-const mockFamily: FamilySummary = {
+const mockFamily: FamilyDropdownItem = {
   id: 5,
-  display_id: "KFI-005",
   family_name: "The Johnsons",
-  family_wish: "Warm wishes",
-  contact_name: "Mom",
-  referrer_id: 1,
-  delivery_user_id: null,
-  delivery_user_name: null,
-  deleted_at: null,
-  person_count: 3,
-  approval_status: "approved",
-  pickup_window: null,
-  wish_lock_level: "admin",
-  wish_review_requested_at: null,
-  wish_rejection_reason: null,
-  has_notes: false,
 };
 
-const mockUser: UserSummary = {
+const mockUser: UserDropdownItem = {
   id: 3,
-  email: "jane@example.com",
   display_name: "Jane Admin",
-  role: "admin",
-  referrer_id: null,
-  family_id: null,
-  deleted_at: null,
-  created_at: "2025-01-01T00:00:00Z",
-  referrer_name: null,
-  family_name: null,
 };
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -125,8 +103,8 @@ describe("AdminWishes", () => {
 
   it("renders loading state initially", () => {
     vi.spyOn(api, "adminListWishes").mockReturnValue(new Promise(() => {}));
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [], total: 0, page: 1, page_size: 200, total_pages: 0 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [], total: 0, page: 1, page_size: 200, total_pages: 0 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
     wrap(<AdminWishes />);
     expect(document.querySelector("svg.animate-spin")).toBeInTheDocument();
@@ -134,8 +112,8 @@ describe("AdminWishes", () => {
 
   it("renders wish list with mocked data", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -150,8 +128,8 @@ describe("AdminWishes", () => {
 
   it("shows empty state when no wishes found", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [], total: 0, page: 1, page_size: 200, total_pages: 0 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [], total: 0, page: 1, page_size: 200, total_pages: 0 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
     wrap(<AdminWishes />);
 
@@ -162,8 +140,8 @@ describe("AdminWishes", () => {
 
   it("renders filter controls", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -179,8 +157,8 @@ describe("AdminWishes", () => {
 
   it("shows purchase status for purchased wishes", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -194,8 +172,8 @@ describe("AdminWishes", () => {
 
   it("disables Mark Purchased button for already purchased wishes", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -212,8 +190,8 @@ describe("AdminWishes", () => {
   it("edit flow opens form and calls update mutation", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
 
@@ -250,8 +228,8 @@ describe("AdminWishes", () => {
   it("mark-purchased dialog opens and calls mutation", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
 
     wrap(<AdminWishes />);
@@ -289,8 +267,8 @@ describe("AdminWishes", () => {
   it("batch assign dialog opens with selected wishes", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminBatchAssignWishes").mockResolvedValue({ assigned_count: 1 });
 
     wrap(<AdminWishes />);
@@ -319,8 +297,8 @@ describe("AdminWishes", () => {
   it("select all checkbox toggles all rows", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -345,8 +323,8 @@ describe("AdminWishes", () => {
     error.response = { data: { detail: "Validation failed" } };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockRejectedValue(error);
 
@@ -377,8 +355,8 @@ describe("AdminWishes", () => {
     vi.spyOn(api, "adminListWishes")
       .mockResolvedValueOnce(mockWishListResponse)
       .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
 
@@ -412,8 +390,8 @@ describe("AdminWishes", () => {
       vi.spyOn(api, "adminListWishes")
         .mockResolvedValueOnce(mockWishListResponse)
         .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-      vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-      vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+      vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
       wrap(<AdminWishes />);
 
@@ -450,8 +428,8 @@ describe("AdminWishes", () => {
     };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(wishWithNote);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(wishWithNote);
 
@@ -494,8 +472,8 @@ describe("AdminWishes", () => {
     };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(wishAssigned);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(wishAssigned);
 
@@ -532,8 +510,8 @@ describe("AdminWishes", () => {
     const user = userEvent.setup();
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
 
@@ -568,8 +546,8 @@ describe("AdminWishes", () => {
     const user = userEvent.setup();
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [mockFamily], total: 1, page: 1, page_size: 200, total_pages: 1 });
-    vi.spyOn(api, "adminListUsers").mockResolvedValue({ users: [mockUser], total: 1, page: 1, page_size: 200, total_pages: 1 });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
 
     wrap(<AdminWishes />);

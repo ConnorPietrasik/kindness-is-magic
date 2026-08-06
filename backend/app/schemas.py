@@ -226,6 +226,38 @@ class ReferrerSelfRegisterResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Dropdown schemas — minimal {id, name} for select inputs
+# ---------------------------------------------------------------------------
+
+
+class UserDropdownItem(BaseModel):
+    """Minimal user entry for dropdown selects."""
+
+    id: int
+    display_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class ReferrerDropdownItem(BaseModel):
+    """Minimal referrer entry for dropdown selects."""
+
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyDropdownItem(BaseModel):
+    """Minimal family entry for dropdown selects."""
+
+    id: int
+    family_name: str
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # Admin CRUD schemas — Referrers
 # ---------------------------------------------------------------------------
 

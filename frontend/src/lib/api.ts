@@ -18,6 +18,7 @@ import type {
   AdminWishUpdate,
   DeliveryFamilySummary,
   FamilyDetail,
+  FamilyDropdownItem,
   FamilyListResponse,
   FamilyPayload,
   FamilyReviewQueueItem,
@@ -36,6 +37,7 @@ import type {
   PurchaserWishListResponse,
   PurchaserWishUpdate,
   ReferrerDetail,
+  ReferrerDropdownItem,
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteResponse,
@@ -46,6 +48,7 @@ import type {
   ReferrerSelfRegisterResponse,
   User,
   UserDetail,
+  UserDropdownItem,
   UserListResponse,
   UserPasswordReset,
   WishBatchAssign,
@@ -265,6 +268,11 @@ export function adminListDeletedReferrers(params?: PaginationParams): Promise<Re
   return apiGet("/api/admin/referrers/deleted", params);
 }
 
+/** Fetch minimal referrer list for dropdown selects (no pagination). */
+export function adminGetReferrersDropdown(): Promise<ReferrerDropdownItem[]> {
+  return apiGet("/api/admin/referrers/dropdown");
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
@@ -299,6 +307,11 @@ export function adminListReferrerFamilies(rid: number, params?: PaginationParams
 /** Fetch soft-deleted families (separate /deleted endpoint). */
 export function adminListDeletedFamilies(params?: PaginationParams & { referrer_id?: number | null }): Promise<FamilyListResponse> {
   return apiGet("/api/admin/families/deleted", params);
+}
+
+/** Fetch minimal family list for dropdown selects (no pagination). */
+export function adminGetFamiliesDropdown(): Promise<FamilyDropdownItem[]> {
+  return apiGet("/api/admin/families/dropdown");
 }
 
 // ---------------------------------------------------------------------------
@@ -433,6 +446,11 @@ export function adminRestoreUser(id: number): Promise<UserDetail> {
 /** Fetch soft-deleted users (separate /deleted endpoint). */
 export function adminListDeletedUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
   return apiGet("/api/admin/users/deleted", params);
+}
+
+/** Fetch minimal user list for dropdown selects (no pagination). Optional role filter. */
+export function adminGetUsersDropdown(roles?: string): Promise<UserDropdownItem[]> {
+  return roles ? apiGet("/api/admin/users/dropdown", { roles }) : apiGet("/api/admin/users/dropdown");
 }
 
 // ---------------------------------------------------------------------------

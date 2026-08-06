@@ -27,6 +27,7 @@ from app.schemas import (
     AdminUserCreate,
     AdminUserUpdate,
     UserDetail,
+    UserDropdownItem,
     UserListResponse,
     UserPasswordReset,
 )
@@ -141,6 +142,23 @@ def _apply_role_filter(query, role: str | None, roles: str | None):
     elif role is not None:
         query = query.filter(User.role == role)
     return query
+
+
+@user_admin_router.get("/dropdown")
+def get_users_dropdown(
+    roles: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[UserDropdownItem]:
+    """Return all active users as minimal {id, display_name} entries.
+
+    Optional ``roles`` query param filters by comma-separated role names
+    (e.g. ``roles=delivery`` or ``roles=admin,purchaser``).
+    """
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    query = _apply_role_filter(query, None, roles)
+    users = query.order_by(User.id).all()
+    return [UserDropdownItem(id=u.id, display_name=u.display_name) for u in users]
 
 
 @user_admin_router.get("")

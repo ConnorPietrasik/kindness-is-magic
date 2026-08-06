@@ -213,6 +213,13 @@ describe("admin referrer API functions", () => {
       params: { page: 2, page_size: 10 },
     });
   });
+
+  it("adminGetReferrersDropdown — GET /api/admin/referrers/dropdown", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, name: "Smith Org" }] });
+    const result = await apiModule.adminGetReferrersDropdown();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/referrers/dropdown");
+    expect(result).toEqual([{ id: 1, name: "Smith Org" }]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -286,6 +293,13 @@ describe("admin family API functions", () => {
     mockAxiosInstance.delete.mockResolvedValueOnce({ data: null });
     await apiModule.adminDeleteFamily(3);
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/families/3");
+  });
+
+  it("adminGetFamiliesDropdown — GET /api/admin/families/dropdown", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, family_name: "The Smiths" }] });
+    const result = await apiModule.adminGetFamiliesDropdown();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/dropdown");
+    expect(result).toEqual([{ id: 1, family_name: "The Smiths" }]);
   });
 });
 
@@ -362,6 +376,20 @@ describe("admin user API functions", () => {
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/deleted", {
       params: { page: 2, page_size: 10, role: "admin", search: "test" },
     });
+  });
+
+  it("adminGetUsersDropdown — GET /api/admin/users/dropdown", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, display_name: "Alice" }] });
+    const result = await apiModule.adminGetUsersDropdown();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/dropdown");
+    expect(result).toEqual([{ id: 1, display_name: "Alice" }]);
+  });
+
+  it("adminGetUsersDropdown with roles — GET /api/admin/users/dropdown?roles=delivery", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 2, display_name: "Bob" }] });
+    const result = await apiModule.adminGetUsersDropdown("delivery");
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/dropdown", { params: { roles: "delivery" } });
+    expect(result).toEqual([{ id: 2, display_name: "Bob" }]);
   });
 });
 

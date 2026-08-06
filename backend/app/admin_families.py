@@ -27,6 +27,7 @@ from app.schemas import (
     AdminFamilyUpdate,
     FamilyCreate,
     FamilyDetail,
+    FamilyDropdownItem,
     FamilyListResponse,
     FamilyReviewList,
     FamilyReviewRequest,
@@ -43,6 +44,16 @@ family_admin_router = APIRouter(
     prefix="/api/admin/families",
     tags=["admin-families"],
 )
+
+
+@family_admin_router.get("/dropdown")
+def get_families_dropdown(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[FamilyDropdownItem]:
+    """Return all active families as minimal {id, family_name} entries."""
+    families = db.query(Family).filter(Family.deleted_at.is_(None)).order_by(Family.id).all()
+    return [FamilyDropdownItem(id=f.id, family_name=f.family_name) for f in families]
 
 
 @family_admin_router.get("")

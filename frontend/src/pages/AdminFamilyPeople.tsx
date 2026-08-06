@@ -31,9 +31,9 @@ import {
   adminCreatePerson,
   adminDeletePerson,
   adminGetFamily,
+  adminGetReferrersDropdown,
   adminListDeletedPeople,
   adminListFamilyPeople,
-  adminListReferrers,
   adminRestorePerson,
   adminUpdateFamily,
   adminUpdatePerson,
@@ -46,7 +46,7 @@ import {
   adminFamilyPeople,
   adminPackingSlips,
   adminReferrerFamilies,
-  adminReferrers,
+  adminReferrersDropdown,
   adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -66,18 +66,18 @@ export default function AdminFamilyPeople() {
   const familyKey = adminFamilyDetail(famIdStr);
 
   // Referrers lookup for the family edit form
-  const { data: referrerData, isLoading: referrersLoading } = useQuery({
-    queryKey: adminReferrers,
-    queryFn: () => adminListReferrers(),
+  const { data: referrers, isLoading: referrersLoading } = useQuery({
+    queryKey: adminReferrersDropdown,
+    queryFn: () => adminGetReferrersDropdown(),
   });
 
   const referrerMap = useMemo((): Record<number, string> => {
     const map: Record<number, string> = {};
-    (referrerData?.referrers ?? []).forEach((r) => {
+    (referrers ?? []).forEach((r) => {
       map[r.id] = r.name;
     });
     return map;
-  }, [referrerData]);
+  }, [referrers]);
 
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();

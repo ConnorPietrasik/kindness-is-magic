@@ -102,3 +102,25 @@ export interface PurchaserWishListResponse {
   page_size: number;
   total_pages: number;
 }
+
+// ---------------------------------------------------------------------------
+// Dropdown items — minimal payloads for select/option lists
+// ---------------------------------------------------------------------------
+
+/** Minimal user entry for dropdown selects. */
+export interface UserDropdownItem {
+  id: number;
+  display_name: string;
+}
+
+/** Minimal referrer entry for dropdown selects. */
+export interface ReferrerDropdownItem {
+  id: number;
+  name: string;
+}
+
+/** Minimal family entry for dropdown selects. */
+export interface FamilyDropdownItem {
+  id: number;
+  family_name: string;
+}

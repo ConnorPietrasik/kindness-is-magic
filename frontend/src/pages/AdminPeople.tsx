@@ -29,15 +29,15 @@ import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminCreatePerson,
   adminDeletePerson,
+  adminGetFamiliesDropdown,
   adminGetPerson,
   adminListDeletedPeople,
-  adminListFamilies,
   adminListPeople,
   adminRestoreFamily,
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
-import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
+import { adminDeletedPeople, adminFamilies, adminFamiliesDropdown, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { PaginationParams, PersonPayload } from "../types";
@@ -124,18 +124,18 @@ export default function AdminPeople() {
   );
 
   // Families lookup (for dropdown + display)
-  const { data: familyData, isLoading: familiesLoading } = useQuery({
-    queryKey: adminFamilies,
-    queryFn: () => adminListFamilies(),
+  const { data: families, isLoading: familiesLoading } = useQuery({
+    queryKey: adminFamiliesDropdown,
+    queryFn: () => adminGetFamiliesDropdown(),
   });
 
   const familyMap = useMemo((): Record<number, string> => {
     const map: Record<number, string> = {};
-    (familyData?.families ?? []).forEach((f) => {
+    (families ?? []).forEach((f) => {
       map[f.id] = f.family_name;
     });
     return map;
-  }, [familyData]);
+  }, [families]);
 
   function handleCreate(formData: PersonPayload) {
     createMut?.mutate(formData);
