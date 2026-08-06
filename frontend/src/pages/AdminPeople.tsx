@@ -14,6 +14,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { DisplayId } from "../components/DisplayId";
 import { defaultPersonForm } from "../components/defaults";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -201,7 +202,9 @@ export default function AdminPeople() {
                 {people.map((p) => (
                   <>
                     <Tr key={p.id} data-id={p.id}>
-                      <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">
+                        <DisplayId displayId={p.display_id} familyId={p.family_id} />
+                      </Td>
                       <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
                       <Td>{p.age}</Td>
                       {p.age >= 18 ? (

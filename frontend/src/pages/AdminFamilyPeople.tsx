@@ -11,6 +11,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { HeaderBar } from "../components/HeaderBar";
@@ -210,7 +211,11 @@ function FamilyCard(
         <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-semibold text-gray-900">{data ? data.family_name : "\u2014"}</h3>
-            {data && <span className="text-xs font-mono text-gray-400">#{data.display_id}</span>}
+            {data && (
+              <span className="text-xs font-mono text-gray-400">
+                #<DisplayId displayId={data.display_id} familyId={data.id} referrerId={data.referrer_id} />
+              </span>
+            )}
             {data && (
               <span className="inline-flex items-center rounded-full bg-btn-start px-2 py-0.5 text-xs font-semibold text-white">
                 {(data.person_count ?? 0) === 1 ? "1 person" : `${data.person_count ?? 0} people`}

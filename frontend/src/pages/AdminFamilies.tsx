@@ -14,6 +14,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { HeaderBar } from "../components/HeaderBar";
@@ -257,7 +258,9 @@ export default function AdminFamilies() {
                 {families.map((f) => (
                   <>
                     <Tr key={f.id} data-id={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
-                      <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+                      <Td className="whitespace-nowrap text-xs text-gray-400">
+                        <DisplayId displayId={f.display_id} familyId={f.id} referrerId={f.referrer_id} />
+                      </Td>
                       <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                         {f.family_name}
                         {f.deleted_at == null && f.has_notes && (

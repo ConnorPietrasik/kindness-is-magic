@@ -13,6 +13,7 @@ import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
@@ -145,6 +146,7 @@ export default function AdminReferrerFamilies() {
                 rows={rows as FamilySummary[]}
                 callbacks={callbacks}
                 isDeletedView={ctx.isDeletedView}
+                referrerId={refIdNum}
                 onResetWishState={(id) => resetMut.mutate(id)}
                 isResetting={resetMut.isPending}
                 onFullyApprove={(id) => fullyApproveMut.mutate(id)}
@@ -255,6 +257,7 @@ function FamiliesTable({
   rows,
   callbacks,
   isDeletedView,
+  referrerId,
   onResetWishState,
   isResetting,
   onFullyApprove,
@@ -263,6 +266,7 @@ function FamiliesTable({
   rows: FamilySummary[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
+  referrerId: number;
   onResetWishState: (id: number) => void;
   isResetting: boolean;
   onFullyApprove: (id: number) => void;
@@ -293,7 +297,9 @@ function FamiliesTable({
         {rows.map((f) => (
           <>
             <Tr key={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
-              <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+              <Td className="whitespace-nowrap text-xs text-gray-400">
+                <DisplayId displayId={f.display_id} familyId={f.id} referrerId={referrerId} />
+              </Td>
               <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
                 {f.family_name}
                 {f.deleted_at == null && f.has_notes && (
