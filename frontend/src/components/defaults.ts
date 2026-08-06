@@ -40,6 +40,7 @@ export interface FamilyFormState {
   referrer_notes: string | null;
   // Admin-only fields (present when initial data includes them)
   referrer_id?: number | null;
+  delivery_user_id?: number | null;
   deleted_at?: string | null;
 }
 

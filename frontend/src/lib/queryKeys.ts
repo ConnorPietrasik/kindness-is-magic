@@ -177,3 +177,12 @@ export const adminWishDetail = (id: number) => ["adminWishes", id] as const;
 export const purchaserWishes = ["purchaserWishes"] as const;
 /** Single purchaser wish detail (pass id at call site) */
 export const purchaserWishDetail = (id: number) => ["purchaserWishes", id] as const;
+
+// ---------------------------------------------------------------------------
+// Delivery — Families
+// ---------------------------------------------------------------------------
+
+/** Delivery person's assigned families list */
+export const deliveryFamilies = ["deliveryFamilies"] as const;
+/** Packing slips for the delivery person's assigned families */
+export const deliveryPackingSlips = ["deliveryPackingSlips"] as const;

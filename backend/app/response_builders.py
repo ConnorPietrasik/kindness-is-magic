@@ -300,12 +300,16 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
     }
 
 
-def build_family_detail(fam: Family, db: Session, *, person_count: int | None = None, include_referrer_notes: bool = False) -> dict:
+def build_family_detail(
+    fam: Family, db: Session, *, person_count: int | None = None, include_referrer_notes: bool = False, include_delivery: bool = True
+) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 
     Pass ``person_count`` to skip the query when it is already known.
     Pass ``include_referrer_notes=True`` to include the referrer_notes field
     (for referrer and admin views; omit for family self-service).
+    Pass ``include_delivery=False`` to skip the delivery-user lookup
+    (for family self-service views that don't expose delivery info).
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
@@ -321,10 +325,19 @@ def build_family_detail(fam: Family, db: Session, *, person_count: int | None = 
         if ref:
             referrer_name = ref.name
 
+    # Resolve delivery user name (skip for self-service views)
+    delivery_user_name: str | None = None
+    if include_delivery and fam.delivery_user_id is not None:
+        del_user = db.query(User).filter(User.id == fam.delivery_user_id, User.deleted_at.is_(None)).first()
+        if del_user:
+            delivery_user_name = del_user.display_name or del_user.email
+
     result: dict = {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
         "referrer_name": referrer_name,
+        "delivery_user_id": fam.delivery_user_id if include_delivery else None,
+        "delivery_user_name": delivery_user_name,
         "display_id": display_id,
         "family_name": fam.family_name,
         "bio": fam.bio,

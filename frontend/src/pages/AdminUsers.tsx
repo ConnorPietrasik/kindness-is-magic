@@ -208,6 +208,8 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
               <option value="referrer">Referrer</option>
               <option value="family">Family</option>
+              <option value="purchaser">Purchaser</option>
+              <option value="delivery">Delivery</option>
             </select>
             <input
               type="text"
@@ -535,6 +537,8 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
             <option value="admin">Admin</option>
             <option value="referrer">Referrer</option>
             <option value="family">Family</option>
+            <option value="purchaser">Purchaser</option>
+            <option value="delivery">Delivery</option>
           </select>
         </div>
 
@@ -689,6 +693,7 @@ const roleColors: Record<UserRole, string> = {
   referrer: "bg-blue-100 text-blue-700",
   family: "bg-green-100 text-green-700",
   purchaser: "bg-orange-100 text-orange-700",
+  delivery: "bg-teal-100 text-teal-700",
 };
 
 function RoleBadge({ role }: { role: UserRole }) {

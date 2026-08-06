@@ -60,7 +60,7 @@ def get_self(
     db: Session = Depends(get_db),
 ) -> FamilySelfServiceDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
-    return FamilySelfServiceDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False))
 
 
 @router.patch("/me")
@@ -77,7 +77,7 @@ def update_self(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s updated own profile (family id=%s)", user.email, fam.id)
-    return FamilySelfServiceDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False))
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ def request_review(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s requested review (family id=%s)", user.email, fam.id)
-    return FamilySelfServiceDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False))
 
 
 @router.post("/me/cancel-review")
@@ -137,7 +137,7 @@ def cancel_review(
     db.commit()
     db.refresh(fam)
     logger.info("Family user %s cancelled review request (family id=%s)", user.email, fam.id)
-    return FamilySelfServiceDetail(**build_family_detail(fam, db))
+    return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False))
 
 
 # ---------------------------------------------------------------------------

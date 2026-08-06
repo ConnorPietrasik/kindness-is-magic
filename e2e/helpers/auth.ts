@@ -21,6 +21,10 @@ export const CREDENTIALS = {
     email: "purchaser.e2e@example.com",
     password: "Password123!",
   },
+  delivery: {
+    email: "mike.torres@example.com",
+    password: "Password123!",
+  },
 } as const;
 
 /**
@@ -72,6 +76,12 @@ export async function loginAsPurchaser(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.purchaser);
   /* Purchasers land on /purchaser/assigned-gifts which has "Assigned Gifts" heading */
   await expect(page.getByRole("heading", { name: "Assigned Gifts" })).toBeVisible();
+}
+
+export async function loginAsDelivery(page: Page): Promise<void> {
+  await loginAs(page, CREDENTIALS.delivery);
+  /* Delivery people land on /delivery which has a welcome heading */
+  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
 }
 
 /**

@@ -94,12 +94,12 @@ export async function deleteReferrerViaApi(
  */
 export async function listFamiliesViaApi(
   request: APIRequestContext,
-): Promise<{ families: Array<{ id: number; family_name: string }>; total: number }> {
+): Promise<{ families: Array<{ id: number; family_name: string; delivery_user_id: number | null }>; total: number }> {
   const resp = await request.get("/api/admin/families");
   if (!resp.ok()) {
     throw new Error(`listFamiliesViaApi failed: ${resp.status()}`);
   }
-  return resp.json() as Promise<{ families: Array<{ id: number; family_name: string }>; total: number }>;
+  return resp.json() as Promise<{ families: Array<{ id: number; family_name: string; delivery_user_id: number | null }>; total: number }>;
 }
 
 /**
@@ -181,5 +181,24 @@ export async function batchAssignWishesViaApi(
   if (!resp.ok()) {
     const body = await resp.text();
     throw new Error(`batchAssignWishesViaApi failed (${resp.status()}): ${body}`);
+  }
+}
+
+/**
+ * Assign families to a delivery person (admin API — PATCH each family).
+ */
+export async function assignFamiliesToDeliveryViaApi(
+  request: APIRequestContext,
+  familyIds: number[],
+  deliveryUserId: number,
+): Promise<void> {
+  for (const familyId of familyIds) {
+    const resp = await request.patch(`/api/admin/families/${familyId}`, {
+      data: { delivery_user_id: deliveryUserId },
+    });
+    if (!resp.ok()) {
+      const body = await resp.text();
+      throw new Error(`assignFamiliesToDeliveryViaApi(${familyId}) failed (${resp.status()}): ${body}`);
+    }
   }
 }

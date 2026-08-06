@@ -133,6 +133,29 @@ def _setup_test_schema() -> Generator[None, None, None]:
 
     yield
 
+    # Drop circular FK constraints before drop_all so SQLAlchemy can
+    # resolve the dependency cycle (users.family_id ↔ family.delivery_user_id).
+    # Constraints are removed from both the DB and SQLAlchemy metadata so
+    # drop_all doesn't retry them. Update this list if new circular FKs are added.
+    from sqlalchemy import ForeignKeyConstraint as SAForeignKeyConstraint
+    from app.models import Family, User
+
+    _CIRCULAR_FK_CONSTRAINTS = [
+        ("users", "fk_users_family_id", User.__table__),
+        ("family", "fk_family_delivery_user_id", Family.__table__),
+    ]
+
+    with engine.connect() as conn:
+        for table_name, constraint_name, sa_table in _CIRCULAR_FK_CONSTRAINTS:
+            conn.execute(
+                text(f'ALTER TABLE "{table_name}" DROP CONSTRAINT IF EXISTS "{constraint_name}"'),
+            )
+            for fk in sa_table.foreign_keys.copy():
+                c = fk.constraint
+                if isinstance(c, SAForeignKeyConstraint) and c.name == constraint_name:
+                    sa_table.foreign_keys.discard(fk)
+        conn.commit()
+
     Base.metadata.drop_all(bind=engine)
     # Drop the per-worker schema if we created one
     if _engine_schema:

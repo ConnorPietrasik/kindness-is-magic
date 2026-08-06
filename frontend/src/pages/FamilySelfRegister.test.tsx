@@ -28,6 +28,8 @@ const mockResponse: FamilySelfRegisterResponse = {
     family_wish: "A wonderful Christmas",
     contact_name: "Test Contact",
     referrer_id: 1,
+    delivery_user_id: null,
+    delivery_user_name: null,
     deleted_at: null,
     person_count: 0,
     approval_status: "approved",

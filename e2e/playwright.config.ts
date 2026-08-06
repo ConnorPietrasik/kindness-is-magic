@@ -73,6 +73,14 @@ export default defineConfig({
         storageState: "storage/purchaser.json",
       },
     },
+    {
+      name: "delivery",
+      testMatch: /tests\/delivery-flow\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "storage/delivery.json",
+      },
+    },
     /* Unauthenticated project for auth, invite, password-reset, wish-list, and core-flow */
     {
       name: "guest",

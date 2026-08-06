@@ -17,6 +17,7 @@ from app.models import (  # noqa: F401
     PasswordResetToken,
     Person,
     Referrer,
+    ReferrerInviteEmail,
     ReferrerInviteToken,
     RefreshToken,
     User,

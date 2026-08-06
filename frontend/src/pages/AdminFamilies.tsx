@@ -24,6 +24,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import {
   adminApproveWishes,
@@ -130,6 +131,9 @@ export default function AdminFamilies() {
     return map;
   }, [referrerData]);
 
+  // Delivery users lookup (for dropdown)
+  const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
+
   // Reset wish state mutation
   const resetMut = useMutation({
     mutationFn: adminResetWishState,
@@ -224,6 +228,8 @@ export default function AdminFamilies() {
               isEdit={false}
               referrerMap={referrerMap}
               referrerOptionsLoading={referrersLoading}
+              deliveryUserMap={deliveryUserMap}
+              deliveryUsersLoading={deliveryUsersLoading}
               showReferrerNotes
               onSubmit={handleCreate}
               onCancel={cancelForm}
@@ -244,6 +250,7 @@ export default function AdminFamilies() {
                 <Th>Family Wish</Th>
                 <Th>Contact</Th>
                 <Th>Referrer</Th>
+                <Th>Delivery</Th>
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
@@ -285,6 +292,7 @@ export default function AdminFamilies() {
                           "—"
                         )}
                       </Td>
+                      <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
                       <Td>
                         <div className="flex gap-2">
                           {!isDeletedView && f.deleted_at == null && (
@@ -354,7 +362,7 @@ export default function AdminFamilies() {
                     </Tr>
                     {editingId === f.id && (
                       <Tr key={`${f.id}-edit`}>
-                        <Td colSpan={6} className="!py-3">
+                        <Td colSpan={7} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -368,6 +376,8 @@ export default function AdminFamilies() {
                                 isEdit={true}
                                 referrerMap={referrerMap}
                                 referrerOptionsLoading={referrersLoading}
+                                deliveryUserMap={deliveryUserMap}
+                                deliveryUsersLoading={deliveryUsersLoading}
                                 showReferrerNotes
                                 onSubmit={handleUpdate}
                                 onCancel={cancelForm}

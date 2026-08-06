@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
-import { batchAssignWishesViaApi, listFamiliesViaApi, listUsersViaApi, listWishesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
+import { assignFamiliesToDeliveryViaApi, batchAssignWishesViaApi, listFamiliesViaApi, listUsersViaApi, listWishesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -82,6 +82,24 @@ async function globalSetup(_config: FullConfig): Promise<void> {
       console.warn("[globalSetup] No purchaser user found in seeded data.");
     }
 
+    /* 3b. Assign some families to the delivery person so e2e tests have data */
+    const deliveries = await listUsersViaApi(apiContext, "delivery");
+    if (deliveries.users.length > 0) {
+      const deliveryUser = deliveries.users[0];
+      console.log(`[globalSetup] Found delivery user: ${deliveryUser.email} (id=${deliveryUser.id})`);
+
+      // Pick a couple of approved families that aren't already assigned
+      const unassignedFamilies = families.families.filter((f) => !f.delivery_user_id).slice(0, 2);
+      if (unassignedFamilies.length > 0) {
+        await assignFamiliesToDeliveryViaApi(apiContext, unassignedFamilies.map((f) => f.id), deliveryUser.id);
+        console.log(`[globalSetup] Assigned ${unassignedFamilies.length} families to delivery person (id=${deliveryUser.id})`);
+      } else {
+        console.warn("[globalSetup] No unassigned families found for delivery person.");
+      }
+    } else {
+      console.warn("[globalSetup] No delivery user found in seeded data.");
+    }
+
     /* 4. Generate storageState files for each role */
     await saveStorageState(browser, "admin", {
       email: getAdminEmail(),
@@ -97,6 +115,10 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     });
     await saveStorageState(browser, "purchaser", {
       email: "purchaser.e2e@example.com",
+      password: "Password123!",
+    });
+    await saveStorageState(browser, "delivery", {
+      email: "mike.torres@example.com",
       password: "Password123!",
     });
 
@@ -128,7 +150,7 @@ async function saveStorageState(
   await page.getByRole("button", { name: "Sign in" }).click();
 
   /* Wait for the role-specific dashboard to load */
-  await page.waitForURL(/\/(dashboard|referrer\/dashboard|family\/dashboard|purchaser\/assigned-gifts)/);
+  await page.waitForURL(/\/(dashboard|referrer\/dashboard|family\/dashboard|purchaser\/assigned-gifts|delivery)/);
   await page.waitForTimeout(1000);
 
   /* Save the storage state */

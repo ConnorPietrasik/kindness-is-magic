@@ -243,6 +243,13 @@ from app.purchaser_routes import purchaser_router  # noqa: E402
 
 app.include_router(purchaser_router)
 
+# ---------------------------------------------------------------------------
+# Include delivery self-service routes
+# ---------------------------------------------------------------------------
+from app.delivery_routes import delivery_router  # noqa: E402
+
+app.include_router(delivery_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.database import get_db
-from app.models import Family, Referrer, User
+from app.models import Family, Referrer, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     _CLEAR,
@@ -69,7 +69,8 @@ email,password,role,referrer_name_or_id,family_name_or_id,display_name
 john@example.com,Password123!,referrer,John Smith,,John S.
 jane@example.com,Password123!,referrer,Jane Doe,,Jane D.
 mom@example.com,Password123!,family,,The Johnsons,Mom Johnson
-dad@example.com,Password123!,family,,The Smiths,Dad Smith"""
+dad@example.com,Password123!,family,,The Smiths,Dad Smith
+delivery@example.com,Password123!,delivery,,,"""
 
 
 @csv_admin_router.get("/csv-sample")
@@ -408,6 +409,10 @@ def delete_user(
 ) -> Response:
     user = get_active_or_404(db, User, user_id, "User not found")
     user.deleted_at = datetime.now(timezone.utc)
+    # Unassign delivery families so they are not orphaned
+    db.query(Family).filter(Family.delivery_user_id == user_id).update({Family.delivery_user_id: None}, synchronize_session=False)
+    # Unassign purchaser wishes so they are not orphaned
+    db.query(Wish).filter(Wish.assigned_to_id == user_id).update({Wish.assigned_to_id: None}, synchronize_session=False)
     db.commit()
     logger.info("Admin %s soft-deleted user '%s' (id=%s)", _admin.email, user.email, user_id)
     return Response(status_code=204)

@@ -8,6 +8,8 @@ const mockFamilyDetail: FamilyDetail = {
   id: 1,
   referrer_id: 2,
   referrer_name: "Jane Smith",
+  delivery_user_id: null,
+  delivery_user_name: null,
   display_id: "2-1",
   family_name: "The Smiths",
   bio: null,

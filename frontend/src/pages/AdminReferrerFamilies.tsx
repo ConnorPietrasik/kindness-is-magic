@@ -26,6 +26,7 @@ import { ReferrerForm } from "../components/ReferrerForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import {
   adminApproveWishes,
   adminCreateFamily,
@@ -106,6 +107,9 @@ export default function AdminReferrerFamilies() {
 
   const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
 
+  // Delivery users lookup (for dropdown)
+  const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.ADMIN_REFERRERS} label="Referrers" />} />
@@ -133,7 +137,9 @@ export default function AdminReferrerFamilies() {
             updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
             formDefault: defaultFamilyForm as unknown as FamilyPayload,
             formComponent: FamilyForm,
-            formExtra: { showReferrerNotes: true } as Partial<React.ComponentProps<typeof FamilyForm>>,
+            formExtra: { showReferrerNotes: true, deliveryUserMap, deliveryUsersLoading } as Partial<
+              React.ComponentProps<typeof FamilyForm>
+            >,
             render: (rows, callbacks, ctx) => (
               <FamiliesTable
                 rows={rows as FamilySummary[]}
@@ -280,6 +286,7 @@ function FamiliesTable({
         <Th>Family Wish</Th>
         <Th>Contact</Th>
         <Th>People</Th>
+        <Th>Delivery</Th>
         <Th>Actions</Th>
       </TableHead>
       <TableBody>
@@ -310,6 +317,7 @@ function FamiliesTable({
               <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
               <Td>{f.contact_name}</Td>
               <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+              <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
               <Td>
                 <div className="flex items-center gap-2">
                   {!isDeletedView && f.deleted_at == null && (
@@ -373,7 +381,7 @@ function FamiliesTable({
             </Tr>
             {callbacks.editingId === f.id && (
               <Tr key={`${f.id}-edit`}>
-                <Td colSpan={6} className="!py-3">
+                <Td colSpan={7} className="!py-3">
                   <div className="rounded-xl bg-gray-50 p-4">
                     {callbacks.detailLoading ? (
                       <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

@@ -28,10 +28,22 @@ class UserRole(str, enum.Enum):
     referrer = "referrer"
     family = "family"
     purchaser = "purchaser"
+    delivery = "delivery"
 
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Explicitly name the FK to family so SQLAlchemy can resolve the
+        # circular dependency (users.family_id → family.id ↔ family.delivery_user_id → users.id)
+        # during DROP ALL at test teardown.
+        ForeignKeyConstraint(
+            ["family_id"],
+            ["family.id"],
+            name="fk_users_family_id",
+            ondelete="SET NULL",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
@@ -45,7 +57,7 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False)
     referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="SET NULL"), nullable=True)
-    family_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("family.id", ondelete="SET NULL"), nullable=True)
+    family_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -164,6 +176,15 @@ class Family(Base):
         # Queries always filter (referrer_id, deleted_at) together —
         # e.g. referrer list_families, family_limit check, build_referrer_detail.
         Index("ix_family_referrer_id_deleted_at", "referrer_id", "deleted_at"),
+        # Explicitly name the FK back to users so SQLAlchemy can resolve the
+        # circular dependency (users.family_id → family.id ↔ family.delivery_user_id → users.id)
+        # during DROP ALL at test teardown.
+        ForeignKeyConstraint(
+            ["delivery_user_id"],
+            ["users.id"],
+            name="fk_family_delivery_user_id",
+            ondelete="SET NULL",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -203,6 +224,13 @@ class Family(Base):
 
     referrer: Mapped["Referrer | None"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
+
+    # Delivery assignment — many families can share one delivery person
+    delivery_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    delivery_user: Mapped["User | None"] = relationship("User", foreign_keys=[delivery_user_id])
 
 
 class Person(Base):

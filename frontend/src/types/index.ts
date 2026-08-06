@@ -23,6 +23,7 @@ export type {
   AdminUserCreate,
   AdminUserUpdate,
   AdminWishUpdate,
+  DeliveryFamilySummary,
   FamilyApprovalStatus,
   FamilyDetail,
   FamilyPayload,

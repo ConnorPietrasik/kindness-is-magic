@@ -20,7 +20,7 @@
 - **Family approval:** Invite-registered families start as `pending`; direct creation is `approved`. Referrer queries filter by `approved` status. Admin sees all.
 - **Referrer approval:** Unlocked invite codes start as `pending`; email-locked codes and admin-created referrers are auto-`approved`. Rejected referrers cannot log in. Pending referrers are blocked from `send-family-invite`.
 - **Invite codes:** Referrer tokens use `KRI-` prefix, family tokens use `KFI-` prefix (10 chars each). Use `generate_invite_code(prefix=...)` from `auth.py`.
-- **Role-based access:** Three roles — `admin`, `referrer`, `family`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides ownership and admin-check dependencies.
+- **Role-based access:** Five roles — `admin`, `referrer`, `family`, `purchaser`, `delivery`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides role-check and ownership-check dependencies.
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
 - **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked.
@@ -48,6 +48,8 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
+| `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
+| `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
 | `families_routes.py` | Public family resource endpoints |
@@ -67,7 +69,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 
 - Never trust role or ownership information from request bodies. Always use the authenticated user from JWT dependencies.
 - Admins access resources via `admin_*_routes.py` modules only. They are explicitly excluded from self-service guards (`require_family`, `require_referrer`) — e.g. `require_family` rejects admins because they have their own routes.
-- Referrers may only manage their assigned families/people. Families may only access their own data.
+- Self-service roles are scoped to their assignments — referrers to families, families to themselves, purchasers and delivery people to admin-assigned resources.
 
 ## API Conventions
 

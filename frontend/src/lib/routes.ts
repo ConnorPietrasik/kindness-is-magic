@@ -42,6 +42,10 @@ export const ROUTES = {
   // ── Purchaser self-service ────────────────────────────────
   PURCHASER_ASSIGNED_GIFTS: "/purchaser/assigned-gifts",
 
+  // ── Delivery self-service ────────────────────────────────
+  DELIVERY_DASHBOARD: "/delivery",
+  DELIVERY_PACKING_SLIPS: "/delivery/packing-slips",
+
   // ── Public ────────────────────────────────────────────────
   FAMILY_WISH_LIST: "/families/:id/wish-list",
 

@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 /** Mirrors backend UserRole enum. */
-export type UserRole = "admin" | "referrer" | "family" | "purchaser";
+export type UserRole = "admin" | "referrer" | "family" | "purchaser" | "delivery";
 
 /** Mirrors UserResponse — the shape returned by /api/auth/me. */
 export interface User {
@@ -140,6 +140,8 @@ export interface FamilySummary {
   family_wish: string;
   contact_name: string;
   referrer_id: number | null;
+  delivery_user_id: number | null;
+  delivery_user_name: string | null;
   deleted_at: string | null;
   person_count: number;
   approval_status: FamilyApprovalStatus;
@@ -155,6 +157,8 @@ export interface FamilyDetail {
   id: number;
   referrer_id: number | null;
   referrer_name: string | null;
+  delivery_user_id: number | null;
+  delivery_user_name: string | null;
   display_id: string;
   family_name: string;
   bio: string | null;
@@ -223,6 +227,7 @@ export interface ReferrerPayload {
 /** Payload for creating or updating a family. `referrer_id` and `deleted_at` are admin-only. */
 export interface FamilyPayload {
   referrer_id?: number | null;
+  delivery_user_id?: number | null;
   family_name?: string;
   bio?: string | null;
   address?: string | null;
@@ -483,6 +488,21 @@ export interface PersonDetail {
   note: string | null;
   deleted_at: string | null;
   wishes: WishSummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Delivery
+// ---------------------------------------------------------------------------
+
+/** Summary of a family assigned to a delivery person (returned by /api/delivery/families). */
+export interface DeliveryFamilySummary {
+  id: number;
+  display_id: string;
+  family_name: string;
+  address: string | null;
+  phone_number: string;
+  contact_name: string;
+  person_count: number;
 }
 
 // ---------------------------------------------------------------------------

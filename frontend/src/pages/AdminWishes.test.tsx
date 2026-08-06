@@ -75,6 +75,8 @@ const mockFamily: FamilySummary = {
   family_wish: "Warm wishes",
   contact_name: "Mom",
   referrer_id: 1,
+  delivery_user_id: null,
+  delivery_user_name: null,
   deleted_at: null,
   person_count: 3,
   approval_status: "approved",

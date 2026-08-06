@@ -12,7 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, WishLockLevel
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole, WishLockLevel
 from app.permissions import require_admin
 from app.response_builders import (
     batch_load_person_wishes,
@@ -81,6 +81,13 @@ def list_families(
 
     pos_map = compute_display_ids(db, "family", families, scope=referrer_id, show_status_labels=True)
 
+    # Resolve delivery user names
+    delivery_user_ids = {f.delivery_user_id for f in families if f.delivery_user_id is not None}
+    delivery_user_map: dict[int, str] = {}
+    if delivery_user_ids:
+        for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
+            delivery_user_map[u.id] = u.display_name or u.email
+
     return FamilyListResponse(
         families=[
             FamilySummary(
@@ -90,6 +97,8 @@ def list_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
+                delivery_user_id=f.delivery_user_id,
+                delivery_user_name=delivery_user_map.get(f.delivery_user_id) if f.delivery_user_id else None,
                 approval_status=f.approval_status,
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
@@ -128,6 +137,13 @@ def list_deleted_families(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
+    # Resolve delivery user names
+    delivery_user_ids = {f.delivery_user_id for f in families if f.delivery_user_id is not None}
+    delivery_user_map: dict[int, str] = {}
+    if delivery_user_ids:
+        for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
+            delivery_user_map[u.id] = u.display_name or u.email
+
     return FamilyListResponse(
         families=[
             FamilySummary(
@@ -137,6 +153,8 @@ def list_deleted_families(
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
+                delivery_user_id=f.delivery_user_id,
+                delivery_user_name=delivery_user_map.get(f.delivery_user_id) if f.delivery_user_id else None,
                 approval_status=f.approval_status,
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
@@ -343,6 +361,13 @@ def update_family(
     # Validate referrer exists if referrer_id is being changed (0 means clear to NULL)
     if body.referrer_id is not None and body.referrer_id != 0:
         get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
+    # Validate delivery_user_id if being changed (0 means clear to NULL)
+    if body.delivery_user_id is not None and body.delivery_user_id != 0:
+        delivery_user = get_or_404(db, User, body.delivery_user_id, "Delivery user not found")
+        if delivery_user.deleted_at is not None:
+            raise HTTPException(status_code=422, detail="Delivery user is soft-deleted")
+        if delivery_user.role != UserRole.delivery:
+            raise HTTPException(status_code=422, detail="User is not a delivery person")
     partial_update(fam, body)
     db.commit()
     db.refresh(fam)

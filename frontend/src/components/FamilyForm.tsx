@@ -17,6 +17,9 @@ interface FamilyFormProps {
   isEdit?: boolean;
   referrerMap?: Record<number, string>;
   referrerOptionsLoading?: boolean;
+  /** Map of delivery user id → display name (admin mode) */
+  deliveryUserMap?: Record<number, string>;
+  deliveryUsersLoading?: boolean;
   showOptionalFields?: boolean;
   /** When true, show the referrer notes field (admin mode) */
   showReferrerNotes?: boolean;
@@ -30,6 +33,7 @@ interface FamilyFormProps {
  *
  * Admin-only features (gated by props):
  * - `referrerMap` — shows a referrer selector on both create and edit.
+ * - `deliveryUserMap` — shows a delivery person selector on edit.
  */
 export function FamilyForm({
   title,
@@ -37,6 +41,8 @@ export function FamilyForm({
   isEdit,
   referrerMap,
   referrerOptionsLoading,
+  deliveryUserMap,
+  deliveryUsersLoading,
   showOptionalFields = true,
   showReferrerNotes,
   onSubmit,
@@ -57,6 +63,10 @@ export function FamilyForm({
   // Referrer select options
   const referrerOptions = referrerMap ? Object.entries(referrerMap) : [];
   const hasReferrerMap = !!referrerMap;
+
+  // Delivery user select options (edit only)
+  const deliveryUserOptions = deliveryUserMap ? Object.entries(deliveryUserMap) : [];
+  const hasDeliveryUserMap = !!deliveryUserMap;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -115,17 +125,6 @@ export function FamilyForm({
           />
 
           <FormField
-            label="Family Wish"
-            fieldProps={{
-              value: form.family_wish,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
-              required: true,
-              maxLength: 400,
-              autoComplete: "off",
-            }}
-          />
-
-          <FormField
             label="Contact Name"
             fieldProps={{
               value: form.contact_name,
@@ -136,10 +135,16 @@ export function FamilyForm({
             }}
           />
 
-          {/* Pickup Window — admin only */}
-          {hasReferrerMap && (
-            <DatePicker label="Pickup Window" isOptional value={form.pickup_window} onChange={(val) => update("pickup_window", val)} />
-          )}
+          <FormField
+            label="Family Wish"
+            fieldProps={{
+              value: form.family_wish,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
+              required: true,
+              maxLength: 400,
+              autoComplete: "off",
+            }}
+          />
 
           {showOptionalFields && (
             <>
@@ -178,6 +183,38 @@ export function FamilyForm({
                 error={phoneError}
               />
             </>
+          )}
+
+          {/* Pickup Window — admin only */}
+          {hasReferrerMap && (
+            <DatePicker label="Pickup Window" isOptional value={form.pickup_window} onChange={(val) => update("pickup_window", val)} />
+          )}
+
+          {/* Delivery person select (edit only, admin mode) */}
+          {hasDeliveryUserMap && deliveryUsersLoading && (
+            <div className="flex items-center gap-2 text-btn-start">
+              <Spinner size="sm" />
+              <span className="text-sm">Loading delivery users…</span>
+            </div>
+          )}
+          {hasDeliveryUserMap && !deliveryUsersLoading && deliveryUserOptions.length > 0 && isEdit && (
+            <FormField
+              label="Delivery Person"
+              as="select"
+              fieldProps={{
+                value: String(form.delivery_user_id ?? 0),
+                onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("delivery_user_id", parseInt(e.target.value, 10)),
+                required: false,
+                autoComplete: "off",
+              }}
+            >
+              <option value="0">No delivery person assigned</option>
+              {deliveryUserOptions.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name} (ID {id})
+                </option>
+              ))}
+            </FormField>
           )}
 
           {/* Referrer Notes — admin only */}

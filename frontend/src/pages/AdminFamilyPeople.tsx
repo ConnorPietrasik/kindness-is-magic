@@ -26,6 +26,7 @@ import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
+import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import {
   adminCreatePerson,
   adminDeletePerson,
@@ -78,6 +79,9 @@ export default function AdminFamilyPeople() {
     return map;
   }, [referrerData]);
 
+  // Delivery users lookup (for dropdown)
+  const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
+
   // Read ?from=referrer to know if user came from a referrer's families page
   const [searchParams] = useSearchParams();
   const cameFromReferrer = searchParams.get("from") === "referrer";
@@ -116,7 +120,16 @@ export default function AdminFamilyPeople() {
             fetchFn: adminGetFamily,
             updateApi: adminUpdateFamily,
             normaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
-            render: (props) => <FamilyCard {...props} famId={famIdNum} referrerMap={referrerMap} referrersLoading={referrersLoading} />,
+            render: (props) => (
+              <FamilyCard
+                {...props}
+                famId={famIdNum}
+                referrerMap={referrerMap}
+                referrersLoading={referrersLoading}
+                deliveryUserMap={deliveryUserMap}
+                deliveryUsersLoading={deliveryUsersLoading}
+              />
+            ),
             invalidationKeys: [familyKey],
             entityName: "Family",
           }}
@@ -167,9 +180,12 @@ function FamilyCard(
     famId: number;
     referrerMap: Record<number, string>;
     referrersLoading: boolean;
+    deliveryUserMap: Record<number, string>;
+    deliveryUsersLoading: boolean;
   }
 ) {
-  const { data, isEditing, onToggleEdit, isSaving, onSave, famId, referrerMap, referrersLoading } = props;
+  const { data, isEditing, onToggleEdit, isSaving, onSave, famId, referrerMap, referrersLoading, deliveryUserMap, deliveryUsersLoading } =
+    props;
   const queryClient = useQueryClient();
   const toast = useToast();
   const lockLevel = data?.wish_lock_level ?? "family";
@@ -234,6 +250,8 @@ function FamilyCard(
           isEdit={true}
           referrerMap={referrerMap}
           referrerOptionsLoading={referrersLoading}
+          deliveryUserMap={deliveryUserMap}
+          deliveryUsersLoading={deliveryUsersLoading}
           showReferrerNotes
           onSubmit={onSave}
           onCancel={() => onToggleEdit()}
@@ -247,7 +265,12 @@ function FamilyCard(
             <InfoRow label="Family Wish" value={data.family_wish} />
             <InfoRow label="Bio" value={data.bio} />
             <InfoRow label="Address" value={data.address} />
-            <InfoRow label="Phone" value={data.phone_number} isLast />
+            <InfoRow label="Phone" value={data.phone_number} />
+            <InfoRow
+              label="Delivery Person"
+              value={data.delivery_user_name || (data.delivery_user_id != null ? `ID ${data.delivery_user_id}` : null)}
+              isLast
+            />
           </div>
         )
       )}

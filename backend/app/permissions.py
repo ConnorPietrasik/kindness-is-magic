@@ -62,6 +62,16 @@ def require_purchaser(current_user: User = Depends(_get_user_or_raise)) -> User:
     return current_user
 
 
+def require_delivery(current_user: User = Depends(_get_user_or_raise)) -> User:
+    """Raise 403 unless the user is a delivery person. Admins are excluded because they have their own routes."""
+    if current_user.role != UserRole.delivery:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Delivery access required",
+        )
+    return current_user
+
+
 # ---------------------------------------------------------------------------
 # Ownership guard
 # ---------------------------------------------------------------------------

@@ -654,6 +654,7 @@ def _process_users(
         "referrer": UserRole.referrer,
         "family": UserRole.family,
         "purchaser": UserRole.purchaser,
+        "delivery": UserRole.delivery,
     }
 
     for i, rec in enumerate(records):
@@ -693,7 +694,7 @@ def _process_users(
                     row_num,
                     "user",
                     "error",
-                    f"Invalid role: {role_str} (must be admin, referrer, or family)",
+                    f"Invalid role: {role_str} (must be admin, referrer, family, purchaser, or delivery)",
                 )
             )
             summary.users_errors += 1
@@ -728,6 +729,10 @@ def _process_users(
                 "Referrer users must not have a family_id": "Referrer users cannot have a family_name_or_id",
                 "Family users must have a family_id": "Family users must have a family_name_or_id",
                 "Family users must not have a referrer_id": "Family users cannot have referrer_name_or_id",
+                "Purchaser users must not have referrer_id": "Purchaser users cannot have referrer_id or family_id",
+                "Purchaser users must not have family_id": "Purchaser users cannot have referrer_id or family_id",
+                "Delivery users must not have referrer_id": "Delivery users cannot have referrer_id or family_id",
+                "Delivery users must not have family_id": "Delivery users cannot have referrer_id or family_id",
             }
             for err in role_errors:
                 summary.rows.append(RowResult(row_num, "user", "error", friendly.get(err, err)))

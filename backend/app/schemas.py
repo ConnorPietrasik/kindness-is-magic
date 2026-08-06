@@ -435,13 +435,14 @@ class ReferrerFamilyUpdate(FamilyUpdate):
 
 
 class AdminFamilyUpdate(FamilyUpdate):
-    """Admin-only: extends FamilyUpdate with referrer_id and referrer_notes.
+    """Admin-only: extends FamilyUpdate with referrer_id, referrer_notes, and delivery_user_id.
 
-    Send ``0`` to unassign a referrer (set referrer_id to NULL).
+    Send ``0`` to unassign a referrer or delivery person (set FK to NULL).
     """
 
     referrer_id: Optional[int] = None
     referrer_notes: str | None | object = Field(default=None)  # type: ignore[assignment]
+    delivery_user_id: Optional[int] = None
 
     @field_validator("referrer_notes", mode="before")
     @classmethod
@@ -459,6 +460,8 @@ class FamilyDetail(BaseModel):
     id: int
     referrer_id: int | None
     referrer_name: Optional[str] = None
+    delivery_user_id: int | None = None
+    delivery_user_name: Optional[str] = None
     display_id: str
     family_name: str
     bio: Optional[str]
@@ -509,6 +512,8 @@ class FamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     referrer_id: int | None
+    delivery_user_id: int | None = None
+    delivery_user_name: Optional[str] = None
     approval_status: FamilyApprovalStatus
     pickup_window: datetime | None = None
     deleted_at: datetime | None

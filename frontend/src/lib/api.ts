@@ -16,6 +16,7 @@ import type {
   AdminUserUpdate,
   AdminWishesListParams,
   AdminWishUpdate,
+  DeliveryFamilySummary,
   FamilyDetail,
   FamilyListResponse,
   FamilyPayload,
@@ -620,6 +621,20 @@ export function purchaserMarkPurchased(wishId: number, payload: WishPurchaseMark
 /** Partial update of purchaser_note and/or received_at on an assigned wish. */
 export function purchaserUpdateWish(wishId: number, payload: Partial<PurchaserWishUpdate>): Promise<WishDetail> {
   return apiPatch(`/api/purchaser/wishes/${wishId}`, payload);
+}
+
+// ---------------------------------------------------------------------------
+// Delivery — Assigned Families
+// ---------------------------------------------------------------------------
+
+/** List families assigned to the current delivery person. */
+export function deliveryListFamilies(): Promise<DeliveryFamilySummary[]> {
+  return apiGet("/api/delivery/families");
+}
+
+/** Get packing slips for families assigned to the current delivery person. */
+export function deliveryGetPackingSlips(): Promise<PackingSlipItem[]> {
+  return apiGet("/api/delivery/packing-slips");
 }
 
 export default api;

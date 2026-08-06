@@ -1,15 +1,16 @@
-Add more info to the displayed list views
-Delivery people - users that are assigned families, and get a list of their delivery info: name, address, phone number
-Delivery slips for delivery people
-Add more admin view filtering / searching / sorting - sort by wishes, sort families by size, etc
-DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They'd get confirmation and reminder emails.
-EVENTUALLY - More detailed audit logs? They said not important, but I feel like it could be helpful
+Add logo to site (I don’t think I have it)
+Add more admin view filtering / searching / sorting - sort by wishes, sort families by size, etc. Maybe a custom view filter so admins can set what columns they want to see by themselves?
+DONOR - Add donor users - able to see families in tiled cards, filter by size (maybe other filters?), mark families as claimed either by donating money or marking them as claimed and then using their wish list to get wishes. They get confirmation and reminder emails including the family’s wishlist (or maybe a link to it?)
+EVENTUALLY - More detailed audit logs? Said not important, but I feel like it could be helpful
 EVENTUALLY - Automated database backups
 EVENTUALLY - Email families a week before their pickup window
 EVENTUALLY - Add button for admins to email families directly using their own email account. Requires more google workspace config to avoid having to register each user individually
-EVENTUALLY - Email "opened" tracking via a logo
+EVENTUALLY - Email "opened" tracking via a logo?
 
 Things that need clarification:
 DONOR - Filter granularity? Family size, contains a person with age in range?
 Should families get emails on referrer rejection / admin approval?
-Would it be helpful to use the display_id as links instead of a separate column? Would save a lot of space, but might be small
+Would it be helpful to use the display_id as links instead of a separate column? Would save a lot of space since the number already identifies the referrer / family, but might be small. Example 1-1-1: the first links to referrer, second to family
+Ideal purchaser workflow? Currently, admins assign them wishes and then they can purchase their assigned gifts and mark them as purchased. Could also just get rid of the assignment thing and have them use the whole list, but that does induce risk of overlap
+Delivery people email; should it be an admin button or a scheduled thing a few days before?
+Should families have a hard limit? Like at 10 people or something it would stop letting them add more (or a much smaller number? Admins can always override, or potentially could let referrers override too)

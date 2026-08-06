@@ -34,6 +34,8 @@ const AdminPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() =
 const AdminWishes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishes"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
+const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
+const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -57,6 +59,9 @@ function DashboardRedirect() {
   }
   if (user?.role === "purchaser") {
     return <Navigate to={ROUTES.PURCHASER_ASSIGNED_GIFTS} replace />;
+  }
+  if (user?.role === "delivery") {
+    return <Navigate to={ROUTES.DELIVERY_DASHBOARD} replace />;
   }
 
   return <Navigate to={ROUTES.LOGIN} replace />;
@@ -124,7 +129,7 @@ export default function App() {
         <Route
           path={ROUTES.DASHBOARD}
           element={
-            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser"] as UserRole[]}>
+            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery"] as UserRole[]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -278,6 +283,24 @@ export default function App() {
           element={
             <ProtectedRoute roles={["purchaser"] as UserRole[]}>
               <PurchaserAssignedGifts />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Delivery self-service ────────────────────────────── */}
+        <Route
+          path={ROUTES.DELIVERY_DASHBOARD}
+          element={
+            <ProtectedRoute roles={["delivery"] as UserRole[]}>
+              <DeliveryDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_PACKING_SLIPS}
+          element={
+            <ProtectedRoute roles={["delivery"] as UserRole[]}>
+              <DeliveryPackingSlips />
             </ProtectedRoute>
           }
         />
