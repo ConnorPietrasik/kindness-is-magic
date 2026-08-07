@@ -296,7 +296,10 @@ def create_person_wish(
     per = get_active_or_404(db, Person, per_id, "Person not found")
 
     # Validate wish type matches person age
-    validate_wishes_for_age([body], per.age)
+    try:
+        validate_wishes_for_age([body], per.age)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     # Check for duplicate type
     existing = (
@@ -364,7 +367,10 @@ def update_person_wish(
 
     # If type is being changed, validate against person age and check for conflicts
     if body.type is not None:
-        validate_wishes_for_age([WishCreate(type=body.type, description=body.description or wish.description, size=body.size)], per.age)
+        try:
+            validate_wishes_for_age([WishCreate(type=body.type, description=body.description or wish.description, size=body.size)], per.age)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         if body.type != wish.type:
             conflicting = (
                 db.query(Wish)

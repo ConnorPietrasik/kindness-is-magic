@@ -136,7 +136,9 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={"detail": f"Rate limit exceeded. {exc.detail}"},
     )
-    response = limiter._inject_headers(response, request.state.view_rate_limit)
+    _view_limit = getattr(request.state, "view_rate_limit", None)
+    if _view_limit is not None:
+        response = limiter._inject_headers(response, _view_limit)
     return response
 
 
