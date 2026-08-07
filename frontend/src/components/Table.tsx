@@ -38,13 +38,16 @@ export const TableBody = memo(({ children }: TableBodyProps) => <tbody className
 
 interface ThProps {
   children?: ReactNode;
+  colSpan?: number;
 }
 
 /**
  * Th — header cell.
  */
-export const Th = memo(({ children }: ThProps) => (
-  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{children}</th>
+export const Th = memo(({ children, colSpan }: ThProps) => (
+  <th {...(colSpan !== undefined && { colSpan })} className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+    {children}
+  </th>
 ));
 
 interface TrProps extends React.HTMLAttributes<HTMLTableRowElement> {

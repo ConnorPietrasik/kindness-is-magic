@@ -63,6 +63,10 @@ def list_people(
     family_id: int | None = Query(None),
     columns: str | None = Query(None),
     search: str | None = Query(None),
+    search_name: str | None = Query(None),
+    search_title: str | None = Query(None),
+    search_note: str | None = Query(None),
+    search_wish: str | None = Query(None),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -73,18 +77,22 @@ def list_people(
     matching the referrer/family's own view. In the flat view, the format
     is {referrer_id_or_0}-{family_position}-{person_position}.
     """
+    # Optional wish join — only when wish-related search is active
+    needs_wish_search = search is not None or search_wish is not None
     query = (
-        db.query(Person)
-        .join(Family)
-        .filter(
-            Person.deleted_at.is_(None),
-            Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
-        )
+        db.query(Person).join(Family).outerjoin(Wish, Wish.person_id == Person.id) if needs_wish_search else db.query(Person).join(Family)
+    )
+    query = query.filter(
+        Person.deleted_at.is_(None),
+        Family.deleted_at.is_(None),
+        Family.approval_status == FamilyApprovalStatus.approved,
     )
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)
 
+    # Multi-field search: each active filter is ANDed together.
+    # `search` uses OR across all fields (including wish.description via join).
+    # Targeted params search single fields.
     if search is not None:
         pattern = f"%{search}%"
         query = query.filter(
@@ -92,8 +100,22 @@ def list_people(
                 Person.given_name.ilike(pattern),
                 Person.title.ilike(pattern),
                 Person.note.ilike(pattern),
+                Wish.description.ilike(pattern),
             )
         )
+    if search_name is not None:
+        query = query.filter(Person.given_name.ilike(f"%{search_name}%"))
+    if search_title is not None:
+        query = query.filter(Person.title.ilike(f"%{search_title}%"))
+    if search_note is not None:
+        query = query.filter(Person.note.ilike(f"%{search_note}%"))
+    if search_wish is not None:
+        query = query.filter(Wish.description.ilike(f"%{search_wish}%"))
+
+    # Deduplicate when wish join is active (a person with multiple wishes would
+    # otherwise appear multiple times in the result set).
+    if needs_wish_search:
+        query = query.distinct(Person.id)
 
     total = query.count()
     offset = (page - 1) * page_size

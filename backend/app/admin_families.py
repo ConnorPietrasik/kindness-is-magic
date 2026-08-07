@@ -67,6 +67,10 @@ def list_families(
     referrer_id: int | None = Query(None),
     columns: str | None = Query(None),
     search: str | None = Query(None),
+    search_name: str | None = Query(None),
+    search_contact: str | None = Query(None),
+    search_phone: str | None = Query(None),
+    search_wish: str | None = Query(None),
     approval_status: str | None = Query(None),
     wish_lock_level: str | None = Query(None),
     sort: str | None = Query(None),
@@ -91,6 +95,8 @@ def list_families(
     if referrer_id is not None:
         query = query.filter(Family.referrer_id == referrer_id)
 
+    # Multi-field search: each active filter is ANDed together.
+    # `search` uses OR across all fields; targeted params search single fields.
     if search is not None:
         pattern = f"%{search}%"
         query = query.filter(
@@ -98,8 +104,17 @@ def list_families(
                 Family.family_name.ilike(pattern),
                 Family.contact_name.ilike(pattern),
                 Family.phone_number.ilike(pattern),
+                Family.family_wish.ilike(pattern),
             )
         )
+    if search_name is not None:
+        query = query.filter(Family.family_name.ilike(f"%{search_name}%"))
+    if search_contact is not None:
+        query = query.filter(Family.contact_name.ilike(f"%{search_contact}%"))
+    if search_phone is not None:
+        query = query.filter(Family.phone_number.ilike(f"%{search_phone}%"))
+    if search_wish is not None:
+        query = query.filter(Family.family_wish.ilike(f"%{search_wish}%"))
 
     if approval_status is not None:
         query = query.filter(Family.approval_status == approval_status)

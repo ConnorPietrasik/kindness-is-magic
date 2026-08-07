@@ -12,7 +12,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -85,6 +84,10 @@ export default function AdminFamilies() {
   const [approvalFilter, setApprovalFilter] = useState<string>("");
   const [lockLevelFilter, setLockLevelFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [searchContact, setSearchContact] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  const [searchWish, setSearchWish] = useState("");
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
@@ -93,6 +96,10 @@ export default function AdminFamilies() {
   const { widthClass } = useTableWidth("adminFamilies");
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
+  const debouncedSearchContact = useDebouncedState(searchContact, 1000, () => pagination.goToPage(1));
+  const debouncedSearchPhone = useDebouncedState(searchPhone, 1000, () => pagination.goToPage(1));
+  const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminFamiliesListParams>(
@@ -100,10 +107,24 @@ export default function AdminFamilies() {
       ...pagination.params,
       columns: apiColumns,
       search: debouncedSearch || undefined,
+      search_name: debouncedSearchName || undefined,
+      search_contact: debouncedSearchContact || undefined,
+      search_phone: debouncedSearchPhone || undefined,
+      search_wish: debouncedSearchWish || undefined,
       approval_status: approvalFilter || undefined,
       wish_lock_level: lockLevelFilter || undefined,
     }),
-    [pagination.params, apiColumns, debouncedSearch, approvalFilter, lockLevelFilter]
+    [
+      pagination.params,
+      apiColumns,
+      debouncedSearch,
+      debouncedSearchName,
+      debouncedSearchContact,
+      debouncedSearchPhone,
+      debouncedSearchWish,
+      approvalFilter,
+      lockLevelFilter,
+    ]
   );
 
   const {
@@ -266,7 +287,7 @@ export default function AdminFamilies() {
             </select>
             <input
               type="text"
-              placeholder="Search by name, contact or phone…"
+              placeholder="Search all fields…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -294,31 +315,89 @@ export default function AdminFamilies() {
             />
           )}
 
-          {/* Table */}
-          {families.length === 0 ? (
-            <Card>
-              <p className="py-8 text-center text-gray-400">{isDeletedView ? "No deleted families." : "No families yet."}</p>
-            </Card>
-          ) : (
-            <Table>
-              <TableHead>
-                {visibleColumns.includes("display_id") && <Th>ID</Th>}
-                {visibleColumns.includes("family_name") && <Th>Family Name</Th>}
-                {visibleColumns.includes("family_wish") && <Th>Family Wish</Th>}
-                {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
-                {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
-                {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
-                {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
-                {visibleColumns.includes("person_count") && <Th>Person Count</Th>}
-                {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
-                {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
-                {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
-                {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
-                {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
-                <Th>Actions</Th>
-              </TableHead>
-              <TableBody>
-                {families.map((f) => (
+          {/* Table — always rendered so column headers / filters stay visible */}
+          <Table>
+            <TableHead>
+              {visibleColumns.includes("display_id") && <Th>ID</Th>}
+              {visibleColumns.includes("family_name") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Family Name</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchName}
+                      onChange={(e) => setSearchName(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("family_wish") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Family Wish</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchWish}
+                      onChange={(e) => setSearchWish(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("contact_name") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Contact</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchContact}
+                      onChange={(e) => setSearchContact(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
+              {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
+              {visibleColumns.includes("phone_number") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Phone</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchPhone}
+                      onChange={(e) => setSearchPhone(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("person_count") && <Th>Person Count</Th>}
+              {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
+              {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
+              {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
+              {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
+              {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
+              <Th>Actions</Th>
+            </TableHead>
+            <TableBody>
+              {families.length === 0 ? (
+                <Tr>
+                  <Td colSpan={visibleColumns.length + 1} className="!text-center !text-gray-400 py-12">
+                    {isDeletedView ? "No deleted families." : "No families yet."}
+                  </Td>
+                </Tr>
+              ) : (
+                families.map((f) => (
                   <React.Fragment key={f.id}>
                     <Tr data-id={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
                       {visibleColumns.includes("display_id") && (
@@ -484,10 +563,10 @@ export default function AdminFamilies() {
                       </Tr>
                     )}
                   </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
 
           {/* Delete confirmation */}
           <ConfirmDialog

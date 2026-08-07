@@ -42,6 +42,10 @@ export interface AdminReferrersListParams extends AdminListParams {
 /** Query params for the admin families list endpoint. */
 export interface AdminFamiliesListParams extends AdminListParams {
   search?: string;
+  search_name?: string;
+  search_contact?: string;
+  search_phone?: string;
+  search_wish?: string;
   approval_status?: string;
   wish_lock_level?: string;
 }
@@ -50,6 +54,10 @@ export interface AdminFamiliesListParams extends AdminListParams {
 export interface AdminPeopleListParams extends AdminListParams {
   family_id?: number;
   search?: string;
+  search_name?: string;
+  search_title?: string;
+  search_note?: string;
+  search_wish?: string;
 }
 
 /** Query params for the admin invites list endpoint (updated with search + sort). */

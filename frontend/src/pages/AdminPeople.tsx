@@ -11,7 +11,6 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -57,12 +56,20 @@ export default function AdminPeople() {
   const [pendingFamilyRestore, setPendingFamilyRestore] = useState<{ personId: number; familyId: number } | null>(null);
   const [familyFilter, setFamilyFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [searchTitle, setSearchTitle] = useState("");
+  const [searchNote, setSearchNote] = useState("");
+  const [searchWish, setSearchWish] = useState("");
 
   // Column visibility
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
   const { widthClass } = useTableWidth("adminPeople");
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
+  const debouncedSearchTitle = useDebouncedState(searchTitle, 1000, () => pagination.goToPage(1));
+  const debouncedSearchNote = useDebouncedState(searchNote, 1000, () => pagination.goToPage(1));
+  const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminPeopleListParams>(
@@ -71,8 +78,21 @@ export default function AdminPeople() {
       columns: apiColumns,
       family_id: familyFilter ?? undefined,
       search: debouncedSearch || undefined,
+      search_name: debouncedSearchName || undefined,
+      search_title: debouncedSearchTitle || undefined,
+      search_note: debouncedSearchNote || undefined,
+      search_wish: debouncedSearchWish || undefined,
     }),
-    [pagination.params, apiColumns, familyFilter, debouncedSearch]
+    [
+      pagination.params,
+      apiColumns,
+      familyFilter,
+      debouncedSearch,
+      debouncedSearchName,
+      debouncedSearchTitle,
+      debouncedSearchNote,
+      debouncedSearchWish,
+    ]
   );
 
   const {
@@ -209,7 +229,7 @@ export default function AdminPeople() {
             </select>
             <input
               type="text"
-              placeholder="Search by name, title or note…"
+              placeholder="Search all fields…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -234,31 +254,87 @@ export default function AdminPeople() {
             />
           )}
 
-          {/* Table */}
-          {people.length === 0 ? (
-            <Card>
-              <p className="py-8 text-center text-gray-400">{isDeletedView ? "No deleted people." : "No people yet."}</p>
-            </Card>
-          ) : (
-            <Table>
-              <TableHead>
-                {visibleColumns.includes("display_id") && <Th>ID</Th>}
-                {visibleColumns.includes("given_name") && <Th>Name</Th>}
-                {visibleColumns.includes("age") && <Th>Age</Th>}
-                {visibleColumns.includes("wishes") && (
-                  <>
-                    <Th>Practical Wish</Th>
-                    <Th>Fun Wish</Th>
-                  </>
-                )}
-                {visibleColumns.includes("family_id") && <Th>Family</Th>}
-                {visibleColumns.includes("title") && <Th>Title</Th>}
-                {visibleColumns.includes("note") && <Th>Note</Th>}
-                {visibleColumns.includes("created_at") && <Th>Created</Th>}
-                <Th>Actions</Th>
-              </TableHead>
-              <TableBody>
-                {people.map((p) => (
+          {/* Table — always rendered so column headers / filters stay visible */}
+          <Table>
+            <TableHead>
+              {visibleColumns.includes("display_id") && <Th>ID</Th>}
+              {visibleColumns.includes("given_name") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchName}
+                      onChange={(e) => setSearchName(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("age") && <Th>Age</Th>}
+              {visibleColumns.includes("wishes") && (
+                <Th colSpan={2}>
+                  <div className="flex flex-col gap-1">
+                    <span>Wishes (Practical + Fun)</span>
+                    <input
+                      type="text"
+                      placeholder="Filter wishes…"
+                      value={searchWish}
+                      onChange={(e) => setSearchWish(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("family_id") && <Th>Family</Th>}
+              {visibleColumns.includes("title") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Title</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchTitle}
+                      onChange={(e) => setSearchTitle(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("note") && (
+                <Th>
+                  <div className="flex flex-col gap-1">
+                    <span>Note</span>
+                    <input
+                      type="text"
+                      placeholder="Filter…"
+                      value={searchNote}
+                      onChange={(e) => setSearchNote(e.target.value)}
+                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+                      autoComplete="off"
+                    />
+                  </div>
+                </Th>
+              )}
+              {visibleColumns.includes("created_at") && <Th>Created</Th>}
+              <Th>Actions</Th>
+            </TableHead>
+            <TableBody>
+              {people.length === 0 ? (
+                <Tr>
+                  <Td
+                    colSpan={visibleColumns.length + (visibleColumns.includes("wishes") ? 1 : 0) + 1}
+                    className="!text-center !text-gray-400 py-12"
+                  >
+                    {isDeletedView ? "No deleted people." : "No people yet."}
+                  </Td>
+                </Tr>
+              ) : (
+                people.map((p) => (
                   <React.Fragment key={p.id}>
                     <Tr data-id={p.id}>
                       {visibleColumns.includes("display_id") && (
@@ -358,10 +434,10 @@ export default function AdminPeople() {
                       </Tr>
                     )}
                   </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
 
           {/* Delete confirmation */}
           <ConfirmDialog

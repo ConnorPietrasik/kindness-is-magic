@@ -198,31 +198,134 @@ class TestReferrersSort:
 
 
 class TestFamiliesSearch:
-    def test_search_by_family_name(self, test_client: TestClient, admin_user, db: Session):
+    def test_search_name(self, test_client: TestClient, admin_user, db: Session):
         _make_families(db, ["Smith Family", "Jones Family", "Brown Family"])
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/families", params={"search": "Jones"})
+        resp = test_client.get("/api/admin/families", params={"search_name": "Jones"})
         assert resp.status_code == 200
         body = resp.json()
         assert body["total"] == 1
         assert body["families"][0]["family_name"] == "Jones Family"
 
-    def test_search_by_contact_name(self, test_client: TestClient, admin_user, db: Session):
+    def test_search_contact(self, test_client: TestClient, admin_user, db: Session):
         _make_families(db, ["Smith Family", "Jones Family"])
         _admin_login(test_client)
 
+        resp = test_client.get("/api/admin/families", params={"search_contact": "Contact 1"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    def test_search_phone(self, test_client: TestClient, admin_user, db: Session):
+        _make_families(db, ["Smith Family", "Jones Family"])
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/families", params={"search_phone": "111-0001"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    def test_search_by_wish(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+
+        f1 = Family(
+            family_name="Alpha",
+            family_wish="Bicycle for the kids",
+            contact_name="C1",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        f2 = Family(
+            family_name="Beta",
+            family_wish="Winter coats please",
+            contact_name="C2",
+            phone_number="555-000-0002",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        db.add_all([f1, f2])
+        db.commit()
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/families", params={"search_wish": "Bicycle"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["families"][0]["family_name"] == "Alpha"
+
+    def test_search_all_fields(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family
+
+        _make_families(db, ["Smith Family", "Jones Family"])
+        # Also set distinct family_wish values
+        for f in db.query(Family).all():
+            if f.family_name == "Smith Family":
+                f.family_wish = "Toys and games"
+            else:
+                f.family_wish = "School supplies"
+        db.commit()
+        _admin_login(test_client)
+
+        # search across name
+        resp = test_client.get("/api/admin/families", params={"search": "Jones"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+        # search across contact
         resp = test_client.get("/api/admin/families", params={"search": "Contact 1"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
-    def test_search_by_phone(self, test_client: TestClient, admin_user, db: Session):
-        _make_families(db, ["Smith Family", "Jones Family"])
-        _admin_login(test_client)
-
+        # search across phone
         resp = test_client.get("/api/admin/families", params={"search": "111-0001"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
+
+        # search across wish
+        resp = test_client.get("/api/admin/families", params={"search": "Toys"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+
+        f1 = Family(
+            family_name="Smith Family",
+            family_wish="Bicycle",
+            contact_name="John Smith",
+            phone_number="555-000-0001",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        f2 = Family(
+            family_name="Smith Family",
+            family_wish="Coats",
+            contact_name="Jane Doe",
+            phone_number="555-000-0002",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        f3 = Family(
+            family_name="Jones Family",
+            family_wish="Bicycle",
+            contact_name="Bob Jones",
+            phone_number="555-000-0003",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        db.add_all([f1, f2, f3])
+        db.commit()
+        _admin_login(test_client)
+
+        # search_name="Smith" + search_wish="Bicycle" → only f1
+        resp = test_client.get(
+            "/api/admin/families",
+            params={"search_name": "Smith", "search_wish": "Bicycle"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["families"][0]["contact_name"] == "John Smith"
 
 
 class TestFamiliesApprovalStatus:
@@ -295,7 +398,7 @@ class TestFamiliesSort:
 
 
 class TestPeopleSearch:
-    def test_search_by_given_name(self, test_client: TestClient, admin_user, family_record, db: Session):
+    def test_search_name(self, test_client: TestClient, admin_user, family_record, db: Session):
         from app.models import Person
 
         for name in ["Alice", "Bob", "Charlie"]:
@@ -303,13 +406,13 @@ class TestPeopleSearch:
         db.commit()
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/people", params={"search": "Bob"})
+        resp = test_client.get("/api/admin/people", params={"search_name": "Bob"})
         assert resp.status_code == 200
         body = resp.json()
         assert body["total"] == 1
         assert body["people"][0]["given_name"] == "Bob"
 
-    def test_search_by_title(self, test_client: TestClient, admin_user, family_record, db: Session):
+    def test_search_title(self, test_client: TestClient, admin_user, family_record, db: Session):
         from app.models import Person
 
         db.add(Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr."))
@@ -317,11 +420,11 @@ class TestPeopleSearch:
         db.commit()
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/people", params={"search": "Dr."})
+        resp = test_client.get("/api/admin/people", params={"search_title": "Dr."})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
-    def test_search_by_note(self, test_client: TestClient, admin_user, family_record, db: Session):
+    def test_search_note(self, test_client: TestClient, admin_user, family_record, db: Session):
         from app.models import Person
 
         db.add(Person(family_id=family_record.id, given_name="Alice", age=10, note="Allergic to peanuts"))
@@ -329,9 +432,101 @@ class TestPeopleSearch:
         db.commit()
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/people", params={"search": "peanuts"})
+        resp = test_client.get("/api/admin/people", params={"search_note": "peanuts"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
+
+    def test_search_by_wish(self, test_client: TestClient, admin_user, family_record, db: Session):
+        from app.models import Person, Wish, WishType
+
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10)
+        db.add(p1)
+        db.flush()
+        db.add(Wish(person_id=p1.id, type=WishType.practical, description="Warm jacket size M"))
+        db.add(Wish(person_id=p1.id, type=WishType.fun, description="Lego set"))
+
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10)
+        db.add(p2)
+        db.flush()
+        db.add(Wish(person_id=p2.id, type=WishType.practical, description="Backpack"))
+        db.add(Wish(person_id=p2.id, type=WishType.fun, description="Art supplies"))
+        db.commit()
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/people", params={"search_wish": "Lego"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["people"][0]["given_name"] == "Alice"
+
+    def test_search_all_fields(self, test_client: TestClient, admin_user, family_record, db: Session):
+        from app.models import Person, Wish, WishType
+
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr.", note="Tall kid")
+        db.add(p1)
+        db.flush()
+        db.add(Wish(person_id=p1.id, type=WishType.practical, description="Science kit"))
+        db.add(Wish(person_id=p1.id, type=WishType.fun, description="Board game"))
+
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, title="Mr.", note="Quiet")
+        db.add(p2)
+        db.flush()
+        db.add(Wish(person_id=p2.id, type=WishType.practical, description="Jacket"))
+        db.commit()
+        _admin_login(test_client)
+
+        # search across name
+        resp = test_client.get("/api/admin/people", params={"search": "Alice"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+        # search across title
+        resp = test_client.get("/api/admin/people", params={"search": "Dr."})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+        # search across note
+        resp = test_client.get("/api/admin/people", params={"search": "Tall"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+        # search across wish description
+        resp = test_client.get("/api/admin/people", params={"search": "Science"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, family_record, db: Session):
+        from app.models import Person, Wish, WishType
+
+        # Alice: title="Dr.", wish="Lego"
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr.")
+        db.add(p1)
+        db.flush()
+        db.add(Wish(person_id=p1.id, type=WishType.fun, description="Lego set"))
+
+        # Bob: title="Dr.", wish="Art"
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, title="Dr.")
+        db.add(p2)
+        db.flush()
+        db.add(Wish(person_id=p2.id, type=WishType.fun, description="Art supplies"))
+
+        # Charlie: title="Mr.", wish="Lego"
+        p3 = Person(family_id=family_record.id, given_name="Charlie", age=10, title="Mr.")
+        db.add(p3)
+        db.flush()
+        db.add(Wish(person_id=p3.id, type=WishType.fun, description="Lego truck"))
+        db.commit()
+        _admin_login(test_client)
+
+        # search_title="Dr." + search_wish="Lego" → only Alice
+        resp = test_client.get(
+            "/api/admin/people",
+            params={"search_title": "Dr.", "search_wish": "Lego"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["people"][0]["given_name"] == "Alice"
 
 
 class TestPeopleSort:
