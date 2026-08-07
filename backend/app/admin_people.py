@@ -12,15 +12,18 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Person, User, Wish
+from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
     apply_column_filter,
     batch_load_person_wishes,
     build_person_detail,
+    build_sort_clause,
     build_wish_detail,
     ColumnRequest,
     compute_display_ids,
     create_person_with_wishes,
+    PERSON_SORT_FIELDS,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -59,6 +62,8 @@ def list_people(
     page_size: int = Query(50, ge=1, le=200),
     family_id: int | None = Query(None),
     columns: str | None = Query(None),
+    search: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
@@ -80,9 +85,21 @@ def list_people(
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)
 
+    if search is not None:
+        pattern = f"%{search}%"
+        query = query.filter(
+            sql_or(
+                Person.given_name.ilike(pattern),
+                Person.title.ilike(pattern),
+                Person.note.ilike(pattern),
+            )
+        )
+
     total = query.count()
     offset = (page - 1) * page_size
-    people = query.order_by(Person.id).offset(offset).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, PERSON_SORT_FIELDS, Person.id.asc())
+    people = query.order_by(sort_clause, Person.id).offset(offset).limit(page_size).all()
 
     # Wishes are always loaded (always_include)
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
@@ -137,7 +154,7 @@ def list_deleted_people(
 
     total = query.count()
     offset = (page - 1) * page_size
-    people = query.order_by(Person.id).offset(offset).limit(page_size).all()
+    people = query.order_by(Person.deleted_at.desc(), Person.id).offset(offset).limit(page_size).all()
 
     items = [
         PersonDetail(

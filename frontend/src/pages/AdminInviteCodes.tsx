@@ -21,6 +21,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite } from "../lib/api";
@@ -38,10 +39,13 @@ export default function AdminInviteCodes() {
   const [showExpired, setShowExpired] = useState<boolean | undefined>(undefined);
   const [showGenerator, setShowGenerator] = useState(false);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Column visibility
   const { visibleColumns, apiColumns } = useColumnVisibility("adminInvites");
   const { widthClass } = useTableWidth("adminInvites");
+
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
   const listParams = useMemo<InviteListParams>(
     () => ({
@@ -49,8 +53,9 @@ export default function AdminInviteCodes() {
       columns: apiColumns,
       redeemed: showRedeemed ?? undefined,
       expired: showExpired ?? undefined,
+      search: debouncedSearch || undefined,
     }),
-    [pagination.params, apiColumns, showRedeemed, showExpired]
+    [pagination.params, apiColumns, showRedeemed, showExpired, debouncedSearch]
   );
 
   // useCrudManager for list + revoke
@@ -99,34 +104,44 @@ export default function AdminInviteCodes() {
         {showGenerator && <InviteGenerator />}
 
         {/* Filters */}
-        <div className="mb-4 flex flex-wrap items-center gap-4 text-sm text-gray-600">
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={showRedeemed === true}
-              onChange={(e) => setShowRedeemed(e.target.checked ? true : undefined)}
-              className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-            />
-            Redeemed only
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={showRedeemed === false}
-              onChange={(e) => setShowRedeemed(e.target.checked ? false : undefined)}
-              className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-            />
-            Unredeemed only
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={showExpired === true}
-              onChange={(e) => setShowExpired(e.target.checked ? true : undefined)}
-              className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-            />
-            Expired only
-          </label>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            placeholder="Search by code or email…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            autoComplete="off"
+          />
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={showRedeemed === true}
+                onChange={(e) => setShowRedeemed(e.target.checked ? true : undefined)}
+                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+              />
+              Redeemed only
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={showRedeemed === false}
+                onChange={(e) => setShowRedeemed(e.target.checked ? false : undefined)}
+                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+              />
+              Unredeemed only
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={showExpired === true}
+                onChange={(e) => setShowExpired(e.target.checked ? true : undefined)}
+                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+              />
+              Expired only
+            </label>
+          </div>
         </div>
 
         {/* Table */}

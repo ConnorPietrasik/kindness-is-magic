@@ -19,11 +19,13 @@ from app.response_builders import (
     _CLEAR,
     _resolve_sentinels,
     apply_column_filter,
+    build_sort_clause,
     build_user_detail,
     ColumnRequest,
     get_active_or_404,
     get_or_404,
     partial_update,
+    USER_SORT_FIELDS,
 )
 from app.schemas import (
     AdminUserCreate,
@@ -171,6 +173,7 @@ def list_users(
     roles: str | None = Query(None),
     search: str | None = Query(None),
     columns: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> UserListResponse:
@@ -190,7 +193,9 @@ def list_users(
             )
         )
     total = query.count()
-    users = query.order_by(User.id).offset((page - 1) * page_size).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, USER_SORT_FIELDS, User.id.asc())
+    users = query.order_by(sort_clause, User.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Conditional lookups — skip queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
@@ -247,7 +252,7 @@ def list_deleted_users(
             )
         )
     total = query.count()
-    users = query.order_by(User.id).offset((page - 1) * page_size).limit(page_size).all()
+    users = query.order_by(User.deleted_at.desc(), User.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Conditional lookups
     cols = ColumnRequest.parse(columns)

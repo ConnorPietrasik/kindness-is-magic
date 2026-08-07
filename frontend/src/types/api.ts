@@ -23,6 +23,7 @@ export interface PaginationParams {
 /** Query params for admin list endpoints that support column visibility. */
 export interface AdminListParams extends PaginationParams {
   columns?: string[]; // resolved backend field names (sent as comma-separated)
+  sort?: string;
 }
 
 /** Query params for the admin users list endpoint. */
@@ -30,6 +31,42 @@ export interface AdminUsersListParams extends AdminListParams {
   role?: string;
   roles?: string;
   search?: string;
+}
+
+/** Query params for the admin referrers list endpoint. */
+export interface AdminReferrersListParams extends AdminListParams {
+  search?: string;
+  approval_status?: string;
+}
+
+/** Query params for the admin families list endpoint. */
+export interface AdminFamiliesListParams extends AdminListParams {
+  search?: string;
+  approval_status?: string;
+  wish_lock_level?: string;
+}
+
+/** Query params for the admin people list endpoint. */
+export interface AdminPeopleListParams extends AdminListParams {
+  family_id?: number;
+  search?: string;
+}
+
+/** Query params for the admin invites list endpoint (updated with search + sort). */
+export interface InviteListParams extends AdminListParams {
+  redeemed?: boolean;
+  expired?: boolean;
+  search?: string;
+}
+
+/** Query params for the admin wishes list endpoint (updated with wish_type + sort). */
+export interface AdminWishesListParams extends AdminListParams {
+  family_id?: number;
+  person_id?: number;
+  assigned_to_id?: number;
+  purchased?: string;
+  search?: string;
+  wish_type?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,21 +116,6 @@ export interface InviteListResponse {
   page: number;
   page_size: number;
   total_pages: number;
-}
-
-/** Query params for the admin invites list endpoint. */
-export interface InviteListParams extends AdminListParams {
-  redeemed?: boolean;
-  expired?: boolean;
-}
-
-/** Query params for the admin wishes list endpoint. */
-export interface AdminWishesListParams extends AdminListParams {
-  family_id?: number;
-  person_id?: number;
-  assigned_to_id?: number;
-  purchased?: string;
-  search?: string;
 }
 
 /** Mirrors WishListResponse — paginated admin wish list. */

@@ -28,6 +28,7 @@ import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
@@ -44,7 +45,7 @@ import {
 import { adminDeletedPeople, adminFamilies, adminFamiliesDropdown, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { AdminListParams, PersonPayload } from "../types";
+import type { AdminPeopleListParams, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -54,13 +55,25 @@ export default function AdminPeople() {
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [pendingFamilyRestore, setPendingFamilyRestore] = useState<{ personId: number; familyId: number } | null>(null);
+  const [familyFilter, setFamilyFilter] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Column visibility
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
   const { widthClass } = useTableWidth("adminPeople");
 
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
+  const listParams = useMemo<AdminPeopleListParams>(
+    () => ({
+      ...pagination.params,
+      columns: apiColumns,
+      family_id: familyFilter ?? undefined,
+      search: debouncedSearch || undefined,
+    }),
+    [pagination.params, apiColumns, familyFilter, debouncedSearch]
+  );
 
   const {
     listData,
@@ -175,6 +188,35 @@ export default function AdminPeople() {
 
         {/* Tabs */}
         <CrudTabs viewTab={viewTab} onChange={handleTabChange} />
+
+        {/* Filters */}
+        {!isDeletedView && (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <select
+              value={familyFilter ?? ""}
+              onChange={(e) => {
+                setFamilyFilter(e.target.value ? parseInt(e.target.value, 10) : null);
+                pagination.goToPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">All families</option>
+              {(families ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.family_name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Search by name, title or note…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {/* Tab panel content */}
         <div role="tabpanel">

@@ -62,6 +62,7 @@ import type {
 export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<string>("");
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
 
@@ -81,8 +82,9 @@ export default function AdminUsers() {
       columns: apiColumns,
       role: roleFilter || undefined,
       search: searchQuery || undefined,
+      sort: sortField || undefined,
     }),
-    [pagination.params, apiColumns, roleFilter, searchQuery]
+    [pagination.params, apiColumns, roleFilter, searchQuery, sortField]
   );
 
   // CRUD manager for users
@@ -226,6 +228,26 @@ export default function AdminUsers() {
               <option value="family">Family</option>
               <option value="purchaser">Purchaser</option>
               <option value="delivery">Delivery</option>
+            </select>
+            <select
+              value={sortField}
+              onChange={(e) => {
+                setSortField(e.target.value);
+                pagination.goToPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">Default sort</option>
+              <option value="id">ID ↑</option>
+              <option value="-id">ID ↓</option>
+              <option value="display_name">Name ↑</option>
+              <option value="-display_name">Name ↓</option>
+              <option value="email">Email ↑</option>
+              <option value="-email">Email ↓</option>
+              <option value="role">Role ↑</option>
+              <option value="-role">Role ↓</option>
+              <option value="created_at">Created ↑</option>
+              <option value="-created_at">Created ↓</option>
             </select>
             <input
               type="text"

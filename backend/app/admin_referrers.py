@@ -19,9 +19,11 @@ from app.permissions import require_admin
 from app.response_builders import (
     apply_column_filter,
     build_referrer_detail,
+    build_sort_clause,
     ColumnRequest,
     get_active_or_404,
     get_or_404,
+    REFERRER_SORT_FIELDS,
     partial_update,
 )
 from app.schemas import (
@@ -55,13 +57,26 @@ def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     columns: str | None = Query(None),
+    search: str | None = Query(None),
+    approval_status: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
     """List active (non-deleted) referrers."""
     query = db.query(Referrer).filter(Referrer.deleted_at.is_(None))
+
+    if search is not None:
+        pattern = f"%{search}%"
+        query = query.filter(Referrer.name.ilike(pattern))
+
+    if approval_status is not None:
+        query = query.filter(Referrer.approval_status == approval_status)
+
     total = query.count()
-    referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, REFERRER_SORT_FIELDS, Referrer.id.asc())
+    referrers = query.order_by(sort_clause, Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Conditional lookups — skip DB queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
@@ -131,7 +146,7 @@ def list_deleted_referrers(
     """List soft-deleted referrers."""
     query = db.query(Referrer).filter(Referrer.deleted_at.isnot(None))
     total = query.count()
-    referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
+    referrers = query.order_by(Referrer.deleted_at.desc(), Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Conditional lookups
     cols = ColumnRequest.parse(columns)

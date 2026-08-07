@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from typing import Type, TypeVar, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import ColumnElement, func
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from datetime import datetime, timezone
 
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, Wish, WishType
+from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerInviteToken, User, Wish, WishType
 from app.schemas import _CLEAR, WishCreate
 
 T = TypeVar("T", bound=DeclarativeBase)
@@ -25,6 +25,100 @@ def _is_clear_sentinel(value) -> bool:
     Referrer IDs are SERIAL starting at 1, so 0 is never a valid id.
     """
     return value == 0
+
+
+# ---------------------------------------------------------------------------
+# Sorting helper
+# ---------------------------------------------------------------------------
+
+
+def build_sort_clause(
+    sort_param: str | None,
+    field_map: dict[str, ColumnElement],
+    default_clause: ColumnElement,
+) -> ColumnElement:
+    """Parse a ``sort`` query param into a SQLAlchemy order-by clause.
+
+    The param format is ``field`` (ascending) or ``-field`` (descending).
+    The *field_map* dict maps allowed field names to SQLAlchemy column
+    expressions.  If the param is missing, empty, or references an
+    unknown field, *default_clause* is returned unchanged.
+
+    Example::
+
+        clause = build_sort_clause(
+            sort="-created_at",
+            field_map={"name": Referrer.name, "created_at": Referrer.created_at},
+            default_clause=Referrer.id.asc(),
+        )
+    """
+    if not sort_param:
+        return default_clause
+
+    descending = False
+    field = sort_param
+    if field.startswith("-"):
+        descending = True
+        field = field[1:]
+
+    if field not in field_map:
+        return default_clause
+
+    col = field_map[field]
+    return col.desc() if descending else col.asc()
+
+
+# ---------------------------------------------------------------------------
+# Sort-field registries (module-level so they aren't rebuilt per request)
+# ---------------------------------------------------------------------------
+
+FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
+    "family_name": Family.family_name,
+    "id": Family.id,
+    "created_at": Family.created_at,
+    "approval_status": Family.approval_status,
+    "wish_lock_level": Family.wish_lock_level,
+    "referrer_id": func.coalesce(Family.referrer_id, 0),
+}
+
+INVITE_SORT_FIELDS: dict[str, ColumnElement] = {
+    "code": ReferrerInviteToken.code,
+    "id": ReferrerInviteToken.id,
+    "created_at": ReferrerInviteToken.created_at,
+    "expires_at": ReferrerInviteToken.expires_at,
+}
+
+PERSON_SORT_FIELDS: dict[str, ColumnElement] = {
+    "given_name": Person.given_name,
+    "age": Person.age,
+    "id": Person.id,
+    "created_at": Person.created_at,
+    "family_id": Person.family_id,
+}
+
+REFERRER_SORT_FIELDS: dict[str, ColumnElement] = {
+    "name": Referrer.name,
+    "id": Referrer.id,
+    "created_at": Referrer.created_at,
+    "approved_at": Referrer.approved_at,
+    "approval_status": Referrer.approval_status,
+}
+
+USER_SORT_FIELDS: dict[str, ColumnElement] = {
+    "display_name": User.display_name,
+    "email": User.email,
+    "role": User.role,
+    "id": User.id,
+    "created_at": User.created_at,
+}
+
+WISH_SORT_FIELDS: dict[str, ColumnElement] = {
+    "description": Wish.description,
+    "type": Wish.type,
+    "id": Wish.id,
+    "purchased_at": Wish.purchased_at,
+    "created_at": Wish.created_at,
+}
 
 
 # ---------------------------------------------------------------------------

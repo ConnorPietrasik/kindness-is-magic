@@ -26,6 +26,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
@@ -42,7 +43,7 @@ import {
 import { adminDeletedReferrers, adminReferrers, adminReferrersDropdown } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { AdminListParams, ReferrerDetail, ReferrerPayload } from "../types";
+import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -54,7 +55,8 @@ export default function AdminReferrers() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
-  const [showUnapproved, setShowUnapproved] = useState(false);
+  const [approvalFilter, setApprovalFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const approveMut = useMutation({
     mutationFn: adminApproveReferrer,
@@ -74,8 +76,18 @@ export default function AdminReferrers() {
   const { visibleColumns, apiColumns } = useColumnVisibility("adminReferrers");
   const { widthClass } = useTableWidth("adminReferrers");
 
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
+  const listParams = useMemo<AdminReferrersListParams>(
+    () => ({
+      ...pagination.params,
+      columns: apiColumns,
+      search: debouncedSearch || undefined,
+      approval_status: approvalFilter || undefined,
+    }),
+    [pagination.params, apiColumns, debouncedSearch, approvalFilter]
+  );
 
   const {
     listData,
@@ -122,11 +134,7 @@ export default function AdminReferrers() {
     updateMut?.mutate({ id: editingId, data: payload as ReferrerPayload });
   }
 
-  const referrers = useMemo(() => {
-    const all = listData?.referrers ?? [];
-    if (showUnapproved || isDeletedView) return all;
-    return all.filter((r) => r.approval_status === "approved");
-  }, [listData, showUnapproved, isDeletedView]);
+  const referrers = listData?.referrers ?? [];
 
   if (listLoading) return <PageSpinner />;
 
@@ -140,24 +148,40 @@ export default function AdminReferrers() {
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
             {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
-            {!isDeletedView && (
-              <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={showUnapproved}
-                  onChange={(e) => setShowUnapproved(e.target.checked)}
-                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                  autoComplete="off"
-                />
-                Show unapproved
-              </label>
-            )}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
           </div>
         </div>
 
         {/* Tabs */}
         <CrudTabs viewTab={viewTab} onChange={handleTabChange} />
+
+        {/* Filters */}
+        {!isDeletedView && (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <select
+              aria-label="Approval status filter"
+              value={approvalFilter}
+              onChange={(e) => {
+                setApprovalFilter(e.target.value);
+                pagination.goToPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search by name…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {/* Tab panel content */}
         <div role="tabpanel">
@@ -186,7 +210,7 @@ export default function AdminReferrers() {
                 {visibleColumns.includes("family_limit") && <Th>Family Limit</Th>}
                 {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
                 {visibleColumns.includes("family_invite_code") && <Th>Invite Code</Th>}
-                {visibleColumns.includes("approval_status") && showUnapproved && <Th>Approval</Th>}
+                {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
                 {visibleColumns.includes("approved_by_admin_name") && <Th>Approved By</Th>}
                 {visibleColumns.includes("approved_at") && <Th>Approved At</Th>}
                 {visibleColumns.includes("created_at") && <Th>Created</Th>}
@@ -205,7 +229,7 @@ export default function AdminReferrers() {
                       )}
                       {visibleColumns.includes("phone_number") && <Td>{r.phone_number || "—"}</Td>}
                       {visibleColumns.includes("family_invite_code") && <Td className="font-mono text-xs">{r.family_invite_code}</Td>}
-                      {visibleColumns.includes("approval_status") && showUnapproved && (
+                      {visibleColumns.includes("approval_status") && (
                         <Td>
                           <div className="flex items-center gap-2">
                             <ApprovalBadge status={r.approval_status} />
@@ -324,10 +348,7 @@ export default function AdminReferrers() {
                     </Tr>
                     {editingId === r.id && (
                       <Tr key={`${r.id}-edit`}>
-                        <Td
-                          colSpan={visibleColumns.length + (!showUnapproved && visibleColumns.includes("approval_status") ? -1 : 0) + 2}
-                          className="!py-3"
-                        >
+                        <Td colSpan={visibleColumns.length + 2} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

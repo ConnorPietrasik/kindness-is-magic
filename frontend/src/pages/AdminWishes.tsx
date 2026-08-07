@@ -60,6 +60,8 @@ export default function AdminWishes() {
   const [familyFilter, setFamilyFilter] = useState<number | null>(null);
   const [assignedToFilter, setAssignedToFilter] = useState<number | null>(null);
   const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
+  const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
+  const [sortField, setSortField] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -94,8 +96,10 @@ export default function AdminWishes() {
       assigned_to_id: assignedToFilter ?? undefined,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
       search: debouncedSearch || undefined,
+      wish_type: wishTypeFilter || undefined,
+      sort: sortField || undefined,
     }),
-    [pagination.params, apiColumns, familyFilter, assignedToFilter, purchasedFilter, debouncedSearch]
+    [pagination.params, apiColumns, familyFilter, assignedToFilter, purchasedFilter, debouncedSearch, wishTypeFilter, sortField]
   );
 
   // CRUD manager — no create/delete (wishes managed via person CRUD)
@@ -276,6 +280,41 @@ export default function AdminWishes() {
             <option value="all">All statuses</option>
             <option value="true">Purchased</option>
             <option value="false">Unpurchased</option>
+          </select>
+
+          <select
+            value={wishTypeFilter}
+            onChange={(e) => {
+              setWishTypeFilter(e.target.value);
+              resetPage();
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          >
+            <option value="">All types</option>
+            <option value="adult">Adult</option>
+            <option value="practical">Practical</option>
+            <option value="fun">Fun</option>
+          </select>
+
+          <select
+            value={sortField}
+            onChange={(e) => {
+              setSortField(e.target.value);
+              resetPage();
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          >
+            <option value="">Default sort</option>
+            <option value="id">ID ↑</option>
+            <option value="-id">ID ↓</option>
+            <option value="description">Description ↑</option>
+            <option value="-description">Description ↓</option>
+            <option value="type">Type ↑</option>
+            <option value="-type">Type ↓</option>
+            <option value="purchased_at">Purchased ↑</option>
+            <option value="-purchased_at">Purchased ↓</option>
+            <option value="created_at">Created ↑</option>
+            <option value="-created_at">Created ↓</option>
           </select>
 
           <input

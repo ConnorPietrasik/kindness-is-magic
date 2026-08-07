@@ -115,8 +115,8 @@ test.describe("Core Flow", () => {
       await adminPage.goto("/admin/referrers");
       await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
-      /* Check "Show unapproved" to reveal pending referrers */
-      await adminPage.getByLabel("Show unapproved").check();
+      /* Select "Pending" from approval status filter to reveal pending referrers */
+      await adminPage.selectOption('[aria-label="Approval status filter"]', 'pending');
 
       /* Find the new referrer (may need to paginate through accumulated referrers) */
       const referrerRow = (await findRowInTable(adminPage, TEST_REFERRER_NAME))!;

@@ -28,6 +28,7 @@ import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
@@ -56,7 +57,7 @@ import {
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { AdminListParams, FamilyDetail, FamilyPayload } from "../types";
+import type { AdminFamiliesListParams, FamilyDetail, FamilyPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -81,7 +82,9 @@ export default function AdminFamilies() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState<number | null>(null);
   const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
-  const [showUnapproved, setShowUnapproved] = useState(false);
+  const [approvalFilter, setApprovalFilter] = useState<string>("");
+  const [lockLevelFilter, setLockLevelFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
@@ -89,8 +92,19 @@ export default function AdminFamilies() {
   const { visibleColumns, apiColumns } = useColumnVisibility("adminFamilies");
   const { widthClass } = useTableWidth("adminFamilies");
 
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
+  const listParams = useMemo<AdminFamiliesListParams>(
+    () => ({
+      ...pagination.params,
+      columns: apiColumns,
+      search: debouncedSearch || undefined,
+      approval_status: approvalFilter || undefined,
+      wish_lock_level: lockLevelFilter || undefined,
+    }),
+    [pagination.params, apiColumns, debouncedSearch, approvalFilter, lockLevelFilter]
+  );
 
   const {
     listData,
@@ -200,11 +214,7 @@ export default function AdminFamilies() {
     }
   }
 
-  const families = useMemo(() => {
-    const all = listData?.families ?? [];
-    if (showUnapproved || isDeletedView) return all;
-    return all.filter((f) => f.approval_status === "approved");
-  }, [listData, showUnapproved, isDeletedView]);
+  const families = listData?.families ?? [];
 
   if (listLoading) return <PageSpinner />;
 
@@ -218,24 +228,52 @@ export default function AdminFamilies() {
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
           <div className="flex items-center gap-3">
             {!isDeletedView && <ColumnToggle resourceKey="adminFamilies" />}
-            {!isDeletedView && (
-              <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={showUnapproved}
-                  onChange={(e) => setShowUnapproved(e.target.checked)}
-                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                  autoComplete="off"
-                />
-                Show unapproved
-              </label>
-            )}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
           </div>
         </div>
 
         {/* Tabs */}
         <CrudTabs viewTab={viewTab} onChange={handleTabChange} />
+
+        {/* Filters */}
+        {!isDeletedView && (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <select
+              value={approvalFilter}
+              onChange={(e) => {
+                setApprovalFilter(e.target.value);
+                pagination.goToPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <select
+              value={lockLevelFilter}
+              onChange={(e) => {
+                setLockLevelFilter(e.target.value);
+                pagination.goToPage(1);
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            >
+              <option value="">All lock levels</option>
+              <option value="family">Family</option>
+              <option value="referrer">Referrer</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search by name, contact or phone…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {/* Tab panel content */}
         <div role="tabpanel">

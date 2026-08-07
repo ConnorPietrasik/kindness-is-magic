@@ -16,11 +16,13 @@ from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_column_filter,
+    build_sort_clause,
     build_wish_detail,
     build_wish_list_item,
     ColumnRequest,
     get_active_or_404,
     get_or_404,
+    WISH_SORT_FIELDS,
     partial_update,
 )
 from app.schemas import (
@@ -57,7 +59,9 @@ def list_wishes(
     assigned_to_id: int | None = Query(None),
     purchased: str | None = Query(None),
     search: str | None = Query(None),
+    wish_type: str | None = Query(None),
     columns: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishListResponse:
@@ -95,12 +99,17 @@ def list_wishes(
                 Family.family_name.ilike(pattern),
             )
         )
+    if wish_type is not None:
+        query = query.filter(Wish.type == wish_type)
 
     total = query.count()
-    wishes = query.order_by(Wish.id).offset((page - 1) * page_size).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, WISH_SORT_FIELDS, Wish.id.asc())
+    wishes = query.order_by(sort_clause, Wish.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Build list items — need person/family context and assigned-to names.
-    # Re-query with joinedload to avoid N+1.
+    # Re-query with joinedload to avoid N+1. Preserve the sort order from
+    # the first query so the response reflects the requested sort.
     cols = ColumnRequest.parse(columns)
     wish_ids = [w.id for w in wishes]
     if wish_ids:
@@ -111,7 +120,7 @@ def list_wishes(
                 joinedload(Wish.assigned_to),
             )
             .filter(Wish.id.in_(wish_ids))
-            .order_by(Wish.id)
+            .order_by(sort_clause)
             .all()
         )
         # Batch-collect assigned-to users for name resolution (conditional)

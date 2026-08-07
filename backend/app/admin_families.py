@@ -13,14 +13,17 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole, WishLockLevel
+from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
     apply_column_filter,
     batch_load_person_wishes,
     build_family_detail,
     build_family_review_summary,
+    build_sort_clause,
     ColumnRequest,
     compute_display_ids,
+    FAMILY_SORT_FIELDS,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -63,6 +66,10 @@ def list_families(
     page_size: int = Query(50, ge=1, le=200),
     referrer_id: int | None = Query(None),
     columns: str | None = Query(None),
+    search: str | None = Query(None),
+    approval_status: str | None = Query(None),
+    wish_lock_level: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> FamilyListResponse:
@@ -84,9 +91,27 @@ def list_families(
     if referrer_id is not None:
         query = query.filter(Family.referrer_id == referrer_id)
 
+    if search is not None:
+        pattern = f"%{search}%"
+        query = query.filter(
+            sql_or(
+                Family.family_name.ilike(pattern),
+                Family.contact_name.ilike(pattern),
+                Family.phone_number.ilike(pattern),
+            )
+        )
+
+    if approval_status is not None:
+        query = query.filter(Family.approval_status == approval_status)
+
+    if wish_lock_level is not None:
+        query = query.filter(Family.wish_lock_level == wish_lock_level)
+
     total = query.count()
     offset = (page - 1) * page_size
-    families = query.order_by(func.coalesce(Family.referrer_id, 0), Family.id).offset(offset).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, FAMILY_SORT_FIELDS, func.coalesce(Family.referrer_id, 0).asc())
+    families = query.order_by(sort_clause, Family.id).offset(offset).limit(page_size).all()
 
     # Conditional lookups — skip queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
@@ -171,7 +196,7 @@ def list_deleted_families(
 
     total = query.count()
     offset = (page - 1) * page_size
-    families = query.order_by(Family.id).offset(offset).limit(page_size).all()
+    families = query.order_by(Family.deleted_at.desc(), Family.id).offset(offset).limit(page_size).all()
 
     # Conditional lookups
     cols = ColumnRequest.parse(columns)

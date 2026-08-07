@@ -8,12 +8,13 @@ import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_ as sql_or
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
-from app.response_builders import apply_column_filter, ColumnRequest
+from app.response_builders import apply_column_filter, build_sort_clause, ColumnRequest, INVITE_SORT_FIELDS
 from app.schemas import InviteListResponse, ReferrerInviteSummary
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,9 @@ def list_invites(
     page_size: int = Query(50, ge=1, le=200),
     redeemed: bool | None = Query(None),
     expired: bool | None = Query(None),
+    search: str | None = Query(None),
     columns: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> InviteListResponse:
@@ -97,8 +100,19 @@ def list_invites(
         else:
             query = query.filter(ReferrerInviteToken.expires_at >= now)
 
+    if search is not None:
+        pattern = f"%{search}%"
+        query = query.filter(
+            sql_or(
+                ReferrerInviteToken.code.ilike(pattern),
+                ReferrerInviteToken.locked_email.ilike(pattern),
+            )
+        )
+
     total = query.count()
-    invites = query.order_by(ReferrerInviteToken.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    sort_clause = build_sort_clause(sort, INVITE_SORT_FIELDS, ReferrerInviteToken.id.desc())
+    invites = query.order_by(sort_clause, ReferrerInviteToken.id).offset((page - 1) * page_size).limit(page_size).all()
 
     # Conditional lookups — skip queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
