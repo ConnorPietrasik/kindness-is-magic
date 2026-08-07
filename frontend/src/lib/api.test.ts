@@ -763,3 +763,299 @@ describe("admin wish review API functions", () => {
     expect(result).toEqual({ id: 5, wish_lock_level: "family" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Admin — Wishes
+// ---------------------------------------------------------------------------
+describe("admin wish API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminListWishes — GET /api/admin/wishes", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.adminListWishes();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/wishes");
+  });
+
+  it("adminListWishes with params — serializes columns as CSV", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.adminListWishes({ page: 2, page_size: 20, columns: ["name", "status"] });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/wishes", {
+      params: { page: 2, page_size: 20, columns: "name,status" },
+    });
+  });
+
+  it("adminGetWish — GET /api/admin/wishes/:id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 7, description: "Jacket" } });
+    const result = await apiModule.adminGetWish(7);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/wishes/7");
+    expect(result).toEqual({ id: 7, description: "Jacket" });
+  });
+
+  it("adminUpdateWish — PATCH /api/admin/wishes/:id", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 7 } });
+    await apiModule.adminUpdateWish(7, { purchaser_note: "Got it" });
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/admin/wishes/7", { purchaser_note: "Got it" });
+  });
+
+  it("adminMarkPurchased — POST /api/admin/wishes/:id/mark-purchased", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 7, purchased_at: "2025-01-01" } });
+    await apiModule.adminMarkPurchased(7, { purchased_where: "Target" });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/wishes/7/mark-purchased", {
+      purchased_where: "Target",
+    });
+  });
+
+  it("adminBatchAssignWishes — POST /api/admin/wishes/batch-assign", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { assigned_count: 3 } });
+    const result = await apiModule.adminBatchAssignWishes({ wish_ids: [1, 2, 3], assigned_to_id: 5 });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/wishes/batch-assign", {
+      wish_ids: [1, 2, 3],
+      assigned_to_id: 5,
+    });
+    expect(result).toEqual({ assigned_count: 3 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Restore (family/person)
+// ---------------------------------------------------------------------------
+describe("admin restore API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminRestoreFamily — POST /api/admin/families/:id/restore", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5 } });
+    const result = await apiModule.adminRestoreFamily(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/families/5/restore");
+    expect(result).toEqual({ id: 5 });
+  });
+
+  it("adminRestorePerson — POST /api/admin/people/:id/restore", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 12 } });
+    const result = await apiModule.adminRestorePerson(12);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/people/12/restore");
+    expect(result).toEqual({ id: 12 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Packing Slips
+// ---------------------------------------------------------------------------
+describe("admin packing slips API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminGetPackingSlips — GET /api/admin/families/packing-slips (no filter)", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+    await apiModule.adminGetPackingSlips();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/packing-slips");
+  });
+
+  it("adminGetPackingSlips with familyIds — serializes as CSV", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+    await apiModule.adminGetPackingSlips([1, 3, 5]);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/packing-slips", {
+      params: { family_ids: "1,3,5" },
+    });
+  });
+
+  it("adminGetPackingSlips with empty array — no filter", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+    await apiModule.adminGetPackingSlips([]);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/families/packing-slips");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auth — Referrer Invite
+// ---------------------------------------------------------------------------
+describe("auth invite API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("createReferrerInvite — POST /api/auth/invite-referrer", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { code: "KMG-ABC", expires_at: "2025-12-31" } });
+    const result = await apiModule.createReferrerInvite({ family_limit: 10, email: "new@example.com" });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/invite-referrer", {
+      family_limit: 10,
+      email: "new@example.com",
+    });
+    expect(result).toEqual({ code: "KMG-ABC", expires_at: "2025-12-31" });
+  });
+
+  it("registerReferrerViaInvite — POST /api/auth/register-referrer", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { user: { id: 1 }, referrer: { id: 1 } } });
+    const result = await apiModule.registerReferrerViaInvite({
+      code: "KMG-ABC",
+      name: "New Org",
+      email: "new@example.com",
+      phone_number: "555-1234",
+      password: "secret123",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/register-referrer", {
+      code: "KMG-ABC",
+      name: "New Org",
+      email: "new@example.com",
+      phone_number: "555-1234",
+      password: "secret123",
+    });
+    expect(result).toEqual({ user: { id: 1 }, referrer: { id: 1 } });
+  });
+
+  it("registerFamilyViaInvite — POST /api/auth/register-family", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { user: { id: 2 }, family: { id: 5 } } });
+    const result = await apiModule.registerFamilyViaInvite({
+      code: "KFI-XYZ",
+      family_name: "The Smiths",
+      family_wish: "A warm blanket",
+      contact_name: "Mom",
+      email: "family@example.com",
+      password: "secret123",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/register-family", {
+      code: "KFI-XYZ",
+      family_name: "The Smiths",
+      family_wish: "A warm blanket",
+      contact_name: "Mom",
+      email: "family@example.com",
+      password: "secret123",
+    });
+    expect(result).toEqual({ user: { id: 2 }, family: { id: 5 } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Referrer — Pending Families (invite approvals)
+// ---------------------------------------------------------------------------
+describe("referrer pending family API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("listPendingFamilies — GET /api/referrer/pending-families", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, family_name: "Smiths" }] });
+    const result = await apiModule.listPendingFamilies();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/referrer/pending-families");
+    expect(result).toEqual([{ id: 1, family_name: "Smiths" }]);
+  });
+
+  it("approveFamily — POST /api/referrer/families/:id/approve", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "approved" } });
+    const result = await apiModule.approveFamily(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/approve");
+    expect(result).toEqual({ id: 5, approval_status: "approved" });
+  });
+
+  it("rejectFamily — POST /api/referrer/families/:id/reject", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "rejected" } });
+    const result = await apiModule.rejectFamily(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/reject");
+    expect(result).toEqual({ id: 5, approval_status: "rejected" });
+  });
+
+  it("sendReferrerFamilyInvite — POST /api/referrer/send-family-invite with email", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { invite_code: "KFI-NEW" } });
+    const result = await apiModule.sendReferrerFamilyInvite("friend@example.com");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/send-family-invite", {
+      email: "friend@example.com",
+    });
+    expect(result).toEqual({ invite_code: "KFI-NEW" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Public — Family Wish List
+// ---------------------------------------------------------------------------
+describe("public wish list API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getFamilyWishList — GET /api/families/:id/wish-list", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { family: { id: 5 }, wishes: [] } });
+    const result = await apiModule.getFamilyWishList(5);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/families/5/wish-list");
+    expect(result).toEqual({ family: { id: 5 }, wishes: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Purchaser — Assigned Wishes
+// ---------------------------------------------------------------------------
+describe("purchaser API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("purchaserListWishes — GET /api/purchaser/wishes", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.purchaserListWishes();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/purchaser/wishes");
+  });
+
+  it("purchaserListWishes with purchased filter", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
+    await apiModule.purchaserListWishes({ purchased: "true", page: 2, page_size: 20 });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/purchaser/wishes", {
+      params: { purchased: "true", page: 2, page_size: 20 },
+    });
+  });
+
+  it("purchaserGetWish — GET /api/purchaser/wishes/:id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 7, description: "Jacket" } });
+    const result = await apiModule.purchaserGetWish(7);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/purchaser/wishes/7");
+    expect(result).toEqual({ id: 7, description: "Jacket" });
+  });
+
+  it("purchaserMarkPurchased — POST /api/purchaser/wishes/:id/mark-purchased", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 7, purchased_at: "2025-01-01" } });
+    await apiModule.purchaserMarkPurchased(7, { purchased_where: "Amazon" });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/purchaser/wishes/7/mark-purchased", {
+      purchased_where: "Amazon",
+    });
+  });
+
+  it("purchaserUpdateWish — PATCH /api/purchaser/wishes/:id", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 7 } });
+    await apiModule.purchaserUpdateWish(7, { purchaser_note: "Left at door" });
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/purchaser/wishes/7", {
+      purchaser_note: "Left at door",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Delivery — Assigned Families
+// ---------------------------------------------------------------------------
+describe("delivery API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("deliveryListFamilies — GET /api/delivery/families", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, family_name: "Smiths" }] });
+    const result = await apiModule.deliveryListFamilies();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/delivery/families");
+    expect(result).toEqual([{ id: 1, family_name: "Smiths" }]);
+  });
+
+  it("deliveryGetPackingSlips — GET /api/delivery/packing-slips", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+    const result = await apiModule.deliveryGetPackingSlips();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/delivery/packing-slips");
+    expect(result).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auth — setAuthQueryData / _registerSetAuthQueryData
+// ---------------------------------------------------------------------------
+describe("auth query data registry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("setAuthQueryData is a no-op before registration", async () => {
+    // _registerSetAuthQueryData was already called by the api module import,
+    // but the internal ref starts as null until AuthProvider registers it.
+    // Calling setAuthQueryData should not throw.
+    expect(() => apiModule.setAuthQueryData(null)).not.toThrow();
+  });
+
+  it("_registerSetAuthQueryData stores the callback", () => {
+    const fn = vi.fn();
+    apiModule._registerSetAuthQueryData(fn);
+    apiModule.setAuthQueryData(null);
+    expect(fn).toHaveBeenCalledWith(null);
+  });
+});
