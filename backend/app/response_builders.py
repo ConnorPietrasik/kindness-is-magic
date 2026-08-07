@@ -363,20 +363,26 @@ def build_family_detail(
     return result
 
 
-def build_family_review_summary(fam: Family, db: Session, *, person_count: int | None = None) -> dict:
+def build_family_review_summary(
+    fam: Family, db: Session, *, person_count: int | None = None, referrer_map: dict[int, str] | None = None
+) -> dict:
     """Build a dict suitable for FamilyReviewList (review queue items).
 
     Includes referrer_name resolution.  Pass ``person_count`` to skip the
-    query when it is already known.
+    query when it is already known.  Pass ``referrer_map`` (id → name) to
+    avoid per-family referrer lookups when building a list response.
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
 
     referrer_name: str | None = None
     if fam.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref:
-            referrer_name = ref.name
+        if referrer_map is not None:
+            referrer_name = referrer_map.get(fam.referrer_id)
+        else:
+            ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
+            if ref:
+                referrer_name = ref.name
 
     return {
         "id": fam.id,

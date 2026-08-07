@@ -384,7 +384,17 @@ def list_review_queue(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
-    return [FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0))) for f in families]
+    # All families in this queue belong to the current referrer — single lookup
+    referrer_map: dict[int, str] = {}
+    if user.referrer_id is not None:
+        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
+        if ref:
+            referrer_map[user.referrer_id] = ref.name
+
+    return [
+        FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map))
+        for f in families
+    ]
 
 
 @router.post("/families/{fam_id}/approve-wishes")

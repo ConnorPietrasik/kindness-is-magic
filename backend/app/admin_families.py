@@ -257,7 +257,17 @@ def list_review_queue(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
-    return [FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0))) for f in families]
+    # Batch referrer names
+    referrer_ids = {f.referrer_id for f in families if f.referrer_id is not None}
+    referrer_map: dict[int, str] = {}
+    if referrer_ids:
+        for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
+            referrer_map[ref.id] = ref.name
+
+    return [
+        FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map))
+        for f in families
+    ]
 
 
 # ---------------------------------------------------------------------------
