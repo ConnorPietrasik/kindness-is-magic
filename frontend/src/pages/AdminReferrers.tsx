@@ -39,7 +39,7 @@ import {
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
-import { adminDeletedReferrers, adminReferrers } from "../lib/queryKeys";
+import { adminDeletedReferrers, adminReferrers, adminReferrersDropdown } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminListParams, ReferrerDetail, ReferrerPayload } from "../types";
@@ -103,7 +103,7 @@ export default function AdminReferrers() {
     updateFn: isDeletedView ? undefined : adminUpdateReferrer,
     deleteFn: isDeletedView ? undefined : adminDeleteReferrer,
     restoreFn: adminRestoreReferrer,
-    invalidationKeys: [adminReferrers, adminDeletedReferrers],
+    invalidationKeys: [adminReferrers, adminDeletedReferrers, adminReferrersDropdown],
     entityName: "Referrer",
   });
 

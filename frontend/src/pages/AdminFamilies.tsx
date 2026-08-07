@@ -47,6 +47,7 @@ import {
   adminDeletedFamilies,
   adminDeletedPeople,
   adminFamilies,
+  adminFamiliesDropdown,
   adminPackingSlips,
   adminPeople,
   adminReferrersDropdown,
@@ -117,7 +118,15 @@ export default function AdminFamilies() {
     updateFn: isDeletedView ? undefined : adminUpdateFamily,
     deleteFn: isDeletedView ? undefined : adminDeleteFamily,
     restoreFn: adminRestoreFamily,
-    invalidationKeys: [adminFamilies, adminDeletedFamilies, adminPeople, adminDeletedPeople, adminPackingSlips, adminWishes],
+    invalidationKeys: [
+      adminFamilies,
+      adminDeletedFamilies,
+      adminPeople,
+      adminDeletedPeople,
+      adminPackingSlips,
+      adminWishes,
+      adminFamiliesDropdown,
+    ],
     entityName: "Family",
   });
 

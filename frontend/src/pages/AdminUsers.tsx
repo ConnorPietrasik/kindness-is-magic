@@ -16,6 +16,7 @@ import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -168,11 +169,16 @@ export default function AdminUsers() {
 
   // Reset password form state
   const [resetForm, setResetForm] = useState({ password: "", confirmPassword: "" });
+  const [resetPasswordError, setResetPasswordError] = useState("");
 
   function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
-    if (resetForm.password !== resetForm.confirmPassword) return;
+    if (resetForm.password !== resetForm.confirmPassword) {
+      setResetPasswordError("Passwords do not match");
+      return;
+    }
     if (resetPasswordId == null) return;
+    setResetPasswordError("");
     resetPasswordMut.mutate({ id: resetPasswordId, data: { password: resetForm.password } });
   }
 
@@ -434,8 +440,12 @@ export default function AdminUsers() {
             form={resetForm}
             setForm={setResetForm}
             onSubmit={handleResetPassword}
-            onCancel={() => setResetPasswordId(null)}
+            onCancel={() => {
+              setResetPasswordId(null);
+              setResetPasswordError("");
+            }}
             loading={resetPasswordMut.isPending}
+            passwordError={resetPasswordError}
           />
         </div>
 
@@ -508,11 +518,17 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
 
+  const [passwordError, setPasswordError] = useState("");
+
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+      setPasswordError("");
 
-      if (!isEdit && form.password !== form.confirmPassword) return;
+      if (!isEdit && form.password !== form.confirmPassword) {
+        setPasswordError("Passwords do not match");
+        return;
+      }
 
       if (isEdit) {
         onUpdate(form);
@@ -611,7 +627,10 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
               type="password"
               fieldProps={{
                 value: form.password,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                  update("password", e.target.value);
+                  if (passwordError) setPasswordError("");
+                },
                 required: true,
                 minLength: 8,
                 placeholder: "Min 8 characters",
@@ -623,7 +642,10 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
               type="password"
               fieldProps={{
                 value: form.confirmPassword,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("confirmPassword", e.target.value),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                  update("confirmPassword", e.target.value);
+                  if (passwordError) setPasswordError("");
+                },
                 required: true,
                 minLength: 8,
                 autoComplete: "off",
@@ -631,6 +653,8 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
             />
           </div>
         )}
+
+        {passwordError && <ErrorBox message={passwordError} className="mt-4" />}
 
         <div className="mt-4 flex gap-2">
           <Button type="submit" loading={loading}>
@@ -657,9 +681,10 @@ interface ResetPasswordDialogProps {
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   loading: boolean;
+  passwordError: string;
 }
 
-function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, loading }: ResetPasswordDialogProps) {
+function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, loading, passwordError }: ResetPasswordDialogProps) {
   if (!open) return null;
 
   return (
@@ -692,6 +717,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
               autoComplete: "off",
             }}
           />
+          {passwordError && <ErrorBox message={passwordError} />}
           <div className="flex gap-3 pt-1">
             <Button type="submit" className="flex-1" loading={loading}>
               {loading ? "Resetting\u2026" : "Set Password"}
