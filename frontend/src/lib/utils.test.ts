@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatApiError,
+  formatDateTime,
   fromDatetimeLocalValue,
   humanize,
   isFamilyLocked,
@@ -8,6 +9,26 @@ import {
   normalizeUpdatePayload,
   toDatetimeLocalValue,
 } from "./utils";
+
+describe("formatDateTime", () => {
+  it("formats a valid ISO datetime string", () => {
+    const result = formatDateTime("2025-02-15T14:30:00Z");
+    expect(result).not.toBe("—");
+    expect(result).toContain("2025");
+  });
+
+  it("returns em-dash for null input", () => {
+    expect(formatDateTime(null)).toBe("—");
+  });
+
+  it("returns em-dash for undefined input", () => {
+    expect(formatDateTime(undefined)).toBe("—");
+  });
+
+  it("returns em-dash for empty string", () => {
+    expect(formatDateTime("")).toBe("—");
+  });
+});
 
 describe("humanize", () => {
   it("capitalises first letter of a string", () => {
