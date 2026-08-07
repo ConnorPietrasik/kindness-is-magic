@@ -18,6 +18,7 @@
  */
 import { test, expect, request } from "@playwright/test";
 import { getAdminEmail, getAdminPassword } from "../helpers/env";
+import { findRowInTable } from "../helpers/assertions";
 
 /* Unique test data so re-runs without a DB wipe don't collide */
 const SUFFIX = Math.random().toString(36).slice(2, 8);
@@ -117,11 +118,11 @@ test.describe("Core Flow", () => {
       /* Check "Show unapproved" to reveal pending referrers */
       await adminPage.getByLabel("Show unapproved").check();
 
-      /* Wait for the new referrer to appear */
-      await expect(adminPage.getByRole("table")).toContainText(TEST_REFERRER_NAME, { timeout: 10_000 });
+      /* Find the new referrer (may need to paginate through accumulated referrers) */
+      const referrerRow = (await findRowInTable(adminPage, TEST_REFERRER_NAME))!;
+      expect(referrerRow).not.toBeNull();
 
       /* Capture referrer ID for cleanup */
-      const referrerRow = adminPage.getByRole("row").filter({ hasText: TEST_REFERRER_NAME });
       const referrerIdRaw = await referrerRow.locator("td").first().textContent();
       if (referrerIdRaw) testData.referrerId = parseInt(referrerIdRaw!.trim(), 10);
 
@@ -174,12 +175,20 @@ test.describe("Core Flow", () => {
       await expect(familyGuestPage).toHaveURL(/\/family\/dashboard/, { timeout: 10_000 });
       await expect(familyGuestPage.getByRole("heading", { name: "Family Dashboard" })).toBeVisible();
 
-      /* Capture family ID for cleanup */
-      const familiesResp = await adminApi.get("/api/admin/families");
-      const familiesData = (await familiesResp.json()) as { families: Array<{ id: number; family_name: string }> };
-      const newFamily = familiesData.families.find((f) => f.family_name === TEST_FAMILY_NAME);
-      expect(newFamily).toBeTruthy();
-      testData.familyId = newFamily!.id;
+      /* Capture family ID for cleanup (paginate if needed) */
+      let familyFound: { id: number } | undefined;
+      for (let page = 1; page <= 20; page++) {
+        const familiesResp = await adminApi.get(`/api/admin/families?page=${page}&page_size=100`);
+        const familiesData = (await familiesResp.json()) as {
+          families: Array<{ id: number; family_name: string }>;
+          total: number;
+        };
+        familyFound = familiesData.families.find((f) => f.family_name === TEST_FAMILY_NAME);
+        if (familyFound) break;
+        if (familiesData.families.length === 0) break; // no more pages
+      }
+      expect(familyFound).toBeTruthy();
+      testData.familyId = familyFound!.id;
 
       await familyGuestContext.close();
 

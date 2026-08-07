@@ -1,12 +1,10 @@
 /**
  * Admin user management — error display on validation failure.
  *
- * Runs in the "admin" project (pre-authenticated).
- * Creates a user via API, then verifies an error appears when duplicating.
+ * Self-contained: creates its own user via API, verifies duplicate email error, then cleans up.
  */
 import { test, expect } from "@playwright/test";
-import type { APIRequestContext } from "@playwright/test";
-import { getAdminEmail, getAdminPassword } from "../helpers/env";
+import { loginViaApi } from "../helpers/api";
 
 const SUFFIX = Math.random().toString(36).slice(2, 6);
 const TEST_EMAIL = `e2etestuser${SUFFIX}@example.com`;
@@ -19,10 +17,11 @@ test.describe("Admin Users", () => {
       const authed = await loginViaApi(request);
       const resp = await authed.delete(`/api/admin/users/${createdUserId}`);
       if (!resp.ok()) console.warn(`[cleanup] delete user ${createdUserId} returned ${resp.status()}`);
+      await authed.dispose();
     }
   });
 
-  test("error appears when creating a user with duplicate email", async ({ page, request }) => {
+  test("error appears when creating a user with duplicate email", async ({ browser, request }) => {
     /* Seed a user via API so we have something to duplicate against */
     const authed = await loginViaApi(request);
     const createResp = await authed.post("/api/admin/users", {
@@ -36,8 +35,12 @@ test.describe("Admin Users", () => {
     expect(createResp.status()).toBe(201);
     const created = (await createResp.json()) as { id: number };
     createdUserId = created.id;
+    await authed.dispose();
 
     /* Open the admin users page and the create form */
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
     await page.goto("/admin/users");
     await expect(page.getByRole("heading", { name: "Manage Users" })).toBeVisible();
 
@@ -61,12 +64,7 @@ test.describe("Admin Users", () => {
 
     /* Error should appear on the page (inline in form and/or bottom MutationErrors) */
     await expect(page.getByText("Email already in use").first()).toBeVisible({ timeout: 10_000 });
+
+    await context.close();
   });
 });
-
-async function loginViaApi(baseRequest: APIRequestContext): Promise<APIRequestContext> {
-  await baseRequest.post("/api/auth/login", {
-    data: { email: getAdminEmail(), password: getAdminPassword() },
-  });
-  return baseRequest;
-}

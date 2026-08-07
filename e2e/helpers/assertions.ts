@@ -2,6 +2,47 @@ import type { Page, Locator } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 /**
+ * Navigate a paginated table's pages until a row containing the given text
+ * is found, or we run out of pages. Returns a Locator to the row if found,
+ * or null if not found after exhausting all pages.
+ *
+ * This is needed because accumulated test data from prior runs can push new
+ * records off the first page of paginated admin tables.
+ */
+export async function findRowInTable(
+  page: Page,
+  searchText: string,
+  opts?: { maxPages?: number; pollMs?: number; timeout?: number },
+): Promise<Locator | null> {
+  const maxPages = opts?.maxPages ?? 20;
+  const pollMs = opts?.pollMs ?? 500;
+  const timeout = opts?.timeout ?? 10_000;
+
+  // First, wait for the row to appear (handles React Query invalidation delay)
+  // Playwright's toHaveCount/toBeVisible with timeout handles retries
+  const row = page.getByRole("row").filter({ hasText: searchText });
+  try {
+    await row.first().waitFor({ state: "visible", timeout });
+    return row;
+  } catch {
+    // Row didn't appear within timeout — try paginating
+  }
+
+  // Fall back to pagination search
+  for (let i = 0; i < maxPages; i++) {
+    if ((await row.count()) > 0) return row;
+
+    // Click "Next page" — if it doesn't exist or is disabled, we've reached the end
+    const nextBtn = page.getByRole("button", { name: "Next page" });
+    if ((await nextBtn.count()) === 0) break;
+    if (await nextBtn.isDisabled()) break;
+    await nextBtn.click();
+    await page.waitForTimeout(pollMs);
+  }
+  return null;
+}
+
+/**
  * Assert that a table on the page contains a row with the given text.
  */
 export async function expectTableContains(page: Page, text: string): Promise<void> {

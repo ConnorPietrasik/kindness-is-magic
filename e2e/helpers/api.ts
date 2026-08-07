@@ -1,4 +1,5 @@
 import type { APIRequestContext } from "@playwright/test";
+import { request as playwrightRequest } from "@playwright/test";
 import fs from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +91,19 @@ export async function deleteReferrerViaApi(
 }
 
 /**
+ * Delete a user by ID (admin API).
+ */
+export async function deleteUserViaApi(
+  request: APIRequestContext,
+  userId: number,
+): Promise<void> {
+  const resp = await request.delete(`/api/admin/users/${userId}`);
+  if (!resp.ok()) {
+    console.warn(`[api] deleteUserViaApi(${userId}) returned ${resp.status()}`);
+  }
+}
+
+/**
  * List families (admin API) — used to find CSV-seeded family IDs.
  */
 export async function listFamiliesViaApi(
@@ -104,7 +118,7 @@ export async function listFamiliesViaApi(
 
 /**
  * Reset a family's wish state to initial (family lock, no review).
- * Used by global-setup to ensure clean state after re-seeding.
+ * Used by tests that mutate wish state and need to clean up.
  */
 export async function resetFamilyWishState(
   request: APIRequestContext,
@@ -152,14 +166,16 @@ export async function listUsersViaApi(
  * List wishes (admin API) with optional filters.
  * Use assignedToId=0 for unassigned wishes (clear-FK sentinel).
  * Use purchased="false" for unpurchased wishes.
+ * Use familyId to scope to a specific family (avoids race conditions in parallel tests).
  */
 export async function listWishesViaApi(
   request: APIRequestContext,
-  opts?: { assignedToId?: number; purchased?: string },
+  opts?: { assignedToId?: number; purchased?: string; familyId?: number },
 ): Promise<{ wishes: Array<{ id: number; assigned_to_id: number | null; purchased_at: string | null }>; total: number }> {
   const params = new URLSearchParams();
   if (opts?.assignedToId !== undefined) params.set("assigned_to_id", String(opts.assignedToId));
   if (opts?.purchased) params.set("purchased", opts.purchased);
+  if (opts?.familyId !== undefined) params.set("family_id", String(opts.familyId));
   const resp = await request.get(`/api/admin/wishes?${params.toString()}`);
   if (!resp.ok()) {
     throw new Error(`listWishesViaApi failed: ${resp.status()}`);
@@ -201,4 +217,322 @@ export async function assignFamiliesToDeliveryViaApi(
       throw new Error(`assignFamiliesToDeliveryViaApi(${familyId}) failed (${resp.status()}): ${body}`);
     }
   }
+}
+
+// ─── New helpers for self-contained scenarios ────────────────────────────────
+
+/**
+ * Create a referrer profile + user via API. The referrer is auto-approved
+ * (admin-created referrers skip the invite flow).
+ *
+ * Returns { referrerId, userId, email, password }.
+ */
+export async function createReferrerWithUser(
+  request: APIRequestContext,
+  data: { name: string; familyLimit: number; phoneNumber: string; email: string; password: string; displayName?: string },
+): Promise<{ referrerId: number; userId: number; email: string; password: string }> {
+  // Create the referrer profile
+  const referrerResp = await request.post("/api/admin/referrers", {
+    data: {
+      name: data.name,
+      family_limit: data.familyLimit,
+      phone_number: data.phoneNumber,
+    },
+  });
+  if (!referrerResp.ok()) {
+    const body = await referrerResp.text();
+    throw new Error(`createReferrerWithUser: referrer creation failed (${referrerResp.status()}): ${body}`);
+  }
+  const referrerData = (await referrerResp.json()) as { id: number };
+  const referrerId = referrerData.id;
+
+  // Create the user linked to the referrer
+  const userResp = await request.post("/api/admin/users", {
+    data: {
+      email: data.email,
+      password: data.password,
+      role: "referrer",
+      referrer_id: referrerId,
+      display_name: data.displayName,
+    },
+  });
+  if (!userResp.ok()) {
+    const body = await userResp.text();
+    throw new Error(`createReferrerWithUser: user creation failed (${userResp.status()}): ${body}`);
+  }
+  const userData = (await userResp.json()) as { id: number };
+
+  return { referrerId, userId: userData.id, email: data.email, password: data.password };
+}
+
+/**
+ * Create a family under a referrer via API.
+ *
+ * Returns { familyId }.
+ */
+export async function createFamilyViaApi(
+  request: APIRequestContext,
+  referrerId: number,
+  data: {
+    familyName: string;
+    familyWish: string;
+    contactName: string;
+    phoneNumber: string;
+    bio?: string;
+    address?: string;
+  },
+): Promise<{ familyId: number }> {
+  const resp = await request.post("/api/admin/families", {
+    data: {
+      referrer_id: referrerId,
+      family_name: data.familyName,
+      family_wish: data.familyWish,
+      contact_name: data.contactName,
+      phone_number: data.phoneNumber,
+      bio: data.bio,
+      address: data.address,
+    },
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`createFamilyViaApi failed (${resp.status()}): ${body}`);
+  }
+  const result = (await resp.json()) as { id: number };
+  return { familyId: result.id };
+}
+
+/**
+ * Create a person with wishes under a family via API.
+ *
+ * Returns { personId }.
+ */
+export async function createPersonViaApi(
+  request: APIRequestContext,
+  familyId: number,
+  personData: {
+    givenName: string;
+    age: number;
+    wish?: string;
+    size?: string;
+    funWish?: string;
+    title?: string;
+    note?: string;
+  },
+): Promise<{ personId: number }> {
+  /* Build wishes array from shorthand fields */
+  const wishes: Array<{ type: string; description: string; size?: string | null }> = [];
+  if (personData.wish) {
+    wishes.push({ type: "practical", description: personData.wish, size: personData.size ?? null });
+  }
+  if (personData.funWish) {
+    wishes.push({ type: "fun", description: personData.funWish });
+  }
+
+  const resp = await request.post("/api/admin/people", {
+    data: {
+      family_id: familyId,
+      given_name: personData.givenName,
+      age: personData.age,
+      wishes,
+      title: personData.title ?? null,
+      note: personData.note ?? null,
+    },
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`createPersonViaApi failed (${resp.status()}): ${body}`);
+  }
+  const result = (await resp.json()) as { id: number };
+  return { personId: result.id };
+}
+
+/**
+ * Walk the full approval chain for a family:
+ *   family → referrer (referrer approves) → admin (admin approves).
+ *
+ * This makes the family's wishes publicly visible (wish_lock_level = "admin").
+ * Uses the CSV-seeded referrer (sarah.chen) for the referrer approval step.
+ */
+export async function approveWishChain(
+  request: APIRequestContext,
+  familyId: number,
+  referrerEmail?: string,
+  referrerPassword?: string,
+): Promise<void> {
+  // 1. Referrer approves (family → referrer lock)
+  const referrerApi = await playwrightRequest.newContext({ baseURL: "http://localhost" });
+  await referrerApi.post("/api/auth/login", {
+    data: {
+      email: referrerEmail ?? "sarah.chen@example.com",
+      password: referrerPassword ?? "Password123!",
+    },
+  });
+  const referrerResp = await referrerApi.post(`/api/referrer/families/${familyId}/approve-wishes`, {
+    data: {},
+  });
+  if (!referrerResp.ok()) {
+    const body = await referrerResp.text();
+    await referrerApi.dispose();
+    throw new Error(`approveWishChain: referrer approve failed (${referrerResp.status()}): ${body}`);
+  }
+  await referrerApi.dispose();
+
+  // 2. Admin approves (referrer → admin lock)
+  // The passed-in request context should already be admin-authenticated
+  const adminResp = await request.post(`/api/admin/families/${familyId}/approve-wishes`, {
+    data: {},
+  });
+  if (!adminResp.ok()) {
+    const body = await adminResp.text();
+    throw new Error(`approveWishChain: admin approve failed (${adminResp.status()}): ${body}`);
+  }
+}
+
+/**
+ * Fully approve a family via the admin API (skip referrer review).
+ * Equivalent to the "Fully Approve" action in the admin UI.
+ */
+export async function fullyApproveFamilyViaApi(
+  request: APIRequestContext,
+  familyId: number,
+): Promise<void> {
+  // Direct admin approval skips referrer step
+  const adminResp = await request.post(`/api/admin/families/${familyId}/approve-wishes`, {
+    data: {},
+  });
+  if (!adminResp.ok()) {
+    const body = await adminResp.text();
+    throw new Error(`fullyApproveFamilyViaApi failed (${adminResp.status()}): ${body}`);
+  }
+}
+
+/**
+ * Login via API and return an authenticated request context.
+ */
+export async function loginViaApi(
+  baseRequest: APIRequestContext,
+  email?: string,
+  password?: string,
+): Promise<APIRequestContext> {
+  await baseRequest.post("/api/auth/login", {
+    data: {
+      email: email ?? getAdminEmail(),
+      password: password ?? getAdminPassword(),
+    },
+  });
+  return baseRequest;
+}
+
+/**
+ * Create a referrer + referrer-user pair via API and return credentials.
+ * Unlike createReferrerWithUser (which creates an admin-linked user),
+ * this creates a referrer user that can log in and approve families.
+ *
+ * Returns { referrerId, userId, email, password }.
+ */
+export async function createReferrerWithUserAndCredentials(
+  request: APIRequestContext,
+  data: {
+    name: string;
+    familyLimit: number;
+    phoneNumber: string;
+    email: string;
+    password: string;
+    displayName?: string;
+  },
+): Promise<{ referrerId: number; userId: number; email: string; password: string }> {
+  // Create the referrer profile
+  const referrerResp = await request.post("/api/admin/referrers", {
+    data: {
+      name: data.name,
+      family_limit: data.familyLimit,
+      phone_number: data.phoneNumber,
+    },
+  });
+  if (!referrerResp.ok()) {
+    const body = await referrerResp.text();
+    throw new Error(`createReferrerWithUserAndCredentials: referrer creation failed (${referrerResp.status()}): ${body}`);
+  }
+  const referrerData = (await referrerResp.json()) as { id: number };
+  const referrerId = referrerData.id;
+
+  // Create the user linked to the referrer (role=referrer so they can log in)
+  const userResp = await request.post("/api/admin/users", {
+    data: {
+      email: data.email,
+      password: data.password,
+      role: "referrer",
+      referrer_id: referrerId,
+      display_name: data.displayName,
+    },
+  });
+  if (!userResp.ok()) {
+    const body = await userResp.text();
+    throw new Error(`createReferrerWithUserAndCredentials: user creation failed (${userResp.status()}): ${body}`);
+  }
+  const userData = (await userResp.json()) as { id: number };
+
+  return { referrerId, userId: userData.id, email: data.email, password: data.password };
+}
+
+/**
+ * Create a complete isolated test scenario: referrer → family → person with wishes.
+ * All entities use unique names so parallel test workers don't collide.
+ *
+ * Returns all created IDs for cleanup.
+ */
+export async function createIsolatedFamilyScenario(
+  request: APIRequestContext,
+  suffix: string,
+  opts?: {
+    familyWish?: string;
+    personName?: string;
+    personAge?: number;
+    personWish?: string;
+    personSize?: string;
+    personFunWish?: string;
+  },
+): Promise<{
+  referrerId: number;
+  referrerEmail: string;
+  referrerPassword: string;
+  familyId: number;
+  familyName: string;
+  personId: number;
+  personName: string;
+}> {
+  const referrer = await createReferrerWithUserAndCredentials(request, {
+    name: `E2E Ref ${suffix}`,
+    familyLimit: 5,
+    phoneNumber: "555-000-9999",
+    email: `e2e-ref-${suffix}@example.com`,
+    password: "Password123!",
+  });
+
+  const familyName = `E2E Family ${suffix}`;
+  const family = await createFamilyViaApi(request, referrer.referrerId, {
+    familyName,
+    familyWish: opts?.familyWish ?? "A warm blanket for everyone",
+    contactName: `Contact ${suffix}`,
+    phoneNumber: "555-111-2222",
+  });
+
+  const personName = opts?.personName ?? `Child ${suffix}`;
+  const person = await createPersonViaApi(request, family.familyId, {
+    givenName: personName,
+    age: opts?.personAge ?? 7,
+    wish: opts?.personWish ?? "Warm winter coat",
+    size: opts?.personSize ?? "7",
+    funWish: opts?.personFunWish ?? "LEGO set",
+  });
+
+  return {
+    referrerId: referrer.referrerId,
+    referrerEmail: referrer.email,
+    referrerPassword: referrer.password,
+    familyId: family.familyId,
+    familyName,
+    personId: person.personId,
+    personName,
+  };
 }

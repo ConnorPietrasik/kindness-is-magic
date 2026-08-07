@@ -2,13 +2,15 @@
  * Global setup — runs once before all tests.
  *
  * 1. Poll the backend until it is healthy.
- * 2. Seed the database via the CSV import API.
- * 3. Generate storageState files for admin, referrer, and family roles.
+ * 2. Seed the database via the CSV import API (auth accounts only).
+ * 3. Generate storageState files for admin, referrer, family, purchaser, delivery roles.
+ *
+ * These auth accounts are never deleted by tests (login tests need them).
+ * All other data (families, people, wishes) is created per-scenario.
  */
-import fs from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
-import { assignFamiliesToDeliveryViaApi, batchAssignWishesViaApi, listFamiliesViaApi, listUsersViaApi, listWishesViaApi, resetFamilyWishState, seedDatabaseViaApi } from "./api";
+import { seedDatabaseViaApi } from "./api";
 import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
@@ -46,81 +48,29 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     /* 2. Seed the database via CSV import API */
     await seedDatabaseViaApi(apiContext);
 
-    /* 2b. Discover the CSV-seeded family ID for e2e wish-list tests */
-    const families = await listFamiliesViaApi(apiContext);
-    const williamsFamily = families.families.find((f) => f.family_name === "The Williams Family");
-    if (williamsFamily) {
-      fs.writeFileSync("storage/seed-family-id.json", JSON.stringify({ id: williamsFamily.id }));
-      console.log(`[globalSetup] Saved seeded family ID ${williamsFamily.id} for wish-list tests.`);
-
-      /* Reset wish state to "family" lock so tests start from a clean baseline.
-       * CSV import is idempotent and does NOT reset wish_lock_level on existing rows,
-       * so a prior run that approved this family would leave it at "admin" lock.
-       */
-      await resetFamilyWishState(apiContext, williamsFamily.id);
-      console.log(`[globalSetup] Reset wish state for family ${williamsFamily.id} to "family" lock.`);
-    } else {
-      console.warn("[globalSetup] Could not find 'The Williams Family' in seeded data.");
-    }
-
-    /* 3. Assign some wishes to the purchaser user so e2e tests have data to work with */
-    const purchasers = await listUsersViaApi(apiContext, "purchaser");
-    if (purchasers.users.length > 0) {
-      const purchaserUser = purchasers.users[0];
-      console.log(`[globalSetup] Found purchaser user: ${purchaserUser.email} (id=${purchaserUser.id})`);
-
-      // Find unpurchased wishes (prior runs may have purchased previously-assigned ones)
-      const unpurchasedWishes = await listWishesViaApi(apiContext, { purchased: "false" });
-      const wishIds = unpurchasedWishes.wishes.slice(0, 3).map((w) => w.id);
-      if (wishIds.length > 0) {
-        await batchAssignWishesViaApi(apiContext, wishIds, purchaserUser.id);
-        console.log(`[globalSetup] Assigned ${wishIds.length} unpurchased wishes to purchaser (id=${purchaserUser.id})`);
-      } else {
-        console.warn("[globalSetup] No unpurchased wishes found for purchaser.");
-      }
-    } else {
-      console.warn("[globalSetup] No purchaser user found in seeded data.");
-    }
-
-    /* 3b. Assign some families to the delivery person so e2e tests have data */
-    const deliveries = await listUsersViaApi(apiContext, "delivery");
-    if (deliveries.users.length > 0) {
-      const deliveryUser = deliveries.users[0];
-      console.log(`[globalSetup] Found delivery user: ${deliveryUser.email} (id=${deliveryUser.id})`);
-
-      // Pick a couple of approved families that aren't already assigned
-      const unassignedFamilies = families.families.filter((f) => !f.delivery_user_id).slice(0, 2);
-      if (unassignedFamilies.length > 0) {
-        await assignFamiliesToDeliveryViaApi(apiContext, unassignedFamilies.map((f) => f.id), deliveryUser.id);
-        console.log(`[globalSetup] Assigned ${unassignedFamilies.length} families to delivery person (id=${deliveryUser.id})`);
-      } else {
-        console.warn("[globalSetup] No unassigned families found for delivery person.");
-      }
-    } else {
-      console.warn("[globalSetup] No delivery user found in seeded data.");
-    }
-
-    /* 4. Generate storageState files for each role */
-    await saveStorageState(browser, "admin", {
-      email: getAdminEmail(),
-      password: getAdminPassword(),
-    });
-    await saveStorageState(browser, "referrer", {
-      email: "sarah.chen@example.com",
-      password: "Password123!",
-    });
-    await saveStorageState(browser, "family", {
-      email: "emily.williams@example.com",
-      password: "Password123!",
-    });
-    await saveStorageState(browser, "purchaser", {
-      email: "purchaser.e2e@example.com",
-      password: "Password123!",
-    });
-    await saveStorageState(browser, "delivery", {
-      email: "mike.torres@example.com",
-      password: "Password123!",
-    });
+    /* 3. Generate storageState files for each role (parallel — independent contexts) */
+    await Promise.all([
+      saveStorageState(browser, "admin", {
+        email: getAdminEmail(),
+        password: getAdminPassword(),
+      }),
+      saveStorageState(browser, "referrer", {
+        email: "sarah.chen@example.com",
+        password: "Password123!",
+      }),
+      saveStorageState(browser, "family", {
+        email: "emily.williams@example.com",
+        password: "Password123!",
+      }),
+      saveStorageState(browser, "purchaser", {
+        email: "purchaser.e2e@example.com",
+        password: "Password123!",
+      }),
+      saveStorageState(browser, "delivery", {
+        email: "mike.torres@example.com",
+        password: "Password123!",
+      }),
+    ]);
 
     console.log("[globalSetup] Setup complete.");
   } finally {
@@ -151,7 +101,6 @@ async function saveStorageState(
 
   /* Wait for the role-specific dashboard to load */
   await page.waitForURL(/\/(dashboard|referrer\/dashboard|family\/dashboard|purchaser\/assigned-gifts|delivery)/);
-  await page.waitForTimeout(1000);
 
   /* Save the storage state */
   const storagePath = `storage/${role}.json`;
