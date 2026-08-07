@@ -7,11 +7,13 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
+import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { DisplayId } from "../components/DisplayId";
@@ -23,10 +25,12 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminApproveWishes,
   adminCreateFamily,
@@ -51,7 +55,7 @@ import {
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload, PaginationParams } from "../types";
+import type { AdminListParams, FamilyDetail, FamilyPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -80,8 +84,12 @@ export default function AdminFamilies() {
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminFamilies");
+  const { widthClass } = useTableWidth("adminFamilies");
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
+  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
 
   const {
     listData,
@@ -195,11 +203,12 @@ export default function AdminFamilies() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
 
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
           <div className="flex items-center gap-3">
+            {!isDeletedView && <ColumnToggle resourceKey="adminFamilies" />}
             {!isDeletedView && (
               <label className="flex items-center gap-1.5 text-sm text-gray-600">
                 <input
@@ -246,56 +255,92 @@ export default function AdminFamilies() {
           ) : (
             <Table>
               <TableHead>
-                <Th>ID</Th>
-                <Th>Family Name</Th>
-                <Th>Family Wish</Th>
-                <Th>Contact</Th>
-                <Th>Referrer</Th>
-                <Th>Delivery</Th>
+                {visibleColumns.includes("display_id") && <Th>ID</Th>}
+                {visibleColumns.includes("family_name") && <Th>Family Name</Th>}
+                {visibleColumns.includes("family_wish") && <Th>Family Wish</Th>}
+                {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
+                {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
+                {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
+                {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
+                {visibleColumns.includes("person_count") && <Th>Person Count</Th>}
+                {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
+                {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
+                {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
+                {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
+                {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
                 {families.map((f) => (
-                  <>
-                    <Tr key={f.id} data-id={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
-                      <Td className="whitespace-nowrap text-xs text-gray-400">
-                        <DisplayId displayId={f.display_id} familyId={f.id} referrerId={f.referrer_id} />
-                      </Td>
-                      <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-                        {f.family_name}
-                        {f.deleted_at == null && f.has_notes && (
-                          <span className="ml-1 text-xs" title="Has internal notes">
-                            📝
-                          </span>
-                        )}
-                        {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-                          <Link
-                            to={route.familyWishList(f.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Wish List"
-                            className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                            title="Wish List"
-                          >
-                            📄
-                          </Link>
-                        )}
-                      </Td>
-                      <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
-                      <Td>{f.contact_name}</Td>
-                      <Td>
-                        {f.referrer_id != null ? (
-                          <Link
-                            to={route.adminReferrerFamilies(f.referrer_id)}
-                            className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                          >
-                            {referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </Td>
-                      <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
+                  <React.Fragment key={f.id}>
+                    <Tr data-id={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
+                      {visibleColumns.includes("display_id") && (
+                        <Td className="whitespace-nowrap text-xs text-gray-400">
+                          <DisplayId displayId={f.display_id} familyId={f.id} referrerId={f.referrer_id} />
+                        </Td>
+                      )}
+                      {visibleColumns.includes("family_name") && (
+                        <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                          {f.family_name}
+                          {f.deleted_at == null && f.referrer_notes != null && (
+                            <span className="ml-1 text-xs" title="Has internal notes">
+                              📝
+                            </span>
+                          )}
+                          {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
+                            <Link
+                              to={route.familyWishList(f.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Wish List"
+                              className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                              title="Wish List"
+                            >
+                              📄
+                            </Link>
+                          )}
+                        </Td>
+                      )}
+                      {visibleColumns.includes("family_wish") && <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>}
+                      {visibleColumns.includes("contact_name") && <Td>{f.contact_name}</Td>}
+                      {visibleColumns.includes("referrer_id") && (
+                        <Td>
+                          {f.referrer_id != null ? (
+                            <Link
+                              to={route.adminReferrerFamilies(f.referrer_id)}
+                              className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                            >
+                              {f.referrer_name || referrerMap[f.referrer_id] || `ID ${f.referrer_id}`}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
+                      )}
+                      {visibleColumns.includes("delivery") && (
+                        <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
+                      )}
+                      {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
+                      {visibleColumns.includes("person_count") && <Td>{f.person_count ?? 0}</Td>}
+                      {visibleColumns.includes("approval_status") && (
+                        <Td>
+                          <ApprovalBadge status={f.approval_status} />
+                        </Td>
+                      )}
+                      {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}
+                      {visibleColumns.includes("wish_lock_level") && (
+                        <Td>
+                          <span className="text-xs capitalize">{f.wish_lock_level}</span>
+                        </Td>
+                      )}
+                      {visibleColumns.includes("wish_review_requested_at") && (
+                        <Td className="text-xs text-gray-500">
+                          {f.wish_review_requested_at ? new Date(f.wish_review_requested_at).toLocaleDateString() : "—"}
+                        </Td>
+                      )}
+                      {visibleColumns.includes("wish_rejection_reason") && (
+                        <Td className="max-w-xs text-xs text-gray-500 truncate">{f.wish_rejection_reason || "—"}</Td>
+                      )}
                       <Td>
                         <div className="flex gap-2">
                           {!isDeletedView && f.deleted_at == null && (
@@ -365,7 +410,7 @@ export default function AdminFamilies() {
                     </Tr>
                     {editingId === f.id && (
                       <Tr key={`${f.id}-edit`}>
-                        <Td colSpan={7} className="!py-3">
+                        <Td colSpan={visibleColumns.length + 1} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -391,7 +436,7 @@ export default function AdminFamilies() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

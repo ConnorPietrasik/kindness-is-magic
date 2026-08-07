@@ -7,6 +7,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -153,12 +154,12 @@ export default function ReferrerFamilies() {
               </TableHead>
               <TableBody>
                 {families.map((f) => (
-                  <>
-                    <Tr key={f.id} className={getLockLevelRowClass(f.wish_lock_level)}>
+                  <React.Fragment key={f.id}>
+                    <Tr className={getLockLevelRowClass(f.wish_lock_level)}>
                       <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                       <Td className="font-medium text-gray-900">
                         {f.family_name}
-                        {f.has_notes && (
+                        {f.referrer_notes != null && (
                           <span className="ml-1 text-xs" title="Has internal notes">
                             📝
                           </span>
@@ -230,7 +231,7 @@ export default function ReferrerFamilies() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </>

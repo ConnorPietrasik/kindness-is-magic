@@ -8,6 +8,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import React from "react";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { defaultPersonForm } from "../components/defaults";
@@ -132,8 +133,8 @@ export default function FamilyPeople() {
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <>
-                    <Tr key={p.id} data-id={p.id}>
+                  <React.Fragment key={p.id}>
+                    <Tr data-id={p.id}>
                       <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                       <Td className="font-medium text-gray-900">{p.given_name}</Td>
                       <Td>{p.age}</Td>
@@ -193,7 +194,7 @@ export default function FamilyPeople() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </>

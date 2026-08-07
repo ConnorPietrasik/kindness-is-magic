@@ -316,6 +316,7 @@ class ReferrerDetail(BaseModel):
     approval_status: ReferrerApprovalStatus
     approved_by_admin_name: str | None = None
     approved_at: datetime | None = None
+    created_at: datetime
     deleted_at: datetime | None
 
     model_config = {"from_attributes": True}
@@ -343,7 +344,7 @@ class SendFamilyInviteResponse(BaseModel):
 
 
 class ReferrerListResponse(BaseModel):
-    referrers: list[ReferrerSummary]
+    referrers: list[ReferrerDetail]
     total: int = 0
     page: int = 1
     page_size: int = 50
@@ -492,16 +493,16 @@ class FamilyDetail(BaseModel):
     referrer_name: Optional[str] = None
     delivery_user_id: int | None = None
     delivery_user_name: Optional[str] = None
-    display_id: str
+    display_id: str | None = None
     family_name: str
-    bio: Optional[str]
-    address: Optional[str]
+    bio: Optional[str] = None
+    address: Optional[str] = None
     phone_number: str
     family_wish: str
     contact_name: str
     approval_status: FamilyApprovalStatus
     pickup_window: datetime | None = None
-    deleted_at: datetime | None
+    deleted_at: datetime | None = None
     person_count: int
     wish_lock_level: WishLockLevel
     wish_review_requested_at: datetime | None = None
@@ -604,7 +605,7 @@ class FamilySelfRegisterResponse(BaseModel):
 
 
 class FamilyListResponse(BaseModel):
-    families: list[FamilySummary]
+    families: list[FamilyDetail]
     total: int = 0
     page: int = 1
     page_size: int = 50
@@ -957,31 +958,20 @@ class PersonUpdate(BaseModel):
 class PersonDetail(BaseModel):
     id: int
     family_id: int
-    display_id: str
+    display_id: str | None = None
     given_name: str
-    title: Optional[str]
+    title: Optional[str] = None
     age: int
-    note: Optional[str]
-    deleted_at: datetime | None
-    wishes: list[WishSummary] = []
-
-    model_config = {"from_attributes": True}
-
-
-class PersonSummary(BaseModel):
-    id: int
-    display_id: str
-    family_id: int
-    given_name: str
-    age: int
-    deleted_at: datetime | None
+    note: Optional[str] = None
+    created_at: datetime
+    deleted_at: datetime | None = None
     wishes: list[WishSummary] = []
 
     model_config = {"from_attributes": True}
 
 
 class PersonListResponse(BaseModel):
-    people: list[PersonSummary]
+    people: list[PersonDetail]
     total: int = 0
     page: int = 1
     page_size: int = 50
@@ -1048,7 +1038,6 @@ class UserDetail(BaseModel):
     """User detail response, including joined names."""
 
     id: int
-    display_id: Optional[str] = None
     email: str
     display_name: str
     role: UserRole

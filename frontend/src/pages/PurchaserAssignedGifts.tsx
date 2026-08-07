@@ -11,7 +11,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -161,8 +161,8 @@ export default function PurchaserAssignedGifts() {
             </TableHead>
             <TableBody>
               {wishes.map((w) => (
-                <>
-                  <Tr key={w.id}>
+                <React.Fragment key={w.id}>
+                  <Tr>
                     <Td>{w.person_given_name}</Td>
                     <Td>
                       <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
@@ -226,7 +226,7 @@ export default function PurchaserAssignedGifts() {
                       </Td>
                     </Tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

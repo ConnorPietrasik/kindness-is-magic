@@ -45,24 +45,9 @@ export interface UserPasswordReset {
   password: string;
 }
 
-/** Mirrors UserSummary — list item with joined names. */
-export interface UserSummary {
-  id: number;
-  email: string;
-  display_name: string;
-  role: UserRole;
-  referrer_id: number | null;
-  family_id: number | null;
-  deleted_at: string | null;
-  created_at: string;
-  referrer_name: string | null;
-  family_name: string | null;
-}
-
 /** Mirrors UserDetail — full user with joined names. */
 export interface UserDetail {
   id: number;
-  display_id: string | null;
   email: string;
   display_name: string;
   role: UserRole;
@@ -105,6 +90,7 @@ export interface ReferrerDetail {
   approval_status: ReferrerApprovalStatus;
   approved_by_admin_name: string | null;
   approved_at: string | null;
+  created_at: string;
   deleted_at: string | null;
 }
 
@@ -159,7 +145,7 @@ export interface FamilyDetail {
   referrer_name: string | null;
   delivery_user_id: number | null;
   delivery_user_name: string | null;
-  display_id: string;
+  display_id: string | null;
   family_name: string;
   bio: string | null;
   address: string | null;
@@ -195,21 +181,6 @@ export interface FamilySelfServiceDetail {
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Person
-// ---------------------------------------------------------------------------
-
-/** Mirrors PersonSummary. */
-export interface PersonSummary {
-  id: number;
-  display_id: string;
-  family_id: number;
-  given_name: string;
-  age: number;
-  deleted_at: string | null;
-  wishes: WishSummary[];
 }
 
 // ---------------------------------------------------------------------------
@@ -481,11 +452,12 @@ export interface PackingSlipItem {
 export interface PersonDetail {
   id: number;
   family_id: number;
-  display_id: string;
+  display_id: string | null;
   given_name: string;
   title: string | null;
   age: number;
   note: string | null;
+  created_at: string;
   deleted_at: string | null;
   wishes: WishSummary[];
 }

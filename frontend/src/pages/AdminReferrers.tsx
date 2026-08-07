@@ -7,12 +7,13 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { defaultReferrerForm } from "../components/defaults";
@@ -22,9 +23,11 @@ import { Pagination } from "../components/Pagination";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminApproveReferrer,
   adminCreateReferrer,
@@ -39,7 +42,7 @@ import {
 import { adminDeletedReferrers, adminReferrers } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { PaginationParams, ReferrerDetail, ReferrerPayload } from "../types";
+import type { AdminListParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -67,8 +70,12 @@ export default function AdminReferrers() {
     },
   });
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminReferrers");
+  const { widthClass } = useTableWidth("adminReferrers");
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
+  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
 
   const {
     listData,
@@ -127,11 +134,12 @@ export default function AdminReferrers() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
 
-      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
+            {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
             {!isDeletedView && (
               <label className="flex items-center gap-1.5 text-sm text-gray-600">
                 <input
@@ -174,21 +182,30 @@ export default function AdminReferrers() {
             <Table>
               <TableHead>
                 <Th>ID</Th>
-                <Th>Name</Th>
-                <Th>Family Limit</Th>
-                {showUnapproved && <Th>Approval</Th>}
+                {visibleColumns.includes("name") && <Th>Name</Th>}
+                {visibleColumns.includes("family_limit") && <Th>Family Limit</Th>}
+                {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
+                {visibleColumns.includes("family_invite_code") && <Th>Invite Code</Th>}
+                {visibleColumns.includes("approval_status") && showUnapproved && <Th>Approval</Th>}
+                {visibleColumns.includes("approved_by_admin_name") && <Th>Approved By</Th>}
+                {visibleColumns.includes("approved_at") && <Th>Approved At</Th>}
+                {visibleColumns.includes("created_at") && <Th>Created</Th>}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
                 {referrers.map((r) => (
-                  <>
-                    <Tr key={r.id}>
+                  <React.Fragment key={r.id}>
+                    <Tr>
                       <Td>{r.id}</Td>
-                      <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>
-                      <Td>
-                        {r.family_count ?? 0} / {r.family_limit}
-                      </Td>
-                      {showUnapproved && (
+                      {visibleColumns.includes("name") && <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>}
+                      {visibleColumns.includes("family_limit") && (
+                        <Td>
+                          {r.family_count ?? 0} / {r.family_limit}
+                        </Td>
+                      )}
+                      {visibleColumns.includes("phone_number") && <Td>{r.phone_number || "—"}</Td>}
+                      {visibleColumns.includes("family_invite_code") && <Td className="font-mono text-xs">{r.family_invite_code}</Td>}
+                      {visibleColumns.includes("approval_status") && showUnapproved && (
                         <Td>
                           <div className="flex items-center gap-2">
                             <ApprovalBadge status={r.approval_status} />
@@ -217,6 +234,13 @@ export default function AdminReferrers() {
                           </div>
                         </Td>
                       )}
+                      {visibleColumns.includes("approved_by_admin_name") && <Td>{r.approved_by_admin_name || "—"}</Td>}
+                      {visibleColumns.includes("approved_at") && (
+                        <Td className="text-xs text-gray-500">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : "—"}</Td>
+                      )}
+                      {visibleColumns.includes("created_at") && (
+                        <Td className="text-xs text-gray-500">{new Date(r.created_at).toLocaleDateString()}</Td>
+                      )}
                       <Td>
                         <div className="flex flex-wrap gap-2">
                           {!isDeletedView && !r.deleted_at && (
@@ -237,9 +261,31 @@ export default function AdminReferrers() {
                               >
                                 {editingId === r.id ? "Done" : "Edit"}
                               </Button>
+                              {r.approval_status === "pending" && (
+                                <>
+                                  <Button
+                                    variant="success"
+                                    size="sm"
+                                    className="px-2 py-1 text-xs"
+                                    onClick={() => setApproveConfirm(r.id)}
+                                    disabled={approveMut.isPending || rejectMut.isPending}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    className="px-2 py-1 text-xs"
+                                    onClick={() => setRejectConfirm(r.id)}
+                                    disabled={approveMut.isPending || rejectMut.isPending}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
                               <ActionsDropdown
                                 items={[
-                                  ...(!showUnapproved && !isDeletedView && !r.deleted_at && r.approval_status === "pending"
+                                  ...(!isDeletedView && !r.deleted_at && r.approval_status === "pending"
                                     ? [
                                         {
                                           label: "Approve",
@@ -278,7 +324,10 @@ export default function AdminReferrers() {
                     </Tr>
                     {editingId === r.id && (
                       <Tr key={`${r.id}-edit`}>
-                        <Td colSpan={showUnapproved ? 5 : 4} className="!py-3">
+                        <Td
+                          colSpan={visibleColumns.length + (!showUnapproved && visibleColumns.includes("approval_status") ? -1 : 0) + 2}
+                          className="!py-3"
+                        >
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -299,7 +348,7 @@ export default function AdminReferrers() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

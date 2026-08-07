@@ -6,11 +6,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
@@ -27,7 +28,9 @@ import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreatePerson,
   adminDeletePerson,
@@ -52,7 +55,7 @@ import {
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
+import type { AdminListParams, FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -87,6 +90,10 @@ export default function AdminFamilyPeople() {
   const [searchParams] = useSearchParams();
   const cameFromReferrer = searchParams.get("from") === "referrer";
 
+  // Column visibility (shared with adminPeople)
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
+  const { widthClass } = useTableWidth("adminPeople");
+
   // Family detail (needed only when coming from referrer to build back link)
   const { data: familyDetail } = useQuery({
     queryKey: adminFamilyDetail(famIdStr),
@@ -111,8 +118,11 @@ export default function AdminFamilyPeople() {
         }
       />
 
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
+          <ColumnToggle resourceKey="adminPeople" />
+        </div>
 
         <HierarchicalManage
           parent={{
@@ -136,7 +146,8 @@ export default function AdminFamilyPeople() {
           }}
           child={{
             queryKey: peopleKey,
-            listFn: () => adminListFamilyPeople(famIdNum),
+            listFn: (params) =>
+              adminListFamilyPeople(famIdNum, params ? ({ ...params, columns: apiColumns } as AdminListParams) : undefined),
             detailFn: getPerson,
             createNormaliseFn: (formData) => ({ ...formData, family_id: famIdNum }) as PersonPayload,
             createApi: (data) => adminCreatePerson(data),
@@ -147,7 +158,12 @@ export default function AdminFamilyPeople() {
             formDefault: defaultPersonForm as unknown as PersonPayload,
             formComponent: PersonForm,
             render: (rows, callbacks, ctx) => (
-              <PeopleTable rows={rows as PersonSummary[]} callbacks={callbacks} isDeletedView={ctx.isDeletedView} />
+              <PeopleTable
+                rows={rows as PersonDetail[]}
+                callbacks={callbacks}
+                isDeletedView={ctx.isDeletedView}
+                visibleColumns={visibleColumns}
+              />
             ),
             title: "People",
             createButtonLabel: "+ Add Person",
@@ -162,6 +178,7 @@ export default function AdminFamilyPeople() {
                   page: params?.page ?? 1,
                   page_size: params?.page_size ?? 20,
                   family_id: famIdNum,
+                  columns: apiColumns,
                 }),
               readonly: true,
             },
@@ -300,17 +317,20 @@ function PeopleTable({
   rows,
   callbacks,
   isDeletedView,
+  visibleColumns,
 }: {
-  rows: PersonSummary[];
+  rows: PersonDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
+  visibleColumns: string[];
 }) {
+  const actionColSpan = visibleColumns.length + 1 + (visibleColumns.includes("wishes") ? 1 : 0);
   return (
     <Table className="mb-6">
       {rows.length === 0 ? (
         <TableBody>
           <Tr>
-            <Td className="!text-center !text-gray-400 py-12">
+            <Td colSpan={actionColSpan} className="!text-center !text-gray-400 py-12">
               {isDeletedView ? "No deleted people in this family." : "No people in this family yet."}
             </Td>
           </Tr>
@@ -318,27 +338,40 @@ function PeopleTable({
       ) : (
         <>
           <TableHead>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Age</Th>
-            <Th>Practical Wish</Th>
-            <Th>Fun Wish</Th>
+            {visibleColumns.includes("display_id") && <Th>ID</Th>}
+            {visibleColumns.includes("given_name") && <Th>Name</Th>}
+            {visibleColumns.includes("age") && <Th>Age</Th>}
+            {visibleColumns.includes("wishes") && (
+              <>
+                <Th>Practical Wish</Th>
+                <Th>Fun Wish</Th>
+              </>
+            )}
+            {visibleColumns.includes("title") && <Th>Title</Th>}
+            {visibleColumns.includes("note") && <Th>Note</Th>}
+            {visibleColumns.includes("created_at") && <Th>Created</Th>}
             <Th>Actions</Th>
           </TableHead>
           <TableBody>
             {rows.map((p) => (
-              <>
-                <Tr key={p.id}>
-                  <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
-                  <Td className="font-medium text-gray-900">{p.given_name}</Td>
-                  <Td>{p.age}</Td>
-                  {p.age >= 18 ? (
-                    <WishCellAdult wishes={p.wishes} />
-                  ) : (
-                    <>
-                      <WishCellType wishes={p.wishes} type="practical" />
-                      <WishCellType wishes={p.wishes} type="fun" />
-                    </>
+              <React.Fragment key={p.id}>
+                <Tr>
+                  {visibleColumns.includes("display_id") && <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>}
+                  {visibleColumns.includes("given_name") && <Td className="font-medium text-gray-900">{p.given_name}</Td>}
+                  {visibleColumns.includes("age") && <Td>{p.age}</Td>}
+                  {visibleColumns.includes("wishes") &&
+                    (p.age >= 18 ? (
+                      <WishCellAdult wishes={p.wishes} />
+                    ) : (
+                      <>
+                        <WishCellType wishes={p.wishes} type="practical" />
+                        <WishCellType wishes={p.wishes} type="fun" />
+                      </>
+                    ))}
+                  {visibleColumns.includes("title") && <Td>{p.title || "—"}</Td>}
+                  {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
+                  {visibleColumns.includes("created_at") && (
+                    <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>
                   )}
                   <Td>
                     <div className="flex items-center gap-2">
@@ -377,7 +410,7 @@ function PeopleTable({
                 </Tr>
                 {callbacks.editingId === p.id && (
                   <Tr key={`${p.id}-edit`}>
-                    <Td colSpan={6} className="!py-3">
+                    <Td colSpan={actionColSpan} className="!py-3">
                       <div className="rounded-xl bg-gray-50 p-4">
                         {callbacks.detailLoading ? (
                           <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -391,7 +424,7 @@ function PeopleTable({
                     </Td>
                   </Tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </TableBody>
         </>

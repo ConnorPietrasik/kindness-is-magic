@@ -15,8 +15,8 @@ import { Link } from "react-router-dom";
 import { route } from "../lib/routes";
 
 interface DisplayIdProps {
-  /** The display_id string from the API. */
-  displayId: string;
+  /** The display_id string from the API (nullable when column filtering omits it). */
+  displayId: string | null;
   /** Database ID of the family (used for the family link). */
   familyId: number;
   /**
@@ -40,6 +40,7 @@ function parseReferrerId(displayId: string): number | null {
 }
 
 export function DisplayId({ displayId, familyId, referrerId }: DisplayIdProps) {
+  if (displayId == null) return <>—</>;
   // Special / scoped values — render as-is
   if (SPECIAL_VALUES.has(displayId) || !displayId.includes("-")) {
     return <>{displayId}</>;

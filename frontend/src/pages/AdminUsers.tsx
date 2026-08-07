@@ -8,11 +8,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { FormField } from "../components/FormField";
@@ -22,9 +23,11 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreateUser,
   adminDeleteUser,
@@ -66,14 +69,19 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminUsers");
+  const { widthClass } = useTableWidth("adminUsers");
+
   // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
     () => ({
       ...pagination.params,
+      columns: apiColumns,
       role: roleFilter || undefined,
       search: searchQuery || undefined,
     }),
-    [pagination.params, roleFilter, searchQuery]
+    [pagination.params, apiColumns, roleFilter, searchQuery]
   );
 
   // CRUD manager for users
@@ -181,11 +189,14 @@ export default function AdminUsers() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
 
-      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Users</h2>
-          {!isDeletedView && <Button onClick={openCreate}>+ Add User</Button>}
+          <div className="flex items-center gap-3">
+            {!isDeletedView && <ColumnToggle resourceKey="adminUsers" />}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add User</Button>}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -245,36 +256,48 @@ export default function AdminUsers() {
           ) : (
             <Table>
               <TableHead>
-                <Th>Email</Th>
-                <Th>Display Name</Th>
-                <Th>Role</Th>
-                <Th>Linked to</Th>
-                <Th>Created</Th>
+                {visibleColumns.includes("email") && <Th>Email</Th>}
+                {visibleColumns.includes("display_name") && <Th>Display Name</Th>}
+                {visibleColumns.includes("role") && <Th>Role</Th>}
+                {visibleColumns.includes("linked_to") && <Th>Linked to</Th>}
+                {visibleColumns.includes("created_at") && <Th>Created</Th>}
+                {visibleColumns.includes("referrer_id") && <Th>Referrer ID</Th>}
+                {visibleColumns.includes("family_id") && <Th>Family ID</Th>}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
                 {users.map((u) => (
-                  <>
-                    <Tr key={u.id}>
-                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>
-                      <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name}</Td>
-                      <Td>
-                        <RoleBadge role={u.role} />
-                      </Td>
-                      <Td>
-                        {u.referrer_id ? (
-                          <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
-                            {u.referrer_name}
-                          </Link>
-                        ) : u.family_id ? (
-                          <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
-                            {u.family_name}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </Td>
-                      <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
+                  <React.Fragment key={u.id}>
+                    <Tr>
+                      {visibleColumns.includes("email") && <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>}
+                      {visibleColumns.includes("display_name") && (
+                        <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name}</Td>
+                      )}
+                      {visibleColumns.includes("role") && (
+                        <Td>
+                          <RoleBadge role={u.role} />
+                        </Td>
+                      )}
+                      {visibleColumns.includes("linked_to") && (
+                        <Td>
+                          {u.referrer_id ? (
+                            <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
+                              {u.referrer_name}
+                            </Link>
+                          ) : u.family_id ? (
+                            <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
+                              {u.family_name}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
+                      )}
+                      {visibleColumns.includes("created_at") && (
+                        <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
+                      )}
+                      {visibleColumns.includes("referrer_id") && <Td className="text-xs text-gray-500">{u.referrer_id ?? "—"}</Td>}
+                      {visibleColumns.includes("family_id") && <Td className="text-xs text-gray-500">{u.family_id ?? "—"}</Td>}
                       <Td>
                         <div className="flex gap-2">
                           {!isDeletedView && u.deleted_at == null && (
@@ -324,7 +347,7 @@ export default function AdminUsers() {
                     </Tr>
                     {editingId === u.id && (
                       <Tr key={`${u.id}-edit`}>
-                        <Td colSpan={6} className="!py-3">
+                        <Td colSpan={visibleColumns.length + 1} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -348,7 +371,7 @@ export default function AdminUsers() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

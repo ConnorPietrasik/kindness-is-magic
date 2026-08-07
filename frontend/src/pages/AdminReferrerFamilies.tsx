@@ -7,11 +7,13 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
+import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
@@ -27,7 +29,9 @@ import { ReferrerForm } from "../components/ReferrerForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminApproveWishes,
   adminCreateFamily,
@@ -53,7 +57,7 @@ import {
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyPayload, FamilySummary, ReferrerDetail } from "../types";
+import type { AdminListParams, FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -111,12 +115,19 @@ export default function AdminReferrerFamilies() {
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
 
+  // Column visibility (shared with adminFamilies)
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminFamilies");
+  const { widthClass } = useTableWidth("adminFamilies");
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.ADMIN_REFERRERS} label="Referrers" />} />
 
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Referrer &amp; Families</h2>
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Referrer &amp; Families</h2>
+          <ColumnToggle resourceKey="adminFamilies" />
+        </div>
 
         <HierarchicalManage
           parent={{
@@ -128,7 +139,8 @@ export default function AdminReferrerFamilies() {
           }}
           child={{
             queryKey: familiesKey,
-            listFn: (params) => adminListReferrerFamilies(refIdNum, params ?? undefined),
+            listFn: (params) =>
+              adminListReferrerFamilies(refIdNum, params ? ({ ...params, columns: apiColumns } as AdminListParams) : undefined),
             detailFn: adminGetFamily,
             createApi: (data) => adminCreateFamily(data),
             updateApi: adminUpdateFamily,
@@ -143,10 +155,11 @@ export default function AdminReferrerFamilies() {
             >,
             render: (rows, callbacks, ctx) => (
               <FamiliesTable
-                rows={rows as FamilySummary[]}
+                rows={rows as FamilyDetail[]}
                 callbacks={callbacks}
                 isDeletedView={ctx.isDeletedView}
                 referrerId={refIdNum}
+                visibleColumns={visibleColumns}
                 onResetWishState={(id) => resetMut.mutate(id)}
                 isResetting={resetMut.isPending}
                 onFullyApprove={(id) => fullyApproveMut.mutate(id)}
@@ -166,6 +179,7 @@ export default function AdminReferrerFamilies() {
                   page: params?.page ?? 1,
                   page_size: params?.page_size ?? 20,
                   referrer_id: refIdNum,
+                  columns: apiColumns,
                 }),
               readonly: true,
             },
@@ -258,15 +272,17 @@ function FamiliesTable({
   callbacks,
   isDeletedView,
   referrerId,
+  visibleColumns,
   onResetWishState,
   isResetting,
   onFullyApprove,
   isFullyApproving,
 }: {
-  rows: FamilySummary[];
+  rows: FamilyDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
   referrerId: number;
+  visibleColumns: string[];
   onResetWishState: (id: number) => void;
   isResetting: boolean;
   onFullyApprove: (id: number) => void;
@@ -285,45 +301,92 @@ function FamiliesTable({
   return (
     <Table>
       <TableHead>
-        <Th>ID</Th>
-        <Th>Family Name</Th>
-        <Th>Family Wish</Th>
-        <Th>Contact</Th>
-        <Th>People</Th>
-        <Th>Delivery</Th>
+        {visibleColumns.includes("display_id") && <Th>ID</Th>}
+        {visibleColumns.includes("family_name") && <Th>Family Name</Th>}
+        {visibleColumns.includes("family_wish") && <Th>Family Wish</Th>}
+        {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
+        {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
+        {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
+        {visibleColumns.includes("person_count") && <Th>People</Th>}
+        {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
+        {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
+        {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
+        {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
+        {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
+        {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
         <Th>Actions</Th>
       </TableHead>
       <TableBody>
         {rows.map((f) => (
-          <>
-            <Tr key={f.id} className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
-              <Td className="whitespace-nowrap text-xs text-gray-400">
-                <DisplayId displayId={f.display_id} familyId={f.id} referrerId={referrerId} />
-              </Td>
-              <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-                {f.family_name}
-                {f.deleted_at == null && f.has_notes && (
-                  <span className="ml-1 text-xs" title="Has internal notes">
-                    📝
-                  </span>
-                )}
-                {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-                  <Link
-                    to={route.familyWishList(f.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Wish List"
-                    className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                    title="Wish List"
-                  >
-                    📄
-                  </Link>
-                )}
-              </Td>
-              <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
-              <Td>{f.contact_name}</Td>
-              <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-              <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
+          <React.Fragment key={f.id}>
+            <Tr className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
+              {visibleColumns.includes("display_id") && (
+                <Td className="whitespace-nowrap text-xs text-gray-400">
+                  <DisplayId displayId={f.display_id} familyId={f.id} referrerId={referrerId} />
+                </Td>
+              )}
+              {visibleColumns.includes("family_name") && (
+                <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+                  {f.family_name}
+                  {f.deleted_at == null && f.referrer_notes != null && (
+                    <span className="ml-1 text-xs" title="Has internal notes">
+                      📝
+                    </span>
+                  )}
+                  {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
+                    <Link
+                      to={route.familyWishList(f.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Wish List"
+                      className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                      title="Wish List"
+                    >
+                      📄
+                    </Link>
+                  )}
+                </Td>
+              )}
+              {visibleColumns.includes("family_wish") && <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>}
+              {visibleColumns.includes("contact_name") && <Td>{f.contact_name}</Td>}
+              {visibleColumns.includes("referrer_id") && (
+                <Td>
+                  {f.referrer_id != null ? (
+                    <Link
+                      to={route.adminReferrerFamilies(f.referrer_id)}
+                      className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                    >
+                      {f.referrer_name || `ID ${f.referrer_id}`}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </Td>
+              )}
+              {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
+              {visibleColumns.includes("person_count") && <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>}
+              {visibleColumns.includes("approval_status") && (
+                <Td>
+                  <ApprovalBadge status={f.approval_status} />
+                </Td>
+              )}
+              {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}
+              {visibleColumns.includes("wish_lock_level") && (
+                <Td>
+                  <span className="text-xs capitalize">{f.wish_lock_level}</span>
+                </Td>
+              )}
+              {visibleColumns.includes("wish_review_requested_at") && (
+                <Td className="text-xs text-gray-500">
+                  {f.wish_review_requested_at ? new Date(f.wish_review_requested_at).toLocaleDateString() : "—"}
+                </Td>
+              )}
+              {visibleColumns.includes("wish_rejection_reason") && (
+                <Td className="max-w-xs text-xs text-gray-500 truncate">{f.wish_rejection_reason || "—"}</Td>
+              )}
+              {visibleColumns.includes("delivery") && (
+                <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
+              )}
               <Td>
                 <div className="flex items-center gap-2">
                   {!isDeletedView && f.deleted_at == null && (
@@ -387,7 +450,7 @@ function FamiliesTable({
             </Tr>
             {callbacks.editingId === f.id && (
               <Tr key={`${f.id}-edit`}>
-                <Td colSpan={7} className="!py-3">
+                <Td colSpan={visibleColumns.length + 1} className="!py-3">
                   <div className="rounded-xl bg-gray-50 p-4">
                     {callbacks.detailLoading ? (
                       <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -401,7 +464,7 @@ function FamiliesTable({
                 </Td>
               </Tr>
             )}
-          </>
+          </React.Fragment>
         ))}
       </TableBody>
     </Table>

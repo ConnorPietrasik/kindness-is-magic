@@ -14,9 +14,11 @@ from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Person, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
+    apply_column_filter,
     batch_load_person_wishes,
     build_person_detail,
     build_wish_detail,
+    ColumnRequest,
     compute_display_ids,
     create_person_with_wishes,
     get_active_or_404,
@@ -30,7 +32,6 @@ from app.schemas import (
     PersonCreate,
     PersonDetail,
     PersonListResponse,
-    PersonSummary,
     PersonUpdate,
     WishCreate,
     WishDetail,
@@ -57,6 +58,7 @@ def list_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     family_id: int | None = Query(None),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
@@ -82,28 +84,41 @@ def list_people(
     offset = (page - 1) * page_size
     people = query.order_by(Person.id).offset(offset).limit(page_size).all()
 
-    pos_map = compute_display_ids(db, "person", people, scope=family_id)
-
+    # Wishes are always loaded (always_include)
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
 
-    return PersonListResponse(
-        people=[
-            PersonSummary(
-                id=p.id,
-                display_id=pos_map[p.id],
-                family_id=p.family_id,
-                given_name=p.given_name,
-                age=p.age,
-                deleted_at=p.deleted_at,
-                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
-            )
-            for p in people
-        ],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+    cols = ColumnRequest.parse(columns)
+    pos_map: dict[int, str] = {}
+    if cols.needs("display_id"):
+        pos_map = compute_display_ids(db, "person", people, scope=family_id)
+
+    items = [
+        PersonDetail(
+            id=p.id,
+            display_id=pos_map.get(p.id),
+            family_id=p.family_id,
+            given_name=p.given_name,
+            title=p.title,
+            age=p.age,
+            note=p.note,
+            created_at=p.created_at,
+            deleted_at=p.deleted_at,
+            wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
+        )
+        for p in people
+    ]
+
+    # NOTE: Returns a plain dict (not PersonListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "people": apply_column_filter(items, columns, always_include={"id", "wishes"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @people_admin_router.get("/deleted")
@@ -111,6 +126,7 @@ def list_deleted_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     family_id: int | None = Query(None),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> PersonListResponse:
@@ -123,23 +139,33 @@ def list_deleted_people(
     offset = (page - 1) * page_size
     people = query.order_by(Person.id).offset(offset).limit(page_size).all()
 
-    return PersonListResponse(
-        people=[
-            PersonSummary(
-                id=p.id,
-                display_id="DELETED",
-                family_id=p.family_id,
-                given_name=p.given_name,
-                age=p.age,
-                deleted_at=p.deleted_at,
-            )
-            for p in people
-        ],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+    items = [
+        PersonDetail(
+            id=p.id,
+            display_id="DELETED",
+            family_id=p.family_id,
+            given_name=p.given_name,
+            title=p.title,
+            age=p.age,
+            note=p.note,
+            created_at=p.created_at,
+            deleted_at=p.deleted_at,
+            wishes=[],
+        )
+        for p in people
+    ]
+
+    # NOTE: Returns a plain dict (not PersonListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "people": apply_column_filter(items, columns, always_include={"id", "wishes"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @people_admin_router.get("/{per_id}")

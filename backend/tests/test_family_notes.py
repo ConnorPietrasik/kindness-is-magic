@@ -231,7 +231,7 @@ class TestReferrerHasNotesInList:
         assert resp.status_code == 200
         families = resp.json()["families"]
         target = [f for f in families if f["id"] == fam.id][0]
-        assert target["has_notes"] is True
+        assert target["referrer_notes"] is not None
 
     def test_has_notes_false_when_no_notes(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
@@ -241,7 +241,7 @@ class TestReferrerHasNotesInList:
         assert resp.status_code == 200
         families = resp.json()["families"]
         target = [f for f in families if f["id"] == fam.id][0]
-        assert target["has_notes"] is False
+        assert target["referrer_notes"] is None
 
 
 # =========================================================================
@@ -305,7 +305,7 @@ class TestAdminNotes:
         assert resp.status_code == 200
         families = resp.json()["families"]
         target = [f for f in families if f["id"] == fam.id][0]
-        assert target["has_notes"] is True
+        assert target["referrer_notes"] is not None
 
 
 # =========================================================================

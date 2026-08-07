@@ -15,8 +15,10 @@ from app.database import get_db
 from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
+    apply_column_filter,
     build_wish_detail,
     build_wish_list_item,
+    ColumnRequest,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -55,6 +57,7 @@ def list_wishes(
     assigned_to_id: int | None = Query(None),
     purchased: str | None = Query(None),
     search: str | None = Query(None),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishListResponse:
@@ -98,6 +101,7 @@ def list_wishes(
 
     # Build list items — need person/family context and assigned-to names.
     # Re-query with joinedload to avoid N+1.
+    cols = ColumnRequest.parse(columns)
     wish_ids = [w.id for w in wishes]
     if wish_ids:
         wishes_with_context = (
@@ -110,11 +114,12 @@ def list_wishes(
             .order_by(Wish.id)
             .all()
         )
-        # Batch-collect assigned-to users for name resolution
-        assigned_user_ids = {w.assigned_to_id for w in wishes_with_context if w.assigned_to_id is not None}
-        assigned_users: dict[int, User] = (
-            {u.id: u for u in db.query(User).filter(User.id.in_(assigned_user_ids)).all()} if assigned_user_ids else {}
-        )
+        # Batch-collect assigned-to users for name resolution (conditional)
+        assigned_users: dict[int, User] = {}
+        if cols.needs("assigned_to_name"):
+            assigned_user_ids = {w.assigned_to_id for w in wishes_with_context if w.assigned_to_id is not None}
+            if assigned_user_ids:
+                assigned_users = {u.id: u for u in db.query(User).filter(User.id.in_(assigned_user_ids)).all()}
     else:
         wishes_with_context = []
         assigned_users = {}
@@ -123,13 +128,17 @@ def list_wishes(
 
     logger.info("Admin %s listed wishes (page=%d, total=%d)", admin.email, page, total)
 
-    return WishListResponse(
-        wishes=items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+    # NOTE: Returns a plain dict (not WishListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "wishes": apply_column_filter(items, columns, always_include={"id"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @admin_wishes_router.post("/batch-assign")

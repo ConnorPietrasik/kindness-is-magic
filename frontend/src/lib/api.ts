@@ -11,6 +11,7 @@
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 import type {
+  AdminListParams,
   AdminUserCreate,
   AdminUsersListParams,
   AdminUserUpdate,
@@ -27,6 +28,7 @@ import type {
   FamilySelfRegisterResponse,
   FamilySelfServiceDetail,
   FamilyWishListResponse,
+  InviteListParams,
   InviteListResponse,
   PackingSlipItem,
   PaginationParams,
@@ -231,8 +233,9 @@ export function registerFamilyViaInvite(data: FamilySelfRegisterPayload): Promis
 // ---------------------------------------------------------------------------
 // Admin — Referrers
 // ---------------------------------------------------------------------------
-export function adminListReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
-  return apiGet("/api/admin/referrers", params);
+export function adminListReferrers(params?: AdminListParams): Promise<ReferrerListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/referrers", p);
 }
 
 export function adminGetReferrer(id: number): Promise<ReferrerDetail> {
@@ -264,8 +267,9 @@ export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
 }
 
 /** Fetch soft-deleted referrers (separate /deleted endpoint). */
-export function adminListDeletedReferrers(params?: PaginationParams): Promise<ReferrerListResponse> {
-  return apiGet("/api/admin/referrers/deleted", params);
+export function adminListDeletedReferrers(params?: AdminListParams): Promise<ReferrerListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/referrers/deleted", p);
 }
 
 /** Fetch minimal referrer list for dropdown selects (no pagination). */
@@ -276,8 +280,9 @@ export function adminGetReferrersDropdown(): Promise<ReferrerDropdownItem[]> {
 // ---------------------------------------------------------------------------
 // Admin — Families
 // ---------------------------------------------------------------------------
-export function adminListFamilies(params?: PaginationParams): Promise<FamilyListResponse> {
-  return apiGet("/api/admin/families", params);
+export function adminListFamilies(params?: AdminListParams): Promise<FamilyListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/families", p);
 }
 
 export function adminGetFamily(id: number): Promise<FamilyDetail> {
@@ -300,13 +305,20 @@ export function adminRestoreFamily(id: number): Promise<FamilyDetail> {
   return apiPost(`/api/admin/families/${id}/restore`);
 }
 
-export function adminListReferrerFamilies(rid: number, params?: PaginationParams): Promise<FamilyListResponse> {
-  return apiGet("/api/admin/families", { ...params, referrer_id: rid });
+export function adminListReferrerFamilies(rid: number, params?: AdminListParams): Promise<FamilyListResponse> {
+  const p: Record<string, unknown> = { referrer_id: rid };
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined) p[k] = k === "columns" && Array.isArray(v) ? v.join(",") : v;
+    });
+  }
+  return apiGet("/api/admin/families", p);
 }
 
 /** Fetch soft-deleted families (separate /deleted endpoint). */
-export function adminListDeletedFamilies(params?: PaginationParams & { referrer_id?: number | null }): Promise<FamilyListResponse> {
-  return apiGet("/api/admin/families/deleted", params);
+export function adminListDeletedFamilies(params?: AdminListParams & { referrer_id?: number | null }): Promise<FamilyListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/families/deleted", p);
 }
 
 /** Fetch minimal family list for dropdown selects (no pagination). */
@@ -343,8 +355,9 @@ export function adminGetPackingSlips(familyIds?: number[]): Promise<PackingSlipI
 // ---------------------------------------------------------------------------
 // Admin — People
 // ---------------------------------------------------------------------------
-export function adminListPeople(params?: PaginationParams): Promise<PersonListResponse> {
-  return apiGet("/api/admin/people", params);
+export function adminListPeople(params?: AdminListParams): Promise<PersonListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/people", p);
 }
 
 export function adminGetPerson(id: number): Promise<PersonDetail> {
@@ -367,26 +380,29 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
   return apiPost(`/api/admin/people/${id}/restore`);
 }
 
-export function adminListFamilyPeople(fid: number, params?: PaginationParams): Promise<PersonListResponse> {
-  return apiGet("/api/admin/people", { ...params, family_id: fid });
+export function adminListFamilyPeople(fid: number, params?: AdminListParams): Promise<PersonListResponse> {
+  const p: Record<string, unknown> = { family_id: fid };
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined) p[k] = k === "columns" && Array.isArray(v) ? v.join(",") : v;
+    });
+  }
+  return apiGet("/api/admin/people", p);
 }
 
 /** Fetch soft-deleted people (separate /deleted endpoint). */
-export function adminListDeletedPeople(params?: PaginationParams & { family_id?: number | null }): Promise<PersonListResponse> {
-  return apiGet("/api/admin/people/deleted", params);
+export function adminListDeletedPeople(params?: AdminListParams & { family_id?: number | null }): Promise<PersonListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/people/deleted", p);
 }
 
 // ---------------------------------------------------------------------------
 // Admin — Invite Tokens
 // ---------------------------------------------------------------------------
 
-export interface InviteListParams extends PaginationParams {
-  redeemed?: boolean;
-  expired?: boolean;
-}
-
 export function adminListInvites(params?: InviteListParams): Promise<InviteListResponse> {
-  return apiGet("/api/admin/invites", params);
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/invites", p);
 }
 
 export function adminGetInvite(id: number): Promise<ReferrerInviteSummary> {
@@ -416,7 +432,8 @@ export function adminImportCsv(fileOrText: File | string): Promise<unknown> {
 // Admin — Users
 // ---------------------------------------------------------------------------
 export function adminListUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
-  return apiGet("/api/admin/users", params);
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/users", p);
 }
 
 export function adminGetUser(id: number): Promise<UserDetail> {
@@ -445,7 +462,8 @@ export function adminRestoreUser(id: number): Promise<UserDetail> {
 
 /** Fetch soft-deleted users (separate /deleted endpoint). */
 export function adminListDeletedUsers(params?: AdminUsersListParams): Promise<UserListResponse> {
-  return apiGet("/api/admin/users/deleted", params);
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/users/deleted", p);
 }
 
 /** Fetch minimal user list for dropdown selects (no pagination). Optional role filter. */
@@ -457,7 +475,8 @@ export function adminGetUsersDropdown(roles?: string): Promise<UserDropdownItem[
 // Admin — Wishes
 // ---------------------------------------------------------------------------
 export function adminListWishes(params?: AdminWishesListParams): Promise<WishListResponse> {
-  return apiGet("/api/admin/wishes", params);
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/wishes", p);
 }
 
 export function adminGetWish(wishId: number): Promise<WishDetail> {

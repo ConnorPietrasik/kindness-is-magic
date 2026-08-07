@@ -26,7 +26,6 @@ from app.schemas import (
     PersonCreateInFamily,
     PersonDetail,
     PersonListResponse,
-    PersonSummary,
     WishSummary,
 )
 
@@ -155,12 +154,15 @@ def list_people(
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
         people=[
-            PersonSummary(
+            PersonDetail(
                 id=p.id,
                 display_id=pos_map[p.id],
                 family_id=p.family_id,
                 given_name=p.given_name,
+                title=p.title,
                 age=p.age,
+                note=p.note,
+                created_at=p.created_at,
                 deleted_at=p.deleted_at,
                 wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
             )

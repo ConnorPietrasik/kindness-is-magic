@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
@@ -18,12 +19,14 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminListInvites, adminRevokeInvite, createReferrerInvite, type InviteListParams } from "../lib/api";
+import { useTableWidth } from "../hooks/useTableWidth";
+import { adminListInvites, adminRevokeInvite, createReferrerInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
 import { formatApiError, formatDateTime } from "../lib/utils";
-import type { ReferrerInviteResponse } from "../types";
+import type { InviteListParams, ReferrerInviteResponse } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -36,13 +39,18 @@ export default function AdminInviteCodes() {
   const [showGenerator, setShowGenerator] = useState(false);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminInvites");
+  const { widthClass } = useTableWidth("adminInvites");
+
   const listParams = useMemo<InviteListParams>(
     () => ({
       ...pagination.params,
+      columns: apiColumns,
       redeemed: showRedeemed ?? undefined,
       expired: showExpired ?? undefined,
     }),
-    [pagination.params, showRedeemed, showExpired]
+    [pagination.params, apiColumns, showRedeemed, showExpired]
   );
 
   // useCrudManager for list + revoke
@@ -72,11 +80,14 @@ export default function AdminInviteCodes() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
 
-      <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Invite Codes</h2>
-          <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide Generator" : "+ Generate New"}</Button>
+          <div className="flex items-center gap-3">
+            <ColumnToggle resourceKey="adminInvites" />
+            <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide Generator" : "+ Generate New"}</Button>
+          </div>
         </div>
 
         {/* Info note */}
@@ -126,42 +137,50 @@ export default function AdminInviteCodes() {
         ) : (
           <Table>
             <TableHead>
-              <Th>Code</Th>
-              <Th>Family Limit</Th>
-              <Th>Locked Email</Th>
-              <Th>Created By</Th>
-              <Th>Created</Th>
-              <Th>Redeemed</Th>
-              <Th>Status</Th>
+              {visibleColumns.includes("code") && <Th>Code</Th>}
+              {visibleColumns.includes("family_limit") && <Th>Family Limit</Th>}
+              {visibleColumns.includes("locked_email") && <Th>Locked Email</Th>}
+              {visibleColumns.includes("created_by_admin_name") && <Th>Created By</Th>}
+              {visibleColumns.includes("created_at") && <Th>Created</Th>}
+              {visibleColumns.includes("redeemed") && <Th>Redeemed</Th>}
+              {visibleColumns.includes("referrer_approval_status") && <Th>Status</Th>}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
               {invites.map((invite) => (
                 <Tr key={invite.id}>
-                  <Td className="font-mono font-semibold">{invite.code}</Td>
-                  <Td>{invite.family_limit}</Td>
-                  <Td>{invite.locked_email ?? <span className="text-gray-400">—</span>}</Td>
-                  <Td>{invite.created_by_admin_name ?? <span className="text-gray-400">—</span>}</Td>
-                  <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>
-                  <Td>
-                    {invite.redeemed ? (
-                      <span className="text-sm text-gray-600">
-                        Yes
-                        {invite.redeemed_by_referrer_name && (
-                          <span className="ml-1 text-gray-400">({invite.redeemed_by_referrer_name})</span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">No</span>
-                    )}
-                  </Td>
-                  <Td>
-                    {invite.redeemed && invite.referrer_approval_status ? (
-                      <ApprovalBadge status={invite.referrer_approval_status} />
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </Td>
+                  {visibleColumns.includes("code") && <Td className="font-mono font-semibold">{invite.code}</Td>}
+                  {visibleColumns.includes("family_limit") && <Td>{invite.family_limit}</Td>}
+                  {visibleColumns.includes("locked_email") && <Td>{invite.locked_email ?? <span className="text-gray-400">—</span>}</Td>}
+                  {visibleColumns.includes("created_by_admin_name") && (
+                    <Td>{invite.created_by_admin_name ?? <span className="text-gray-400">—</span>}</Td>
+                  )}
+                  {visibleColumns.includes("created_at") && (
+                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>
+                  )}
+                  {visibleColumns.includes("redeemed") && (
+                    <Td>
+                      {invite.redeemed ? (
+                        <span className="text-sm text-gray-600">
+                          Yes
+                          {invite.redeemed_by_referrer_name && (
+                            <span className="ml-1 text-gray-400">({invite.redeemed_by_referrer_name})</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">No</span>
+                      )}
+                    </Td>
+                  )}
+                  {visibleColumns.includes("referrer_approval_status") && (
+                    <Td>
+                      {invite.redeemed && invite.referrer_approval_status ? (
+                        <ApprovalBadge status={invite.referrer_approval_status} />
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </Td>
+                  )}
                   <Td>
                     {!invite.redeemed && (
                       <Button

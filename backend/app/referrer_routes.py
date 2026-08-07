@@ -40,12 +40,10 @@ from app.schemas import (
     FamilyListResponse,
     FamilyReviewList,
     FamilyReviewRequest,
-    FamilySummary,
     PendingFamilySummary,
     PersonCreateInFamily,
     PersonDetail,
     PersonListResponse,
-    PersonSummary,
     ReferrerDetail,
     ReferrerFamilyUpdate,
     ReferrerUpdate,
@@ -114,13 +112,19 @@ def list_families(
 
     return FamilyListResponse(
         families=[
-            FamilySummary(
+            FamilyDetail(
                 id=f.id,
                 display_id=pos_map[f.id],
                 family_name=f.family_name,
                 family_wish=f.family_wish,
                 contact_name=f.contact_name,
                 referrer_id=f.referrer_id,
+                referrer_name=None,
+                delivery_user_id=f.delivery_user_id,
+                delivery_user_name=None,
+                bio=f.bio,
+                address=f.address,
+                phone_number=f.phone_number,
                 approval_status=f.approval_status,
                 pickup_window=f.pickup_window,
                 deleted_at=f.deleted_at,
@@ -128,7 +132,7 @@ def list_families(
                 wish_lock_level=f.wish_lock_level,
                 wish_review_requested_at=f.wish_review_requested_at,
                 wish_rejection_reason=f.wish_rejection_reason,
-                has_notes=f.referrer_notes is not None,
+                referrer_notes=f.referrer_notes,
             )
             for f in families
         ]
@@ -486,12 +490,15 @@ def list_family_people(
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
         people=[
-            PersonSummary(
+            PersonDetail(
                 id=p.id,
                 display_id=pos_map[p.id],
                 family_id=p.family_id,
                 given_name=p.given_name,
+                title=p.title,
                 age=p.age,
+                note=p.note,
+                created_at=p.created_at,
                 deleted_at=p.deleted_at,
                 wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
             )

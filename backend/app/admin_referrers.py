@@ -17,7 +17,9 @@ from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User
 from app.permissions import require_admin
 from app.response_builders import (
+    apply_column_filter,
     build_referrer_detail,
+    ColumnRequest,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -28,7 +30,6 @@ from app.schemas import (
     ReferrerDetail,
     ReferrerDropdownItem,
     ReferrerListResponse,
-    ReferrerSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ def get_referrers_dropdown(
 def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
@@ -61,53 +63,68 @@ def list_referrers(
     total = query.count()
     referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
 
-    # Resolve approved_by_admin names in bulk
-    admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
+    # Conditional lookups — skip DB queries for columns the client doesn't need
+    cols = ColumnRequest.parse(columns)
+
     admin_map: dict[int, str] = {}
-    if admin_ids:
-        admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: a.display_name for a in admins}
+    if cols.needs("approved_by_admin_name"):
+        admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
+        if admin_ids:
+            admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
+            admin_map = {a.id: a.display_name for a in admins}
 
-    # Resolve family counts in bulk
-    referrer_ids = {r.id for r in referrers}
-    family_counts = (
-        db.query(Family.referrer_id, func.count(Family.id))
-        .filter(
-            Family.referrer_id.in_(referrer_ids),
-            Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
-        )
-        .group_by(Family.referrer_id)
-        .all()
-    )
-    family_count_map = {rid: count for rid, count in family_counts}
-
-    return ReferrerListResponse(
-        referrers=[
-            ReferrerSummary(
-                id=r.id,
-                name=r.name,
-                family_limit=r.family_limit,
-                family_count=family_count_map.get(r.id, 0),
-                family_invite_code=r.family_invite_code,
-                approval_status=r.approval_status,
-                approved_by_admin_name=admin_map.get(r.approved_by_admin_id) if r.approved_by_admin_id else None,
-                approved_at=r.approved_at,
-                deleted_at=r.deleted_at,
+    family_count_map: dict[int, int] = {}
+    if cols.needs("family_count"):
+        referrer_ids = {r.id for r in referrers}
+        family_counts = (
+            db.query(Family.referrer_id, func.count(Family.id))
+            .filter(
+                Family.referrer_id.in_(referrer_ids),
+                Family.deleted_at.is_(None),
+                Family.approval_status == FamilyApprovalStatus.approved,
             )
-            for r in referrers
-        ],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+            .group_by(Family.referrer_id)
+            .all()
+        )
+        family_count_map = {rid: count for rid, count in family_counts}
+
+    items = [
+        ReferrerDetail(
+            id=r.id,
+            name=r.name,
+            family_limit=r.family_limit,
+            phone_number=r.phone_number,
+            family_invite_code=r.family_invite_code,
+            family_count=family_count_map.get(r.id, 0) if cols.needs("family_count") else 0,
+            approval_status=r.approval_status,
+            approved_by_admin_name=admin_map.get(r.approved_by_admin_id)
+            if cols.needs("approved_by_admin_name") and r.approved_by_admin_id
+            else None,
+            approved_at=r.approved_at,
+            created_at=r.created_at,
+            deleted_at=r.deleted_at,
+        )
+        for r in referrers
+    ]
+
+    # NOTE: Returns a plain dict (not ReferrerListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "referrers": apply_column_filter(items, columns, always_include={"id"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @referrer_admin_router.get("/deleted")
 def list_deleted_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerListResponse:
@@ -116,47 +133,61 @@ def list_deleted_referrers(
     total = query.count()
     referrers = query.order_by(Referrer.id).offset((page - 1) * page_size).limit(page_size).all()
 
-    # Resolve approved_by_admin names in bulk
-    admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
+    # Conditional lookups
+    cols = ColumnRequest.parse(columns)
+
     admin_map: dict[int, str] = {}
-    if admin_ids:
-        admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: a.display_name for a in admins}
+    if cols.needs("approved_by_admin_name"):
+        admin_ids = {r.approved_by_admin_id for r in referrers if r.approved_by_admin_id is not None}
+        if admin_ids:
+            admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
+            admin_map = {a.id: a.display_name for a in admins}
 
-    # Resolve family counts in bulk
-    referrer_ids = {r.id for r in referrers}
-    family_counts = (
-        db.query(Family.referrer_id, func.count(Family.id))
-        .filter(
-            Family.referrer_id.in_(referrer_ids),
-            Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
-        )
-        .group_by(Family.referrer_id)
-        .all()
-    )
-    family_count_map = {rid: count for rid, count in family_counts}
-
-    return ReferrerListResponse(
-        referrers=[
-            ReferrerSummary(
-                id=r.id,
-                name=r.name,
-                family_limit=r.family_limit,
-                family_count=family_count_map.get(r.id, 0),
-                family_invite_code=r.family_invite_code,
-                approval_status=r.approval_status,
-                approved_by_admin_name=admin_map.get(r.approved_by_admin_id) if r.approved_by_admin_id else None,
-                approved_at=r.approved_at,
-                deleted_at=r.deleted_at,
+    family_count_map: dict[int, int] = {}
+    if cols.needs("family_count"):
+        referrer_ids = {r.id for r in referrers}
+        family_counts = (
+            db.query(Family.referrer_id, func.count(Family.id))
+            .filter(
+                Family.referrer_id.in_(referrer_ids),
+                Family.deleted_at.is_(None),
+                Family.approval_status == FamilyApprovalStatus.approved,
             )
-            for r in referrers
-        ],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+            .group_by(Family.referrer_id)
+            .all()
+        )
+        family_count_map = {rid: count for rid, count in family_counts}
+
+    items = [
+        ReferrerDetail(
+            id=r.id,
+            name=r.name,
+            family_limit=r.family_limit,
+            phone_number=r.phone_number,
+            family_invite_code=r.family_invite_code,
+            family_count=family_count_map.get(r.id, 0) if cols.needs("family_count") else 0,
+            approval_status=r.approval_status,
+            approved_by_admin_name=admin_map.get(r.approved_by_admin_id)
+            if cols.needs("approved_by_admin_name") and r.approved_by_admin_id
+            else None,
+            approved_at=r.approved_at,
+            created_at=r.created_at,
+            deleted_at=r.deleted_at,
+        )
+        for r in referrers
+    ]
+
+    # NOTE: Returns a plain dict (not ReferrerListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "referrers": apply_column_filter(items, columns, always_include={"id"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @referrer_admin_router.get("/{ref_id}")

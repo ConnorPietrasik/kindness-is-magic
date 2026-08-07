@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
+from app.response_builders import apply_column_filter, ColumnRequest
 from app.schemas import InviteListResponse, ReferrerInviteSummary
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ def list_invites(
     page_size: int = Query(50, ge=1, le=200),
     redeemed: bool | None = Query(None),
     expired: bool | None = Query(None),
+    columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> InviteListResponse:
@@ -98,26 +100,36 @@ def list_invites(
     total = query.count()
     invites = query.order_by(ReferrerInviteToken.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
-    # Bulk-resolve admin and referrer names to avoid N+1 queries
-    admin_ids = {inv.created_by_admin_id for inv in invites if inv.created_by_admin_id is not None}
+    # Conditional lookups — skip queries for columns the client doesn't need
+    cols = ColumnRequest.parse(columns)
+
     admin_map: dict[int, str] = {}
-    if admin_ids:
-        admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
-        admin_map = {a.id: a.display_name for a in admins}
+    if cols.needs("created_by_admin_name"):
+        admin_ids = {inv.created_by_admin_id for inv in invites if inv.created_by_admin_id is not None}
+        if admin_ids:
+            admins = db.query(User).filter(User.id.in_(admin_ids), User.deleted_at.is_(None)).all()
+            admin_map = {a.id: a.display_name for a in admins}
 
-    referrer_ids = {inv.redeemed_by_referrer_id for inv in invites if inv.redeemed_by_referrer_id is not None}
     referrer_map: dict[int, tuple[str, Referrer.approval_status]] = {}
-    if referrer_ids:
-        refs = db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all()
-        referrer_map = {r.id: (r.name, r.approval_status) for r in refs}
+    if cols.needs("redeemed_by_referrer_name", "referrer_approval_status"):
+        referrer_ids = {inv.redeemed_by_referrer_id for inv in invites if inv.redeemed_by_referrer_id is not None}
+        if referrer_ids:
+            refs = db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all()
+            referrer_map = {r.id: (r.name, r.approval_status) for r in refs}
 
-    return InviteListResponse(
-        invites=[_build_invite_summary(inv, admin_map, referrer_map) for inv in invites],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=math.ceil(total / page_size) if total else 0,
-    )
+    items = [_build_invite_summary(inv, admin_map, referrer_map) for inv in invites]
+
+    # NOTE: Returns a plain dict (not InviteListResponse) because apply_column_filter
+    # produces partial dicts with only requested columns. FastAPI validates this dict
+    # against the annotated response model — required fields are always included so
+    # validation passes. See response_builders.apply_column_filter for details.
+    return {
+        "invites": apply_column_filter(items, columns, always_include={"id"}),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 @invite_admin_router.get("/{invite_id}")

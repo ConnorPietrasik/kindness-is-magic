@@ -13,7 +13,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -47,7 +47,7 @@ import {
 import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople, referrerReviewQueue } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload, PersonPayload, PersonSummary } from "../types";
+import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -90,7 +90,7 @@ export default function ReferrerFamilyDetail() {
             formComponent: PersonForm,
             render: (rows, callbacks, ctx) => (
               <PeopleTable
-                rows={rows as PersonSummary[]}
+                rows={rows as PersonDetail[]}
                 callbacks={callbacks}
                 lockLevel={(ctx?.parentData as FamilyDetail | undefined)?.wish_lock_level}
               />
@@ -281,7 +281,7 @@ function PeopleTable({
   callbacks,
   lockLevel,
 }: {
-  rows: PersonSummary[];
+  rows: PersonDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   lockLevel?: string;
 }) {
@@ -307,8 +307,8 @@ function PeopleTable({
           </TableHead>
           <TableBody>
             {rows.map((p) => (
-              <>
-                <Tr key={p.id} data-id={p.id}>
+              <React.Fragment key={p.id}>
+                <Tr data-id={p.id}>
                   <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>
                   <Td className="font-medium text-gray-900">{p.given_name}</Td>
                   <Td>{p.age}</Td>
@@ -362,7 +362,7 @@ function PeopleTable({
                     </Td>
                   </Tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </TableBody>
         </>

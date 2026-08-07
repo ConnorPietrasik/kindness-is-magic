@@ -12,6 +12,7 @@ const mockChildPerson: PersonDetail = {
   title: null,
   age: 8,
   note: null,
+  created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
   wishes: [
     {
@@ -49,6 +50,7 @@ const mockAdultPerson: PersonDetail = {
   title: null,
   age: 25,
   note: null,
+  created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
   wishes: [
     {

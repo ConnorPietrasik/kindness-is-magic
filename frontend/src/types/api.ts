@@ -1,12 +1,12 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
 import type {
-  FamilySummary,
-  PersonSummary,
+  FamilyDetail,
+  PersonDetail,
   PurchaserWishSummary,
+  ReferrerDetail,
   ReferrerInviteSummary,
-  ReferrerSummary,
-  UserSummary,
+  UserDetail,
   WishListSummary,
 } from "./domain";
 
@@ -20,8 +20,13 @@ export interface PaginationParams {
   page_size: number;
 }
 
+/** Query params for admin list endpoints that support column visibility. */
+export interface AdminListParams extends PaginationParams {
+  columns?: string[]; // resolved backend field names (sent as comma-separated)
+}
+
 /** Query params for the admin users list endpoint. */
-export interface AdminUsersListParams extends PaginationParams {
+export interface AdminUsersListParams extends AdminListParams {
   role?: string;
   roles?: string;
   search?: string;
@@ -33,7 +38,7 @@ export interface AdminUsersListParams extends PaginationParams {
 
 /** Mirrors ReferrerListResponse. */
 export interface ReferrerListResponse {
-  referrers: ReferrerSummary[];
+  referrers: ReferrerDetail[];
   total: number;
   page: number;
   page_size: number;
@@ -42,7 +47,7 @@ export interface ReferrerListResponse {
 
 /** Mirrors FamilyListResponse. */
 export interface FamilyListResponse {
-  families: FamilySummary[];
+  families: FamilyDetail[];
   total: number;
   page: number;
   page_size: number;
@@ -51,7 +56,7 @@ export interface FamilyListResponse {
 
 /** Mirrors PersonListResponse. */
 export interface PersonListResponse {
-  people: PersonSummary[];
+  people: PersonDetail[];
   total: number;
   page: number;
   page_size: number;
@@ -60,7 +65,7 @@ export interface PersonListResponse {
 
 /** Mirrors UserListResponse. */
 export interface UserListResponse {
-  users: UserSummary[];
+  users: UserDetail[];
   total: number;
   page: number;
   page_size: number;
@@ -76,8 +81,14 @@ export interface InviteListResponse {
   total_pages: number;
 }
 
+/** Query params for the admin invites list endpoint. */
+export interface InviteListParams extends AdminListParams {
+  redeemed?: boolean;
+  expired?: boolean;
+}
+
 /** Query params for the admin wishes list endpoint. */
-export interface AdminWishesListParams extends PaginationParams {
+export interface AdminWishesListParams extends AdminListParams {
   family_id?: number;
   person_id?: number;
   assigned_to_id?: number;

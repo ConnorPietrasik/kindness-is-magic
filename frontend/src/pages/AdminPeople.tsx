@@ -7,11 +7,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { DisplayId } from "../components/DisplayId";
@@ -24,9 +25,11 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreatePerson,
   adminDeletePerson,
@@ -41,7 +44,7 @@ import {
 import { adminDeletedPeople, adminFamilies, adminFamiliesDropdown, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { PaginationParams, PersonPayload } from "../types";
+import type { AdminListParams, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -52,8 +55,12 @@ export default function AdminPeople() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [pendingFamilyRestore, setPendingFamilyRestore] = useState<{ personId: number; familyId: number } | null>(null);
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
+  const { widthClass } = useTableWidth("adminPeople");
+
   // Build list params (no include_deleted — deleted uses separate endpoint)
-  const listParams = useMemo<PaginationParams>(() => pagination.params, [pagination.params]);
+  const listParams = useMemo<AdminListParams>(() => ({ ...pagination.params, columns: apiColumns }), [pagination.params, apiColumns]);
 
   const {
     listData,
@@ -156,11 +163,14 @@ export default function AdminPeople() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
 
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage People</h2>
-          {!isDeletedView && <Button onClick={openCreate}>+ Add Person</Button>}
+          <div className="flex items-center gap-3">
+            {!isDeletedView && <ColumnToggle resourceKey="adminPeople" />}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add Person</Button>}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -190,39 +200,58 @@ export default function AdminPeople() {
           ) : (
             <Table>
               <TableHead>
-                <Th>ID</Th>
-                <Th>Name</Th>
-                <Th>Age</Th>
-                <Th>Practical Wish</Th>
-                <Th>Fun Wish</Th>
-                <Th>Family</Th>
+                {visibleColumns.includes("display_id") && <Th>ID</Th>}
+                {visibleColumns.includes("given_name") && <Th>Name</Th>}
+                {visibleColumns.includes("age") && <Th>Age</Th>}
+                {visibleColumns.includes("wishes") && (
+                  <>
+                    <Th>Practical Wish</Th>
+                    <Th>Fun Wish</Th>
+                  </>
+                )}
+                {visibleColumns.includes("family_id") && <Th>Family</Th>}
+                {visibleColumns.includes("title") && <Th>Title</Th>}
+                {visibleColumns.includes("note") && <Th>Note</Th>}
+                {visibleColumns.includes("created_at") && <Th>Created</Th>}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
                 {people.map((p) => (
-                  <>
-                    <Tr key={p.id} data-id={p.id}>
-                      <Td className="whitespace-nowrap text-xs text-gray-400">
-                        <DisplayId displayId={p.display_id} familyId={p.family_id} />
-                      </Td>
-                      <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
-                      <Td>{p.age}</Td>
-                      {p.age >= 18 ? (
-                        <WishCellAdult wishes={p.wishes} />
-                      ) : (
-                        <>
-                          <WishCellType wishes={p.wishes} type="practical" />
-                          <WishCellType wishes={p.wishes} type="fun" />
-                        </>
+                  <React.Fragment key={p.id}>
+                    <Tr data-id={p.id}>
+                      {visibleColumns.includes("display_id") && (
+                        <Td className="whitespace-nowrap text-xs text-gray-400">
+                          <DisplayId displayId={p.display_id} familyId={p.family_id} />
+                        </Td>
                       )}
-                      <Td>
-                        <Link
-                          to={route.adminFamilyPeople(p.family_id)}
-                          className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                        >
-                          {familyMap[p.family_id] || `ID ${p.family_id}`}
-                        </Link>
-                      </Td>
+                      {visibleColumns.includes("given_name") && (
+                        <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
+                      )}
+                      {visibleColumns.includes("age") && <Td>{p.age}</Td>}
+                      {visibleColumns.includes("wishes") &&
+                        (p.age >= 18 ? (
+                          <WishCellAdult wishes={p.wishes} />
+                        ) : (
+                          <>
+                            <WishCellType wishes={p.wishes} type="practical" />
+                            <WishCellType wishes={p.wishes} type="fun" />
+                          </>
+                        ))}
+                      {visibleColumns.includes("family_id") && (
+                        <Td>
+                          <Link
+                            to={route.adminFamilyPeople(p.family_id)}
+                            className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                          >
+                            {familyMap[p.family_id] || `ID ${p.family_id}`}
+                          </Link>
+                        </Td>
+                      )}
+                      {visibleColumns.includes("title") && <Td>{p.title || "—"}</Td>}
+                      {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
+                      {visibleColumns.includes("created_at") && (
+                        <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>
+                      )}
                       <Td>
                         <div className="flex gap-2">
                           {!isDeletedView && p.deleted_at == null && (
@@ -263,7 +292,7 @@ export default function AdminPeople() {
                     </Tr>
                     {editingId === p.id && (
                       <Tr key={`${p.id}-edit`}>
-                        <Td colSpan={7} className="!py-3">
+                        <Td colSpan={visibleColumns.length + (visibleColumns.includes("wishes") ? 2 : 1)} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -286,7 +315,7 @@ export default function AdminPeople() {
                         </Td>
                       </Tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

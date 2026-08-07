@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnToggle } from "../components/ColumnToggle";
 import { DatePicker } from "../components/DatePicker";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
@@ -23,8 +24,10 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminBatchAssignWishes,
   adminGetFamiliesDropdown,
@@ -77,17 +80,22 @@ export default function AdminWishes() {
     return () => clearTimeout(timer);
   }, [searchQuery, pagination]);
 
+  // Column visibility
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminWishes");
+  const { widthClass } = useTableWidth("adminWishes");
+
   // Build list params from filters
   const listParams = useMemo<AdminWishesListParams>(
     () => ({
       ...pagination.params,
+      columns: apiColumns,
       family_id: familyFilter ?? undefined,
       person_id: undefined,
       assigned_to_id: assignedToFilter ?? undefined,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
       search: debouncedSearch || undefined,
     }),
-    [pagination.params, familyFilter, assignedToFilter, purchasedFilter, debouncedSearch]
+    [pagination.params, apiColumns, familyFilter, assignedToFilter, purchasedFilter, debouncedSearch]
   );
 
   // CRUD manager — no create/delete (wishes managed via person CRUD)
@@ -211,13 +219,16 @@ export default function AdminWishes() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Wishes</h2>
-          <Button onClick={() => setBatchAssignOpen(true)} disabled={selectedIds.size === 0 || batchAssignMut.isPending}>
-            Batch Assign ({selectedIds.size})
-          </Button>
+          <div className="flex items-center gap-3">
+            <ColumnToggle resourceKey="adminWishes" />
+            <Button onClick={() => setBatchAssignOpen(true)} disabled={selectedIds.size === 0 || batchAssignMut.isPending}>
+              Batch Assign ({selectedIds.size})
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -296,13 +307,16 @@ export default function AdminWishes() {
                   aria-label="Select all wishes on this page"
                 />
               </Th>
-              <Th>Person</Th>
-              <Th>Family</Th>
-              <Th>Type</Th>
-              <Th>Description</Th>
-              <Th>Size</Th>
-              <Th>Assigned To</Th>
-              <Th>Purchased</Th>
+              {visibleColumns.includes("person_given_name") && <Th>Person</Th>}
+              {visibleColumns.includes("family_id") && <Th>Family</Th>}
+              {visibleColumns.includes("type") && <Th>Type</Th>}
+              {visibleColumns.includes("description") && <Th>Description</Th>}
+              {visibleColumns.includes("size") && <Th>Size</Th>}
+              {visibleColumns.includes("assigned_to") && <Th>Assigned To</Th>}
+              {visibleColumns.includes("purchased_at") && <Th>Purchased</Th>}
+              {visibleColumns.includes("purchased_where") && <Th>Purchased Where</Th>}
+              {visibleColumns.includes("received_at") && <Th>Received At</Th>}
+              {visibleColumns.includes("purchaser_note") && <Th>Purchaser Note</Th>}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
@@ -318,31 +332,46 @@ export default function AdminWishes() {
                         aria-label={`Select wish for ${w.person_given_name}`}
                       />
                     </Td>
-                    <Td>
-                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                        {w.person_given_name}
-                      </Link>
-                    </Td>
-                    <Td>
-                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                        {getFamilyName(families ?? [], w.family_id)}
-                      </Link>
-                    </Td>
-                    <Td>
-                      <WishTypeBadge type={w.type} />
-                    </Td>
-                    <Td className="max-w-xs truncate">{w.description}</Td>
-                    <Td>{w.size ?? "—"}</Td>
-                    <Td>{w.assigned_to_name ?? "—"}</Td>
-                    <Td>
-                      {w.purchased_at ? (
-                        <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
-                          ✓ {formatDateTime(w.purchased_at)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </Td>
+                    {visibleColumns.includes("person_given_name") && (
+                      <Td>
+                        <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                          {w.person_given_name}
+                        </Link>
+                      </Td>
+                    )}
+                    {visibleColumns.includes("family_id") && (
+                      <Td>
+                        <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                          {getFamilyName(families ?? [], w.family_id)}
+                        </Link>
+                      </Td>
+                    )}
+                    {visibleColumns.includes("type") && (
+                      <Td>
+                        <WishTypeBadge type={w.type} />
+                      </Td>
+                    )}
+                    {visibleColumns.includes("description") && <Td className="max-w-xs truncate">{w.description}</Td>}
+                    {visibleColumns.includes("size") && <Td>{w.size ?? "—"}</Td>}
+                    {visibleColumns.includes("assigned_to") && <Td>{w.assigned_to_name ?? "—"}</Td>}
+                    {visibleColumns.includes("purchased_at") && (
+                      <Td>
+                        {w.purchased_at ? (
+                          <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
+                            ✓ {formatDateTime(w.purchased_at)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </Td>
+                    )}
+                    {visibleColumns.includes("purchased_where") && (
+                      <Td className="max-w-xs text-xs truncate">{w.purchased_where || "—"}</Td>
+                    )}
+                    {visibleColumns.includes("received_at") && (
+                      <Td className="text-xs text-gray-500">{w.received_at ? new Date(w.received_at).toLocaleDateString() : "—"}</Td>
+                    )}
+                    {visibleColumns.includes("purchaser_note") && <Td className="max-w-xs text-xs truncate">{w.purchaser_note || "—"}</Td>}
                     <Td>
                       <div className="flex gap-2">
                         <Button
@@ -391,7 +420,7 @@ export default function AdminWishes() {
                   </Tr>
                   {editingId === w.id && (
                     <Tr key={`${w.id}-edit`}>
-                      <Td colSpan={9} className="!py-3">
+                      <Td colSpan={visibleColumns.length + 2} className="!py-3">
                         <div className="rounded-xl bg-gray-50 p-4">
                           {detailLoading ? (
                             <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

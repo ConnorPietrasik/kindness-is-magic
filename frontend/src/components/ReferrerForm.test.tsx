@@ -14,6 +14,7 @@ const mockReferrerDetail: ReferrerDetail = {
   approval_status: "approved",
   approved_by_admin_name: "Admin User",
   approved_at: "2025-01-01T00:00:00Z",
+  created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
 };
 
