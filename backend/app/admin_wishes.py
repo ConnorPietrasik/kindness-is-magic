@@ -179,8 +179,6 @@ def batch_assign(
         admin.email,
         count,
         "(unassigned)" if is_unassign else body.assigned_to_id,
-        count,
-        body.assigned_to_id,
     )
     return {"assigned_count": count}
 
