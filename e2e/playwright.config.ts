@@ -43,7 +43,7 @@ export default defineConfig({
   projects: [
     {
       name: "admin",
-      testMatch: /tests\/(00-seed|admin-crud|admin-deleted-tabs|admin-fully-approve|admin-users|admin-wishes|csv-upload|display-name)\.spec\.ts/,
+      testMatch: /tests\/(00-seed|admin-crud|admin-deleted-tabs|admin-fully-approve|admin-users|admin-wishes|csv-upload)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "storage/admin.json",
@@ -84,7 +84,7 @@ export default defineConfig({
     /* Unauthenticated project for auth, invite, password-reset, wish-list, and core-flow */
     {
       name: "guest",
-      testMatch: /tests\/(auth|invite-flow|password-reset|wish-list|core-flow)\.spec\.ts/,
+      testMatch: /tests\/(auth|invite-flow|password-reset|wish-list|core-flow|role-guards)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },

@@ -89,13 +89,4 @@ test.describe("Family self-service", () => {
     await expect(page.getByRole("row").filter({ hasText: TEST_CHILD })).toBeVisible();
   });
 
-  test("family cannot access admin routes", async ({ page }) => {
-    await page.goto("/admin/referrers");
-    await expect(page).toHaveURL(/\/dashboard/);
-  });
-
-  test("family cannot access referrer routes", async ({ page }) => {
-    await page.goto("/referrer/families");
-    await expect(page).toHaveURL(/\/dashboard/);
-  });
 });

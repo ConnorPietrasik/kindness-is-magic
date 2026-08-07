@@ -90,20 +90,4 @@ test.describe("Purchaser — Assigned Gifts", () => {
     await expect(familyLink.locator("a")).toBeVisible();
   });
 
-  test("purchaser cannot access admin routes", async ({ page }) => {
-    await page.goto("/admin/wishes");
-    // Should be redirected or show access denied — ProtectedRoute redirects wrong-role users
-    // to /dashboard
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  test("purchaser cannot access referrer routes", async ({ page }) => {
-    await page.goto("/referrer/dashboard");
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  test("purchaser cannot access family routes", async ({ page }) => {
-    await page.goto("/family/dashboard");
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
 });

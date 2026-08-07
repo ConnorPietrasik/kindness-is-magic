@@ -5,9 +5,8 @@
  * Tests the Active/Deleted tab pattern for families and people,
  * including cascade delete (family delete → people appear in deleted people tab).
  *
- * Tests 1-2 use the CSV-seeded "The Lee Family" to avoid the async referrer
- * dropdown.  Test 1 deletes it and restores it at the end so test 2 starts
- * fresh.  Test 2 deletes it and leaves it restored at the end so seeded
+ * Uses the CSV-seeded "The Lee Family" for the delete/restore test to avoid
+ * the async referrer dropdown.  Leaves it restored at the end so seeded
  * data is intact for any other tests.
  */
 import { test, expect } from "@playwright/test";
@@ -22,7 +21,7 @@ async function clickAction(row: Locator, actionLabel: string) {
 const SEEDED_FAMILY = "The Lee Family";
 
 test.describe("Admin Deleted Tabs", () => {
-  test("admin deletes a family and sees it in the Deleted tab", async ({ page }) => {
+  test("admin deletes a family, sees it in Deleted tab, restores it back to Active", async ({ page }) => {
     await page.goto("/admin/families");
     await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
 
@@ -44,27 +43,6 @@ test.describe("Admin Deleted Tabs", () => {
     /* Verify the family appears in the Deleted tab with DELETED display_id */
     await expect(page.getByRole("table")).toContainText(SEEDED_FAMILY, { timeout: 10_000 });
     await expect(page.getByRole("table")).toContainText("DELETED");
-
-    /* Restore so seeded data is intact for the next test */
-    const deletedRow = page.getByRole("row").filter({ hasText: SEEDED_FAMILY });
-    await deletedRow.getByRole("button", { name: "Restore" }).click();
-    await page.getByRole("button", { name: "Yes, restore" }).click();
-  });
-
-  test("admin restores a family from the Deleted tab", async ({ page }) => {
-    await page.goto("/admin/families");
-
-    /* Delete the seeded family first so it lands in the Deleted tab (inside actions dropdown) */
-    const familyRow = page.getByRole("row").filter({ hasText: SEEDED_FAMILY });
-    await clickAction(familyRow, "Delete");
-    await page.getByRole("button", { name: "Yes, delete" }).click();
-
-    /* Wait for the delete mutation to complete before switching tabs */
-    await expect(page.getByText(SEEDED_FAMILY)).not.toBeVisible();
-
-    /* Switch to Deleted tab */
-    await page.getByRole("tab", { name: "Deleted", exact: true }).click();
-    await expect(page.getByRole("table")).toContainText(SEEDED_FAMILY, { timeout: 10_000 });
 
     /* Restore the family */
     const deletedRow = page.getByRole("row").filter({ hasText: SEEDED_FAMILY });

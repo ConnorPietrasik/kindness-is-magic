@@ -70,25 +70,3 @@ test.describe("Delivery — Packing Slips", () => {
   });
 });
 
-test.describe("Delivery — Role Isolation", () => {
-  test("cannot access admin routes", async ({ page }) => {
-    await page.goto("/admin/families");
-    // ProtectedRoute redirects wrong-role users to /dashboard
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  test("cannot access referrer routes", async ({ page }) => {
-    await page.goto("/referrer/dashboard");
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  test("cannot access family routes", async ({ page }) => {
-    await page.goto("/family/dashboard");
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  test("cannot access purchaser routes", async ({ page }) => {
-    await page.goto("/purchaser/assigned-gifts");
-    await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
-  });
-});
