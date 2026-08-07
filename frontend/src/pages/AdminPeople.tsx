@@ -60,6 +60,9 @@ export default function AdminPeople() {
   const [searchTitle, setSearchTitle] = useState("");
   const [searchNote, setSearchNote] = useState("");
   const [searchWish, setSearchWish] = useState("");
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
+  const [sortField, setSortField] = useState<string | null>(null);
 
   // Column visibility
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
@@ -70,6 +73,18 @@ export default function AdminPeople() {
   const debouncedSearchTitle = useDebouncedState(searchTitle, 1000, () => pagination.goToPage(1));
   const debouncedSearchNote = useDebouncedState(searchNote, 1000, () => pagination.goToPage(1));
   const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
+  const debouncedMinAge = useDebouncedState(minAge, 1000, () => pagination.goToPage(1));
+  const debouncedMaxAge = useDebouncedState(maxAge, 1000, () => pagination.goToPage(1));
+
+  // Cycle sort: null → "age" → "-age" → null
+  function handleSortToggle() {
+    setSortField((prev) => {
+      if (prev === null) return "age";
+      if (prev === "age") return "-age";
+      return null;
+    });
+    pagination.goToPage(1);
+  }
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminPeopleListParams>(
@@ -82,6 +97,9 @@ export default function AdminPeople() {
       search_title: debouncedSearchTitle || undefined,
       search_note: debouncedSearchNote || undefined,
       search_wish: debouncedSearchWish || undefined,
+      min_age: debouncedMinAge !== "" ? parseInt(debouncedMinAge, 10) : undefined,
+      max_age: debouncedMaxAge !== "" ? parseInt(debouncedMaxAge, 10) : undefined,
+      sort: sortField || undefined,
     }),
     [
       pagination.params,
@@ -92,6 +110,9 @@ export default function AdminPeople() {
       debouncedSearchTitle,
       debouncedSearchNote,
       debouncedSearchWish,
+      debouncedMinAge,
+      debouncedMaxAge,
+      sortField,
     ]
   );
 
@@ -235,6 +256,24 @@ export default function AdminPeople() {
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />
+            <input
+              type="number"
+              placeholder="Min age"
+              value={minAge}
+              onChange={(e) => setMinAge(e.target.value)}
+              className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+              min="0"
+            />
+            <input
+              type="number"
+              placeholder="Max age"
+              value={maxAge}
+              onChange={(e) => setMaxAge(e.target.value)}
+              className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+              min="0"
+            />
           </div>
         )}
 
@@ -273,7 +312,18 @@ export default function AdminPeople() {
                   </div>
                 </Th>
               )}
-              {visibleColumns.includes("age") && <Th>Age</Th>}
+              {visibleColumns.includes("age") && (
+                <Th>
+                  <button
+                    type="button"
+                    onClick={handleSortToggle}
+                    className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
+                  >
+                    Age
+                    <span className="text-[10px]">{sortField === "age" ? "↑" : sortField === "-age" ? "↓" : "⇅"}</span>
+                  </button>
+                </Th>
+              )}
               {visibleColumns.includes("wishes") && (
                 <Th colSpan={2}>
                   <div className="flex flex-col gap-1">

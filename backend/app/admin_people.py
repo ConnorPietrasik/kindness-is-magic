@@ -67,6 +67,8 @@ def list_people(
     search_title: str | None = Query(None),
     search_note: str | None = Query(None),
     search_wish: str | None = Query(None),
+    min_age: int | None = Query(None, ge=0),
+    max_age: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -111,6 +113,10 @@ def list_people(
         query = query.filter(Person.note.ilike(f"%{search_note}%"))
     if search_wish is not None:
         query = query.filter(Wish.description.ilike(f"%{search_wish}%"))
+    if min_age is not None:
+        query = query.filter(Person.age >= min_age)
+    if max_age is not None:
+        query = query.filter(Person.age <= max_age)
 
     # Deduplicate when wish join is active (a person with multiple wishes would
     # otherwise appear multiple times in the result set).

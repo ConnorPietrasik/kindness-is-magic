@@ -58,6 +58,8 @@ export interface AdminPeopleListParams extends AdminListParams {
   search_title?: string;
   search_note?: string;
   search_wish?: string;
+  min_age?: number;
+  max_age?: number;
 }
 
 /** Query params for the admin invites list endpoint (updated with search + sort). */
