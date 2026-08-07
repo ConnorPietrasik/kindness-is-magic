@@ -163,7 +163,7 @@ def get_users_dropdown(
     return [UserDropdownItem(id=u.id, display_name=u.display_name) for u in users]
 
 
-@user_admin_router.get("")
+@user_admin_router.get("", response_model_exclude_unset=True)
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -224,7 +224,7 @@ def list_users(
     }
 
 
-@user_admin_router.get("/deleted")
+@user_admin_router.get("/deleted", response_model_exclude_unset=True)
 def list_deleted_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),

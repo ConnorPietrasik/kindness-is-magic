@@ -50,7 +50,7 @@ def get_referrers_dropdown(
     return [ReferrerDropdownItem(id=r.id, name=r.name) for r in referrers]
 
 
-@referrer_admin_router.get("")
+@referrer_admin_router.get("", response_model_exclude_unset=True)
 def list_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -120,7 +120,7 @@ def list_referrers(
     }
 
 
-@referrer_admin_router.get("/deleted")
+@referrer_admin_router.get("/deleted", response_model_exclude_unset=True)
 def list_deleted_referrers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),

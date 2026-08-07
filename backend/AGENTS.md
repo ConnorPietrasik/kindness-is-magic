@@ -76,6 +76,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 - Keep route handlers thin. Reuse existing helpers and response builders.
 - Match existing HTTP status codes and response formats. Do not introduce new ones without discussion.
 - Do not suppress Ruff errors unless there is a documented reason.
+- Admin list endpoints support a `columns` query param for field selection. Self-service endpoints don't.
 
 ## Config
 

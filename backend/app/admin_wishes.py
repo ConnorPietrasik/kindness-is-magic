@@ -48,7 +48,7 @@ def _get_valid_wish_types_for_age(age: int) -> set[WishType]:
     return {WishType.practical, WishType.fun}
 
 
-@admin_wishes_router.get("")
+@admin_wishes_router.get("", response_model_exclude_unset=True)
 def list_wishes(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),

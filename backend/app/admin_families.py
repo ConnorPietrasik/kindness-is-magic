@@ -57,7 +57,7 @@ def get_families_dropdown(
     return [FamilyDropdownItem(id=f.id, family_name=f.family_name) for f in families]
 
 
-@family_admin_router.get("")
+@family_admin_router.get("", response_model_exclude_unset=True)
 def list_families(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -155,7 +155,7 @@ def list_families(
     }
 
 
-@family_admin_router.get("/deleted")
+@family_admin_router.get("/deleted", response_model_exclude_unset=True)
 def list_deleted_families(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),

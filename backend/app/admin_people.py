@@ -53,7 +53,7 @@ people_admin_router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-@people_admin_router.get("")
+@people_admin_router.get("", response_model_exclude_unset=True)
 def list_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -121,7 +121,7 @@ def list_people(
     }
 
 
-@people_admin_router.get("/deleted")
+@people_admin_router.get("/deleted", response_model_exclude_unset=True)
 def list_deleted_people(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
