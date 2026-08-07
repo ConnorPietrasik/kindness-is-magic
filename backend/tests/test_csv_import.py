@@ -153,6 +153,21 @@ class TestCsvImportMinimal:
         assert user.role.value == "referrer"
         assert user.referrer_id == ref.id
 
+    def test_referrers_approved_by_importing_admin(self, test_client: TestClient, admin_user, db: Session):
+        """CSV-imported referrers should be approved by the importing admin."""
+        from app.models import Referrer, ReferrerApprovalStatus
+
+        _admin_login(test_client)
+        resp = _post_csv(test_client, CSV_MINIMAL)
+        assert resp.status_code == 200
+
+        db.expire_all()
+        ref = db.query(Referrer).filter(Referrer.name == "Test Ref").first()
+        assert ref is not None
+        assert ref.approval_status == ReferrerApprovalStatus.approved
+        assert ref.approved_by_admin_id == admin_user.id
+        assert ref.approved_at is not None
+
     def test_409_duplicate_skip(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
 

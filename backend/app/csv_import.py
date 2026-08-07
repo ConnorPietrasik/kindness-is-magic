@@ -31,6 +31,8 @@ import csv
 import io
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
 import dataclasses
 
 from sqlalchemy.orm import Session
@@ -247,6 +249,7 @@ def _process_referrers(
     records: list[dict[str, str]],
     base_row: int,
     summary: ImportSummary,
+    admin_id: int | None = None,
     dry_run: bool = False,
 ) -> None:
     """Create referrers from CSV records."""
@@ -302,6 +305,8 @@ def _process_referrers(
             phone_number=phone_number,
             family_invite_code=code,
             approval_status=ReferrerApprovalStatus.approved,
+            approved_by_admin_id=admin_id,
+            approved_at=datetime.now(timezone.utc),
         )
         db.add(referrer)
         db.flush()
@@ -783,6 +788,7 @@ def _process_users(
 def import_csv(
     db: Session,
     csv_text: str,
+    admin_id: int | None = None,
     dry_run: bool = False,
 ) -> ImportSummary:
     """Parse and import a CSV string into the database.
@@ -810,7 +816,7 @@ def import_csv(
             continue
 
         if section_name == "referrers":
-            _process_referrers(db, records, row_offset + 1, summary, dry_run=dry_run)
+            _process_referrers(db, records, row_offset + 1, summary, admin_id=admin_id, dry_run=dry_run)
         elif section_name == "families":
             _process_families(db, records, row_offset + 1, summary, dry_run=dry_run)
         elif section_name == "people":
