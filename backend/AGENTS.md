@@ -14,6 +14,10 @@
 - **Python 3.11** (Docker image `python:3.11-slim`).
 - Do not upgrade dependencies unless requested.
 
+## Logging
+
+Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware logs every HTTP request with `request_id`, `user_id`, `user_email`, `method`, `path`, `status_code`, `duration_ms` and adds `X-Request-ID` to responses. A `_RequestContextFilter` auto-injects `request_id`/`user_id` into all log records during request handling. Set `LOG_LEVEL` env var to control verbosity (default `INFO`).
+
 ## Key Patterns
 
 - **Soft deletes:** All normal queries must exclude soft-deleted records (`Model.deleted_at.is_(None)`) unless the endpoint explicitly needs deleted data. Deletion sets `deleted_at` to the current timestamp (`datetime.now(timezone.utc)`) rather than removing the row. For plain Python checks (e.g. in conditionals on already-loaded objects), use `is None` / `is not None`.

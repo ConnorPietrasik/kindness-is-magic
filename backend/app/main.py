@@ -1,8 +1,10 @@
 import contextlib
+import contextvars
 import json
 import logging
 import os
 import sys
+import uuid
 from collections.abc import Generator
 from datetime import datetime, timezone
 
@@ -45,6 +47,11 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "msg": record.getMessage(),
         }
+        # Attach request context when available (from middleware)
+        for _key in ("request_id", "user_id", "user_email", "user_role", "method", "path", "status_code", "duration_ms"):
+            val = getattr(record, _key, None)
+            if val is not None:
+                payload[_key] = val
         # Attach exception info when present
         if record.exc_info and record.exc_info[0] is not None:
             payload["exc"] = self.formatException(record.exc_info)
@@ -54,6 +61,28 @@ class JsonFormatter(logging.Formatter):
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(JsonFormatter())
+
+
+class _RequestContextFilter(logging.Filter):
+    """Auto-inject request_id and user_id from context vars into every log record.
+
+    This means any logger.info() call made during request handling automatically
+    includes the correlation ID and authenticated user — no code changes needed
+    in route handlers.
+    """
+
+    name = "request_context"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Only set if not already present (middleware sets its own)
+        if not hasattr(record, "request_id"):
+            record.request_id = _request_id_ctx.get("-")
+        if not hasattr(record, "user_id"):
+            record.user_id = _user_id_ctx.get("-")
+        return True
+
+
+_handler.addFilter(_RequestContextFilter())
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     handlers=[_handler],
@@ -65,6 +94,70 @@ for _quiet in ("uvicorn.access", "watchfiles"):
 logging.getLogger("slowapi").setLevel(logging.CRITICAL)
 
 logger = logging.getLogger(__name__)
+
+# Context vars so any module can include request/user info in its logs
+_request_id_ctx = contextvars.ContextVar("request_id", default="-")
+_user_id_ctx = contextvars.ContextVar("user_id", default="-")
+
+
+# ---------------------------------------------------------------------------
+# Request logging middleware — audit trail (who, what, when)
+# ---------------------------------------------------------------------------
+
+
+async def log_request_middleware(request: Request, call_next):
+    """Log every HTTP request as a JSON line to stdout.
+
+    Captures: request_id, user_id (from JWT cookie), method, path,
+    status_code, and duration_ms. Adds X-Request-ID to every response.
+
+    No database writes — pure stdout, Docker handles rotation.
+    """
+    request_id = uuid.uuid4().hex[:16]
+    token = _request_id_ctx.set(request_id)
+
+    # Extract user from JWT cookie (no DB hit)
+    user_id = "-"
+    user_email = "-"
+    user_role = "-"
+    access_token = request.cookies.get("access_token")
+    if access_token:
+        try:
+            from app.auth import decode_access_token
+
+            payload = decode_access_token(access_token)
+            user_id = payload.get("sub", "-") or "-"
+            user_email = payload.get("email", "-") or "-"
+            user_role = payload.get("role", "-") or "-"
+            _user_id_ctx.set(str(user_id))
+        except Exception:
+            pass  # token invalid; log as anonymous
+
+    start = datetime.now(timezone.utc)
+    try:
+        response = await call_next(request)
+    finally:
+        _request_id_ctx.reset(token)
+
+    duration_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    response.headers["X-Request-ID"] = request_id
+
+    log_level = logging.ERROR if response.status_code >= 500 else logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(
+        log_level,
+        "Request",
+        extra={
+            "request_id": request_id,
+            "user_id": user_id,
+            "user_email": user_email,
+            "user_role": user_role,
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": round(duration_ms, 1),
+        },
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +213,9 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Register request logging middleware (wraps all routes)
+app.middleware("http")(log_request_middleware)
 
 # ---------------------------------------------------------------------------
 # Rate limiting
