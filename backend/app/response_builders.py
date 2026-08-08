@@ -318,6 +318,33 @@ def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, li
     return result
 
 
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+
+MAX_FAMILY_PERSONS = 10
+"""Maximum number of active persons a family can have (non-admin creation)."""
+
+
+def check_family_person_cap(db: Session, family_id: int) -> None:
+    """Raise 400 if the family has reached the person cap.
+
+    Only active (non-deleted) persons are counted.  Admin routes bypass
+    this check — call it only from self-service / referrer endpoints.
+    """
+    current_count = db.query(Person).filter(Person.family_id == family_id, Person.deleted_at.is_(None)).count()
+    if current_count >= MAX_FAMILY_PERSONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Family person limit of {MAX_FAMILY_PERSONS} reached",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Person creation
+# ---------------------------------------------------------------------------
+
+
 def create_person_with_wishes(
     db: Session,
     family_id: int,

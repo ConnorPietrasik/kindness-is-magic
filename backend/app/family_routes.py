@@ -15,6 +15,7 @@ from app.response_builders import (
     batch_load_person_wishes,
     build_family_detail,
     build_person_detail,
+    check_family_person_cap,
     compute_display_ids,
     create_person_with_wishes,
     get_active_or_404,
@@ -180,6 +181,7 @@ def create_person(
     family_id = user.family_id
     fam = get_active_or_404(db, Family, family_id, "Family record not found")
     _check_family_edit_lock(fam)
+    check_family_person_cap(db, family_id)
 
     per = create_person_with_wishes(
         db,

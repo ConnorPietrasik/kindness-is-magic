@@ -28,6 +28,7 @@ from app.response_builders import (
     build_family_review_summary,
     build_person_detail,
     build_referrer_detail,
+    check_family_person_cap,
     compute_display_ids,
     create_person_with_wishes,
     get_or_404,
@@ -525,6 +526,7 @@ def create_family_person(
     db: Session = Depends(get_db),
 ) -> PersonDetail:
     _check_referrer_edit_lock(owner.family)
+    check_family_person_cap(db, fid)
     per = create_person_with_wishes(
         db,
         family_id=fid,
