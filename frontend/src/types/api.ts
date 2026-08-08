@@ -48,6 +48,8 @@ export interface AdminFamiliesListParams extends AdminListParams {
   search_wish?: string;
   approval_status?: string;
   wish_lock_level?: string;
+  min_person_count?: number;
+  max_person_count?: number;
 }
 
 /** Query params for the admin people list endpoint. */

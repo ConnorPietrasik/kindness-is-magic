@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Type, TypeVar, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, func
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from datetime import datetime, timezone
@@ -72,6 +72,12 @@ def build_sort_clause(
 # Sort-field registries (module-level so they aren't rebuilt per request)
 # ---------------------------------------------------------------------------
 
+# Reusable correlated subquery: count of active persons per family.
+# Used by both FAMILY_SORT_FIELDS and filter logic in admin_families.py.
+FAMILY_PERSON_COUNT = (
+    select(func.count(Person.id)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
+)
+
 FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "family_name": Family.family_name,
     "id": Family.id,
@@ -79,6 +85,7 @@ FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "approval_status": Family.approval_status,
     "wish_lock_level": Family.wish_lock_level,
     "referrer_id": func.coalesce(Family.referrer_id, 0),
+    "person_count": FAMILY_PERSON_COUNT,
 }
 
 INVITE_SORT_FIELDS: dict[str, ColumnElement] = {

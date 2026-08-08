@@ -23,6 +23,7 @@ from app.response_builders import (
     build_sort_clause,
     ColumnRequest,
     compute_display_ids,
+    FAMILY_PERSON_COUNT,
     FAMILY_SORT_FIELDS,
     get_active_or_404,
     get_or_404,
@@ -73,6 +74,8 @@ def list_families(
     search_wish: str | None = Query(None),
     approval_status: str | None = Query(None),
     wish_lock_level: str | None = Query(None),
+    min_person_count: int | None = Query(None, ge=0),
+    max_person_count: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -121,6 +124,11 @@ def list_families(
 
     if wish_lock_level is not None:
         query = query.filter(Family.wish_lock_level == wish_lock_level)
+
+    if min_person_count is not None:
+        query = query.filter(FAMILY_PERSON_COUNT >= min_person_count)
+    if max_person_count is not None:
+        query = query.filter(FAMILY_PERSON_COUNT <= max_person_count)
 
     total = query.count()
     offset = (page - 1) * page_size

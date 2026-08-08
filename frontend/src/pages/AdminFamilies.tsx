@@ -88,6 +88,9 @@ export default function AdminFamilies() {
   const [searchContact, setSearchContact] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [searchWish, setSearchWish] = useState("");
+  const [minPersonCount, setMinPersonCount] = useState("");
+  const [maxPersonCount, setMaxPersonCount] = useState("");
+  const [sortField, setSortField] = useState<string | null>(null);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
@@ -100,6 +103,18 @@ export default function AdminFamilies() {
   const debouncedSearchContact = useDebouncedState(searchContact, 1000, () => pagination.goToPage(1));
   const debouncedSearchPhone = useDebouncedState(searchPhone, 1000, () => pagination.goToPage(1));
   const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
+  const debouncedMinPersonCount = useDebouncedState(minPersonCount, 1000, () => pagination.goToPage(1));
+  const debouncedMaxPersonCount = useDebouncedState(maxPersonCount, 1000, () => pagination.goToPage(1));
+
+  // Cycle sort: null → "person_count" → "-person_count" → null
+  function handleSortToggle() {
+    setSortField((prev) => {
+      if (prev === null) return "person_count";
+      if (prev === "person_count") return "-person_count";
+      return null;
+    });
+    pagination.goToPage(1);
+  }
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminFamiliesListParams>(
@@ -113,6 +128,9 @@ export default function AdminFamilies() {
       search_wish: debouncedSearchWish || undefined,
       approval_status: approvalFilter || undefined,
       wish_lock_level: lockLevelFilter || undefined,
+      min_person_count: debouncedMinPersonCount !== "" ? parseInt(debouncedMinPersonCount, 10) : undefined,
+      max_person_count: debouncedMaxPersonCount !== "" ? parseInt(debouncedMaxPersonCount, 10) : undefined,
+      sort: sortField || undefined,
     }),
     [
       pagination.params,
@@ -122,8 +140,11 @@ export default function AdminFamilies() {
       debouncedSearchContact,
       debouncedSearchPhone,
       debouncedSearchWish,
+      debouncedMinPersonCount,
+      debouncedMaxPersonCount,
       approvalFilter,
       lockLevelFilter,
+      sortField,
     ]
   );
 
@@ -285,6 +306,28 @@ export default function AdminFamilies() {
               <option value="referrer">Referrer</option>
               <option value="admin">Admin</option>
             </select>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                placeholder="Min"
+                value={minPersonCount}
+                onChange={(e) => setMinPersonCount(e.target.value)}
+                className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                autoComplete="off"
+              />
+              <span className="text-xs text-gray-400">—</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="Max"
+                value={maxPersonCount}
+                onChange={(e) => setMaxPersonCount(e.target.value)}
+                className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                autoComplete="off"
+              />
+              <span className="text-xs text-gray-500">people</span>
+            </div>
             <input
               type="text"
               placeholder="Search all fields…"
@@ -381,7 +424,18 @@ export default function AdminFamilies() {
                   </div>
                 </Th>
               )}
-              {visibleColumns.includes("person_count") && <Th>Person Count</Th>}
+              {visibleColumns.includes("person_count") && (
+                <Th>
+                  <button
+                    type="button"
+                    onClick={handleSortToggle}
+                    className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
+                  >
+                    Person Count
+                    <span className="text-[10px]">{sortField === "person_count" ? "↑" : sortField === "-person_count" ? "↓" : "⇅"}</span>
+                  </button>
+                </Th>
+              )}
               {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
               {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
               {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
