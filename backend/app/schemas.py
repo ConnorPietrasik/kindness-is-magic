@@ -1060,6 +1060,38 @@ class UserListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Public families list schemas
+# ---------------------------------------------------------------------------
+
+
+class PublicFamilySummary(BaseModel):
+    """Minimal family info for the public browse page.
+
+    Excludes all PII (family_name, contact_name, phone_number, address).
+    Only ``display_id`` is exposed so donors can identify the family anonymously.
+    """
+
+    id: int
+    display_id: str
+    bio: str | None = None
+    person_count: int
+    min_age: int | None = None
+    max_age: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class PublicFamilyListResponse(BaseModel):
+    """Paginated public families list response."""
+
+    families: list[PublicFamilySummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 12
+    total_pages: int = 0
+
+
+# ---------------------------------------------------------------------------
 # Public wish-list schemas
 # ---------------------------------------------------------------------------
 

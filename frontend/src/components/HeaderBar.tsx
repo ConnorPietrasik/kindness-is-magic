@@ -4,17 +4,21 @@ import { ROUTES } from "../lib/routes";
 
 interface HeaderBarProps {
   title: string;
+  titleTo?: string;
   left?: ReactNode;
   right?: ReactNode;
 }
 
 /**
  * HeaderBar — purple gradient top bar with title and optional actions.
+ *
+ * @param titleTo  Where the centred title links to (default: dashboard).
+ *                 Pass a public route on unauthenticated pages.
  */
-export const HeaderBar = memo(({ title, left, right }: HeaderBarProps) => (
+export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, left, right }: HeaderBarProps) => (
   <header className="relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6">
     <div className="z-10">{left}</div>
-    <Link to={ROUTES.DASHBOARD} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
+    <Link to={titleTo} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
       {title}
     </Link>
     <div className="z-10">{right}</div>

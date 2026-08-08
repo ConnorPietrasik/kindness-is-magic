@@ -38,6 +38,7 @@ import type {
   PersonDetail,
   PersonListResponse,
   PersonPayload,
+  PublicFamilyListResponse,
   PurchaserWishListResponse,
   PurchaserWishUpdate,
   ReferrerDetail,
@@ -575,6 +576,25 @@ export function referrerApproveWishes(id: number): Promise<FamilyDetail> {
 
 export function referrerRejectWishes(id: number, reason: string): Promise<FamilyDetail> {
   return apiPost(`/api/referrer/families/${id}/reject-wishes`, { reason });
+}
+
+// ---------------------------------------------------------------------------
+// Public — Families (donor browse)
+// ---------------------------------------------------------------------------
+
+export interface PublicFamiliesListParams {
+  page?: number;
+  page_size?: number;
+  min_person_count?: number;
+  max_person_count?: number;
+  min_age?: number;
+  max_age?: number;
+  sort?: string;
+}
+
+/** Public: list all fully-approved families for donor browsing (no auth required). */
+export function listPublicFamilies(params?: PublicFamiliesListParams): Promise<PublicFamilyListResponse> {
+  return apiGet("/api/families", params);
 }
 
 // ---------------------------------------------------------------------------

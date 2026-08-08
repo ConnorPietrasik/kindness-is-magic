@@ -154,6 +154,13 @@ export const adminReviewQueue = ["adminReviewQueue"] as const;
 export const adminPackingSlips = ["adminPackingSlips"] as const;
 
 // ---------------------------------------------------------------------------
+// Public — Families (donor browse)
+// ---------------------------------------------------------------------------
+
+/** Public families list for donor browsing */
+export const publicFamilies = ["publicFamilies"] as const;
+
+// ---------------------------------------------------------------------------
 // Public — Wish List
 // ---------------------------------------------------------------------------
 

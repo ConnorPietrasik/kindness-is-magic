@@ -72,10 +72,18 @@ def build_sort_clause(
 # Sort-field registries (module-level so they aren't rebuilt per request)
 # ---------------------------------------------------------------------------
 
-# Reusable correlated subquery: count of active persons per family.
-# Used by both FAMILY_SORT_FIELDS and filter logic in admin_families.py.
+# Reusable correlated subqueries: aggregate stats over active persons per family.
+# Used by sort registries, filter logic, and public family list endpoint.
 FAMILY_PERSON_COUNT = (
     select(func.count(Person.id)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
+)
+
+FAMILY_MIN_AGE = (
+    select(func.min(Person.age)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
+)
+
+FAMILY_MAX_AGE = (
+    select(func.max(Person.age)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
 )
 
 FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
@@ -125,6 +133,12 @@ WISH_SORT_FIELDS: dict[str, ColumnElement] = {
     "id": Wish.id,
     "purchased_at": Wish.purchased_at,
     "created_at": Wish.created_at,
+}
+
+PUBLIC_FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
+    "person_count": FAMILY_PERSON_COUNT,
+    "min_age": FAMILY_MIN_AGE,
+    "max_age": FAMILY_MAX_AGE,
 }
 
 

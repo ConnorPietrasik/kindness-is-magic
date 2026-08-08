@@ -47,6 +47,7 @@ export const ROUTES = {
   DELIVERY_PACKING_SLIPS: "/delivery/packing-slips",
 
   // ── Public ────────────────────────────────────────────────
+  PUBLIC_FAMILIES: "/families",
   FAMILY_WISH_LIST: "/families/:id/wish-list",
 
   // ── Root ──────────────────────────────────────────────────

@@ -402,6 +402,29 @@ export interface FamilyReviewQueueItem {
 }
 
 // ---------------------------------------------------------------------------
+// Public Families (donor browse)
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend PublicFamilySummary — compact family card for the browse page. */
+export interface PublicFamilySummary {
+  id: number;
+  display_id: string;
+  bio: string | null;
+  person_count: number;
+  min_age: number | null;
+  max_age: number | null;
+}
+
+/** Mirrors backend PublicFamilyListResponse — paginated public families list. */
+export interface PublicFamilyListResponse {
+  families: PublicFamilySummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// ---------------------------------------------------------------------------
 // Family Wish List (public page)
 // ---------------------------------------------------------------------------
 

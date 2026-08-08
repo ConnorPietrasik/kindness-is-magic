@@ -36,6 +36,7 @@ const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => i
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
+const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -64,7 +65,7 @@ function DashboardRedirect() {
     return <Navigate to={ROUTES.DELIVERY_DASHBOARD} replace />;
   }
 
-  return <Navigate to={ROUTES.LOGIN} replace />;
+  return <Navigate to={ROUTES.PUBLIC_FAMILIES} replace />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -306,6 +307,7 @@ export default function App() {
         />
 
         {/* ── Public (no auth required) ─────────────────────────── */}
+        <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
         <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
 
         {/* ── Catch-all: redirect root to login or dashboard ────── */}

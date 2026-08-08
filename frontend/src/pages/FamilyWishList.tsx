@@ -32,7 +32,16 @@ export default function FamilyWishList() {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" left={<BackToHome />} />
+        <HeaderBar
+          title="Kindness is Magic"
+          titleTo={ROUTES.PUBLIC_FAMILIES}
+          left={<BackToHome />}
+          right={
+            <Link to={ROUTES.LOGIN} className="text-sm text-white/80 transition-colors hover:text-white">
+              Sign in
+            </Link>
+          }
+        />
         <main className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6">
           <h2 className="mb-2 text-xl font-bold text-gray-900">Family Not Found</h2>
           <p className="text-gray-500">This wish list doesn't exist or has been removed.</p>
@@ -46,7 +55,16 @@ export default function FamilyWishList() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackToHome />} />
+      <HeaderBar
+        title="Kindness is Magic"
+        titleTo={ROUTES.PUBLIC_FAMILIES}
+        left={<BackToHome />}
+        right={
+          <Link to={ROUTES.LOGIN} className="text-sm text-white/80 transition-colors hover:text-white">
+            Sign in
+          </Link>
+        }
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* Family header */}

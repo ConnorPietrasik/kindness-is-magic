@@ -100,6 +100,11 @@ export default function Login() {
             Family signup
           </Link>
         </p>
+        <p className="mt-4 text-center text-sm">
+          <Link to={ROUTES.PUBLIC_FAMILIES} className="text-gray-500 hover:underline">
+            ← Browse families
+          </Link>
+        </p>
       </div>
     </div>
   );

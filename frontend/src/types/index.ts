@@ -50,6 +50,8 @@ export type {
   PersonDetail,
   PersonPayload,
   PersonWishItem,
+  PublicFamilyListResponse,
+  PublicFamilySummary,
   PurchaserWishSummary,
   PurchaserWishUpdate,
   ReferrerApprovalStatus,
