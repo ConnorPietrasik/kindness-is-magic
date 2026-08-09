@@ -22,9 +22,11 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-      // Families skip the main dashboard and go straight to their role dashboard
+      // Families and donors skip the main dashboard and go straight to their role dashboard
       if (user.role === "family") {
         navigate(ROUTES.FAMILY_DASHBOARD, { replace: true });
+      } else if (user.role === "donor") {
+        navigate(ROUTES.DONOR_DASHBOARD, { replace: true });
       } else {
         navigate(from, { replace: true });
       }
@@ -98,6 +100,11 @@ export default function Login() {
         <p className="mt-2 text-center text-sm">
           <Link to={ROUTES.FAMILY_SELF_REGISTER} className="text-btn-start hover:underline">
             Family signup
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-sm">
+          <Link to={ROUTES.DONOR_SELF_REGISTER} className="text-btn-start hover:underline">
+            Register to claim a family
           </Link>
         </p>
         <p className="mt-4 text-center text-sm">

@@ -193,3 +193,19 @@ export const purchaserWishDetail = (id: number) => ["purchaserWishes", id] as co
 export const deliveryFamilies = ["deliveryFamilies"] as const;
 /** Packing slips for the delivery person's assigned families */
 export const deliveryPackingSlips = ["deliveryPackingSlips"] as const;
+
+// ---------------------------------------------------------------------------
+// Donor — Self
+// ---------------------------------------------------------------------------
+
+/** Current donor user profile */
+export const donorMe = ["donorMe"] as const;
+
+// ---------------------------------------------------------------------------
+// Donor — Claims
+// ---------------------------------------------------------------------------
+
+/** Donor's claims list */
+export const donorClaims = ["donorClaims"] as const;
+/** Single claim detail (pass id at call site) */
+export const donorClaim = (id: number) => ["donorClaim", id] as const;

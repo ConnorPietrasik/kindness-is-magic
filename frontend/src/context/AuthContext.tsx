@@ -105,6 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isAdmin = user?.role === "admin";
   const isReferrer = user?.role === "referrer";
   const isFamily = user?.role === "family";
+  const isClaimCapable = user ? ["admin", "referrer", "purchaser", "donor"].includes(user.role) : false;
 
   return (
     <AuthContext.Provider
@@ -118,6 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAdmin,
         isReferrer,
         isFamily,
+        isClaimCapable,
       }}
     >
       {children}

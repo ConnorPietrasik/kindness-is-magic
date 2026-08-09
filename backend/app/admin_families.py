@@ -12,7 +12,16 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, User, UserRole, WishLockLevel
+from app.models import (
+    Family,
+    FamilyApprovalStatus,
+    FamilyClaim,
+    Person,
+    Referrer,
+    User,
+    UserRole,
+    WishLockLevel,
+)
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
@@ -162,6 +171,27 @@ def list_families(
             for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
                 delivery_user_map[u.id] = u.display_name
 
+    # Claim info for admin families table
+    claim_map: dict[int, FamilyClaim] = {}
+    if cols.needs("claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"):
+        family_ids = [f.id for f in families]
+        if family_ids:
+            claims = (
+                db.query(FamilyClaim)
+                .filter(
+                    FamilyClaim.family_id.in_(family_ids),
+                    FamilyClaim.deleted_at.is_(None),
+                )
+                .all()
+            )
+            claim_map = {c.family_id: c for c in claims}
+            # Resolve donor names
+            donor_ids = {c.donor_user_id for c in claims}
+            donor_map: dict[int, str] = {}
+            if donor_ids:
+                for u in db.query(User).filter(User.id.in_(donor_ids), User.deleted_at.is_(None)).all():
+                    donor_map[u.id] = u.display_name
+
     items = [
         FamilyDetail(
             id=f.id,
@@ -186,6 +216,12 @@ def list_families(
             wish_review_requested_at=f.wish_review_requested_at,
             wish_rejection_reason=f.wish_rejection_reason,
             referrer_notes=f.referrer_notes,
+            claim_status=(
+                "fulfilled" if f.id in claim_map and claim_map[f.id].fulfilled_at is not None else "active" if f.id in claim_map else None
+            ),
+            claim_commitment_type=claim_map[f.id].commitment_type.value if f.id in claim_map else None,
+            claim_donor_name=donor_map.get(claim_map[f.id].donor_user_id) if f.id in claim_map else None,
+            claim_id=claim_map[f.id].id if f.id in claim_map else None,
         )
         for f in families
     ]

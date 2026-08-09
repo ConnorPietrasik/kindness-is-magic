@@ -52,8 +52,10 @@ test.describe("Admin Referrers", () => {
     await page.getByLabel("Family Limit").fill("5");
     await page.getByLabel("Phone Number").fill("5559990000");
 
-    /* Submit */
+    /* Submit — wait for the form to close so we know the mutation finished
+       and the table has refreshed with the new row. */
     await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByLabel("Name")).not.toBeVisible({ timeout: 15_000 });
 
     /* Verify it appears in the table (may need to paginate) */
     const referrerRow = await findRowInTable(page, TEST_REFERRER);

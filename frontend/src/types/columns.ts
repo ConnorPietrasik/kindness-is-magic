@@ -23,7 +23,8 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "family_wish", label: "Family Wish", visible: true },
     { key: "contact_name", label: "Contact", visible: true },
     { key: "referrer_id", label: "Referrer", visible: true },
-    { key: "delivery", label: "Delivery", visible: true },
+    { key: "delivery", label: "Delivery", visible: false },
+    { key: "claim", label: "Claim", visible: false },
     { key: "phone_number", label: "Phone", visible: false },
     { key: "person_count", label: "Person Count", visible: false },
     { key: "approval_status", label: "Approval", visible: false },
@@ -79,6 +80,7 @@ export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   linked_to: ["referrer_name", "family_name"],
   referrer_id: ["referrer_id", "referrer_name"],
   delivery: ["delivery_user_id", "delivery_user_name"],
+  claim: ["claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"],
   assigned_to: ["assigned_to_id", "assigned_to_name"],
   redeemed: ["redeemed", "redeemed_by_referrer_name"],
 };

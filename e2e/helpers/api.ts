@@ -481,6 +481,42 @@ export async function createReferrerWithUserAndCredentials(
  *
  * Returns all created IDs for cleanup.
  */
+/**
+ * Create a donor user via the admin API.
+ *
+ * Returns { userId, email, password }.
+ */
+export async function createDonorWithUser(
+  request: APIRequestContext,
+  data: {
+    email: string;
+    password: string;
+    displayName?: string;
+  },
+): Promise<{ userId: number; email: string; password: string }> {
+  const userResp = await request.post("/api/admin/users", {
+    data: {
+      email: data.email,
+      password: data.password,
+      role: "donor",
+      display_name: data.displayName,
+    },
+  });
+  if (!userResp.ok()) {
+    const body = await userResp.text();
+    throw new Error(`createDonorWithUser: user creation failed (${userResp.status()}): ${body}`);
+  }
+  const userData = (await userResp.json()) as { id: number };
+
+  return { userId: userData.id, email: data.email, password: data.password };
+}
+
+/**
+ * Create a complete isolated test scenario: referrer → family → person with wishes.
+ * All entities use unique names so parallel test workers don't collide.
+ *
+ * Returns all created IDs for cleanup.
+ */
 export async function createIsolatedFamilyScenario(
   request: APIRequestContext,
   suffix: string,

@@ -19,6 +19,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 4,
     min_age: 5,
     max_age: 14,
+    claimed_by_current_user: false,
   },
   {
     id: 2,
@@ -27,6 +28,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 30,
     max_age: 35,
+    claimed_by_current_user: false,
   },
   {
     id: 3,
@@ -35,6 +37,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 8,
     max_age: 8,
+    claimed_by_current_user: false,
   },
 ];
 
@@ -119,6 +122,7 @@ describe("PublicFamilies", () => {
       person_count: 1,
       min_age: 5,
       max_age: 14,
+      claimed_by_current_user: false,
     };
     const singleMemberResponse = {
       ...mockResponse,

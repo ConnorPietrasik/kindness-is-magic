@@ -12,6 +12,7 @@ export const ROUTES = {
   RESET_PASSWORD: "/reset-password/:token",
   REFERRER_SELF_REGISTER: "/register-referrer",
   FAMILY_SELF_REGISTER: "/register-family",
+  DONOR_SELF_REGISTER: "/register-donor",
 
   // ── Dashboard (all authenticated roles) ────────────────────
   DASHBOARD: "/dashboard",
@@ -46,6 +47,11 @@ export const ROUTES = {
   DELIVERY_DASHBOARD: "/delivery",
   DELIVERY_PACKING_SLIPS: "/delivery/packing-slips",
 
+  // ── Donor self-service ───────────────────────────────────
+  DONOR_DASHBOARD: "/donor/dashboard",
+  DONOR_CLAIMS: "/donor/claims",
+  DONOR_CLAIM_DETAIL: "/donor/claims/:id",
+
   // ── Public ────────────────────────────────────────────────
   PUBLIC_FAMILIES: "/families",
   FAMILY_WISH_LIST: "/families/:id/wish-list",
@@ -66,4 +72,5 @@ export const route = {
   familyWishList: (id: number | string) => `/families/${id}/wish-list`,
   adminPackingSlips: (familyIds?: number[]) =>
     familyIds && familyIds.length > 0 ? `/admin/packing-slips?family_ids=${familyIds.join(",")}` : "/admin/packing-slips",
+  donorClaimDetail: (id: number | string) => `/donor/claims/${id}`,
 };

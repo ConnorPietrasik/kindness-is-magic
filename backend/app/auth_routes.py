@@ -54,6 +54,8 @@ from app.schemas import (
     FamilySelfRegisterResponse,
     FamilySummary,
     UpdateProfile,
+    DonorSelfRegister,
+    DonorSelfRegisterResponse,
 )
 from app.rate_limit import limiter
 
@@ -647,3 +649,45 @@ async def register_family(
             wish_rejection_reason=family.wish_rejection_reason,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Register donor (public, open — no invite code required)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/register-donor",
+    response_model=DonorSelfRegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_donor(
+    data: DonorSelfRegister,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Public self-registration: create a donor user (no approval gate)."""
+    # 1. Check for duplicate email
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    # 2. Create user
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        role=UserRole.donor,
+        display_name=data.display_name,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # 3. Issue auth cookies (auto-login)
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info("Donor self-registered: %s", data.email)
+
+    return DonorSelfRegisterResponse(user=UserResponse.model_validate(user))

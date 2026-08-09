@@ -409,6 +409,7 @@ export default function AdminFamilies() {
               )}
               {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
               {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
+              {visibleColumns.includes("claim") && <Th>Claim</Th>}
               {visibleColumns.includes("phone_number") && (
                 <Th>
                   <div className="flex flex-col gap-1">
@@ -499,6 +500,20 @@ export default function AdminFamilies() {
                       )}
                       {visibleColumns.includes("delivery") && (
                         <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
+                      )}
+                      {visibleColumns.includes("claim") && (
+                        <Td>
+                          {f.claim_status != null ? (
+                            <ClaimBadge
+                              status={f.claim_status}
+                              commitmentType={f.claim_commitment_type ?? ""}
+                              donorName={f.claim_donor_name ?? undefined}
+                              claimId={f.claim_id ?? undefined}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </Td>
                       )}
                       {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
                       {visibleColumns.includes("person_count") && <Td>{f.person_count ?? 0}</Td>}
@@ -742,5 +757,43 @@ export default function AdminFamilies() {
         />
       </main>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Claim Badge (admin families table)                                 */
+/* ------------------------------------------------------------------ */
+
+interface ClaimBadgeProps {
+  status: string;
+  commitmentType: string;
+  donorName?: string;
+  claimId?: number;
+}
+
+function ClaimBadge({ status, commitmentType, donorName, claimId }: ClaimBadgeProps) {
+  const colorMap: Record<string, string> = {
+    active: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    fulfilled: "bg-gray-100 text-gray-600 border-gray-200",
+  };
+  const cls = colorMap[status] ?? "bg-blue-100 text-blue-800 border-blue-200";
+
+  if (claimId != null) {
+    return (
+      <Link
+        to={route.donorClaimDetail(claimId)}
+        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${cls} cursor-pointer transition-colors hover:opacity-80`}
+      >
+        {status} — {commitmentType}
+        {donorName && <span className="text-[11px] opacity-75">({donorName})</span>}
+      </Link>
+    );
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${cls}`}>
+      {status} — {commitmentType}
+      {donorName && <span className="text-[11px] opacity-75">({donorName})</span>}
+    </span>
   );
 }

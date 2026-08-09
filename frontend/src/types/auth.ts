@@ -12,4 +12,5 @@ export interface AuthContextValue {
   isAdmin: boolean;
   isReferrer: boolean;
   isFamily: boolean;
+  isClaimCapable: boolean;
 }

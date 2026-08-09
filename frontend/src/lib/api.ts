@@ -19,7 +19,14 @@ import type {
   AdminUserUpdate,
   AdminWishesListParams,
   AdminWishUpdate,
+  CommitmentType,
   DeliveryFamilySummary,
+  DonorSelfRegisterPayload,
+  DonorSelfRegisterResponse,
+  DonorWishPurchaseMark,
+  FamilyClaimDetail,
+  FamilyClaimSummary,
+  FamilyClaimUpdate,
   FamilyDetail,
   FamilyDropdownItem,
   FamilyListResponse,
@@ -60,6 +67,7 @@ import type {
   WishDetail,
   WishListResponse,
   WishPurchaseMark,
+  WishSummary,
 } from "../types";
 import { normalizePayload } from "./utils";
 
@@ -604,6 +612,67 @@ export function listPublicFamilies(params?: PublicFamiliesListParams): Promise<P
 /** Public: fetch the wish list for a family by ID (no auth required). */
 export function getFamilyWishList(familyId: number): Promise<FamilyWishListResponse> {
   return apiGet(`/api/families/${familyId}/wish-list`);
+}
+
+/** Claim a family (authenticated claim-capable user). */
+export function claimFamily(familyId: number, commitmentType: CommitmentType): Promise<FamilyClaimSummary> {
+  return apiPost(`/api/families/${familyId}/claim`, { commitment_type: commitmentType });
+}
+
+// ---------------------------------------------------------------------------
+// Donor — Self-Registration
+// ---------------------------------------------------------------------------
+
+/** Public: open donor self-registration (auto-logs in). */
+export function registerDonor(data: DonorSelfRegisterPayload): Promise<DonorSelfRegisterResponse> {
+  return apiPost("/api/auth/register-donor", data);
+}
+
+// ---------------------------------------------------------------------------
+// Donor — Profile
+// ---------------------------------------------------------------------------
+
+export interface DonorClaimsListParams {
+  fulfilled?: boolean;
+}
+
+/** Get current user profile (claim-capable roles). */
+export function donorGetMe(): Promise<User> {
+  return apiGet("/api/donor/me");
+}
+
+// ---------------------------------------------------------------------------
+// Donor — Claims
+// ---------------------------------------------------------------------------
+
+/** List current user's claims. */
+export function donorListClaims(params?: DonorClaimsListParams): Promise<FamilyClaimSummary[]> {
+  return apiGet("/api/donor/claims", params);
+}
+
+/** Get claim detail with wish list. */
+export function donorGetClaim(claimId: number): Promise<FamilyClaimDetail> {
+  return apiGet(`/api/donor/claims/${claimId}`);
+}
+
+/** Update claim (commitment_type, notes). */
+export function donorUpdateClaim(claimId: number, payload: FamilyClaimUpdate): Promise<FamilyClaimSummary> {
+  return apiPatch(`/api/donor/claims/${claimId}`, payload);
+}
+
+/** Cancel (soft-delete) a claim. */
+export function donorCancelClaim(claimId: number): Promise<void> {
+  return apiDelete(`/api/donor/claims/${claimId}`);
+}
+
+/** Mark a wish as purchased (donor — no received_at). */
+export function donorMarkWishPurchased(claimId: number, wishId: number, payload: DonorWishPurchaseMark): Promise<WishSummary> {
+  return apiPost(`/api/donor/claims/${claimId}/wishes/${wishId}/mark-purchased`, payload);
+}
+
+/** Admin: fulfill a claim. */
+export function donorFulfillClaim(claimId: number): Promise<FamilyClaimSummary> {
+  return apiPost(`/api/donor/claims/${claimId}/fulfill`);
 }
 
 // ---------------------------------------------------------------------------

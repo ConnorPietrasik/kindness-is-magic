@@ -288,7 +288,14 @@ function FamilyCard({ family }: { family: PublicFamilySummary }) {
   return (
     <Link to={route.familyWishList(family.id)}>
       <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-        <div className="mb-2 text-xl font-bold tracking-tight text-gray-900">{family.display_id}</div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-xl font-bold tracking-tight text-gray-900">{family.display_id}</span>
+          {family.claimed_by_current_user && (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+              Claimed
+            </span>
+          )}
+        </div>
 
         {family.bio && <p className="mb-3 line-clamp-2 text-sm text-gray-600">{family.bio}</p>}
 

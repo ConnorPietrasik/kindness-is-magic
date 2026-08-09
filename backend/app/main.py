@@ -349,6 +349,13 @@ from app.delivery_routes import delivery_router  # noqa: E402
 
 app.include_router(delivery_router)
 
+# ---------------------------------------------------------------------------
+# Include donor / claim-capable routes
+# ---------------------------------------------------------------------------
+from app.donor_routes import router as donor_router  # noqa: E402
+
+app.include_router(donor_router)
+
 
 # ---------------------------------------------------------------------------
 # Existing routes

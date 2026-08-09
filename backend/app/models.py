@@ -29,6 +29,7 @@ class UserRole(str, enum.Enum):
     family = "family"
     purchaser = "purchaser"
     delivery = "delivery"
+    donor = "donor"
 
 
 class User(Base):
@@ -372,3 +373,52 @@ class EmailPreference(Base):
 
     email: Mapped[str] = mapped_column(String(120), primary_key=True, index=True)
     unsubscribed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Donor claims
+# ---------------------------------------------------------------------------
+
+
+class CommitmentType(str, enum.Enum):
+    """Type of commitment a donor makes to a family."""
+
+    gifts = "gifts"
+    cash = "cash"
+
+
+class FamilyClaim(Base):
+    """A donor's claim on a family (gift promise or cash commitment).
+
+    Any claim-capable role (admin, referrer, purchaser, donor) can create
+    and manage claims.  Only admins can mark a claim as fulfilled.
+    """
+
+    __tablename__ = "family_claims"
+    __table_args__ = (
+        # One non-deleted claim per family at a time.
+        Index(
+            "uq_family_claims_family_active",
+            "family_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        # Index for the gift-cap query (count active non-deleted gift claims per donor).
+        Index("ix_family_claims_donor_deleted", "donor_user_id", "deleted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    donor_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    family_id: Mapped[int] = mapped_column(Integer, ForeignKey("family.id"), nullable=False)
+    commitment_type: Mapped[CommitmentType] = mapped_column(
+        SAEnum(CommitmentType, name="commitment_type", create_constraint=True),
+        nullable=False,
+    )
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    donor_user: Mapped["User"] = relationship("User")
+    family: Mapped["Family"] = relationship("Family")

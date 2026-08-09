@@ -52,6 +52,7 @@ Single Playwright project with `fullyParallel: true` and `workers: 16`. Each tes
 | `role-self-service.spec.ts` | Family dashboard + people CRUD, referrer dashboard + people CRUD, display name |
 | `role-downstream.spec.ts` | Purchaser assigned gifts + delivery packing slips + public wish list |
 | `admin-users.spec.ts` | Duplicate email error |
+| `donor-self-service.spec.ts` | Donor dashboard, claim family, view claims, mark purchased, cancel |
 
 ## Conventions
 

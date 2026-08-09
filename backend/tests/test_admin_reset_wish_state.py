@@ -17,8 +17,6 @@ from app.models import (
     FamilyApprovalStatus,
     Referrer,
     ReferrerApprovalStatus,
-    User,
-    UserRole,
     WishLockLevel,
 )
 

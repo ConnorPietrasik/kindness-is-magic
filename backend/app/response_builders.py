@@ -13,7 +13,18 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 from datetime import datetime, timezone
 
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerInviteToken, User, Wish, WishType
+from app.config import MAX_FAMILY_PERSONS
+from app.models import (
+    Family,
+    FamilyApprovalStatus,
+    FamilyClaim,
+    Person,
+    Referrer,
+    ReferrerInviteToken,
+    User,
+    Wish,
+    WishType,
+)
 from app.schemas import _CLEAR, WishCreate
 
 T = TypeVar("T", bound=DeclarativeBase)
@@ -336,9 +347,6 @@ def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, li
 # Validation helpers
 # ---------------------------------------------------------------------------
 
-MAX_FAMILY_PERSONS = 10
-"""Maximum number of active persons a family can have (non-admin creation)."""
-
 
 def check_family_person_cap(db: Session, family_id: int) -> None:
     """Raise 400 if the family has reached the person cap.
@@ -477,6 +485,27 @@ def build_family_detail(
         if del_user:
             delivery_user_name = del_user.display_name
 
+    # Resolve active claim info
+    active_claim = (
+        db.query(FamilyClaim)
+        .filter(
+            FamilyClaim.family_id == fam.id,
+            FamilyClaim.deleted_at.is_(None),
+        )
+        .first()
+    )
+    claim_status: str | None = None
+    claim_commitment_type: str | None = None
+    claim_donor_name: str | None = None
+    claim_id: int | None = None
+    if active_claim:
+        claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
+        claim_commitment_type = active_claim.commitment_type.value
+        claim_id = active_claim.id
+        donor = db.query(User).filter(User.id == active_claim.donor_user_id).first()
+        if donor and donor.deleted_at is None:
+            claim_donor_name = donor.display_name
+
     result: dict = {
         "id": fam.id,
         "referrer_id": fam.referrer_id,
@@ -497,6 +526,10 @@ def build_family_detail(
         "wish_lock_level": fam.wish_lock_level,
         "wish_review_requested_at": fam.wish_review_requested_at,
         "wish_rejection_reason": fam.wish_rejection_reason,
+        "claim_status": claim_status,
+        "claim_commitment_type": claim_commitment_type,
+        "claim_donor_name": claim_donor_name,
+        "claim_id": claim_id,
     }
 
     if include_referrer_notes:

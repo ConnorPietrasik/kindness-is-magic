@@ -33,8 +33,17 @@ export type {
   AdminUserCreate,
   AdminUserUpdate,
   AdminWishUpdate,
+  ClaimStatus,
+  CommitmentType,
   DeliveryFamilySummary,
+  DonorSelfRegisterPayload,
+  DonorSelfRegisterResponse,
+  DonorWishPurchaseMark,
   FamilyApprovalStatus,
+  FamilyClaimCreate,
+  FamilyClaimDetail,
+  FamilyClaimSummary,
+  FamilyClaimUpdate,
   FamilyDetail,
   FamilyPayload,
   FamilyReviewQueueItem,
@@ -77,4 +86,4 @@ export type {
   WishSummary,
   WishType,
 } from "./domain";
-export { WISH_TYPE } from "./domain";
+export { getClaimStatus, WISH_TYPE } from "./domain";

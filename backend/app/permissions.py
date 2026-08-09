@@ -72,6 +72,24 @@ def require_delivery(current_user: User = Depends(_get_user_or_raise)) -> User:
     return current_user
 
 
+def require_claim_capable(current_user: User = Depends(_get_user_or_raise)) -> User:
+    """Raise 403 unless the user can claim families.
+
+    Claim-capable roles: admin, referrer, purchaser, donor.
+    """
+    if current_user.role not in (
+        UserRole.admin,
+        UserRole.referrer,
+        UserRole.purchaser,
+        UserRole.donor,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage claims",
+        )
+    return current_user
+
+
 # ---------------------------------------------------------------------------
 # Ownership guard
 # ---------------------------------------------------------------------------

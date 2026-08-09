@@ -8,12 +8,23 @@ router which is scoped to the authenticated family user.
 import logging
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
+from app.auth import decode_access_token
+from app.config import GIFT_CLAIM_CAP
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, WishLockLevel
+from app.permissions import require_claim_capable
+from app.models import (
+    CommitmentType,
+    Family,
+    FamilyApprovalStatus,
+    FamilyClaim,
+    Person,
+    User,
+    WishLockLevel,
+)
 from app.response_builders import (
     PUBLIC_FAMILY_SORT_FIELDS,
     FAMILY_MAX_AGE,
@@ -22,8 +33,17 @@ from app.response_builders import (
     batch_load_person_wishes,
     build_sort_clause,
     compute_display_ids,
+    get_active_or_404,
 )
-from app.schemas import FamilyWishListResponse, PersonWishItem, PublicFamilyListResponse, PublicFamilySummary, WishSummary
+from app.schemas import (
+    FamilyClaimCreate,
+    FamilyClaimSummary,
+    FamilyWishListResponse,
+    PersonWishItem,
+    PublicFamilyListResponse,
+    PublicFamilySummary,
+    WishSummary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +64,7 @@ def list_public_families(
     min_age: int | None = Query(None, ge=0),
     max_age: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
+    access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(get_db),
 ) -> PublicFamilyListResponse:
     """List approved families for the public donor browse page.
@@ -52,7 +73,18 @@ def list_public_families(
     * Only returns families that are: approved, not soft-deleted, and
       wish_lock_level == admin (fully reviewed).
     * Supports pagination, filtering by person count / age range, and sorting.
+    * If authenticated, sets ``claimed_by_current_user`` on families the
+      current user has an active claim for.
     """
+    # Extract current user id from access token (no DB lookup)
+    current_user_id: int | None = None
+    if access_token:
+        try:
+            payload = decode_access_token(access_token)
+            current_user_id = int(payload.get("sub"))
+        except Exception:
+            pass
+
     # Base query: active, approved, admin-locked families
     query = db.query(Family).filter(
         Family.deleted_at.is_(None),
@@ -107,6 +139,22 @@ def list_public_families(
     # Compute flat-format display IDs (unscoped)
     display_id_map = compute_display_ids(db, "family", families, scope=None)
 
+    # Build set of family IDs claimed by the current user
+    claimed_family_ids: set[int] = set()
+    if current_user_id is not None and families:
+        family_ids = [f.id for f in families]
+        claimed = (
+            db.query(FamilyClaim.family_id)
+            .filter(
+                FamilyClaim.donor_user_id == current_user_id,
+                FamilyClaim.family_id.in_(family_ids),
+                FamilyClaim.deleted_at.is_(None),
+                FamilyClaim.fulfilled_at.is_(None),
+            )
+            .all()
+        )
+        claimed_family_ids = {row[0] for row in claimed}
+
     # Build response items from the single query result
     result_families = []
     for fam, pc, ma, xa in results or []:
@@ -118,6 +166,7 @@ def list_public_families(
                 person_count=pc if pc else 0,
                 min_age=ma,
                 max_age=xa,
+                claimed_by_current_user=fam.id in claimed_family_ids,
             )
         )
 
@@ -140,6 +189,7 @@ def list_public_families(
 @router.get("/{family_id}/wish-list")
 def get_family_wish_list(
     family_id: int,
+    access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(get_db),
 ) -> FamilyWishListResponse:
     """Return the public wish list for a family.
@@ -147,6 +197,7 @@ def get_family_wish_list(
     * No authentication required.
     * Soft-deleted families return 404.
     * Soft-deleted people are excluded from the people list.
+    * If authenticated, includes claim status info.
     """
     # Look up family (skip soft-deleted and non-admin-locked)
     fam = (
@@ -175,6 +226,34 @@ def get_family_wish_list(
     display_id_map = compute_display_ids(db, "family", [fam], scope=None)
     display_id = display_id_map.get(fam.id, "0")
 
+    # Check for active claim on this family
+    active_claim = (
+        db.query(FamilyClaim)
+        .filter(
+            FamilyClaim.family_id == family_id,
+            FamilyClaim.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    # Check if current user is the claim owner
+    claimed_by_current_user = False
+    claim_status: str | None = None
+    claim_id: int | None = None
+    if active_claim:
+        claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
+        claim_id = active_claim.id
+        # Check if current user is the claim owner
+        current_user_id: int | None = None
+        if access_token:
+            try:
+                payload = decode_access_token(access_token)
+                current_user_id = int(payload.get("sub"))
+            except Exception:
+                pass
+        if current_user_id is not None and active_claim.donor_user_id == current_user_id:
+            claimed_by_current_user = True
+
     return FamilyWishListResponse(
         display_id=display_id,
         bio=fam.bio,
@@ -189,4 +268,98 @@ def get_family_wish_list(
             )
             for p in people
         ],
+        claimed_by_current_user=claimed_by_current_user,
+        claim_status=claim_status,
+        claim_id=claim_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Claim a family
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{family_id}/claim", response_model=FamilyClaimSummary, status_code=status.HTTP_201_CREATED)
+def claim_family(
+    family_id: int,
+    data: FamilyClaimCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_claim_capable),
+) -> FamilyClaimSummary:
+    """Claim a family (gift promise or cash commitment).
+
+    * Requires authentication with a claim-capable role.
+    * Validates family is not already actively claimed.
+    * If commitment_type == "gifts", user must have < 5 active gift claims.
+    * Cash claims have no limit.
+    """
+    # 1. Validate family exists and is active
+    fam = get_active_or_404(db, Family, family_id, "Family not found")
+
+    # 2. Check family is not already actively claimed
+    existing_claim = (
+        db.query(FamilyClaim)
+        .filter(
+            FamilyClaim.family_id == family_id,
+            FamilyClaim.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing_claim:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This family is already claimed",
+        )
+
+    # 3. Check gift-claim cap
+    if data.commitment_type == CommitmentType.gifts:
+        current_gift_count = (
+            db.query(func.count(FamilyClaim.id))
+            .filter(
+                FamilyClaim.donor_user_id == user.id,
+                FamilyClaim.deleted_at.is_(None),
+                FamilyClaim.fulfilled_at.is_(None),
+                FamilyClaim.commitment_type == CommitmentType.gifts,
+            )
+            .scalar()
+        )
+        if current_gift_count >= GIFT_CLAIM_CAP:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Gift claim limit of {GIFT_CLAIM_CAP} reached",
+            )
+
+    # 4. Create the claim
+    claim = FamilyClaim(
+        donor_user_id=user.id,
+        family_id=family_id,
+        commitment_type=data.commitment_type,
+    )
+    db.add(claim)
+    db.commit()
+    db.refresh(claim)
+
+    # Build family info
+    display_id_map = compute_display_ids(db, "family", [fam], scope=None)
+    display_id = display_id_map.get(fam.id, "0")
+    pc = db.query(FAMILY_PERSON_COUNT).filter(Family.id == fam.id).scalar()
+    ma = db.query(FAMILY_MIN_AGE).filter(Family.id == fam.id).scalar()
+    xa = db.query(FAMILY_MAX_AGE).filter(Family.id == fam.id).scalar()
+
+    logger.info("User %s claimed family %s (commitment=%s)", user.id, family_id, data.commitment_type.value)
+
+    return FamilyClaimSummary(
+        id=claim.id,
+        family={
+            "id": fam.id,
+            "display_id": display_id,
+            "bio": fam.bio,
+            "person_count": pc if pc else 0,
+            "min_age": ma,
+            "max_age": xa,
+        },
+        commitment_type=claim.commitment_type,
+        notes=claim.notes,
+        created_at=claim.created_at,
+        fulfilled_at=claim.fulfilled_at,
     )

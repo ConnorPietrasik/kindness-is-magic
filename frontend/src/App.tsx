@@ -37,6 +37,10 @@ const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
 const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
+const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
+const DonorDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorDashboard"));
+const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
+const DonorClaimDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaimDetail"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -63,6 +67,9 @@ function DashboardRedirect() {
   }
   if (user?.role === "delivery") {
     return <Navigate to={ROUTES.DELIVERY_DASHBOARD} replace />;
+  }
+  if (user?.role === "donor") {
+    return <Navigate to={ROUTES.DONOR_DASHBOARD} replace />;
   }
 
   return <Navigate to={ROUTES.PUBLIC_FAMILIES} replace />;
@@ -122,6 +129,14 @@ export default function App() {
           element={
             <PublicRoute>
               <FamilySelfRegister />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DONOR_SELF_REGISTER}
+          element={
+            <PublicRoute>
+              <DonorSelfRegister />
             </PublicRoute>
           }
         />
@@ -302,6 +317,32 @@ export default function App() {
           element={
             <ProtectedRoute roles={["delivery"] as UserRole[]}>
               <DeliveryPackingSlips />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Donor self-service ───────────────────────────────── */}
+        <Route
+          path={ROUTES.DONOR_DASHBOARD}
+          element={
+            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+              <DonorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DONOR_CLAIMS}
+          element={
+            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+              <DonorClaims />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DONOR_CLAIM_DETAIL}
+          element={
+            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+              <DonorClaimDetail />
             </ProtectedRoute>
           }
         />

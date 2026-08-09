@@ -121,6 +121,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_WISH_REVIEW} icon="📋" label="Wish Approval" desc="Approve or reject family wishes" />
               <NavCard to={ROUTES.ADMIN_WISHES} icon="🎁" label="Manage Wishes" desc="Assign & track gift purchases" />
               <NavCard to={ROUTES.ADMIN_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for volunteers" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
             </>
           )}
 
@@ -129,6 +130,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your approved families" />
               <NavCard to={ROUTES.REFERRER_FAMILY_INVITES} icon="⏳" label="Family Invites" desc="Invite families & review applications" />
               <NavCard to={ROUTES.REFERRER_WISH_REVIEW} icon="📋" label="Wish Review" desc="Review and approve family wishes" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
             </>
           )}
 
@@ -137,7 +139,10 @@ export default function Dashboard() {
           )}
 
           {user?.role === "purchaser" && (
-            <NavCard to={ROUTES.PURCHASER_ASSIGNED_GIFTS} icon="🎁" label="Assigned Gifts" desc="View and manage your assigned gifts" />
+            <>
+              <NavCard to={ROUTES.PURCHASER_ASSIGNED_GIFTS} icon="🎁" label="Assigned Gifts" desc="View and manage your assigned gifts" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
+            </>
           )}
 
           {user?.role === "delivery" && (
@@ -177,6 +182,7 @@ function WelcomeCard() {
     family: "bg-green-600",
     purchaser: "bg-orange-600",
     delivery: "bg-teal-600",
+    donor: "bg-purple-600",
   };
   const badgeClass = `${roleColors[user?.role as UserRole] ?? "bg-gray-500"} inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white`;
 

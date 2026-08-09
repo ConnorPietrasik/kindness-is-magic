@@ -113,4 +113,10 @@ def validate_user_role_consistency(
         if family_id is not None:
             errors.append("Delivery users must not have family_id")
 
+    elif role == UserRole.donor:
+        if referrer_id is not None:
+            errors.append("Donor users must not have referrer_id")
+        if family_id is not None:
+            errors.append("Donor users must not have family_id")
+
     return errors

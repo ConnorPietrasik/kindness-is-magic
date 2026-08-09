@@ -5,7 +5,14 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models import FamilyApprovalStatus, ReferrerApprovalStatus, UserRole, WishLockLevel, WishType
+from app.models import (
+    CommitmentType,
+    FamilyApprovalStatus,
+    ReferrerApprovalStatus,
+    UserRole,
+    WishLockLevel,
+    WishType,
+)
 from app.user_validation import sanitize_plain_text, validate_email, validate_phone_number
 
 
@@ -508,6 +515,11 @@ class FamilyDetail(BaseModel):
     wish_review_requested_at: datetime | None = None
     wish_rejection_reason: Optional[str] = None
     referrer_notes: str | None = None
+    # Claim info for admin families table
+    claim_status: str | None = None
+    claim_commitment_type: str | None = None
+    claim_donor_name: str | None = None
+    claim_id: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -1077,6 +1089,7 @@ class PublicFamilySummary(BaseModel):
     person_count: int
     min_age: int | None = None
     max_age: int | None = None
+    claimed_by_current_user: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -1119,6 +1132,9 @@ class FamilyWishListResponse(BaseModel):
     bio: str | None = None
     family_wish: str
     people: list[PersonWishItem]
+    claimed_by_current_user: bool = False
+    claim_status: str | None = None
+    claim_id: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -1208,4 +1224,114 @@ class PersonCreateInFamily(BaseModel):
         age = info.data.get("age")
         if age is not None:
             validate_wishes_for_age(v, age)
+        return v
+
+
+# ---------------------------------------------------------------------------
+# Donor self-registration schemas
+# ---------------------------------------------------------------------------
+
+
+class DonorSelfRegister(BaseModel):
+    """Public: donor self-registration (open, no invite code required)."""
+
+    display_name: str = Field(..., min_length=1, max_length=40)
+    email: str = Field(..., min_length=1, max_length=120)
+    password: str = Field(..., min_length=8)
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
+
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+
+class DonorSelfRegisterResponse(BaseModel):
+    """Returned when a donor self-registers."""
+
+    user: UserResponse
+
+
+# ---------------------------------------------------------------------------
+# Donor claim schemas
+# ---------------------------------------------------------------------------
+
+
+class FamilyClaimSummary(BaseModel):
+    """Compact claim representation for list views."""
+
+    id: int
+    family: dict  # {id, display_id, bio, person_count, min_age, max_age}
+    commitment_type: CommitmentType
+    notes: str | None = None
+    created_at: datetime
+    fulfilled_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyClaimDetail(BaseModel):
+    """Full claim detail with wish list."""
+
+    id: int
+    family: dict  # {id, display_id, bio, person_count, min_age, max_age}
+    commitment_type: CommitmentType
+    notes: str | None = None
+    created_at: datetime
+    fulfilled_at: datetime | None = None
+    donor_user_id: int
+    donor_display_name: str
+    people: list[PersonWishItem] = []
+
+    model_config = {"from_attributes": True}
+
+
+class FamilyClaimCreate(BaseModel):
+    """Body for creating a family claim."""
+
+    commitment_type: CommitmentType
+
+
+class FamilyClaimUpdate(BaseModel):
+    """Non-admin partial update for a claim.
+
+    No status field — only owner or admin can modify, and status changes
+    go through dedicated endpoints (fulfill, cancel).
+    """
+
+    commitment_type: CommitmentType | None = None
+    notes: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def _notes_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 500:
+            raise ValueError("notes must be 500 characters or fewer")
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
+        return v
+
+
+class DonorWishPurchaseMark(BaseModel):
+    """Body for marking a wish purchased by a donor.
+
+    Like WishPurchaseMark but **no received_at** — that's set by delivery.
+    """
+
+    purchased_where: str | None = None
+    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchaser_note", mode="before")
+    @classmethod
+    def _purchaser_note_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
         return v

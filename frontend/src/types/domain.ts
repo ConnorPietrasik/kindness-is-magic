@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 /** Mirrors backend UserRole enum. */
-export type UserRole = "admin" | "referrer" | "family" | "purchaser" | "delivery";
+export type UserRole = "admin" | "referrer" | "family" | "purchaser" | "delivery" | "donor";
 
 /** Mirrors UserResponse — the shape returned by /api/auth/me. */
 export interface User {
@@ -160,6 +160,11 @@ export interface FamilyDetail {
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
   referrer_notes: string | null;
+  // Claim info for admin families table
+  claim_status: string | null;
+  claim_commitment_type: string | null;
+  claim_donor_name: string | null;
+  claim_id: number | null;
 }
 
 /** Family detail returned to family self-service endpoints (no referrer_notes). */
@@ -413,6 +418,7 @@ export interface PublicFamilySummary {
   person_count: number;
   min_age: number | null;
   max_age: number | null;
+  claimed_by_current_user: boolean;
 }
 
 /** Mirrors backend PublicFamilyListResponse — paginated public families list. */
@@ -443,6 +449,9 @@ export interface FamilyWishListResponse {
   bio: string | null;
   family_wish: string;
   people: PersonWishItem[];
+  claimed_by_current_user: boolean;
+  claim_status: string | null;
+  claim_id: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -524,4 +533,85 @@ export interface PurchaserWishSummary {
 export interface PurchaserWishUpdate {
   purchaser_note?: string | null;
   received_at?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Donor / Claims
+// ---------------------------------------------------------------------------
+
+/** Payload for open donor self-registration. */
+export interface DonorSelfRegisterPayload {
+  display_name: string;
+  email: string;
+  password: string;
+}
+
+/** Response when a donor self-registers. */
+export interface DonorSelfRegisterResponse {
+  user: User;
+}
+
+/** Claim status — derived from fulfilled_at. */
+export type ClaimStatus = "active" | "fulfilled";
+
+/** Derive claim status from fulfilled_at timestamp. */
+export function getClaimStatus(fulfilled_at: string | null): ClaimStatus {
+  return fulfilled_at != null ? "fulfilled" : "active";
+}
+
+/** What the donor is committing to. */
+export type CommitmentType = "gifts" | "cash";
+
+/** Compact claim for list views. */
+export interface FamilyClaimSummary {
+  id: number;
+  family: {
+    id: number;
+    display_id: string;
+    bio: string | null;
+    person_count: number;
+    min_age: number | null;
+    max_age: number | null;
+  };
+  commitment_type: CommitmentType;
+  notes: string | null;
+  created_at: string;
+  fulfilled_at: string | null;
+}
+
+/** Full claim detail with wish list. */
+export interface FamilyClaimDetail {
+  id: number;
+  family: {
+    id: number;
+    display_id: string;
+    bio: string | null;
+    person_count: number;
+    min_age: number | null;
+    max_age: number | null;
+  };
+  commitment_type: CommitmentType;
+  notes: string | null;
+  created_at: string;
+  fulfilled_at: string | null;
+  donor_user_id: number;
+  donor_display_name: string;
+  people: PersonWishItem[];
+}
+
+/** Body for creating a family claim. */
+export interface FamilyClaimCreate {
+  commitment_type: CommitmentType;
+}
+
+/** Non-admin partial update for a claim. */
+export interface FamilyClaimUpdate {
+  commitment_type?: CommitmentType | null;
+  notes?: string | null;
+}
+
+/** Body for marking a wish purchased by a donor (no received_at). */
+export interface DonorWishPurchaseMark {
+  purchased_where?: string | null;
+  purchaser_note?: string | null;
 }

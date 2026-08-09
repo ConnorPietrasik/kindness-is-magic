@@ -1059,3 +1059,105 @@ describe("auth query data registry", () => {
     expect(fn).toHaveBeenCalledWith(null);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Donor — Self-Registration
+// ---------------------------------------------------------------------------
+describe("donor self-registration API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("registerDonor — POST /api/auth/register-donor", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { user: { id: 1, role: "donor" } } });
+    const result = await apiModule.registerDonor({
+      display_name: "Jane Donor",
+      email: "donor@example.com",
+      password: "secret123",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/register-donor", {
+      display_name: "Jane Donor",
+      email: "donor@example.com",
+      password: "secret123",
+    });
+    expect(result).toEqual({ user: { id: 1, role: "donor" } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Donor — Profile
+// ---------------------------------------------------------------------------
+describe("donor profile API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("donorGetMe — GET /api/donor/me", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 1, role: "donor" } });
+    const result = await apiModule.donorGetMe();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/me");
+    expect(result).toEqual({ id: 1, role: "donor" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Donor — Claims
+// ---------------------------------------------------------------------------
+describe("donor claims API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("donorListClaims — GET /api/donor/claims", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, fulfilled_at: null }] });
+    const result = await apiModule.donorListClaims();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/claims");
+    expect(result).toEqual([{ id: 1, fulfilled_at: null }]);
+  });
+
+  it("donorListClaims with fulfilled filter", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: [{ id: 1, fulfilled_at: null }] });
+    await apiModule.donorListClaims({ fulfilled: false });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/claims", { params: { fulfilled: false } });
+  });
+
+  it("donorGetClaim — GET /api/donor/claims/:id", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 5, status: "active" } });
+    await apiModule.donorGetClaim(5);
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/claims/5");
+  });
+
+  it("donorUpdateClaim — PATCH /api/donor/claims/:id", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 5, notes: "Updated" } });
+    await apiModule.donorUpdateClaim(5, { notes: "Updated" });
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/donor/claims/5", { notes: "Updated" });
+  });
+
+  it("donorCancelClaim — DELETE /api/donor/claims/:id", async () => {
+    mockAxiosInstance.delete.mockResolvedValueOnce({ data: null });
+    await apiModule.donorCancelClaim(5);
+    expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/donor/claims/5");
+  });
+
+  it("donorMarkWishPurchased — POST /api/donor/claims/:claimId/wishes/:wishId/mark-purchased", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 10, purchased_at: "2025-01-01" } });
+    await apiModule.donorMarkWishPurchased(5, 10, { purchased_where: "Target" });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/donor/claims/5/wishes/10/mark-purchased", {
+      purchased_where: "Target",
+    });
+  });
+
+  it("donorFulfillClaim — POST /api/donor/claims/:id/fulfill", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, status: "fulfilled" } });
+    await apiModule.donorFulfillClaim(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/donor/claims/5/fulfill");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Public — Claim Family
+// ---------------------------------------------------------------------------
+describe("claim family API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("claimFamily — POST /api/families/:id/claim with commitment_type", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 1, status: "active", commitment_type: "gifts" } });
+    const result = await apiModule.claimFamily(42, "gifts");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/families/42/claim", { commitment_type: "gifts" });
+    expect(result).toEqual({ id: 1, status: "active", commitment_type: "gifts" });
+  });
+});
