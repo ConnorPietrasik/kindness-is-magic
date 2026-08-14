@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -17,9 +16,9 @@ from app.database import get_db
 from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User
 from app.permissions import require_admin
 from app.response_builders import (
-    apply_column_filter,
     build_referrer_detail,
     build_sort_clause,
+    column_filtered_page,
     ColumnRequest,
     get_active_or_404,
     get_or_404,
@@ -104,35 +103,10 @@ def list_referrers(
         family_count_map = {rid: count for rid, count in family_counts}
 
     items = [
-        ReferrerDetail(
-            id=r.id,
-            name=r.name,
-            family_limit=r.family_limit,
-            phone_number=r.phone_number,
-            family_invite_code=r.family_invite_code,
-            family_count=family_count_map.get(r.id, 0) if cols.needs("family_count") else 0,
-            approval_status=r.approval_status,
-            approved_by_admin_name=admin_map.get(r.approved_by_admin_id)
-            if cols.needs("approved_by_admin_name") and r.approved_by_admin_id
-            else None,
-            approved_at=r.approved_at,
-            created_at=r.created_at,
-            deleted_at=r.deleted_at,
-        )
-        for r in referrers
+        ReferrerDetail(**build_referrer_detail(r, db, family_count=family_count_map.get(r.id, 0), admin_map=admin_map)) for r in referrers
     ]
 
-    # NOTE: Returns a plain dict (not ReferrerListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "referrers": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @referrer_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -174,35 +148,10 @@ def list_deleted_referrers(
         family_count_map = {rid: count for rid, count in family_counts}
 
     items = [
-        ReferrerDetail(
-            id=r.id,
-            name=r.name,
-            family_limit=r.family_limit,
-            phone_number=r.phone_number,
-            family_invite_code=r.family_invite_code,
-            family_count=family_count_map.get(r.id, 0) if cols.needs("family_count") else 0,
-            approval_status=r.approval_status,
-            approved_by_admin_name=admin_map.get(r.approved_by_admin_id)
-            if cols.needs("approved_by_admin_name") and r.approved_by_admin_id
-            else None,
-            approved_at=r.approved_at,
-            created_at=r.created_at,
-            deleted_at=r.deleted_at,
-        )
-        for r in referrers
+        ReferrerDetail(**build_referrer_detail(r, db, family_count=family_count_map.get(r.id, 0), admin_map=admin_map)) for r in referrers
     ]
 
-    # NOTE: Returns a plain dict (not ReferrerListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "referrers": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @referrer_admin_router.get("/{ref_id}")

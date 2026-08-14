@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -15,7 +14,6 @@ from app.database import get_db
 from app.models import (
     Family,
     FamilyApprovalStatus,
-    FamilyClaim,
     Person,
     Referrer,
     User,
@@ -25,17 +23,19 @@ from app.models import (
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
-    apply_column_filter,
     batch_load_person_wishes,
     build_family_detail,
+    build_family_list_item,
     build_family_review_summary,
     build_sort_clause,
+    column_filtered_page,
     ColumnRequest,
     compute_display_ids,
     FAMILY_PERSON_COUNT,
     FAMILY_SORT_FIELDS,
     get_active_or_404,
     get_or_404,
+    load_family_list_context,
     partial_update,
 )
 from app.schemas import (
@@ -147,96 +147,11 @@ def list_families(
 
     # Conditional lookups — skip queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
+    ctx = load_family_list_context(db, families, cols, scope=referrer_id, include_claim=True, show_status_labels=True)
 
-    count_map: dict[int, int] = {}
-    if cols.needs("person_count"):
-        counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-        count_map = {fid: cnt for fid, cnt in counts}
+    items = [FamilyDetail(**build_family_list_item(f, ctx)) for f in families]
 
-    pos_map: dict[int, str] = {}
-    if cols.needs("display_id"):
-        pos_map = compute_display_ids(db, "family", families, scope=referrer_id, show_status_labels=True)
-
-    referrer_map: dict[int, str] = {}
-    if cols.needs("referrer_name"):
-        referrer_ids = {f.referrer_id for f in families if f.referrer_id is not None}
-        if referrer_ids:
-            for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
-                referrer_map[ref.id] = ref.name
-
-    delivery_user_map: dict[int, str] = {}
-    if cols.needs("delivery_user_name"):
-        delivery_user_ids = {f.delivery_user_id for f in families if f.delivery_user_id is not None}
-        if delivery_user_ids:
-            for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
-                delivery_user_map[u.id] = u.display_name
-
-    # Claim info for admin families table
-    claim_map: dict[int, FamilyClaim] = {}
-    if cols.needs("claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"):
-        family_ids = [f.id for f in families]
-        if family_ids:
-            claims = (
-                db.query(FamilyClaim)
-                .filter(
-                    FamilyClaim.family_id.in_(family_ids),
-                    FamilyClaim.deleted_at.is_(None),
-                )
-                .all()
-            )
-            claim_map = {c.family_id: c for c in claims}
-            # Resolve donor names
-            donor_ids = {c.donor_user_id for c in claims}
-            donor_map: dict[int, str] = {}
-            if donor_ids:
-                for u in db.query(User).filter(User.id.in_(donor_ids), User.deleted_at.is_(None)).all():
-                    donor_map[u.id] = u.display_name
-
-    items = [
-        FamilyDetail(
-            id=f.id,
-            display_id=pos_map.get(f.id),
-            family_name=f.family_name,
-            family_wish=f.family_wish,
-            contact_name=f.contact_name,
-            referrer_id=f.referrer_id,
-            referrer_name=referrer_map.get(f.referrer_id) if cols.needs("referrer_name") and f.referrer_id else None,
-            delivery_user_id=f.delivery_user_id,
-            delivery_user_name=delivery_user_map.get(f.delivery_user_id)
-            if cols.needs("delivery_user_name") and f.delivery_user_id
-            else None,
-            bio=f.bio,
-            address=f.address,
-            phone_number=f.phone_number,
-            approval_status=f.approval_status,
-            pickup_window=f.pickup_window,
-            deleted_at=f.deleted_at,
-            person_count=count_map.get(f.id, 0) if cols.needs("person_count") else 0,
-            wish_lock_level=f.wish_lock_level,
-            wish_review_requested_at=f.wish_review_requested_at,
-            wish_rejection_reason=f.wish_rejection_reason,
-            referrer_notes=f.referrer_notes,
-            claim_status=(
-                "fulfilled" if f.id in claim_map and claim_map[f.id].fulfilled_at is not None else "active" if f.id in claim_map else None
-            ),
-            claim_commitment_type=claim_map[f.id].commitment_type.value if f.id in claim_map else None,
-            claim_donor_name=donor_map.get(claim_map[f.id].donor_user_id) if f.id in claim_map else None,
-            claim_id=claim_map[f.id].id if f.id in claim_map else None,
-        )
-        for f in families
-    ]
-
-    # NOTE: Returns a plain dict (not FamilyListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "families": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @family_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -259,65 +174,11 @@ def list_deleted_families(
 
     # Conditional lookups
     cols = ColumnRequest.parse(columns)
+    ctx = load_family_list_context(db, families, cols, scope=referrer_id, include_claim=False)
 
-    count_map: dict[int, int] = {}
-    if cols.needs("person_count"):
-        counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-        count_map = {fid: cnt for fid, cnt in counts}
+    items = [FamilyDetail(**build_family_list_item(f, ctx, display_id="DELETED")) for f in families]
 
-    referrer_map: dict[int, str] = {}
-    if cols.needs("referrer_name"):
-        referrer_ids = {f.referrer_id for f in families if f.referrer_id is not None}
-        if referrer_ids:
-            for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
-                referrer_map[ref.id] = ref.name
-
-    delivery_user_map: dict[int, str] = {}
-    if cols.needs("delivery_user_name"):
-        delivery_user_ids = {f.delivery_user_id for f in families if f.delivery_user_id is not None}
-        if delivery_user_ids:
-            for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
-                delivery_user_map[u.id] = u.display_name
-
-    items = [
-        FamilyDetail(
-            id=f.id,
-            display_id="DELETED",
-            family_name=f.family_name,
-            family_wish=f.family_wish,
-            contact_name=f.contact_name,
-            referrer_id=f.referrer_id,
-            referrer_name=referrer_map.get(f.referrer_id) if cols.needs("referrer_name") and f.referrer_id else None,
-            delivery_user_id=f.delivery_user_id,
-            delivery_user_name=delivery_user_map.get(f.delivery_user_id)
-            if cols.needs("delivery_user_name") and f.delivery_user_id
-            else None,
-            bio=f.bio,
-            address=f.address,
-            phone_number=f.phone_number,
-            approval_status=f.approval_status,
-            pickup_window=f.pickup_window,
-            deleted_at=f.deleted_at,
-            person_count=count_map.get(f.id, 0) if cols.needs("person_count") else 0,
-            wish_lock_level=f.wish_lock_level,
-            wish_review_requested_at=f.wish_review_requested_at,
-            wish_rejection_reason=f.wish_rejection_reason,
-            referrer_notes=f.referrer_notes,
-        )
-        for f in families
-    ]
-
-    # NOTE: Returns a plain dict (not FamilyListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "families": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @family_admin_router.get("/review-queue")

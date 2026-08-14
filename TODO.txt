@@ -1,8 +1,9 @@
 Add logo to site (I don’t think I have it)
-Payment processing - some way to accept credit card payments
-Donor confirmation and reminder emails including the family’s wishlist (or maybe a link to it?)
-Donor payment stuff - probably automatically marking as fulfilled if paid, and unclaiming if no payment within a day
+Payment processing - some way to accept credit card payments. Qwen recommends Stripe
+Donor payment integration - probably automatically marking as fulfilled if paid, and unclaiming if no payment within a day
+Anonymous donors - accept payments for families without requiring a donor account
 Add deadlines: family info, donor bringing gifts, others?
+Donor reminder emails before deadline
 EVENTUALLY - Automated database backups
 EVENTUALLY - Email families a week before their pickup window
 EVENTUALLY - Add button for admins to email families directly using their own email account. Requires more google workspace config to avoid having to register each user individually

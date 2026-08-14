@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
-from app.response_builders import apply_column_filter, build_sort_clause, ColumnRequest, INVITE_SORT_FIELDS
+from app.response_builders import build_sort_clause, column_filtered_page, ColumnRequest, INVITE_SORT_FIELDS
 from app.schemas import InviteListResponse, ReferrerInviteSummary
 
 logger = logging.getLogger(__name__)
@@ -133,17 +132,7 @@ def list_invites(
 
     items = [_build_invite_summary(inv, admin_map, referrer_map) for inv in invites]
 
-    # NOTE: Returns a plain dict (not InviteListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "invites": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="invites", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @invite_admin_router.get("/{invite_id}")

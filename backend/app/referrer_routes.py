@@ -25,13 +25,16 @@ from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
     batch_load_person_wishes,
     build_family_detail,
+    build_family_list_item,
     build_family_review_summary,
     build_person_detail,
+    build_person_list_item,
     build_referrer_detail,
     check_family_person_cap,
     compute_display_ids,
     create_person_with_wishes,
     get_or_404,
+    load_family_list_context,
     partial_update,
 )
 from app.schemas import (
@@ -50,7 +53,6 @@ from app.schemas import (
     ReferrerUpdate,
     SendFamilyInviteRequest,
     SendFamilyInviteResponse,
-    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,28 +107,9 @@ def list_families(
         .all()
     )
 
-    # Single aggregation query instead of N+1 count() calls
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-    count_map = {fid: cnt for fid, cnt in counts}
+    ctx = load_family_list_context(db, families, scope=user.referrer_id, include_claim=True)
 
-    pos_map = compute_display_ids(db, "family", families, scope=user.referrer_id)
-
-    return FamilyListResponse(
-        families=[
-            FamilyDetail(
-                **build_family_detail(
-                    f,
-                    db,
-                    person_count=count_map.get(f.id, 0),
-                    display_id=pos_map[f.id],
-                    include_referrer_notes=True,
-                    include_delivery=True,
-                    include_claim=True,
-                )
-            )
-            for f in families
-        ]
-    )
+    return FamilyListResponse(families=[FamilyDetail(**build_family_list_item(f, ctx)) for f in families])
 
 
 @router.get("/families/{fam_id}")
@@ -489,21 +472,7 @@ def list_family_people(
     pos_map = compute_display_ids(db, "person", people, scope=fid)
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
-        people=[
-            PersonDetail(
-                id=p.id,
-                display_id=pos_map[p.id],
-                family_id=p.family_id,
-                given_name=p.given_name,
-                title=p.title,
-                age=p.age,
-                note=p.note,
-                created_at=p.created_at,
-                deleted_at=p.deleted_at,
-                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
-            )
-            for p in people
-        ]
+        people=[PersonDetail(**build_person_list_item(p, display_id=pos_map[p.id], wishes=wish_map.get(p.id, []))) for p in people]
     )
 
 

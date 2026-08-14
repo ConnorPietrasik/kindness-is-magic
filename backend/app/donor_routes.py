@@ -43,6 +43,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/donor", tags=["donor"])
 
 
+def get_claim_or_403(db: Session, claim_id: int, user: User) -> FamilyClaim:
+    """Load a non-deleted claim the user may access, else raise.
+
+    Raises 404 if the claim does not exist or is soft-deleted, and 403
+    unless the user is the claim's donor or an admin.
+    """
+    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
+    if claim.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
+    if user.role != UserRole.admin and claim.donor_user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to access this claim")
+    return claim
+
+
 # ---------------------------------------------------------------------------
 # GET /api/donor/me
 # ---------------------------------------------------------------------------
@@ -114,13 +128,7 @@ def get_claim(
     user: User = Depends(require_claim_capable),
 ) -> FamilyClaimDetail:
     """Get claim detail with wish list. Owner or admin only."""
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
-
-    # Owner or admin only
-    if user.role != UserRole.admin and claim.donor_user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to view this claim")
+    claim = get_claim_or_403(db, claim_id, user)
 
     fam = get_or_404(db, Family, claim.family_id, "Family not found")
     if fam.deleted_at is not None:
@@ -176,13 +184,7 @@ def update_claim(
     user: User = Depends(require_claim_capable),
 ) -> FamilyClaimSummary:
     """Update commitment_type, notes. Owner or admin only."""
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
-
-    # Owner or admin only
-    if user.role != UserRole.admin and claim.donor_user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to modify this claim")
+    claim = get_claim_or_403(db, claim_id, user)
 
     partial_update(claim, data)
     db.commit()
@@ -211,13 +213,7 @@ def cancel_claim(
     user: User = Depends(require_claim_capable),
 ):
     """Soft-delete (cancel) a claim. Owner or admin only."""
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
-
-    # Owner or admin only
-    if user.role != UserRole.admin and claim.donor_user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to cancel this claim")
+    claim = get_claim_or_403(db, claim_id, user)
 
     claim.deleted_at = datetime.now(timezone.utc)
     db.commit()
@@ -241,13 +237,7 @@ def mark_wish_purchased(
 
     No received_at — that's set by delivery. Owner or admin only.
     """
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
-
-    # Owner or admin only
-    if user.role != UserRole.admin and claim.donor_user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to modify this claim")
+    claim = get_claim_or_403(db, claim_id, user)
 
     # Wish must exist and belong to the claimed family
     wish = get_or_404(db, Wish, wish_id, "Wish not found")

@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -15,11 +14,12 @@ from app.models import Family, FamilyApprovalStatus, Person, User, Wish
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
-    apply_column_filter,
     batch_load_person_wishes,
     build_person_detail,
+    build_person_list_item,
     build_sort_clause,
     build_wish_detail,
+    column_filtered_page,
     ColumnRequest,
     compute_display_ids,
     create_person_with_wishes,
@@ -137,33 +137,9 @@ def list_people(
     if cols.needs("display_id"):
         pos_map = compute_display_ids(db, "person", people, scope=family_id)
 
-    items = [
-        PersonDetail(
-            id=p.id,
-            display_id=pos_map.get(p.id),
-            family_id=p.family_id,
-            given_name=p.given_name,
-            title=p.title,
-            age=p.age,
-            note=p.note,
-            created_at=p.created_at,
-            deleted_at=p.deleted_at,
-            wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
-        )
-        for p in people
-    ]
+    items = [PersonDetail(**build_person_list_item(p, display_id=pos_map.get(p.id), wishes=wish_map.get(p.id, []))) for p in people]
 
-    # NOTE: Returns a plain dict (not PersonListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "people": apply_column_filter(items, columns, always_include={"id", "wishes"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"})
 
 
 @people_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -184,33 +160,9 @@ def list_deleted_people(
     offset = (page - 1) * page_size
     people = query.order_by(Person.deleted_at.desc(), Person.id).offset(offset).limit(page_size).all()
 
-    items = [
-        PersonDetail(
-            id=p.id,
-            display_id="DELETED",
-            family_id=p.family_id,
-            given_name=p.given_name,
-            title=p.title,
-            age=p.age,
-            note=p.note,
-            created_at=p.created_at,
-            deleted_at=p.deleted_at,
-            wishes=[],
-        )
-        for p in people
-    ]
+    items = [PersonDetail(**build_person_list_item(p, display_id="DELETED", wishes=[])) for p in people]
 
-    # NOTE: Returns a plain dict (not PersonListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "people": apply_column_filter(items, columns, always_include={"id", "wishes"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"})
 
 
 @people_admin_router.get("/{per_id}")

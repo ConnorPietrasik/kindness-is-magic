@@ -4,6 +4,7 @@ Centralises logic that was duplicated across admin_*_routes, referrer_routes,
 and family_routes.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Type, TypeVar, Literal
 
@@ -25,7 +26,7 @@ from app.models import (
     Wish,
     WishType,
 )
-from app.schemas import _CLEAR, WishCreate
+from app.schemas import _CLEAR, WishCreate, WishSummary
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -244,11 +245,19 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
 # ---------------------------------------------------------------------------
 
 
-def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | None = None) -> dict:
+def build_referrer_detail(
+    ref: Referrer,
+    db: Session,
+    *,
+    family_count: int | None = None,
+    admin_map: dict[int, str] | None = None,
+) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count.
 
     Only *approved*, non-deleted families count toward the family count.
     Pass ``family_count`` to skip the query when it is already known.
+    Pass ``admin_map`` (id → display_name) to resolve the approving admin
+    name without a per-referrer query when building a list response.
     """
     if family_count is None:
         family_count = (
@@ -264,9 +273,12 @@ def build_referrer_detail(ref: Referrer, db: Session, *, family_count: int | Non
     # Resolve approved_by_admin name
     approved_by_name: str | None = None
     if ref.approved_by_admin_id is not None:
-        admin = db.query(User).filter(User.id == ref.approved_by_admin_id).first()
-        if admin and admin.deleted_at is None:
-            approved_by_name = admin.display_name
+        if admin_map is not None:
+            approved_by_name = admin_map.get(ref.approved_by_admin_id)
+        else:
+            admin = db.query(User).filter(User.id == ref.approved_by_admin_id).first()
+            if admin and admin.deleted_at is None:
+                approved_by_name = admin.display_name
 
     return {
         "id": ref.id,
@@ -319,6 +331,27 @@ def build_person_detail(per: Person, db: Session) -> dict:
             }
             for w in wishes
         ],
+    }
+
+
+def build_person_list_item(p: Person, *, display_id: str | None, wishes: list[Wish]) -> dict:
+    """Build a dict suitable for ``PersonDetail`` (list views).
+
+    Pass the pre-computed ``display_id`` and the person's wishes
+    (typically from :func:`batch_load_person_wishes`); use ``[]`` for the
+    soft-deleted list where wishes are not loaded.
+    """
+    return {
+        "id": p.id,
+        "display_id": display_id,
+        "family_id": p.family_id,
+        "given_name": p.given_name,
+        "title": p.title,
+        "age": p.age,
+        "note": p.note,
+        "created_at": p.created_at,
+        "deleted_at": p.deleted_at,
+        "wishes": [WishSummary.model_validate(w) for w in wishes],
     }
 
 
@@ -627,6 +660,130 @@ def build_family_detail(
     return result
 
 
+@dataclass
+class FamilyListContext:
+    """Batch-loaded lookup maps for building a page of family list items."""
+
+    count_map: dict[int, int]
+    pos_map: dict[int, str]
+    referrer_map: dict[int, str]
+    delivery_user_map: dict[int, str]
+    claim_map: dict[int, FamilyClaim]
+    donor_map: dict[int, str]
+
+
+def load_family_list_context(
+    db: Session,
+    families: list[Family],
+    cols: "ColumnRequest | None" = None,
+    *,
+    scope: int | None,
+    include_claim: bool = False,
+    show_status_labels: bool = False,
+) -> FamilyListContext:
+    """Batch-load the lookup maps needed to build a family list page.
+
+    Only runs queries for the maps that ``cols`` indicates the client needs
+    (``cols=None`` loads all maps, for endpoints without a ``columns`` param).
+    ``scope`` restricts display-ID numbering to a single referrer
+    (``None`` = flat admin numbering).  ``include_claim`` loads claim and
+    donor names (admin views); ``show_status_labels`` gives pending/rejected
+    families ``"PENDING"``/``"REJECTED"`` display IDs.
+    """
+    if cols is None:
+        cols = ColumnRequest.parse(None)
+
+    count_map: dict[int, int] = {}
+    if cols.needs("person_count"):
+        counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
+        count_map = {fid: cnt for fid, cnt in counts}
+
+    pos_map: dict[int, str] = {}
+    if cols.needs("display_id"):
+        pos_map = compute_display_ids(db, "family", families, scope, show_status_labels=show_status_labels)
+
+    referrer_map: dict[int, str] = {}
+    if cols.needs("referrer_name"):
+        referrer_ids = {f.referrer_id for f in families if f.referrer_id is not None}
+        if referrer_ids:
+            for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
+                referrer_map[ref.id] = ref.name
+
+    delivery_user_map: dict[int, str] = {}
+    if cols.needs("delivery_user_name"):
+        delivery_user_ids = {f.delivery_user_id for f in families if f.delivery_user_id is not None}
+        if delivery_user_ids:
+            for u in db.query(User).filter(User.id.in_(delivery_user_ids), User.deleted_at.is_(None)).all():
+                delivery_user_map[u.id] = u.display_name
+
+    claim_map: dict[int, FamilyClaim] = {}
+    donor_map: dict[int, str] = {}
+    if include_claim and cols.needs("claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"):
+        family_ids = [f.id for f in families]
+        if family_ids:
+            claims = (
+                db.query(FamilyClaim)
+                .filter(
+                    FamilyClaim.family_id.in_(family_ids),
+                    FamilyClaim.deleted_at.is_(None),
+                )
+                .all()
+            )
+            claim_map = {c.family_id: c for c in claims}
+            donor_ids = {c.donor_user_id for c in claims}
+            if donor_ids:
+                for u in db.query(User).filter(User.id.in_(donor_ids), User.deleted_at.is_(None)).all():
+                    donor_map[u.id] = u.display_name
+
+    return FamilyListContext(
+        count_map=count_map,
+        pos_map=pos_map,
+        referrer_map=referrer_map,
+        delivery_user_map=delivery_user_map,
+        claim_map=claim_map,
+        donor_map=donor_map,
+    )
+
+
+def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: str | None = None) -> dict:
+    """Build a dict suitable for ``FamilyDetail`` (list views).
+
+    All ``FamilyDetail`` fields are always present (matching a full
+    ``model_dump()``, including ``None`` claim fields when no claim is
+    loaded) so column filtering and ``response_model_exclude_unset`` behave
+    the same as when items were built as ``FamilyDetail`` instances directly.
+    Pass ``display_id`` to override the context's computed display IDs
+    (e.g. ``"DELETED"`` on the soft-deleted list).
+    """
+    claim = ctx.claim_map.get(fam.id)
+    return {
+        "id": fam.id,
+        "display_id": display_id if display_id is not None else ctx.pos_map.get(fam.id),
+        "family_name": fam.family_name,
+        "family_wish": fam.family_wish,
+        "contact_name": fam.contact_name,
+        "referrer_id": fam.referrer_id,
+        "referrer_name": ctx.referrer_map.get(fam.referrer_id) if fam.referrer_id else None,
+        "delivery_user_id": fam.delivery_user_id,
+        "delivery_user_name": ctx.delivery_user_map.get(fam.delivery_user_id) if fam.delivery_user_id else None,
+        "bio": fam.bio,
+        "address": fam.address,
+        "phone_number": fam.phone_number,
+        "approval_status": fam.approval_status,
+        "pickup_window": fam.pickup_window,
+        "deleted_at": fam.deleted_at,
+        "person_count": ctx.count_map.get(fam.id, 0),
+        "wish_lock_level": fam.wish_lock_level,
+        "wish_review_requested_at": fam.wish_review_requested_at,
+        "wish_rejection_reason": fam.wish_rejection_reason,
+        "referrer_notes": fam.referrer_notes,
+        "claim_status": "fulfilled" if claim is not None and claim.fulfilled_at is not None else "active" if claim is not None else None,
+        "claim_commitment_type": claim.commitment_type.value if claim is not None else None,
+        "claim_donor_name": ctx.donor_map.get(claim.donor_user_id) if claim is not None else None,
+        "claim_id": claim.id if claim is not None else None,
+    }
+
+
 def build_family_review_summary(
     fam: Family, db: Session, *, person_count: int | None = None, referrer_map: dict[int, str] | None = None
 ) -> dict:
@@ -835,6 +992,35 @@ def apply_column_filter(items: list, columns: str | None, *, always_include: set
     if items and isinstance(items[0], dict):
         return [{k: v for k, v in item.items() if k in requested} for item in items]
     return [item.model_dump(include=requested) for item in items]
+
+
+def column_filtered_page(
+    items: list,
+    columns: str | None,
+    *,
+    key: str,
+    total: int,
+    page: int,
+    page_size: int,
+    always_include: set[str] | None = None,
+) -> dict:
+    """Build the paginated, column-filtered list envelope.
+
+    Returns ``{"<key>": items, "total", "page", "page_size", "total_pages"}`` where the
+    items are filtered through :func:`apply_column_filter`.
+
+    NOTE: Returns a plain dict (not the ``*ListResponse`` model) because
+    apply_column_filter produces partial dicts with only requested columns.
+    FastAPI validates this dict against the annotated response model —
+    required fields are always included so validation passes.
+    """
+    return {
+        key: apply_column_filter(items, columns, always_include=always_include),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
 
 
 # ---------------------------------------------------------------------------

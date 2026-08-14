@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,8 +14,8 @@ from app.database import get_db
 from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
-    apply_column_filter,
     build_sort_clause,
+    column_filtered_page,
     build_wish_detail,
     build_wish_list_item,
     ColumnRequest,
@@ -137,17 +136,7 @@ def list_wishes(
 
     logger.info("Admin %s listed wishes (page=%d, total=%d)", admin.email, page, total)
 
-    # NOTE: Returns a plain dict (not WishListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "wishes": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="wishes", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @admin_wishes_router.post("/batch-assign")

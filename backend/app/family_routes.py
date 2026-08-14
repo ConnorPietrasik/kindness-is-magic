@@ -15,6 +15,7 @@ from app.response_builders import (
     batch_load_person_wishes,
     build_family_detail,
     build_person_detail,
+    build_person_list_item,
     check_family_person_cap,
     compute_display_ids,
     create_person_with_wishes,
@@ -27,7 +28,6 @@ from app.schemas import (
     PersonCreateInFamily,
     PersonDetail,
     PersonListResponse,
-    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -154,21 +154,7 @@ def list_people(
     pos_map = compute_display_ids(db, "person", people, scope=user.family_id)
     wish_map = batch_load_person_wishes(db, [p.id for p in people])
     return PersonListResponse(
-        people=[
-            PersonDetail(
-                id=p.id,
-                display_id=pos_map[p.id],
-                family_id=p.family_id,
-                given_name=p.given_name,
-                title=p.title,
-                age=p.age,
-                note=p.note,
-                created_at=p.created_at,
-                deleted_at=p.deleted_at,
-                wishes=[WishSummary.model_validate(w) for w in wish_map.get(p.id, [])],
-            )
-            for p in people
-        ]
+        people=[PersonDetail(**build_person_list_item(p, display_id=pos_map[p.id], wishes=wish_map.get(p.id, []))) for p in people]
     )
 
 

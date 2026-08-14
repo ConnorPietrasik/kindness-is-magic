@@ -4,7 +4,6 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -18,9 +17,9 @@ from app.permissions import require_admin
 from app.response_builders import (
     _CLEAR,
     _resolve_sentinels,
-    apply_column_filter,
     build_sort_clause,
     build_user_detail,
+    column_filtered_page,
     ColumnRequest,
     get_active_or_404,
     get_or_404,
@@ -216,17 +215,7 @@ def list_users(
 
     items = [UserDetail(**build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map)) for u in users]
 
-    # NOTE: Returns a plain dict (not UserListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "users": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="users", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @user_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -273,17 +262,7 @@ def list_deleted_users(
 
     items = [UserDetail(**build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map)) for u in users]
 
-    # NOTE: Returns a plain dict (not UserListResponse) because apply_column_filter
-    # produces partial dicts with only requested columns. FastAPI validates this dict
-    # against the annotated response model — required fields are always included so
-    # validation passes. See response_builders.apply_column_filter for details.
-    return {
-        "users": apply_column_filter(items, columns, always_include={"id"}),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return column_filtered_page(items, columns, key="users", total=total, page=page, page_size=page_size, always_include={"id"})
 
 
 @user_admin_router.get("/{user_id}")
