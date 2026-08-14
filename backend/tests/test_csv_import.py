@@ -477,8 +477,9 @@ Dedup Fam3,Alice,12,Coat,,Game,,
 
 
 class TestCsvImportDisplayName:
-    def test_admin_user_gets_kindness_fairy(self, test_client: TestClient, admin_user, db: Session):
-        """Admin users imported via CSV get display_name='Kindness Fairy'."""
+
+    def test_admin_user_gets_email_localpart(self, test_client: TestClient, admin_user, db: Session):
+        """Admin users imported via CSV get display_name from email local-part."""
         from app.models import User
 
         csv_data = """# users
@@ -492,7 +493,7 @@ csv_admin@test.com,Password123!,admin,,
 
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_admin@test.com").first()
-        assert user.display_name == "Kindness Fairy"
+        assert user.display_name == "csv_admin"
 
     def test_referrer_user_gets_referrer_name(self, test_client: TestClient, admin_user, db: Session):
         """Referrer users imported via CSV get display_name from referrer name."""

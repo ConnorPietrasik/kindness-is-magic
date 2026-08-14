@@ -660,6 +660,7 @@ def _process_users(
         "family": UserRole.family,
         "purchaser": UserRole.purchaser,
         "delivery": UserRole.delivery,
+        "donor": UserRole.donor,
     }
 
     for i, rec in enumerate(records):
@@ -699,7 +700,7 @@ def _process_users(
                     row_num,
                     "user",
                     "error",
-                    f"Invalid role: {role_str} (must be admin, referrer, family, purchaser, or delivery)",
+                    f"Invalid role: {role_str} (must be admin, referrer, family, purchaser, delivery, or donor)",
                 )
             )
             summary.users_errors += 1
@@ -748,9 +749,7 @@ def _process_users(
         # then email local-part as final fallback.
         display_name: str | None = rec.get("display_name", "").strip() or None
         if display_name is None:
-            if role == UserRole.admin:
-                display_name = "Kindness Fairy"
-            elif role == UserRole.referrer and referrer_id:
+            if role == UserRole.referrer and referrer_id:
                 ref = db.query(Referrer).filter(Referrer.id == referrer_id).first()
                 if ref:
                     display_name = ref.name
