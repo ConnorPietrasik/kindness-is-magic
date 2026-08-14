@@ -1028,56 +1028,35 @@ def column_filtered_page(
 # ---------------------------------------------------------------------------
 
 
-def compute_display_ids(
+def compute_position_maps(
     db: Session,
     entity_type: Literal["family", "person"],
     page_entities: list,
     scope: int | None = None,
-    *,
-    show_status_labels: bool = False,
-) -> dict[int, str]:
-    """Compute stable display IDs for a page of entities.
+) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
+    """Compute the raw ROW_NUMBER position maps behind display IDs.
 
-    Display IDs are hierarchical positions based on ROW_NUMBER over *active
-    only* entities (approved, non-deleted).  Positions are ordered by database
-    ``id`` so they are stable across viewers and pagination — a position shifts
-    only when an entity before it is created, deleted, restored, or changes
-    approval status.
+    Returns ``(fam_pos_map, fam_ref_map, per_pos_map)`` where:
 
-    Format by view:
+    * ``fam_pos_map`` — ``{family_id: position}`` within the referrer
+      partition.
+    * ``fam_ref_map`` — ``{family_id: referrer_id_or_0}``.
+    * ``per_pos_map`` — ``{person_id: position}`` within the family
+      partition (empty for ``entity_type="family"``).
 
-    +---------------------+---------------------------+----------------------------------+
-    | View                | Family                    | Person                           |
-    +=====================+===========================+==================================+
-    | Flat (admin)        | ``{ref_or_0}-{pos}``      | ``{ref_or_0}-{fam}-{per}``       |
-    +---------------------+---------------------------+----------------------------------+
-    | Scoped to referrer  | ``{pos}``                 | n/a                              |
-    +---------------------+---------------------------+----------------------------------+
-    | Scoped to family    | n/a                       | ``{per}``                        |
-    +---------------------+---------------------------+----------------------------------+
+    The maps are scope-independent: only the string formatting in
+    ``compute_display_ids()`` depends on ``scope``.  Endpoints that need
+    positions for entities spanning multiple scopes (e.g. packing slips over
+    many families) can call this once for the whole batch instead of calling
+    ``compute_display_ids()`` per scope, avoiding a query round-trip per
+    scope.
 
-    Non-enumerated entities (pending, rejected, deleted) receive ``"0"`` or,
-    when ``show_status_labels`` is True, their status label (``"PENDING"``,
-    ``"REJECTED"``, ``"DELETED"``).
-
-    Args:
-        db: database session.
-        entity_type: ``"family"`` or ``"person"``.
-        page_entities: entities on the current page (used to scope queries).
-        scope: ``referrer_id`` for family views, ``family_id`` for person
-            views. ``None`` for flat (unscoped) views.
-        show_status_labels: if True, non-enumerated entities get their status
-            label instead of ``"0"``.
-
-    Returns:
-        ``{entity.id: display_id}`` for each entity in page_entities.
+    ``page_entities`` must be non-empty; the family window is resolved from
+    the families referenced by the page (see ``compute_display_ids``).
     """
     if not page_entities:
-        return {}
+        return {}, {}, {}
 
-    # ------------------------------------------------------------------ #
-    # 1. Compute family positions (always needed)
-    # ------------------------------------------------------------------ #
     # ROW_NUMBER must be computed over the full partition to preserve
     # pagination continuity.  We scope the query by referrer_id so it
     # doesn't scan the entire table.
@@ -1134,13 +1113,10 @@ def compute_display_ids(
         fam_pos_map[fid] = int(rn)
         fam_ref_map[fid] = ref_id if ref_id is not None else 0
 
-    # ------------------------------------------------------------------ #
-    # 2. Compute person positions (only for person views)
-    # ------------------------------------------------------------------ #
+    # Filter by family_id, not person_id, so ROW_NUMBER is computed over all
+    # people in each family (preserves pagination continuity).
     per_pos_map: dict[int, int] = {}
     if entity_type == "person":
-        # Filter by family_id, not person_id, so ROW_NUMBER is computed
-        # over all people in each family (preserves pagination continuity).
         if scope is not None:
             per_filter = [
                 Person.deleted_at.is_(None),
@@ -1167,8 +1143,57 @@ def compute_display_ids(
         )
         per_pos_map = {pid: int(rn) for pid, rn in positions}
 
+    return fam_pos_map, fam_ref_map, per_pos_map
+
+
+def compute_display_ids(
+    db: Session,
+    entity_type: Literal["family", "person"],
+    page_entities: list,
+    scope: int | None = None,
+    *,
+    show_status_labels: bool = False,
+) -> dict[int, str]:
+    """Compute stable display IDs for a page of entities.
+
+    Display IDs are hierarchical positions based on ROW_NUMBER over *active
+    only* entities (approved, non-deleted).  Positions are ordered by database
+    ``id`` so they are stable across viewers and pagination — a position shifts
+    only when an entity before it is created, deleted, restored, or changes
+    approval status.
+
+    Format by view:
+
+    +---------------------+---------------------------+----------------------------------+
+    | View                | Family                    | Person                           |
+    +=====================+===========================+==================================+
+    | Flat (admin)        | ``{ref_or_0}-{pos}``      | ``{ref_or_0}-{fam}-{per}``       |
+    +---------------------+---------------------------+----------------------------------+
+    | Scoped to referrer  | ``{pos}``                 | n/a                              |
+    +---------------------+---------------------------+----------------------------------+
+    | Scoped to family    | n/a                       | ``{per}``                        |
+    +---------------------+---------------------------+----------------------------------+
+
+    Non-enumerated entities (pending, rejected, deleted) receive ``"0"`` or,
+    when ``show_status_labels`` is True, their status label (``"PENDING"``,
+    ``"REJECTED"``, ``"DELETED"``).
+
+    Args:
+        db: database session.
+        entity_type: ``"family"`` or ``"person"``.
+        page_entities: entities on the current page (used to scope queries).
+        scope: ``referrer_id`` for family views, ``family_id`` for person
+            views. ``None`` for flat (unscoped) views.
+        show_status_labels: if True, non-enumerated entities get their status
+            label instead of ``"0"``.
+
+    Returns:
+        ``{entity.id: display_id}`` for each entity in page_entities.
+    """
+    fam_pos_map, fam_ref_map, per_pos_map = compute_position_maps(db, entity_type, page_entities, scope)
+
     # ------------------------------------------------------------------ #
-    # 3. Format display IDs
+    # Format display IDs
     # ------------------------------------------------------------------ #
     result: dict[int, str] = {}
 

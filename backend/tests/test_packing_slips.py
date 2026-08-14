@@ -435,3 +435,133 @@ class TestPackingSlipsEdgeCases:
 
         fam_data = next(item for item in body if item["id"] == fam.id)
         assert fam_data["people"] == []
+
+
+# =========================================================================
+# Display IDs — exact values
+# =========================================================================
+
+
+class TestPackingSlipsDisplayIds:
+    """Packing-slip display_ids use exact hierarchical values.
+
+    Family display_ids are flat ({referrer_id}-{fam_pos}); person
+    display_ids reset to 1 in each family — they are the person's
+    position within their own family, not a global counter.
+    """
+
+    def test_family_display_ids_flat_format(self, test_client: TestClient, admin_user, packing_slip_families, referrer_record):
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        by_id = {item["id"]: item for item in body}
+        fam1 = packing_slip_families["families"][0]
+        fam2 = packing_slip_families["families"][1]
+        assert by_id[fam1.id]["display_id"] == f"{referrer_record.id}-1"
+        assert by_id[fam2.id]["display_id"] == f"{referrer_record.id}-2"
+
+    def test_person_display_ids_reset_per_family(self, test_client: TestClient, admin_user, packing_slip_families):
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        by_id = {item["id"]: item for item in body}
+        fam1 = packing_slip_families["families"][0]
+        fam2 = packing_slip_families["families"][1]
+
+        fam1_people = {p["given_name"]: p["display_id"] for p in by_id[fam1.id]["people"]}
+        fam2_people = {p["given_name"]: p["display_id"] for p in by_id[fam2.id]["people"]}
+        assert fam1_people == {"Alice": "1", "Bob": "2"}
+        # Carol restarts at 1 in her own family, not a global "3"
+        assert fam2_people == {"Carol": "1"}
+
+    def test_deleted_person_does_not_consume_number(self, test_client: TestClient, admin_user, packing_slip_families, db: Session):
+        from app.models import Person
+
+        fam1 = packing_slip_families["families"][0]
+        bob = packing_slip_families["people"]["fam1"][1]  # 2nd person by id
+        dave = Person(family_id=fam1.id, given_name="Dave", age=11)
+        db.add(dave)
+        db.commit()
+        # Soft-delete the middle person
+        bob.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        fam1_data = next(item for item in body if item["id"] == fam1.id)
+        fam1_people = {p["given_name"]: p["display_id"] for p in fam1_data["people"]}
+        # Alice stays 1; Dave is 2nd active person (deleted Bob doesn't consume a number)
+        assert fam1_people == {"Alice": "1", "Dave": "2"}
+
+    def test_display_ids_stable_with_family_ids_filter(self, test_client: TestClient, admin_user, packing_slip_families, referrer_record):
+        """Filtering to a subset must not renumber families or people."""
+        _admin_login(test_client)
+        fam2 = packing_slip_families["families"][1]
+        resp = test_client.get(f"/api/admin/families/packing-slips?family_ids={fam2.id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 1
+        # fam2 keeps its position 2 in the referrer's enumeration (not renumbered to 1)
+        assert body[0]["display_id"] == f"{referrer_record.id}-2"
+        assert body[0]["people"][0]["display_id"] == "1"
+
+    def test_pending_family_does_not_shift_family_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """A pending family by id doesn't consume a family position."""
+        from app.models import Family, FamilyApprovalStatus, Person, WishLockLevel
+
+        fam_a = Family(
+            referrer_id=referrer_record.id,
+            family_name="Shift A",
+            family_wish="Wish",
+            contact_name="Contact A",
+            phone_number="555-005-0001",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.admin,
+        )
+        fam_b = Family(
+            referrer_id=referrer_record.id,
+            family_name="Shift B (pending)",
+            family_wish="Wish",
+            contact_name="Contact B",
+            phone_number="555-005-0002",
+            approval_status=FamilyApprovalStatus.pending,
+            wish_lock_level=WishLockLevel.admin,
+        )
+        fam_c = Family(
+            referrer_id=referrer_record.id,
+            family_name="Shift C",
+            family_wish="Wish",
+            contact_name="Contact C",
+            phone_number="555-005-0003",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.admin,
+        )
+        db.add_all([fam_a, fam_b, fam_c])
+        db.commit()
+        db.refresh(fam_a)
+        db.refresh(fam_c)
+
+        pa = Person(family_id=fam_a.id, given_name="Pasha", age=8)
+        pc = Person(family_id=fam_c.id, given_name="Cleo", age=9)
+        db.add_all([pa, pc])
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        by_id = {item["id"]: item for item in body}
+        assert len(body) == 2  # pending fam_b is not included
+        assert by_id[fam_a.id]["display_id"] == f"{referrer_record.id}-1"
+        # fam_c is family 2, not 3 — the pending family doesn't consume a position
+        assert by_id[fam_c.id]["display_id"] == f"{referrer_record.id}-2"
+        assert by_id[fam_a.id]["people"][0]["display_id"] == "1"
+        assert by_id[fam_c.id]["people"][0]["display_id"] == "1"

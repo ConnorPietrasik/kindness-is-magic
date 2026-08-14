@@ -28,7 +28,7 @@ Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware 
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline. List endpoints build items with the list-item builders there and return via `column_filtered_page()`.
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
 - **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked.
-- **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `response_builders.py` — see its docstring for format and enumeration rules.
+- **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `response_builders.py` — see its docstring for format and enumeration rules (multi-scope endpoints such as packing slips batch via `compute_position_maps()`).
 
 ## Project Structure
 

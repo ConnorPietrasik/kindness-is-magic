@@ -15,6 +15,7 @@ from app.permissions import require_delivery
 from app.response_builders import (
     batch_load_person_wishes,
     compute_display_ids,
+    compute_position_maps,
 )
 from app.schemas import (
     PackingSlipItem,
@@ -133,11 +134,12 @@ def get_packing_slips(
     for p in people:
         people_by_family.setdefault(p.family_id, []).append(p)
 
-    # Compute person display IDs scoped to each family
+    # Compute person display IDs (one batched pass over all people — position
+    # maps are scope-independent, so within-family positions are unchanged).
     person_display_map: dict[int, str] = {}
-    for fid, fam_people in people_by_family.items():
-        if fam_people:
-            person_display_map.update(compute_display_ids(db, "person", fam_people, scope=fid))
+    if people:
+        fam_pos_map, _, per_pos_map = compute_position_maps(db, "person", people, scope=None)
+        person_display_map = {p.id: str(per_pos_map[p.id]) for p in people if p.id in per_pos_map and p.family_id in fam_pos_map}
 
     # Assemble response
     result: list[PackingSlipItem] = []

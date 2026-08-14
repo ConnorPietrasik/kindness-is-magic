@@ -8,6 +8,7 @@ Covers:
 - Family people: sequential enumeration
 - Pagination continuity across pages
 - Display ID stability: admin scoped view matches referrer's own view
+- compute_position_maps: batched multi-scope call matches per-scope calls
 """
 
 from datetime import datetime, timezone
@@ -1065,3 +1066,62 @@ class TestFamilyPeopleDisplayId:
         assert body["people"][0]["display_id"] == "1"
         assert body["people"][1]["display_id"] == "2"
         assert body["people"][2]["display_id"] == "3"
+
+
+# =========================================================================
+# compute_position_maps — batching invariant
+# =========================================================================
+
+
+class TestComputePositionMapsBatching:
+    """Batched (scope=None) position maps must match per-scope results.
+
+    Multi-scope endpoints (packing slips) call compute_position_maps() once
+    over people spanning many families; the per-family positions it returns
+    must be identical to calling it per family with scope=<family_id>.
+    """
+
+    def test_batched_matches_per_family_scoped(self, referrer_record, db: Session):
+        from app.models import Family, FamilyApprovalStatus, Person
+        from app.response_builders import compute_position_maps
+
+        fams = []
+        for i in range(3):
+            f = Family(
+                referrer_id=referrer_record.id,
+                family_name=f"Batch Fam {i}",
+                family_wish="Wish",
+                contact_name="Contact",
+                phone_number=f"555-006-000{i}",
+                approval_status=FamilyApprovalStatus.approved,
+            )
+            db.add(f)
+            db.commit()
+            db.refresh(f)
+            fams.append(f)
+
+        # 1, 2, 3 people per family (uneven, to catch off-by-one numbering)
+        for i, f in enumerate(fams):
+            for j in range(i + 1):
+                p = Person(family_id=f.id, given_name=f"P{i}-{j}", age=8)
+                db.add(p)
+        db.commit()
+
+        all_people = db.query(Person).filter(Person.family_id.in_([f.id for f in fams])).order_by(Person.id).all()
+
+        # One batched call over all families (what packing slips do)
+        fam_pos_batch, _, per_pos_batch = compute_position_maps(db, "person", all_people, scope=None)
+        assert len(per_pos_batch) == 6
+
+        # Per-family scoped calls (what pre-batching code did) must agree
+        for f in fams:
+            fam_people = [p for p in all_people if p.family_id == f.id]
+            fam_pos_scoped, _, per_pos_scoped = compute_position_maps(db, "person", fam_people, scope=f.id)
+            assert fam_pos_scoped == fam_pos_batch
+            for p in fam_people:
+                assert per_pos_scoped[p.id] == per_pos_batch[p.id], f"position mismatch for person {p.id}"
+
+        # Positions within each family are 1..n by id order
+        for i, f in enumerate(fams):
+            positions = sorted(per_pos_batch[p.id] for p in all_people if p.family_id == f.id)
+            assert positions == list(range(1, i + 2))

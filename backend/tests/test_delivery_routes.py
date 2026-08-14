@@ -218,3 +218,57 @@ def test_delivery_packing_slips_no_family_pii(test_client, delivery_user, delive
         assert "family_name" not in slip
         assert "contact_name" not in slip
         assert "address" not in slip
+
+
+def test_delivery_packing_slips_display_ids_exact_values(test_client, delivery_user, delivery_assigned_families, referrer_record, db):
+    """Family display_ids are flat {ref}-{pos}; person display_ids reset per family."""
+    from app.models import Person
+
+    fam1 = delivery_assigned_families["fam1"]
+    fam2 = delivery_assigned_families["fam2"]
+    # Give fam1 a second person so the per-family reset is observable
+    dana = Person(family_id=fam1.id, given_name="Dana", age=9)
+    db.add(dana)
+    db.commit()
+
+    login_as(test_client, "delivery@test.com", "DelPass1234!")
+    resp = test_client.get("/api/delivery/packing-slips")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    by_id = {slip["id"]: slip for slip in data}
+    assert by_id[fam1.id]["display_id"] == f"{referrer_record.id}-1"
+    assert by_id[fam2.id]["display_id"] == f"{referrer_record.id}-2"
+
+    fam1_people = {p["given_name"]: p["display_id"] for p in by_id[fam1.id]["people"]}
+    fam2_people = {p["given_name"]: p["display_id"] for p in by_id[fam2.id]["people"]}
+    assert fam1_people == {"Alice": "1", "Dana": "2"}
+    # Bob restarts at 1 in his own family, not a global "3"
+    assert fam2_people == {"Bob": "1"}
+
+
+def test_delivery_packing_slips_deleted_person_does_not_consume_number(test_client, delivery_user, delivery_assigned_families, db):
+    """Soft-deleted people don't consume enumeration numbers."""
+    from datetime import datetime, timezone
+
+    from app.models import Person
+
+    fam1 = delivery_assigned_families["fam1"]
+    eve = Person(family_id=fam1.id, given_name="Eve", age=5)
+    frank = Person(family_id=fam1.id, given_name="Frank", age=7)
+    grace = Person(family_id=fam1.id, given_name="Grace", age=6)
+    db.add_all([eve, frank, grace])
+    db.commit()
+    # Soft-delete the second person by id (Eve)
+    eve.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+
+    login_as(test_client, "delivery@test.com", "DelPass1234!")
+    resp = test_client.get("/api/delivery/packing-slips")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    by_id = {slip["id"]: slip for slip in data}
+    fam1_people = {p["given_name"]: p["display_id"] for p in by_id[fam1.id]["people"]}
+    # Alice stays 1; Frank and Grace renumber to 2 and 3 (Eve doesn't consume a number)
+    assert fam1_people == {"Alice": "1", "Frank": "2", "Grace": "3"}
