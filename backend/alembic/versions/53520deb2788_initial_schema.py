@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-08-08 21:10:15.554181
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -29,9 +30,7 @@ def upgrade() -> None:
         sa.Column("unsubscribed_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("email"),
     )
-    op.create_index(
-        op.f("ix_email_preferences_email"), "email_preferences", ["email"], unique=False
-    )
+    op.create_index(op.f("ix_email_preferences_email"), "email_preferences", ["email"], unique=False)
 
     # -----------------------------------------------------------------------
     # 2. Core trio — created WITHOUT the circular FKs first
@@ -105,9 +104,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_family_id"), "family", ["id"], unique=False)
-    op.create_index(
-        "ix_family_referrer_id_deleted_at", "family", ["referrer_id", "deleted_at"], unique=False
-    )
+    op.create_index("ix_family_referrer_id_deleted_at", "family", ["referrer_id", "deleted_at"], unique=False)
 
     op.create_table(
         "users",
@@ -245,9 +242,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("token"),
     )
-    op.create_index(
-        op.f("ix_password_reset_tokens_id"), "password_reset_tokens", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_password_reset_tokens_id"), "password_reset_tokens", ["id"], unique=False)
     op.create_index(
         "ix_password_reset_tokens_user_id_used_at",
         "password_reset_tokens",
@@ -273,9 +268,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["family_id"], ["family.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_person_family_id_deleted_at", "person", ["family_id", "deleted_at"], unique=False
-    )
+    op.create_index("ix_person_family_id_deleted_at", "person", ["family_id", "deleted_at"], unique=False)
     op.create_index(op.f("ix_person_id"), "person", ["id"], unique=False)
 
     op.create_table(
@@ -292,9 +285,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["referrer_id"], ["referrer.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_referrer_invite_emails_id"), "referrer_invite_emails", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_referrer_invite_emails_id"), "referrer_invite_emails", ["id"], unique=False)
     op.create_index(
         "ix_referrer_invite_emails_recipient_sent",
         "referrer_invite_emails",
@@ -335,9 +326,7 @@ def upgrade() -> None:
         ["code"],
         unique=True,
     )
-    op.create_index(
-        op.f("ix_referrer_invite_tokens_id"), "referrer_invite_tokens", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_referrer_invite_tokens_id"), "referrer_invite_tokens", ["id"], unique=False)
 
     op.create_table(
         "refresh_tokens",
@@ -354,9 +343,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_refresh_tokens_id"), "refresh_tokens", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_refresh_tokens_id"), "refresh_tokens", ["id"], unique=False)
     op.create_index(op.f("ix_refresh_tokens_token"), "refresh_tokens", ["token"], unique=False)
 
     op.create_table(
@@ -387,9 +374,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_wish_id"), "wish", ["id"], unique=False)
-    op.create_index(
-        "ix_wish_person_id_deleted_at", "wish", ["person_id", "deleted_at"], unique=False
-    )
+    op.create_index("ix_wish_person_id_deleted_at", "wish", ["person_id", "deleted_at"], unique=False)
     op.create_index(
         "uq_wish_person_type_active",
         "wish",
