@@ -944,7 +944,7 @@ class ColumnRequest:
 def _get_required_fields(item) -> set[str]:
     """Extract required field names from a Pydantic model instance."""
     required: set[str] = set()
-    for name, field_info in item.model_fields.items():
+    for name, field_info in type(item).model_fields.items():
         if field_info.is_required():
             required.add(name)
     return required
@@ -976,12 +976,12 @@ def apply_column_filter(items: list, columns: str | None, *, always_include: set
         requested.update(always_include)
 
     # Always include required fields so partial dicts satisfy the response schema
-    if items and hasattr(items[0], "model_fields"):
+    if items and hasattr(type(items[0]), "model_fields"):
         requested.update(_get_required_fields(items[0]))
 
     # Validate against whitelist — reject unknown column names
-    if items and hasattr(items[0], "model_fields"):
-        allowed = set(items[0].model_fields.keys())
+    if items and hasattr(type(items[0]), "model_fields"):
+        allowed = set(type(items[0]).model_fields.keys())
         unknown = requested - allowed
         if unknown:
             raise HTTPException(
