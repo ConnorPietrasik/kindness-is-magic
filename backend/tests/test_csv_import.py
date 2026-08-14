@@ -477,7 +477,6 @@ Dedup Fam3,Alice,12,Coat,,Game,,
 
 
 class TestCsvImportDisplayName:
-
     def test_admin_user_gets_email_localpart(self, test_client: TestClient, admin_user, db: Session):
         """Admin users imported via CSV get display_name from email local-part."""
         from app.models import User

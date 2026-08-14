@@ -39,6 +39,71 @@ def _is_clear_sentinel(value) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Batch family info helpers
+# ---------------------------------------------------------------------------
+
+
+def _batch_family_aggregates(db: Session, family_ids: list[int]) -> dict[int, tuple]:
+    """Batch-load person_count, min_age, max_age for a list of families.
+
+    Returns ``{family_id: (person_count, min_age, max_age)}``.
+    """
+    if not family_ids:
+        return {}
+    rows = (
+        db.query(
+            Person.family_id,
+            func.count(Person.id).label("pc"),
+            func.min(Person.age).label("ma"),
+            func.max(Person.age).label("xa"),
+        )
+        .filter(Person.family_id.in_(family_ids), Person.deleted_at.is_(None))
+        .group_by(Person.family_id)
+        .all()
+    )
+    return {fid: (pc, ma, xa) for fid, pc, ma, xa in rows}
+
+
+def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, dict]:
+    """Build family info dicts for a batch of families in a single pass.
+
+    Returns ``{family_id: {id, display_id, bio, person_count, min_age, max_age}}``.
+    """
+    if not families:
+        return {}
+
+    family_ids = [f.id for f in families]
+    fam_map: dict[int, Family] = {f.id: f for f in families}
+
+    # Batch display IDs
+    display_id_map = compute_display_ids(db, "family", families, scope=None)
+
+    # Batch aggregates (person_count, min_age, max_age)
+    agg_map = _batch_family_aggregates(db, family_ids)
+
+    return {
+        fid: {
+            "id": fid,
+            "display_id": display_id_map.get(fid, "0"),
+            "bio": fam_map[fid].bio,
+            "person_count": agg_map[fid][0] if agg_map[fid][0] else 0,
+            "min_age": agg_map[fid][1],
+            "max_age": agg_map[fid][2],
+        }
+        for fid in family_ids
+    }
+
+
+def build_family_info(fam: Family, db: Session) -> dict:
+    """Build the family info dict used in claim/public responses.
+
+    For single families. Use ``batch_build_family_info()`` for lists.
+    """
+    result = batch_build_family_info(db, [fam])
+    return result.get(fam.id, {"id": fam.id, "display_id": "0", "bio": fam.bio, "person_count": 0})
+
+
+# ---------------------------------------------------------------------------
 # Sorting helper
 # ---------------------------------------------------------------------------
 

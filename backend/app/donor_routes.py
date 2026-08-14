@@ -21,11 +21,9 @@ from app.models import (
 )
 from app.permissions import require_admin, require_claim_capable
 from app.response_builders import (
+    batch_build_family_info,
     batch_load_person_wishes,
-    compute_display_ids,
-    FAMILY_MAX_AGE,
-    FAMILY_MIN_AGE,
-    FAMILY_PERSON_COUNT,
+    build_family_info,
     get_or_404,
     partial_update,
 )
@@ -43,28 +41,6 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/donor", tags=["donor"])
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_family_info(fam: Family, db: Session) -> dict:
-    """Build the family info dict used in claim responses."""
-    display_id_map = compute_display_ids(db, "family", [fam], scope=None)
-    display_id = display_id_map.get(fam.id, "0")
-    pc = db.query(FAMILY_PERSON_COUNT).filter(Family.id == fam.id).scalar()
-    ma = db.query(FAMILY_MIN_AGE).filter(Family.id == fam.id).scalar()
-    xa = db.query(FAMILY_MAX_AGE).filter(Family.id == fam.id).scalar()
-    return {
-        "id": fam.id,
-        "display_id": display_id,
-        "bio": fam.bio,
-        "person_count": pc if pc else 0,
-        "min_age": ma,
-        "max_age": xa,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -111,10 +87,12 @@ def list_claims(
         for f in db.query(Family).filter(Family.id.in_(family_ids)).all():
             families[f.id] = f
 
+    family_info_map = batch_build_family_info(db, list(families.values()))
+
     return [
         FamilyClaimSummary(
             id=c.id,
-            family=_build_family_info(families[c.family_id], db),
+            family=family_info_map.get(c.family_id, {"id": c.family_id, "display_id": "0", "bio": None, "person_count": 0}),
             commitment_type=c.commitment_type,
             notes=c.notes,
             created_at=c.created_at,
@@ -165,7 +143,7 @@ def get_claim(
 
     return FamilyClaimDetail(
         id=claim.id,
-        family=_build_family_info(fam, db),
+        family=build_family_info(fam, db),
         commitment_type=claim.commitment_type,
         notes=claim.notes,
         created_at=claim.created_at,
@@ -213,7 +191,7 @@ def update_claim(
     fam = get_or_404(db, Family, claim.family_id, "Family not found")
     return FamilyClaimSummary(
         id=claim.id,
-        family=_build_family_info(fam, db),
+        family=build_family_info(fam, db),
         commitment_type=claim.commitment_type,
         notes=claim.notes,
         created_at=claim.created_at,
@@ -333,7 +311,7 @@ def fulfill_claim(
     fam = get_or_404(db, Family, claim.family_id, "Family not found")
     return FamilyClaimSummary(
         id=claim.id,
-        family=_build_family_info(fam, db),
+        family=build_family_info(fam, db),
         commitment_type=claim.commitment_type,
         notes=claim.notes,
         created_at=claim.created_at,

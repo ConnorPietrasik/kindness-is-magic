@@ -31,6 +31,7 @@ from app.response_builders import (
     FAMILY_MIN_AGE,
     FAMILY_PERSON_COUNT,
     batch_load_person_wishes,
+    build_family_info,
     build_sort_clause,
     compute_display_ids,
     get_active_or_404,
@@ -339,25 +340,11 @@ def claim_family(
     db.commit()
     db.refresh(claim)
 
-    # Build family info
-    display_id_map = compute_display_ids(db, "family", [fam], scope=None)
-    display_id = display_id_map.get(fam.id, "0")
-    pc = db.query(FAMILY_PERSON_COUNT).filter(Family.id == fam.id).scalar()
-    ma = db.query(FAMILY_MIN_AGE).filter(Family.id == fam.id).scalar()
-    xa = db.query(FAMILY_MAX_AGE).filter(Family.id == fam.id).scalar()
-
     logger.info("User %s claimed family %s (commitment=%s)", user.id, family_id, data.commitment_type.value)
 
     return FamilyClaimSummary(
         id=claim.id,
-        family={
-            "id": fam.id,
-            "display_id": display_id,
-            "bio": fam.bio,
-            "person_count": pc if pc else 0,
-            "min_age": ma,
-            "max_age": xa,
-        },
+        family=build_family_info(fam, db),
         commitment_type=claim.commitment_type,
         notes=claim.notes,
         created_at=claim.created_at,
