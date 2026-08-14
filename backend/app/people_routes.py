@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User, UserRole
+from app.models import Family, Person, User, UserRole, WishLockLevel
 from app.permissions import PersonOwner, require_person_owner
 from app.response_builders import (
     build_person_detail,
@@ -46,14 +46,14 @@ def _check_person_edit_lock(user: User, family: Family) -> None:
         return
 
     if user.role == UserRole.family:
-        if family.wish_lock_level != "family":
+        if family.wish_lock_level != WishLockLevel.family:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your family profile is locked for editing. Contact your referrer to request changes.",
             )
 
     elif user.role == UserRole.referrer:
-        if family.wish_lock_level == "admin":
+        if family.wish_lock_level == WishLockLevel.admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This family is locked (admin-approved). Contact an admin to make changes.",

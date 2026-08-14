@@ -83,7 +83,7 @@ def list_families(
     search_phone: str | None = Query(None),
     search_wish: str | None = Query(None),
     approval_status: str | None = Query(None),
-    wish_lock_level: str | None = Query(None),
+    wish_lock_level: WishLockLevel | None = Query(None),
     min_person_count: int | None = Query(None, ge=0),
     max_person_count: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
@@ -192,7 +192,7 @@ def list_review_queue(
         db.query(Family)
         .filter(
             Family.deleted_at.is_(None),
-            Family.wish_lock_level == "referrer",
+            Family.wish_lock_level == WishLockLevel.referrer,
             Family.wish_review_requested_at.isnot(None),
         )
         .order_by(Family.wish_review_requested_at.asc())
@@ -450,13 +450,13 @@ def admin_approve_wishes(
     """
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
 
-    if fam.wish_lock_level == "admin":
+    if fam.wish_lock_level == WishLockLevel.admin:
         raise HTTPException(
             status_code=400,
             detail="Wishes are already fully approved.",
         )
 
-    fam.wish_lock_level = "admin"
+    fam.wish_lock_level = WishLockLevel.admin
     fam.wish_review_requested_at = None
     fam.wish_rejection_reason = None
 
@@ -476,7 +476,7 @@ def admin_reject_wishes(
     """Admin rejects wishes — family moves back to referrer lock."""
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
 
-    if fam.wish_lock_level != "referrer":
+    if fam.wish_lock_level != WishLockLevel.referrer:
         raise HTTPException(
             status_code=400,
             detail="Cannot reject wishes at current lock level.",
@@ -487,7 +487,7 @@ def admin_reject_wishes(
             detail="No pending review request to reject.",
         )
 
-    fam.wish_lock_level = "referrer"
+    fam.wish_lock_level = WishLockLevel.referrer
     fam.wish_review_requested_at = None
     fam.wish_rejection_reason = body.reason
 
@@ -510,7 +510,7 @@ def admin_reset_wish_state(
     """
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
 
-    fam.wish_lock_level = "family"
+    fam.wish_lock_level = WishLockLevel.family
     fam.wish_review_requested_at = None
     fam.wish_rejection_reason = None
 

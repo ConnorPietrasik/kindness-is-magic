@@ -65,6 +65,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+def _issue_session(response: Response, user: User, db: Session) -> None:
+    """Mint an access + refresh token pair and set the HttpOnly auth cookies.
+
+    Used by every endpoint that logs a user in (login, refresh rotation,
+    and the self-registration flows).
+    """
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
+    set_auth_cookies(response, access_token, refresh_token)
+
+
+def _assert_referrer_login_allowed(user: User, db: Session) -> None:
+    """Raise 401 if the user is a referrer whose referrer record was rejected.
+
+    Enforced on both login and token refresh so rejected referrers are
+    locked out even with existing sessions.
+    """
+    if user.role != UserRole.referrer or user.referrer_id is None:
+        return
+    ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
+    if ref is not None and ref.approval_status == ReferrerApprovalStatus.rejected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your account has been rejected.",
+        )
+
+
 def _get_inviter_name(user: User, db: Session) -> str | None:
     """Derive the sender name for invite emails from the authenticated user."""
     if user.display_name:
@@ -137,18 +164,9 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
         )
 
     # Rejected referrers cannot log in
-    if user.role == UserRole.referrer and user.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref and ref.approval_status == ReferrerApprovalStatus.rejected:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Your account has been rejected.",
-            )
+    _assert_referrer_login_allowed(user, db)
 
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
-
-    set_auth_cookies(response, access_token, refresh_token)
+    _issue_session(response, user, db)
 
     logger.info("User logged in: %s (role=%s)", user.email, user.role)
 
@@ -215,10 +233,7 @@ def refresh(
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
     # Rejected referrers cannot refresh tokens
-    if user.role == UserRole.referrer and user.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref and ref.approval_status == ReferrerApprovalStatus.rejected:
-            raise HTTPException(status_code=401, detail="Your account has been rejected.")
+    _assert_referrer_login_allowed(user, db)
 
     # Validate the token exists on the server and delete it (rotation)
     stored = (
@@ -234,13 +249,10 @@ def refresh(
 
     db.delete(stored)
 
-    # Issue new tokens
-    new_access = create_access_token(data={"sub": str(user.id), "role": user.role})
-    new_refresh = create_refresh_token(data={"sub": str(user.id)}, db=db)
+    # Issue new tokens and set cookies
+    _issue_session(response, user, db)
 
     db.commit()
-
-    set_auth_cookies(response, new_access, new_refresh)
 
     return {"message": "Token refreshed", "user": UserResponse.model_validate(user)}
 
@@ -545,9 +557,7 @@ def register_referrer(
     db.commit()
 
     # 5. Issue auth cookies (auto-login)
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
-    set_auth_cookies(response, access_token, refresh_token)
+    _issue_session(response, user, db)
 
     logger.info("Referrer self-registered via invite %s: %s", data.code, data.email)
 
@@ -610,9 +620,7 @@ async def register_family(
     db.commit()
 
     # 4. Issue auth cookies (auto-login)
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
-    set_auth_cookies(response, access_token, refresh_token)
+    _issue_session(response, user, db)
 
     logger.info("Family self-registered via invite: %s (referrer_id=%s)", data.email, referrer.id)
 
@@ -685,9 +693,7 @@ def register_donor(
     db.refresh(user)
 
     # 3. Issue auth cookies (auto-login)
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
-    set_auth_cookies(response, access_token, refresh_token)
+    _issue_session(response, user, db)
 
     logger.info("Donor self-registered: %s", data.email)
 

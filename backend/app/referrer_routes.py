@@ -20,6 +20,7 @@ from app.models import (
     ReferrerApprovalStatus,
     ReferrerInviteEmail,
     User,
+    WishLockLevel,
 )
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
@@ -328,7 +329,7 @@ _REFERRER_LOCKED_MSG = "This family is locked (admin-approved). Contact an admin
 
 def _check_referrer_edit_lock(fam: Family) -> None:
     """Raise 403 if the referrer cannot edit at the current lock level."""
-    if fam.wish_lock_level == "admin":
+    if fam.wish_lock_level == WishLockLevel.admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=_REFERRER_LOCKED_MSG,
@@ -346,7 +347,7 @@ def list_review_queue(
         .filter(
             Family.referrer_id == user.referrer_id,
             Family.deleted_at.is_(None),
-            Family.wish_lock_level == "family",
+            Family.wish_lock_level == WishLockLevel.family,
             Family.wish_review_requested_at.isnot(None),
         )
         .order_by(Family.wish_review_requested_at.asc())
@@ -385,12 +386,12 @@ def referrer_approve_wishes(
     fam = owner.family
     now = datetime.now(timezone.utc)
 
-    if fam.wish_lock_level == "family":
+    if fam.wish_lock_level == WishLockLevel.family:
         # Initial approval — promote to referrer lock
-        fam.wish_lock_level = "referrer"
+        fam.wish_lock_level = WishLockLevel.referrer
         fam.wish_review_requested_at = now
         fam.wish_rejection_reason = None
-    elif fam.wish_lock_level == "referrer":
+    elif fam.wish_lock_level == WishLockLevel.referrer:
         # Re-submission after admin rejection
         fam.wish_rejection_reason = None
         fam.wish_review_requested_at = now
@@ -416,7 +417,7 @@ def referrer_reject_wishes(
     """Referrer rejects wishes, sending them back to the family for revision."""
     fam = owner.family
 
-    if fam.wish_lock_level != "family":
+    if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Can only reject wishes at family lock level.",

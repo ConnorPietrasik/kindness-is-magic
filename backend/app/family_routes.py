@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User
+from app.models import Family, Person, User, WishLockLevel
 from app.permissions import require_family
 from app.response_builders import (
     batch_load_person_wishes,
@@ -42,7 +42,7 @@ _FAMILY_LOCKED_MSG = "Your family profile is locked for editing. Contact your re
 
 def _check_family_edit_lock(fam: Family) -> None:
     """Raise 403 if the family cannot edit at the current lock level."""
-    if fam.wish_lock_level != "family":
+    if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=_FAMILY_LOCKED_MSG,
@@ -93,7 +93,7 @@ def request_review(
     """Family requests referrer review of their wishes."""
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
 
-    if fam.wish_lock_level != "family":
+    if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot request review at current lock level.",
@@ -121,7 +121,7 @@ def cancel_review(
     """Family cancels a pending review request."""
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
 
-    if fam.wish_lock_level != "family":
+    if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot cancel review at current lock level.",
