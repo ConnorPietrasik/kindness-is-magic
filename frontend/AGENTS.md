@@ -2,125 +2,107 @@
 
 **No backward compatibility needed.** The app is not yet deployed.
 
-## Stack
-
-- **React 19** with **TypeScript** (`.tsx` files, strict mode enabled)
-- **TypeScript** with `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`
-- **Vite** as the build tool
-- **Tailwind CSS v4** via `@tailwindcss/vite` plugin
-- **React Query** (`@tanstack/react-query`) for server state
-- **Axios** for HTTP requests
-- **React Router v7** for client-side routing
-- **Vitest** + **@testing-library/react** + **@testing-library/jest-dom** + **@testing-library/user-event** for unit/component tests
-
 ## TypeScript
 
 - Never use `any`. Use `unknown` and narrow, or import the correct type from `src/types/`.
 - Explicitly type exported functions, hooks, and APIs. Infer local variable types when obvious.
 
-## Frontend Rules
+## Server State
 
-- All remote server state must be managed by React Query. `useState` is only for local UI state (not duplicated server data).
-- Keep API calls in `src/lib/api.ts`; do not call Axios directly from page components.
-- Prefer reusing components from `src/components/` and `useCrudManager` over duplicating patterns.
-- Use Tailwind utility classes for styling. Do not add CSS modules, styled-components, or arbitrary CSS files. Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or application-wide behavior. Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
-- Every text-like `<input>` and `<FormField>` must have an `autoComplete` attribute (default `"off"`, semantic values like `"email"` where appropriate). Omit on checkboxes, radios, and other non-text controls.
+All remote data goes through React Query. `useState` is only for local UI state (form drafts, open menus, etc.). Never duplicate server data in component state.
+
+## API Layer (`src/lib/api.ts`)
+
+- All API calls live here. Do not call Axios directly from pages or components.
+- Use the typed helpers (`apiGet`, `apiPost`, `apiPatch`, `apiPut`, `apiDelete`) — they auto-extract `response.data`.
+- **Exception:** `loginRequest` returns the full `AxiosResponse` so `AuthContext` can destructure `{ data }`. Do not change this.
+- Public endpoints (family browsing, donor registration) use the same Axios instance — no separate unauthenticated client.
+- For create operations, wrap payloads with `normalizePayload()` from `src/lib/utils.ts` to convert empty strings to `null` on nullable fields.
+- For update operations, use `normalizeUpdatePayload(formData, original)` to build minimal patch payloads that omit unchanged fields.
+
+## Query Keys (`src/lib/queryKeys.ts`)
+
+All query keys are defined here as `as const` arrays. Reference these exports instead of inline string arrays. This ensures mutations can invalidate the right caches.
+
+## Authentication
+
+- **Cookie-based auth** (HttpOnly cookies), not JWT in localStorage.
+- On `401`, the Axios interceptor attempts a silent refresh via `POST /api/auth/refresh` with thundering-herd protection (single in-flight refresh, pending 401s retry afterward).
+- If refresh fails, the interceptor dispatches `onFailedRefresh` — `AuthContext` clears user and navigates to `/login` (no hard redirect).
+- `AuthContext.setUser(user)` is for endpoints that auto-log the user in (e.g. referrer/family self-registration via invite, donor self-registration). Call it after a successful registration to set the session without a page reload.
+- `AuthContext` exposes role booleans (`isAdmin`, `isReferrer`, `isFamily`) and `isClaimCapable` (admin/referrer/purchaser/donor).
 
 ## React Query Rules
 
-- Use the hook's `isLoading`/`isError`/`data` instead of manual request flags.
-- Mutations must invalidate affected queries after success (see `useCrudManager` for the pattern).
-- Query keys should be stable arrays, passed as parameters or defined near their usage.
-- **Cascade invalidation:** when a mutation affects multiple resources, invalidate all affected query keys (e.g. family delete/restore also invalidates the people list).
+- Use the hook's `isLoading`/`isError`/`data` — no manual request flags.
+- Mutations must invalidate affected queries after success. See `useCrudManager` for the pattern.
+- **Cascade invalidation:** when a mutation affects multiple resources, invalidate all affected query keys (e.g. family delete also invalidates the people list).
+
+## Shared Patterns
+
+- **`useCrudManager`** (`src/hooks/useCrudManager.ts`) — encapsulates list/detail CRUD. Reuse it instead of duplicating CRUD state management.
+- **`HierarchicalManage`** (`src/components/HierarchicalManage.tsx`) — wraps `useCrudManager` for parent-detail + child-CRUD pages (e.g. referrer → families → people). See `ReferrerFamilyDetail` for the pattern.
+- **`useToast()`** — `toast.error()` / `toast.success()` / `toast.info()` for popup notifications.
+- **`MutationErrors`** — auto-shows mutation errors as toasts. Use on forms that trigger mutations.
+- **`ErrorBox`** — inline form validation only (not for API errors).
+- **`formatApiError(error, fallback?)`** in `src/lib/utils.ts` — extracts user-facing strings from Axios errors.
+
+## Routing
+
+- Route paths are centralized in `src/lib/routes.ts`. Always use `ROUTES` constants and `route` helpers — never hardcode path strings.
+- Pages are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
+- `ProtectedRoute` wraps routes with a `roles` array. Unauthenticated users → `/login`; wrong role → `/dashboard`.
+- `PublicRoute` wraps **auth-only** pages (login, registration, password reset). Authenticated users see "Already Logged In" instead of the form.
+- **Truly public pages** (family browse, wish list) have no wrapper — they render for everyone, authenticated or not.
+- Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
+
+## Styling
+
+- Tailwind utility classes only. No CSS modules, styled-components, or arbitrary CSS files.
+- Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or app-wide behavior.
+- Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
+- Every text-like `<input>` and `<FormField>` must have an `autoComplete` attribute (default `"off"`, semantic values like `"email"` where appropriate). Omit on checkboxes, radios, and other non-text controls.
+
+## Components
+
+- Use **named exports** in `src/components/`.
+- Reuse existing components before creating new ones.
 
 ## Testing
 
 ### What to test where
 
 - **Vitest** — pure utilities, API layer, hooks, context, route guards, and components with non-trivial logic. Tests run in jsdom with no real network.
-- **Playwright** — full user flows: login, CRUD operations, role-based access, CSV upload, password reset. Vitest does not replace Playwright.
+- **Playwright** (`e2e/`) — full user flows: login, CRUD, role-based access, CSV upload, password reset. Vitest does not replace Playwright.
 
 ### Conventions
 
-- **Mock only external boundaries.** Mock Axios/API calls and browser APIs when necessary. Do not mock React, React Query, or component internals.
+- **Mock only external boundaries.** Mock Axios/API calls and browser APIs. Do not mock React, React Query, or component internals.
 - **Use a real `QueryClient`** (created fresh per test with `retry: false`) when testing hooks or context. Don't mock React Query's hooks.
 - **Pass mock API functions as options** to hooks rather than using `vi.mock` on imports — hooks accept API functions as parameters.
 - **Use `@testing-library/user-event`** (`user.click()`, `user.type()`) over `fireEvent`.
 - **Use `@testing-library/jest-dom`** matchers (`toBeInTheDocument()`, `toHaveValue()`).
-- **Use explicit `cleanup()` in `afterEach`** for tests that render components with `<Navigate>` or dialogs — RTL auto-cleanup doesn't fire reliably in this vitest config.
+- **Use explicit `cleanup()` in `afterEach`** for tests rendering components with `<Navigate>` or dialogs — RTL auto-cleanup doesn't fire reliably in this vitest config.
 - **Wrap route components in `<MemoryRouter>`** rather than mocking `useNavigate`.
 - **No snapshot testing.** Not useful for this app's component structure.
 - **No coverage targets.** Cover logic, not line counts.
+- Test setup (`src/test/setup.ts`) polyfills `localStorage` and `globalThis.window` for React 19 scheduler.
 
-## API Proxy
+## Adding a New CRUD Page
 
-Vite dev server proxies `/api` → `http://backend:8000` (see `vite.config.mts`). In production the backend sits behind the same origin. All API calls use relative paths — never hardcode absolute backend URLs in application code.
+1. Add types to `src/types/` (or extend existing type files)
+2. Add API functions to `src/lib/api.ts`
+3. Add query keys to `src/lib/queryKeys.ts`
+4. Reuse `useCrudManager` (flat lists) or `HierarchicalManage` (parent + children)
+5. Reuse existing table/form components from `src/components/`
+6. Add route in `src/lib/routes.ts` and lazy-loaded page in `src/App.tsx`
+7. Add Vitest tests for new logic; Playwright tests if user workflow changes
 
-## Authentication
+## Linting
 
-- **Cookie-based auth** (HttpOnly cookies), **not** JWT in localStorage.
-- Axios `withCredentials: true` sends cookies with every request.
-- On `401`, the Axios interceptor attempts a silent refresh via `POST /api/auth/refresh` with thundering-herd protection (single in-flight refresh, pending 401s retry afterward).
-- If refresh fails, the interceptor rejects — `AuthContext` sets `user=null` and React Router navigates to `/login` (no hard redirect).
-- `AuthContext` exposes `setUser(user)` for endpoints that auto-log the user in (e.g. referrer self-registration via invite).
-
-## API Layer
-
-- Functions are grouped by domain: auth, admin, referrer, family, shared.
-- Functions return `response.data`, not raw Axios response objects. **Exception:** `loginRequest` and `registerRequest` return the full axios response (AuthContext destructures `{ data }` from them — do not change this).
-- Extend `src/lib/api.ts` rather than creating new fetch utilities.
-
-## Error Handling
-
-- `formatApiError(error, fallback?)` in `src/lib/utils.ts` extracts user-facing strings from Axios errors.
-- `useToast()` from `src/context/ToastContext` — use `toast.error()` / `toast.success()` / `toast.info()` for popup notifications.
-- `MutationErrors` auto-shows mutation errors as toasts. `ErrorBox` is for inline form validation only.
-
-## Shared CRUD Hook
-
-`src/hooks/useCrudManager.ts` encapsulates list/detail CRUD pages. Reuse it instead of duplicating CRUD state management.
-
-## HierarchicalManage Component
-
-`src/components/HierarchicalManage.tsx` wraps `useCrudManager` for parent-detail + child-CRUD pages (e.g. referrer → families → people). Use it instead of manually composing parent queries + child CRUD. See `ReferrerFamilyDetail` for the pattern.
-
-### Adding a New CRUD Page
-
-1. Add API functions to `src/lib/api.ts`
-2. Reuse `useCrudManager` (flat lists) or `HierarchicalManage` (parent + children)
-3. Reuse existing table/form components from `src/components/`
-4. Add route in `src/lib/routes.ts` and lazy-loaded page in `src/App.tsx`
-5. Add Vitest tests for new logic; Playwright tests if user workflow changes
-
-## User Roles and Routes
-
-Three roles: `admin`, `referrer`, `family`.
-
-- **`ProtectedRoute`** component wraps routes with a `roles` array. Unauthenticated users are redirected to `/login`; wrong-role users to `/dashboard`.
-- **`PublicRoute`** wraps public pages (login, registration). Authenticated users see an "Already Logged In" page instead of a silent redirect.
-- Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
-- Route paths are centralized in `src/lib/routes.ts`. Always use `ROUTES` constants and `route` helpers rather than hardcoded strings.
-
-## Structure
-
-Only entries that encode conventions are listed here. The full directory tree is discoverable — these are the locations that matter because they carry rules.
-
-- `src/components/` — Reusable UI components. Use **named exports**.
-- `src/types/` — Shared TypeScript types. Import from here rather than redefining shapes.
-- `src/lib/api.ts` — Axios instance and all API functions. Do not call Axios directly from page components.
-- `src/lib/routes.ts` — Route constants and dynamic builders. Always use `ROUTES` constants rather than hardcoded strings.
-- `src/hooks/useCrudManager.ts` — Shared CRUD hook. Reuse it instead of duplicating CRUD state management.
-- `src/components/HierarchicalManage.tsx` — Shared parent-detail + child-CRUD wrapper. Use for hierarchical admin views (e.g. referrer → families → people).
-- `src/components/InternalNotesSection.tsx` — Internal notes editor for family detail pages.
-- Pages in `src/pages/` are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
-- Test files: `*.test.ts` / `*.test.tsx` alongside source.
-
-## Linting and Formatting
-
-**Biome** (`@biomejs/biome`) handles linting and formatting. Config is in `biome.json`.
+**Biome** (`@biomejs/biome`) handles linting and formatting. Config in `biome.json`.
 
 - Double quotes, semicolons, 140 char line width, organize imports
-- Lint: `recommended` preset, see `biome.json` for overrides
 - Run `npm run lint` to check, `npm run lint:fix` to auto-fix
 - Biome formatting is authoritative. Do not manually reformat code against Biome's output.
 

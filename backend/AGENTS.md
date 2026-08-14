@@ -24,7 +24,7 @@ Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware 
 - **Family approval:** Invite-registered families start as `pending`; direct creation is `approved`. Referrer queries filter by `approved` status. Admin sees all.
 - **Referrer approval:** Unlocked invite codes start as `pending`; email-locked codes and admin-created referrers are auto-`approved`. Rejected referrers cannot log in. Pending referrers are blocked from `send-family-invite`.
 - **Invite codes:** Referrer tokens use `KRI-` prefix, family tokens use `KFI-` prefix (10 chars each). Use `generate_invite_code(prefix=...)` from `auth.py`.
-- **Role-based access:** Five roles — `admin`, `referrer`, `family`, `purchaser`, `delivery`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides role-check and ownership-check dependencies.
+- **Role-based access:** Six roles — `admin`, `referrer`, `family`, `purchaser`, `delivery`, `donor`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides role-check, ownership-check, and capability-check dependencies (e.g. `require_claim_capable`).
 - **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline.
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
 - **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked.
@@ -42,7 +42,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `database.py` | Engine and session setup |
 | `auth.py` | JWT creation/validation, password hashing, current-user dependencies |
 | `auth_routes.py` | Login, register, password reset, token refresh, referrer/family self-registration via invites |
-| `permissions.py` | Role-check and ownership-check dependencies |
+| `permissions.py` | Role-check, ownership-check, and capability-check dependencies |
 | `response_builders.py` | Response dict construction |
 | `user_validation.py` | Shared user registration validation logic |
 | `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
@@ -52,7 +52,9 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
+| `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
 | `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
+| `donor_routes.py` | Donor / claim-capable self-service (family claims — available to admin, referrer, purchaser, donor) |
 | `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
