@@ -114,26 +114,15 @@ def list_families(
     return FamilyListResponse(
         families=[
             FamilyDetail(
-                id=f.id,
-                display_id=pos_map[f.id],
-                family_name=f.family_name,
-                family_wish=f.family_wish,
-                contact_name=f.contact_name,
-                referrer_id=f.referrer_id,
-                referrer_name=None,
-                delivery_user_id=f.delivery_user_id,
-                delivery_user_name=None,
-                bio=f.bio,
-                address=f.address,
-                phone_number=f.phone_number,
-                approval_status=f.approval_status,
-                pickup_window=f.pickup_window,
-                deleted_at=f.deleted_at,
-                person_count=count_map.get(f.id, 0),
-                wish_lock_level=f.wish_lock_level,
-                wish_review_requested_at=f.wish_review_requested_at,
-                wish_rejection_reason=f.wish_rejection_reason,
-                referrer_notes=f.referrer_notes,
+                **build_family_detail(
+                    f,
+                    db,
+                    person_count=count_map.get(f.id, 0),
+                    display_id=pos_map[f.id],
+                    include_referrer_notes=True,
+                    include_delivery=True,
+                    include_claim=True,
+                )
             )
             for f in families
         ]

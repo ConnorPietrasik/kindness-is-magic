@@ -519,22 +519,37 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
 
 
 def build_family_detail(
-    fam: Family, db: Session, *, person_count: int | None = None, include_referrer_notes: bool = False, include_delivery: bool = True
+    fam: Family,
+    db: Session,
+    *,
+    person_count: int | None = None,
+    display_id: str | None = None,
+    include_referrer_notes: bool = False,
+    include_delivery: bool = True,
+    include_claim: bool = True,
+    claim_map: dict[int, FamilyClaim] | None = None,
+    donor_map: dict[int, str] | None = None,
 ) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 
     Pass ``person_count`` to skip the query when it is already known.
+    Pass ``display_id`` to skip the compute_display_ids query (for list views
+    that already batch-compute IDs).
     Pass ``include_referrer_notes=True`` to include the referrer_notes field
     (for referrer and admin views; omit for family self-service).
     Pass ``include_delivery=False`` to skip the delivery-user lookup
     (for family self-service views that don't expose delivery info).
+    Pass ``include_claim=False`` to skip claim lookups.
+    Pass pre-loaded ``claim_map`` (family_id → FamilyClaim) and ``donor_map``
+    (user_id → display_name) to avoid per-family claim queries.
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
 
-    # Compute display_id scoped to the family's referrer
-    display_id_map = compute_display_ids(db, "family", [fam], scope=fam.referrer_id)
-    display_id = display_id_map.get(fam.id, "0")
+    # Compute display_id (skip if already provided)
+    if display_id is None:
+        display_id_map = compute_display_ids(db, "family", [fam], scope=fam.referrer_id)
+        display_id = display_id_map.get(fam.id, "0")
 
     # Resolve referrer name
     referrer_name: str | None = None
@@ -551,25 +566,34 @@ def build_family_detail(
             delivery_user_name = del_user.display_name
 
     # Resolve active claim info
-    active_claim = (
-        db.query(FamilyClaim)
-        .filter(
-            FamilyClaim.family_id == fam.id,
-            FamilyClaim.deleted_at.is_(None),
-        )
-        .first()
-    )
     claim_status: str | None = None
     claim_commitment_type: str | None = None
     claim_donor_name: str | None = None
     claim_id: int | None = None
-    if active_claim:
-        claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
-        claim_commitment_type = active_claim.commitment_type.value
-        claim_id = active_claim.id
-        donor = db.query(User).filter(User.id == active_claim.donor_user_id).first()
-        if donor and donor.deleted_at is None:
-            claim_donor_name = donor.display_name
+    if include_claim:
+        active_claim = (
+            claim_map.get(fam.id)
+            if claim_map is not None
+            else (
+                db.query(FamilyClaim)
+                .filter(
+                    FamilyClaim.family_id == fam.id,
+                    FamilyClaim.deleted_at.is_(None),
+                )
+                .first()
+            )
+        )
+        if active_claim:
+            claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
+            claim_commitment_type = active_claim.commitment_type.value
+            claim_id = active_claim.id
+            donor = (
+                donor_map.get(active_claim.donor_user_id)
+                if donor_map is not None
+                else (db.query(User).filter(User.id == active_claim.donor_user_id).first())
+            )
+            if donor and (donor.deleted_at if isinstance(donor, User) else False) is None:
+                claim_donor_name = donor.display_name if isinstance(donor, User) else donor
 
     result: dict = {
         "id": fam.id,
