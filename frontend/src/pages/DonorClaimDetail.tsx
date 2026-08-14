@@ -12,7 +12,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
-import { donorClaim, donorClaims } from "../lib/queryKeys";
+import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
 import type { CommitmentType, DonorWishPurchaseMark, FamilyClaimDetail, FamilyClaimUpdate, WishSummary } from "../types";
@@ -285,7 +285,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: donorClaims });
       queryClient.invalidateQueries({ queryKey: donorClaim(claim.id) });
-      queryClient.invalidateQueries({ queryKey: ["publicFamilies"] });
+      queryClient.invalidateQueries({ queryKey: publicFamilies });
       toast.success("Claim cancelled");
     },
   });

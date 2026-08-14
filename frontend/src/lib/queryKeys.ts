@@ -101,6 +101,8 @@ export const referrerMe = ["referrerMe"] as const;
 
 /** Referrer's approved families list */
 export const referrerFamilies = ["referrerFamilies"] as const;
+/** Key prefix for a single referrer family detail (invalidate all details) */
+export const referrerFamily = ["referrerFamily"] as const;
 /** Single family detail for a referrer (pass id at call site) */
 export const referrerFamilyDetail = (id: string) => ["referrerFamily", id] as const;
 

@@ -5,8 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { claimFamily } from "../lib/api";
-import { donorClaims, familyWishList } from "../lib/queryKeys";
-import { ROUTES } from "../lib/routes";
+import { donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
+import { ROUTES, route } from "../lib/routes";
 import type { CommitmentType } from "../types";
 import { Button } from "./Button";
 import { MutationErrors } from "./MutationErrors";
@@ -81,11 +81,11 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
     mutationFn: () => claimFamily(familyId, commitmentType),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: donorClaims });
-      queryClient.invalidateQueries({ queryKey: ["publicFamilies"] });
+      queryClient.invalidateQueries({ queryKey: publicFamilies });
       queryClient.invalidateQueries({ queryKey: familyWishList(familyId) });
       onClose();
       // Navigate to the claim detail page
-      navigate(`/donor/claims/${data.id}`);
+      navigate(route.donorClaimDetail(data.id));
       if (data.email_error) {
         toast.info(
           "Claim created! However, we couldn't send your confirmation email. " + "Please contact us if you need a record of your claim."

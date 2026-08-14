@@ -27,7 +27,7 @@ import {
   listReferrerFamilies,
   updateReferrerFamily,
 } from "../lib/api";
-import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
+import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamily, referrerFamilies, referrerMe } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyPayload, WishLockLevel } from "../types";
@@ -75,7 +75,7 @@ export default function ReferrerFamilies() {
     createFn: createReferrerFamily,
     updateFn: updateReferrerFamily,
     deleteFn: deleteReferrerFamily,
-    invalidationKeys: [referrerFamilies, referrerMe, ["referrerFamily"]],
+    invalidationKeys: [referrerFamilies, referrerMe, referrerFamily],
     entityName: "Family",
   });
 
