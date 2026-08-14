@@ -112,6 +112,15 @@ describe("normalizeUpdatePayload", () => {
     expect(result.family_name).toBeUndefined();
   });
 
+  it("omits unchanged nullable fields when the form state retains null", () => {
+    const original = { family_name: "Smith", bio: null as string | null, address: null as string | null };
+    const form = { family_name: "Smith Updated", bio: null as string | null, address: null as string | null };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result.bio).toBeUndefined();
+    expect(result.address).toBeUndefined();
+    expect(result.family_name).toBe("Smith Updated");
+  });
+
   it("includes changed non-nullable fields", () => {
     const original = { family_name: "Smith", contact_name: "John" };
     const form = { family_name: "Jones", contact_name: "John" };

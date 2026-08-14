@@ -59,9 +59,10 @@ export function normalizeUpdatePayload<T, O>(formData: T, original: O | null): P
       continue;
     }
 
-    // Treat null ≡ "" for comparison (forms render null as "")
+    // Treat null ≡ "" for comparison (forms render null as "" and retain
+    // null for untouched nullable fields initialized from the detail record)
     const originalStr = originalValue ?? "";
-    if (originalStr === formValue) {
+    if (originalStr === (formValue ?? "")) {
       continue; // unchanged — omit
     }
     result[key] = formValue;
