@@ -86,9 +86,9 @@ def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, di
             "id": fid,
             "display_id": display_id_map.get(fid, "0"),
             "bio": fam_map[fid].bio,
-            "person_count": agg_map[fid][0] if agg_map[fid][0] else 0,
-            "min_age": agg_map[fid][1],
-            "max_age": agg_map[fid][2],
+            "person_count": agg_map.get(fid, (0, None, None))[0],
+            "min_age": agg_map.get(fid, (0, None, None))[1],
+            "max_age": agg_map.get(fid, (0, None, None))[2],
         }
         for fid in family_ids
     }

@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.mail import (
     _wrap_email,
+    build_admin_email_failure_notice,
+    build_claim_confirmation_email,
     build_family_approved_email,
     build_family_invite_email,
     build_family_pending_email,
@@ -103,6 +105,54 @@ EXAMPLES = [
             referrer_name="David Park",
         ),
         "unsubscribe": True,
+    },
+    {
+        "filename": "09-claim-confirmation.html",
+        "label": "Donor Claim Confirmation",
+        "body": build_claim_confirmation_email(
+            donor_name="Alex Thompson",
+            family_display_id="3-2",
+            family_wish="Warm clothes and school supplies",
+            family_bio="A family of four looking for winter clothing and school supplies.",
+            people=[
+                {
+                    "given_name": "Emma",
+                    "age": 8,
+                    "wishes": [
+                        {"type": "practical", "description": "A winter coat", "size": "Medium"},
+                        {"type": "fun", "description": "A doll", "size": None},
+                    ],
+                },
+                {
+                    "given_name": "Liam",
+                    "age": 5,
+                    "wishes": [
+                        {"type": "practical", "description": "Warm boots", "size": "Size 14"},
+                        {"type": "fun", "description": "Lego set", "size": None},
+                    ],
+                },
+                {
+                    "given_name": "Maria",
+                    "age": 34,
+                    "wishes": [
+                        {"type": "adult", "description": "Winter jacket", "size": "Large"},
+                    ],
+                },
+            ],
+            claim_detail_url="https://kindnessismagic.love/donor/claims/42",
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "10-admin-email-failure.html",
+        "label": "Admin Email Failure Notice",
+        "body": build_admin_email_failure_notice(
+            donor_email="alex.thompson@example.com",
+            family_display_id="3-2",
+            claim_id=42,
+            error_summary="SMTP connection refused",
+        ),
+        "unsubscribe": False,
     },
 ]
 

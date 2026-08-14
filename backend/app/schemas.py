@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 
 from app.models import (
     CommitmentType,
@@ -1270,8 +1270,16 @@ class FamilyClaimSummary(BaseModel):
     notes: str | None = None
     created_at: datetime
     fulfilled_at: datetime | None = None
+    email_error: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler):
+        result = handler(self)
+        if self.email_error is None:
+            result.pop("email_error", None)
+        return result
 
 
 class FamilyClaimDetail(BaseModel):

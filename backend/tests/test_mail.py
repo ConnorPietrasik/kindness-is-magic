@@ -38,11 +38,10 @@ class TestUnsubscribeUrl:
     def test_url_uses_app_base_url(self, monkeypatch):
         from app import mail as mail_mod
 
-        monkeypatch.setenv("APP_BASE_URL", "http://custom.example.com")
-        # Force re-read of env var by patching os.environ
-        with patch.object(mail_mod.os, "environ", {"APP_BASE_URL": "http://custom.example.com"}):
-            url = mail_mod._unsubscribe_url("test@example.com")
-            assert url.startswith("http://custom.example.com/api/auth/unsubscribe?token=")
+        # mail.py imports APP_BASE_URL at module level, so we patch the binding on mail_mod directly
+        monkeypatch.setattr(mail_mod, "APP_BASE_URL", "http://custom.example.com")
+        url = mail_mod._unsubscribe_url("test@example.com")
+        assert url.startswith("http://custom.example.com/api/auth/unsubscribe?token=")
 
 
 class TestCheckUnsubscribed:

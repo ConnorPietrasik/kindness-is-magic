@@ -13,8 +13,14 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.auth import decode_access_token
-from app.config import GIFT_CLAIM_CAP
+from app.config import APP_BASE_URL, GIFT_CLAIM_CAP
 from app.database import get_db
+from app.mail import (
+    build_claim_confirmation_email,
+    build_admin_email_failure_notice,
+    send_email,
+    send_admin_notification,
+)
 from app.permissions import require_claim_capable
 from app.models import (
     CommitmentType,
@@ -280,8 +286,109 @@ def get_family_wish_list(
 # ---------------------------------------------------------------------------
 
 
+async def _send_claim_confirmation(
+    claim: FamilyClaim,
+    fam: Family,
+    user: User,
+    db: Session,
+) -> str | None:
+    """Send a claim confirmation email for gift commitments.
+
+    Returns an error message string if the email failed, or None on success.
+    """
+    # Build display_id early so the except block can reference it
+    display_id = compute_display_ids(db, "family", [fam], scope=None).get(fam.id, "0")
+
+    try:
+        # Load people + wishes for the email body
+        people = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).order_by(Person.id).all()
+        person_ids = [p.id for p in people]
+        wishes_by_person = batch_load_person_wishes(db, person_ids)
+
+        # Build people data for the template
+        people_data = [
+            {
+                "given_name": p.given_name,
+                "age": p.age,
+                "wishes": [{"type": w.type.value, "description": w.description, "size": w.size} for w in wishes_by_person.get(p.id, [])],
+            }
+            for p in people
+        ]
+
+        base = APP_BASE_URL
+        claim_detail_url = f"{base}/donor/claims/{claim.id}"
+
+        body = build_claim_confirmation_email(
+            donor_name=user.display_name,
+            family_display_id=display_id,
+            family_wish=fam.family_wish,
+            family_bio=fam.bio,
+            people=people_data,
+            claim_detail_url=claim_detail_url,
+        )
+
+        result = await send_email(
+            to=user.email,
+            subject=f"Claim Confirmation — Family {display_id}",
+            html_body=body,
+            db=db,
+        )
+
+        if result["sent"]:
+            return None
+        if result.get("reason") == "unsubscribed":
+            # Unsubscribe suppression is not an error
+            return None
+
+        # SMTP failure or other send failure
+        logger.error(
+            "Claim confirmation email failed: claim_id=%s donor_email=%s family_display_id=%s reason=%s",
+            claim.id,
+            user.email,
+            display_id,
+            result.get("reason"),
+        )
+
+        # Attempt admin notification (non-blocking)
+        try:
+            admin_body = build_admin_email_failure_notice(
+                donor_email=user.email,
+                family_display_id=display_id,
+                claim_id=claim.id,
+                error_summary=result.get("reason", "unknown"),
+            )
+            await send_admin_notification(
+                subject="Claim Confirmation Email Failed",
+                body_html=admin_body,
+                db=db,
+            )
+        except Exception:  # noqa: BLE001
+            logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
+
+        return "Confirmation email failed to send"
+
+    except Exception:  # noqa: BLE001
+        # Safety net for template rendering or other unexpected errors
+        logger.error("Unexpected error sending claim confirmation for claim %s", claim.id, exc_info=True)
+        try:
+            admin_body = build_admin_email_failure_notice(
+                donor_email=user.email,
+                family_display_id=display_id,
+                claim_id=claim.id,
+                error_summary="unexpected error",
+            )
+            await send_admin_notification(
+                subject="Claim Confirmation Email Failed",
+                body_html=admin_body,
+                db=db,
+            )
+        except Exception:  # noqa: BLE001
+            logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
+        return "Confirmation email failed to send"
+
+
 @router.post("/{family_id}/claim", response_model=FamilyClaimSummary, status_code=status.HTTP_201_CREATED)
-def claim_family(
+async def claim_family(
     family_id: int,
     data: FamilyClaimCreate,
     db: Session = Depends(get_db),
@@ -293,6 +400,7 @@ def claim_family(
     * Validates family is not already actively claimed.
     * If commitment_type == "gifts", user must have < 5 active gift claims.
     * Cash claims have no limit.
+    * For gift claims, a confirmation email is sent to the donor.
     """
     # 1. Validate family exists and is active
     fam = get_active_or_404(db, Family, family_id, "Family not found")
@@ -342,6 +450,11 @@ def claim_family(
 
     logger.info("User %s claimed family %s (commitment=%s)", user.id, family_id, data.commitment_type.value)
 
+    # 5. Send confirmation email for gift claims
+    email_error: str | None = None
+    if data.commitment_type == CommitmentType.gifts:
+        email_error = await _send_claim_confirmation(claim, fam, user, db)
+
     return FamilyClaimSummary(
         id=claim.id,
         family=build_family_info(fam, db),
@@ -349,4 +462,5 @@ def claim_family(
         notes=claim.notes,
         created_at=claim.created_at,
         fulfilled_at=claim.fulfilled_at,
+        email_error=email_error,
     )

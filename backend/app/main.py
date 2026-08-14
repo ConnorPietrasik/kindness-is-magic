@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth import get_password_hash
+from app.config import APP_BASE_URL
 from app.database import get_db
 from app.models import User, UserRole
 
@@ -241,7 +242,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 # ---------------------------------------------------------------------------
 # CORS — required for HttpOnly cookie auth from a different origin
 # ---------------------------------------------------------------------------
-_cors_origins = [os.environ.get("APP_BASE_URL", "http://localhost")]
+_cors_origins = [APP_BASE_URL]
 if os.environ.get("DEBUG", "false").lower() == "true":
     _cors_origins.append("http://localhost")
 app.add_middleware(

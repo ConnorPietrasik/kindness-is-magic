@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Location } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { claimFamily } from "../lib/api";
 import { donorClaims, familyWishList } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -74,6 +75,7 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
   const [commitmentType, setCommitmentType] = useState<CommitmentType>("gifts");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const claimMut = useMutation({
     mutationFn: () => claimFamily(familyId, commitmentType),
@@ -84,6 +86,11 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
       onClose();
       // Navigate to the claim detail page
       navigate(`/donor/claims/${data.id}`);
+      if (data.email_error) {
+        toast.info(
+          "Claim created! However, we couldn't send your confirmation email. " + "Please contact us if you need a record of your claim."
+        );
+      }
     },
   });
 

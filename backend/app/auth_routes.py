@@ -1,13 +1,14 @@
 """Authentication routes: /api/auth/*"""
 
 import logging
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
+
+from app.config import APP_BASE_URL
 
 from app.auth import (
     INVITE_EXPIRY_HOURS,
@@ -338,7 +339,7 @@ async def forgot_password(request: Request, data: ForgotPassword, db: Session = 
     db.commit()
 
     # Send password reset email (exempt from unsubscribe block)
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     reset_link = f"{base}/reset-password/{raw_token}"
     html_body = build_password_reset_email(reset_link)
     result = await send_email(

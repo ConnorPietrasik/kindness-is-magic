@@ -577,6 +577,7 @@ export interface FamilyClaimSummary {
   notes: string | null;
   created_at: string;
   fulfilled_at: string | null;
+  email_error?: string;
 }
 
 /** Full claim detail with wish list. */

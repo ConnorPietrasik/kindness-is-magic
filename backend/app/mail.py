@@ -10,6 +10,7 @@ from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
+from app.config import APP_BASE_URL
 from app.models import EmailPreference
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration (from environment)
 # ---------------------------------------------------------------------------
+
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
 
 MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
 MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
@@ -63,7 +66,7 @@ def _unsubscribe_url(email: str) -> str:
     Produces a URL like ``GET /api/auth/unsubscribe?token=...``.
     """
     token = jwt.encode({"email": email}, SECRET_KEY, algorithm=ALGORITHM)
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     path = "/api/auth/unsubscribe"
     params = urlencode({"token": token})
     return f"{base}{path}?{params}"
@@ -157,7 +160,7 @@ def build_invite_email(
 ) -> str:
     """Build the HTML body for a referrer invite email."""
     expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     from_line = (
         f"<p>You've been invited by <strong>{from_name}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
         if from_name
@@ -190,7 +193,7 @@ def build_password_reset_email(reset_link: str) -> str:
 
 def build_family_pending_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "new family pending approval" notification to the referrer."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
 <p>A new family, <strong>{family_name}</strong>, has registered through your family invite code and is awaiting your approval.</p>
 <p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Review Pending Families</a></p>
@@ -199,7 +202,7 @@ def build_family_pending_email(family_name: str, referrer_name: str) -> str:
 
 def build_family_approved_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "family approved" notification to the family contact."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     return f"""<p>Great news, <strong>{family_name}</strong>!</p>
 <p>Your family has been <strong>approved</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
 <p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""
@@ -207,7 +210,7 @@ def build_family_approved_email(family_name: str, referrer_name: str) -> str:
 
 def build_family_invite_email(code: str, referrer_name: str) -> str:
     """Build the HTML body for a family invite email sent by a referrer."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     return f"""<p>Hi there,</p>
 <p><strong>{referrer_name}</strong> would like to connect your family with Kindness Is Magic. Use the invite code below to sign up:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
@@ -217,7 +220,7 @@ def build_family_invite_email(code: str, referrer_name: str) -> str:
 
 def build_referrer_approved_email(referrer_name: str) -> str:
     """Build the HTML body for a referrer approval notification."""
-    base = os.environ.get("APP_BASE_URL", "http://localhost")
+    base = APP_BASE_URL
     return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
 <p>Great news — your Kindness Is Magic account has been <strong>approved</strong> ✨</p>
 <p>You can now send family invite emails and connect families in need with the support and joy they deserve.</p>
@@ -230,3 +233,150 @@ def build_referrer_rejected_email(referrer_name: str) -> str:
     return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
 <p>Thank you for your interest in helping with Kindness Is Magic.</p>
 <p>After review, we've decided not to move forward with your account at this time. We appreciate your willingness to contribute and wish you the best.</p>"""
+
+
+# ---------------------------------------------------------------------------
+# Donor claim confirmation email
+# ---------------------------------------------------------------------------
+
+
+def _build_wish_table_rows(people: list[dict]) -> str:
+    """Build HTML table rows for people and their wishes.
+
+    Each person dict has: given_name, age, wishes (list of {type, description, size}).
+    Children (age < 18) get practical + fun columns.
+    Adults (age >= 18) get a single 'Wish' column.
+    """
+    rows = ""
+    for person in people:
+        name = person["given_name"]
+        age = person["age"]
+        wishes = {w["type"]: w for w in person.get("wishes", [])}
+
+        if age >= 18:
+            # Adult: single wish column
+            adult_wish = wishes.get("adult", {})
+            desc = adult_wish.get("description", "")
+            size = adult_wish.get("size")
+            size_str = f" ({size})" if size else ""
+            rows += f"""<tr>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{name} (age {age})</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{desc}{size_str}</td>
+</tr>"""
+        else:
+            # Child: practical + fun columns
+            practical = wishes.get("practical", {})
+            fun = wishes.get("fun", {})
+            p_desc = practical.get("description", "")
+            p_size = practical.get("size")
+            p_size_str = f" ({p_size})" if p_size else ""
+            f_desc = fun.get("description", "")
+            f_size = fun.get("size")
+            f_size_str = f" ({f_size})" if f_size else ""
+            rows += f"""<tr>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{name} (age {age})</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{p_desc}{p_size_str}</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{f_desc}{f_size_str}</td>
+</tr>"""
+
+    return rows
+
+
+def _build_wish_table_header(has_children: bool) -> str:
+    """Build the table header row."""
+    if has_children:
+        return """<tr style="background-color:#f5f0fc;">
+  <th style="padding:8px 12px;text-align:left;font-size:13px;color:#4c1d95;">Person</th>
+  <th style="padding:8px 12px;text-align:left;font-size:13px;color:#4c1d95;">Practical Wish</th>
+  <th style="padding:8px 12px;text-align:left;font-size:13px;color:#4c1d95;">Fun Wish</th>
+</tr>"""
+    else:
+        return """<tr style="background-color:#f5f0fc;">
+  <th style="padding:8px 12px;text-align:left;font-size:13px;color:#4c1d95;">Person</th>
+  <th style="padding:8px 12px;text-align:left;font-size:13px;color:#4c1d95;">Wish</th>
+</tr>"""
+
+
+def build_claim_confirmation_email(
+    donor_name: str,
+    family_display_id: str,
+    family_wish: str,
+    family_bio: str | None,
+    people: list[dict],
+    claim_detail_url: str,
+) -> str:
+    """Build the HTML body for a donor claim confirmation email.
+
+    Args:
+        donor_name: The donor's display name.
+        family_display_id: The family's display ID (e.g. "1-3").
+        family_wish: The family's overall wish (e.g. "Warm clothes").
+        family_bio: Optional family bio text.
+        people: List of person dicts with given_name, age, and wishes.
+            Each wish has type, description, and optional size.
+        claim_detail_url: Full URL to the claim detail page.
+    """
+    has_children = any(p["age"] < 18 for p in people)
+
+    bio_line = f"<p>{family_bio}</p>" if family_bio else ""
+
+    family_wish_html = f"""<div style="background-color:#f5f0fc;padding:12px 16px;border-radius:4px;margin-bottom:12px;"><strong>Family wish:</strong> {family_wish}</div>"""
+
+    if people:
+        table_html = f"""<table style="width:100%;border-collapse:collapse;margin:16px 0;">
+{_build_wish_table_header(has_children)}
+{_build_wish_table_rows(people)}
+</table>"""
+    else:
+        table_html = """<p style="color:#666666;font-style:italic;">No family members have been added to this family yet. You can check back later or contact the organization for details.</p>"""
+
+    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+<p>Thank you for claiming <strong>Family {family_display_id}</strong> on Kindness Is Magic ✨</p>
+{bio_line}
+<h2 style="font-size:16px;color:{_BRAND_COLOR};margin-top:20px;">Wish List</h2>
+{family_wish_html}
+{table_html}
+<p style="text-align:center;margin-top:24px;"><a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">View Your Claim</a></p>
+<p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts.</p>"""
+
+
+def build_admin_email_failure_notice(
+    donor_email: str,
+    family_display_id: str,
+    claim_id: int,
+    error_summary: str,
+) -> str:
+    """Build the HTML body for an admin notification about a failed confirmation email."""
+    base = APP_BASE_URL
+    return f"""<p>An error occurred while sending the claim confirmation email to a donor.</p>
+<table style="width:100%;border-collapse:collapse;margin:16px 0;">
+<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{donor_email}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Family</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{family_display_id}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Claim ID</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{claim_id}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{error_summary}</td></tr>
+</table>
+<p style="text-align:center;"><a href="{base}/admin" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Admin Dashboard</a></p>"""
+
+
+async def send_admin_notification(
+    subject: str,
+    body_html: str,
+    db: Session,
+) -> dict:
+    """Send a notification email to the admin address.
+
+    Skips silently if ADMIN_EMAIL is not configured.
+    Returns the same dict format as send_email.
+    """
+    if not ADMIN_EMAIL:
+        logger.warning("Admin notification skipped: ADMIN_EMAIL not configured")
+        return {"sent": False, "reason": "no_admin_email"}
+
+    return await send_email(
+        to=ADMIN_EMAIL,
+        subject=f"[Kindness Is Magic] {subject}",
+        html_body=body_html,
+        db=db,
+        exempt_unsubscribe=True,
+        include_unsubscribe_link=False,
+    )
