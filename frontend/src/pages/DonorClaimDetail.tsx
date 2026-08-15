@@ -247,8 +247,10 @@ function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary;
                 className="flex-1"
                 onClick={() =>
                   markMut.mutate({
+                    // purchased_where always overwrites (null clears)
                     purchased_where: purchasedWhere || null,
-                    purchaser_note: purchaserNote || null,
+                    // "" is the backend sentinel for clearing (null = no change)
+                    purchaser_note: purchaserNote,
                   })
                 }
                 loading={markMut.isPending}

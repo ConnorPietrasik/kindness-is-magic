@@ -196,7 +196,7 @@ test.describe("Role Downstream", () => {
       await markBtn.first().click();
 
       // Dialog opens
-      await expect(page.getByText(/Mark gift for/)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/Mark wish for/)).toBeVisible({ timeout: 10_000 });
 
       // Fill purchased where and submit
       await page.getByLabel("Purchased Where").fill("E2E Test Store");
