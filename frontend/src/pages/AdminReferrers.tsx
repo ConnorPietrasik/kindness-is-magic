@@ -8,7 +8,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
@@ -50,6 +50,7 @@ import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const pagination = usePagination();
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
@@ -147,6 +148,7 @@ export default function AdminReferrers() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
+            <Button onClick={() => navigate(route.adminInviteCodes(true))}>Invite Referrers</Button>
             {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
           </div>

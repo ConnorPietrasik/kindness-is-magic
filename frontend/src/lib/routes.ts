@@ -68,6 +68,7 @@ export const route = {
   resetPassword: (token: string) => `/reset-password/${token}`,
   referrerFamilyDetail: (id: number | string) => `/referrer/families/${id}`,
   adminReferrerFamilies: (id: number | string) => `/admin/referrers/${id}/families`,
+  adminInviteCodes: (openGenerator?: boolean) => (openGenerator ? "/admin/invite-codes?generate=1" : "/admin/invite-codes"),
   adminFamilyPeople: (id: number | string) => `/admin/families/${id}/people`,
   familyWishList: (id: number | string) => `/families/${id}/wish-list`,
   adminPackingSlips: (familyIds?: number[]) =>

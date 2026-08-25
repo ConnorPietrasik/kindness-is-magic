@@ -6,7 +6,8 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -34,10 +35,19 @@ import type { InviteListParams, ReferrerInviteResponse } from "../types";
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
   const pagination = usePagination();
+  const [searchParams] = useSearchParams();
 
   const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
   const [showExpired, setShowExpired] = useState<boolean | undefined>(undefined);
-  const [showGenerator, setShowGenerator] = useState(false);
+  // ?generate=1 opens the generator (e.g. navigation from the referrers page)
+  const [showGenerator, setShowGenerator] = useState(searchParams.get("generate") === "1");
+  const generateParamOpen = searchParams.get("generate") === "1";
+
+  useEffect(() => {
+    // Covers the param appearing while the page is already mounted (same route,
+    // search change only), where the useState initializer has already run.
+    if (generateParamOpen) setShowGenerator(true);
+  }, [generateParamOpen]);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
