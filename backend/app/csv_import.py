@@ -48,6 +48,7 @@ from app.models import (
     UserRole,
     Wish,
     WishType,
+    default_display_name_from_email,
 )
 from app.user_validation import (
     sanitize_plain_text,
@@ -754,7 +755,7 @@ def _process_users(
                 if ref:
                     display_name = ref.name
         if display_name is None:
-            display_name = email.split("@")[0]  # e.g. "mike.torres"
+            display_name = default_display_name_from_email(email)  # e.g. "Mike.torres"
 
         user = User(
             email=email,

@@ -492,7 +492,7 @@ csv_admin@test.com,Password123!,admin,,
 
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_admin@test.com").first()
-        assert user.display_name == "csv_admin"
+        assert user.display_name == "Csv_admin"
 
     def test_referrer_user_gets_referrer_name(self, test_client: TestClient, admin_user, db: Session):
         """Referrer users imported via CSV get display_name from referrer name."""
@@ -538,4 +538,4 @@ csv_fam@test.com,Password123!,family,,Fam Csv
 
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_fam@test.com").first()
-        assert user.display_name == "csv_fam"
+        assert user.display_name == "Csv_fam"

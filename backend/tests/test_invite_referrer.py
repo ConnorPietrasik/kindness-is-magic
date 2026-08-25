@@ -264,7 +264,7 @@ class TestInviteReferrerCreate:
         from unittest.mock import patch
 
         # display_name is now non-nullable; defaults to email prefix
-        assert admin_user.display_name == "admin"
+        assert admin_user.display_name == "Admin"
         login_as(test_client, "admin@test.com", "AdminPass123!")
 
         captured_from_name = {}
@@ -279,7 +279,7 @@ class TestInviteReferrerCreate:
                 json={"family_limit": 10, "email": "newref@example.com"},
             )
         assert resp.status_code == 201
-        assert captured_from_name["value"] == "admin"
+        assert captured_from_name["value"] == "Admin"
 
 
 # ---------------------------------------------------------------------------

@@ -38,6 +38,7 @@ from app.models import (
     RefreshToken,
     User,
     UserRole,
+    default_display_name_from_email,
 )
 from app.permissions import require_admin
 from app.schemas import (
@@ -611,7 +612,7 @@ async def register_family(
         email=data.email,
         hashed_password=get_password_hash(data.password),
         role=UserRole.family,
-        display_name=data.email.split("@")[0],
+        display_name=default_display_name_from_email(data.email),
         family_id=family.id,
     )
     db.add(user)

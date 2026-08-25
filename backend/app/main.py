@@ -19,7 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.auth import get_password_hash
 from app.config import APP_BASE_URL
 from app.database import get_db
-from app.models import User, UserRole
+from app.models import User, UserRole, default_display_name_from_email
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
                     email=admin_email,
                     hashed_password=get_password_hash(admin_password),
                     role=UserRole.admin,
-                    display_name=admin_email.split("@")[0],
+                    display_name=default_display_name_from_email(admin_email),
                     referrer_id=None,
                     family_id=None,
                 )

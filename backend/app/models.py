@@ -32,6 +32,15 @@ class UserRole(str, enum.Enum):
     donor = "donor"
 
 
+def default_display_name_from_email(email: str | None) -> str:
+    """Derive a default display name from the email local-part.
+
+    Capitalizes the first character, e.g. ``sarah.chen@example.com`` → ``"Sarah.chen"``.
+    """
+    local = email.split("@")[0] if email else ""
+    return local[:1].upper() + local[1:]
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -63,11 +72,11 @@ class User(Base):
     def _default_display_name(self, _key: str, value: str | None) -> str:
         """Ensure display_name always has a value.
 
-        If not provided or empty, defaults to the email local-part
-        (e.g. ``sarah.chen@example.com`` → ``"sarah.chen"``).
+        If not provided or empty, defaults to the email local-part with the
+        first letter capitalized (e.g. ``sarah.chen@example.com`` → ``"Sarah.chen"``).
         """
         if not value:
-            value = self.email.split("@")[0] if self.email else ""
+            value = default_display_name_from_email(self.email)
         return value
 
     family_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
