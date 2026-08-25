@@ -238,6 +238,7 @@ export default function AdminWishes() {
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <select
+            aria-label="Family filter"
             value={familyFilter ?? ""}
             onChange={(e) => {
               setFamilyFilter(e.target.value ? parseInt(e.target.value, 10) : null);
@@ -254,6 +255,7 @@ export default function AdminWishes() {
           </select>
 
           <select
+            aria-label="Assigned to filter"
             value={assignedToFilter ?? ""}
             onChange={(e) => {
               setAssignedToFilter(e.target.value ? parseInt(e.target.value, 10) : null);
@@ -270,6 +272,7 @@ export default function AdminWishes() {
           </select>
 
           <select
+            aria-label="Purchased filter"
             value={purchasedFilter}
             onChange={(e) => {
               setPurchasedFilter(e.target.value);
@@ -283,6 +286,7 @@ export default function AdminWishes() {
           </select>
 
           <select
+            aria-label="Wish type filter"
             value={wishTypeFilter}
             onChange={(e) => {
               setWishTypeFilter(e.target.value);
@@ -297,6 +301,7 @@ export default function AdminWishes() {
           </select>
 
           <select
+            aria-label="Sort"
             value={sortField}
             onChange={(e) => {
               setSortField(e.target.value);
@@ -320,6 +325,7 @@ export default function AdminWishes() {
           <input
             type="text"
             placeholder="Search wishes…"
+            aria-label="Search wishes"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);

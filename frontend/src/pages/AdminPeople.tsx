@@ -234,6 +234,7 @@ export default function AdminPeople() {
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
+              aria-label="Family filter"
               value={familyFilter ?? ""}
               onChange={(e) => {
                 setFamilyFilter(e.target.value ? parseInt(e.target.value, 10) : null);
@@ -251,6 +252,7 @@ export default function AdminPeople() {
             <input
               type="text"
               placeholder="Search all fields…"
+              aria-label="Search all fields"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -259,6 +261,7 @@ export default function AdminPeople() {
             <input
               type="number"
               placeholder="Min age"
+              aria-label="Minimum age"
               value={minAge}
               onChange={(e) => setMinAge(e.target.value)}
               className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -268,6 +271,7 @@ export default function AdminPeople() {
             <input
               type="number"
               placeholder="Max age"
+              aria-label="Maximum age"
               value={maxAge}
               onChange={(e) => setMaxAge(e.target.value)}
               className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -304,6 +308,7 @@ export default function AdminPeople() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by name"
                       value={searchName}
                       onChange={(e) => setSearchName(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -331,6 +336,7 @@ export default function AdminPeople() {
                     <input
                       type="text"
                       placeholder="Filter wishes…"
+                      aria-label="Filter by wishes"
                       value={searchWish}
                       onChange={(e) => setSearchWish(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -347,6 +353,7 @@ export default function AdminPeople() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by title"
                       value={searchTitle}
                       onChange={(e) => setSearchTitle(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -362,6 +369,7 @@ export default function AdminPeople() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by note"
                       value={searchNote}
                       onChange={(e) => setSearchNote(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"

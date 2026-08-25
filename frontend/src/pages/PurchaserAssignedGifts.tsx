@@ -123,6 +123,7 @@ export default function PurchaserAssignedGifts() {
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <select
+            aria-label="Purchased filter"
             value={purchasedFilter}
             onChange={(e) => {
               setPurchasedFilter(e.target.value);

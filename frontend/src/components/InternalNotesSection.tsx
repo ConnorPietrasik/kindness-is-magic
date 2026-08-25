@@ -62,6 +62,7 @@ export function InternalNotesSection({ initialNotes, onSave, isSaving }: Interna
       {expanded && (
         <div className="mt-3 space-y-2">
           <textarea
+            aria-label="Internal notes"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             rows={3}
             maxLength={1000}

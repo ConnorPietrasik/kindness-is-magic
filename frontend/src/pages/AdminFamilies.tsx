@@ -281,6 +281,7 @@ export default function AdminFamilies() {
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
+              aria-label="Approval status filter"
               value={approvalFilter}
               onChange={(e) => {
                 setApprovalFilter(e.target.value);
@@ -294,6 +295,7 @@ export default function AdminFamilies() {
               <option value="rejected">Rejected</option>
             </select>
             <select
+              aria-label="Lock level filter"
               value={lockLevelFilter}
               onChange={(e) => {
                 setLockLevelFilter(e.target.value);
@@ -311,6 +313,7 @@ export default function AdminFamilies() {
                 type="number"
                 min="0"
                 placeholder="Min"
+                aria-label="Minimum people"
                 value={minPersonCount}
                 onChange={(e) => setMinPersonCount(e.target.value)}
                 className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -321,6 +324,7 @@ export default function AdminFamilies() {
                 type="number"
                 min="0"
                 placeholder="Max"
+                aria-label="Maximum people"
                 value={maxPersonCount}
                 onChange={(e) => setMaxPersonCount(e.target.value)}
                 className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -331,6 +335,7 @@ export default function AdminFamilies() {
             <input
               type="text"
               placeholder="Search all fields…"
+              aria-label="Search all fields"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -369,6 +374,7 @@ export default function AdminFamilies() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by family name"
                       value={searchName}
                       onChange={(e) => setSearchName(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -384,6 +390,7 @@ export default function AdminFamilies() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by family wish"
                       value={searchWish}
                       onChange={(e) => setSearchWish(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -399,6 +406,7 @@ export default function AdminFamilies() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by contact name"
                       value={searchContact}
                       onChange={(e) => setSearchContact(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
@@ -417,6 +425,7 @@ export default function AdminFamilies() {
                     <input
                       type="text"
                       placeholder="Filter…"
+                      aria-label="Filter by phone number"
                       value={searchPhone}
                       onChange={(e) => setSearchPhone(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"

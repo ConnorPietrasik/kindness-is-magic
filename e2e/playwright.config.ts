@@ -1,3 +1,4 @@
+import os from "node:os";
 import { defineConfig, devices } from "@playwright/test";
 
 /**
@@ -18,10 +19,14 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 16,
+  /* Scale to the machine: more browser workers than cores starve the longest
+   * test (core-flow) into its test timeout without speeding the suite up. */
+  workers: os.cpus().length,
 
-  /* Timeouts — lazy-loaded routes + API calls can be slow in Docker */
-  timeout: 30_000,
+  /* Timeouts — heavy multi-step flows can approach 30s under full parallel load
+   * on an 8-core machine (30s is the untuned Playwright default); 60s keeps
+   * headroom while still catching genuine hangs */
+  timeout: 60_000,
   expect: { timeout: 10_000 },
 
   /* Global setup: seed auth accounts + generate storageState files */

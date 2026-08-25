@@ -46,6 +46,7 @@ export function RejectReasonModal({
         </p>
         <p className="mb-2 text-xs text-gray-500">{audienceLabel}</p>
         <textarea
+          aria-label="Rejection reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={4}

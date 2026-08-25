@@ -60,7 +60,7 @@ test.describe.serial("Admin Person Lifecycle", () => {
 
     /* Fill the person form */
     await page.getByLabel("Given Name").fill(TEST_PERSON);
-    await page.getByLabel("Age").fill("7");
+    await page.getByLabel("Age", { exact: true }).fill("7");
     await page.getByLabel("Practical Wish").fill("A warm jacket");
     await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("A puzzle");
@@ -96,7 +96,7 @@ test.describe.serial("Admin Person Lifecycle", () => {
     await row.getByRole("button", { name: "Edit" }).click();
 
     /* Edit the age */
-    await page.getByLabel("Age").fill("8");
+    await page.getByLabel("Age", { exact: true }).fill("8");
 
     /* Submit */
     await page.getByRole("button", { name: "Update" }).click();

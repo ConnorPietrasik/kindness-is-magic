@@ -175,6 +175,7 @@ export default function AdminReferrers() {
             <input
               type="text"
               placeholder="Search by name…"
+              aria-label="Search by name"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"

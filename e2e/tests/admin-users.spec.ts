@@ -48,7 +48,7 @@ test.describe("Admin Users", () => {
     await expect(page.getByRole("heading", { name: "Add User" })).toBeVisible();
 
     /* Fill in the SAME email to trigger duplicate error */
-    await page.getByLabel("Email").fill(TEST_EMAIL);
+    await page.getByLabel("Email", { exact: true }).fill(TEST_EMAIL);
     await page.getByLabel("Display Name").fill(`Duplicate ${SUFFIX}`);
     await page.getByLabel("Password", { exact: true }).fill("Password123!");
     await page.getByLabel("Confirm Password").fill("Password123!");

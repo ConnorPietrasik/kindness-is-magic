@@ -72,6 +72,38 @@ describe("useDebouncedState", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it("does not call onChange when the callback identity changes without a value change", () => {
+    vi.useFakeTimers();
+
+    // Simulates the AdminFamilies pattern: inline () => pagination.goToPage(1)
+    // gives a new callback identity on every render. Previously this re-armed
+    // the timer each render and fired the callback ~delay ms after any render,
+    // yanking paginated tables back to page 1 with no user input.
+    const { rerender } = renderHook(({ value, onChange }) => useDebouncedState(value, DELAY, onChange), {
+      initialProps: { value: "a", onChange: vi.fn() },
+    });
+
+    const freshOnChange = vi.fn();
+    rerender({ value: "a", onChange: freshOnChange });
+    act(() => vi.advanceTimersByTime(DELAY * 2));
+    expect(freshOnChange).not.toHaveBeenCalled();
+  });
+
+  it("fires the latest callback when the value changes", () => {
+    vi.useFakeTimers();
+
+    const first = vi.fn();
+    const { rerender } = renderHook(({ value, onChange }) => useDebouncedState(value, DELAY, onChange), {
+      initialProps: { value: "a", onChange: first },
+    });
+
+    const latest = vi.fn();
+    rerender({ value: "b", onChange: latest });
+    act(() => vi.advanceTimersByTime(DELAY));
+    expect(latest).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+  });
+
   it("does not call onChange on mount", () => {
     vi.useFakeTimers();
 

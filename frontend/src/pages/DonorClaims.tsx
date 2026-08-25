@@ -54,6 +54,7 @@ export default function DonorClaims() {
           <h2 className="text-xl font-bold text-violet-950">My Claims</h2>
           <div className="flex items-center gap-3">
             <select
+              aria-label="Claim status filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"

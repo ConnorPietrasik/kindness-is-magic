@@ -18,6 +18,12 @@ import { useEffect, useRef, useState } from "react";
 export function useDebouncedState<T>(value: T, delay: number, onChange?: () => void): T {
   const [debounced, setDebounced] = useState(value);
   const isFirstRender = useRef(true);
+  // Keep the callback in a ref: callers pass inline lambdas (new identity each
+  // render), and putting it in the deps array would re-arm the timer on every
+  // render — firing the callback (e.g. a pagination reset) even when the value
+  // never changed.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -26,10 +32,10 @@ export function useDebouncedState<T>(value: T, delay: number, onChange?: () => v
     }
     const timer = setTimeout(() => {
       setDebounced(value);
-      onChange?.();
+      onChangeRef.current?.();
     }, delay);
     return () => clearTimeout(timer);
-  }, [value, delay, onChange]);
+  }, [value, delay]);
 
   return debounced;
 }

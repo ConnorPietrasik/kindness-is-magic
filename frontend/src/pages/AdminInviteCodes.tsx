@@ -108,6 +108,7 @@ export default function AdminInviteCodes() {
           <input
             type="text"
             placeholder="Search by code or email…"
+            aria-label="Search by code or email"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"

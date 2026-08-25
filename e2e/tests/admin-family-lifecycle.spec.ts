@@ -35,10 +35,10 @@ test.describe("Admin Family Lifecycle — delete/restore", () => {
     await page.getByRole("button", { name: "+ Add Family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
-    await page.getByLabel("Family Name").fill(DELETE_RESTORE_FAMILY);
-    await page.getByLabel("Contact Name").fill("DR Contact");
-    await page.getByLabel("Family Wish").fill("DR wish");
-    await page.getByLabel("Phone Number").fill("5551234567");
+    await page.getByLabel("Family Name", { exact: true }).fill(DELETE_RESTORE_FAMILY);
+    await page.getByLabel("Contact Name", { exact: true }).fill("DR Contact");
+    await page.getByLabel("Family Wish", { exact: true }).fill("DR wish");
+    await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 
     /* Find the new family in the table (may need to paginate) */
@@ -100,10 +100,10 @@ test.describe("Admin Family Lifecycle — cascade delete", () => {
     await page.getByRole("button", { name: "+ Add Family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
-    await page.getByLabel("Family Name").fill(familyName);
-    await page.getByLabel("Contact Name").fill("Cascade Contact");
-    await page.getByLabel("Family Wish").fill("Cascade wish");
-    await page.getByLabel("Phone Number").fill("5551234567");
+    await page.getByLabel("Family Name", { exact: true }).fill(familyName);
+    await page.getByLabel("Contact Name", { exact: true }).fill("Cascade Contact");
+    await page.getByLabel("Family Wish", { exact: true }).fill("Cascade wish");
+    await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 
     /* Find the new family (may need to paginate) */
@@ -195,10 +195,10 @@ test.describe("Admin Family Lifecycle — fully approve", () => {
     await page.getByRole("button", { name: "+ Add Family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
-    await page.getByLabel("Family Name").fill(FULLY_APPROVE_FAMILY);
-    await page.getByLabel("Contact Name").fill("FA Contact");
-    await page.getByLabel("Family Wish").fill("FA wish");
-    await page.getByLabel("Phone Number").fill("5551234567");
+    await page.getByLabel("Family Name", { exact: true }).fill(FULLY_APPROVE_FAMILY);
+    await page.getByLabel("Contact Name", { exact: true }).fill("FA Contact");
+    await page.getByLabel("Family Wish", { exact: true }).fill("FA wish");
+    await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 
     /* Find our test family row (may need to paginate) */

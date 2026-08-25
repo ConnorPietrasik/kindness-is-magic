@@ -215,6 +215,7 @@ export default function AdminUsers() {
           {/* Filters */}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
+              aria-label="Role filter"
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
@@ -230,6 +231,7 @@ export default function AdminUsers() {
               <option value="delivery">Delivery</option>
             </select>
             <select
+              aria-label="Sort"
               value={sortField}
               onChange={(e) => {
                 setSortField(e.target.value);
@@ -252,6 +254,7 @@ export default function AdminUsers() {
             <input
               type="text"
               placeholder="Search email or name…"
+              aria-label="Search email or name"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -589,17 +592,20 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
               autoComplete: "off",
             }}
           />
-          <select
-            value={form.role}
-            onChange={(e) => update("role", e.target.value as UserRole)}
-            className="rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          <FormField
+            label="Role"
+            as="select"
+            fieldProps={{
+              value: form.role,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("role", e.target.value as UserRole),
+            }}
           >
             <option value="admin">Admin</option>
             <option value="referrer">Referrer</option>
             <option value="family">Family</option>
             <option value="purchaser">Purchaser</option>
             <option value="delivery">Delivery</option>
-          </select>
+          </FormField>
         </div>
 
         {/* Conditional FK dropdowns */}
