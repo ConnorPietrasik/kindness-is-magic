@@ -38,7 +38,6 @@ const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() =
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
 const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
 const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
-const DonorDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorDashboard"));
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
 const DonorClaimDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaimDetail"));
 
@@ -69,7 +68,7 @@ function DashboardRedirect() {
     return <Navigate to={ROUTES.DELIVERY_DASHBOARD} replace />;
   }
   if (user?.role === "donor") {
-    return <Navigate to={ROUTES.DONOR_DASHBOARD} replace />;
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
 
   return <Navigate to={ROUTES.PUBLIC_FAMILIES} replace />;
@@ -145,7 +144,7 @@ export default function App() {
         <Route
           path={ROUTES.DASHBOARD}
           element={
-            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery"] as UserRole[]}>
+            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -322,14 +321,6 @@ export default function App() {
         />
 
         {/* ── Donor self-service ───────────────────────────────── */}
-        <Route
-          path={ROUTES.DONOR_DASHBOARD}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
-              <DonorDashboard />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path={ROUTES.DONOR_CLAIMS}
           element={

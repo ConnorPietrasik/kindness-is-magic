@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
   changePasswordRequest,
+  donorListClaims,
   getReferrerMe,
   listAdminReviewQueue,
   listPendingFamilies,
@@ -20,11 +21,20 @@ import {
   patchReferrerMe,
   updateMyProfile,
 } from "../lib/api";
-import { adminReviewQueue, auth, pendingFamilies as PENDING_FAMILIES_KEY, referrerMe, referrerReviewQueue } from "../lib/queryKeys";
+import {
+  adminReviewQueue,
+  auth,
+  donorClaims,
+  pendingFamilies as PENDING_FAMILIES_KEY,
+  referrerMe,
+  referrerReviewQueue,
+} from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { humanize, normalizeUpdatePayload } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
 import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
+
+const GIFT_CLAIM_CAP = 5;
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -60,7 +70,15 @@ export default function Dashboard() {
     enabled: user?.role === "admin",
   });
 
-  if (user?.role === "referrer" && referrerLoading) {
+  const { data: donorClaimsData, isLoading: donorClaimsLoading } = useQuery({
+    queryKey: donorClaims,
+    queryFn: () => donorListClaims(),
+    enabled: user?.role === "donor",
+  });
+
+  const giftClaimCount = donorClaimsData?.filter((c) => c.commitment_type === "gifts" && c.fulfilled_at == null).length ?? 0;
+
+  if ((user?.role === "referrer" && referrerLoading) || (user?.role === "donor" && donorClaimsLoading)) {
     return <PageSpinner />;
   }
 
@@ -71,6 +89,27 @@ export default function Dashboard() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Welcome card with inline display name edit */}
         <WelcomeCard />
+
+        {/* Donor gift claim cap */}
+        {user?.role === "donor" && (
+          <Card className="mb-6">
+            <h3 className="mb-3 text-base font-semibold text-gray-900">Gift Claim Cap</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 rounded-full bg-gray-200">
+                <div
+                  className={`h-3 rounded-full transition-all ${giftClaimCount >= GIFT_CLAIM_CAP ? "bg-red-500" : "bg-gradient-to-r from-btn-start to-btn-end"}`}
+                  style={{ width: `${(giftClaimCount / GIFT_CLAIM_CAP) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm font-medium text-gray-700">
+                {giftClaimCount} / {GIFT_CLAIM_CAP}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              You can claim up to {GIFT_CLAIM_CAP} families for gifts. Cash claims are unlimited.
+            </p>
+          </Card>
+        )}
 
         {/* Referrer pending approval banner */}
         {user?.role === "referrer" && referrerInfo?.approval_status === "pending" && <PendingApprovalBanner />}
@@ -151,6 +190,13 @@ export default function Dashboard() {
               <NavCard to={ROUTES.DELIVERY_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for delivery" />
             </>
           )}
+
+          {user?.role === "donor" && (
+            <>
+              <NavCard to={ROUTES.DONOR_CLAIMS} icon="🎯" label="My Claims" desc="View and manage your claims" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🏠" label="Browse Families" desc="Find families needing gifts" />
+            </>
+          )}
         </div>
 
         {/* Change password */}
@@ -214,6 +260,7 @@ function WelcomeCard() {
   return (
     <Card className="mb-6">
       <h2 className="mb-4 text-lg font-semibold text-gray-900">Welcome back!</h2>
+      {user?.role === "donor" && <p className="mb-4 text-sm text-gray-500">Browse families and claim them to help this holiday season.</p>}
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-btn-start to-btn-end text-lg font-bold text-white">
           {displayName[0]?.toUpperCase()}

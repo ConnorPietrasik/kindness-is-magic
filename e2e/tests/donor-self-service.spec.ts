@@ -1,5 +1,5 @@
 /**
- * Donor Self-Service — donor dashboard, claim a family, view claims,
+ * Donor Self-Service — donor home (shared dashboard), claim a family, view claims,
  * mark wishes as purchased, cancel claim.
  *
  * Creates an isolated donor user + family scenario so parallel workers
@@ -61,7 +61,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
 
   // ── Donor dashboard ────────────────────────────────────────────────────
 
-  test("donor dashboard loads with welcome card and gift claim cap", async ({ browser }) => {
+  test("donor lands on the shared dashboard with welcome card and gift claim cap", async ({ browser }) => {
     if (!testData.donorEmail || !testData.donorPassword) test.skip();
 
     const context = await browser.newContext();
@@ -73,11 +73,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    // Donors are redirected to /donor/dashboard
-    await page.waitForURL(/\/donor\/dashboard/);
-    await expect(page.getByRole("heading", { name: new RegExp(`Welcome, Donor ${SUFFIX}`, "i") })).toBeVisible({
-      timeout: 10_000,
-    });
+    // Donors are redirected to the shared dashboard
+    await page.waitForURL(/\/dashboard/);
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(`Donor ${SUFFIX}`)).toBeVisible();
 
     // Gift claim cap should show 0 / 5
     await expect(page.getByText("0 / 5")).toBeVisible();
@@ -85,6 +84,34 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     // Navigation cards should be present
     await expect(page.getByText("My Claims", { exact: true })).toBeVisible();
     await expect(page.getByText("Browse Families", { exact: true })).toBeVisible();
+
+    await context.close();
+  });
+
+  // ── Header title link ──────────────────────────────────────────────────
+
+  test("donor can return to the dashboard from the header title", async ({ browser }) => {
+    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Login as donor
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(testData.donorEmail);
+    await page.getByLabel("Password").fill(testData.donorPassword);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/dashboard/);
+
+    // Go to a donor sub-page, then use the centred "Kindness is Magic" title to return home
+    await page.getByRole("link", { name: "My Claims" }).click();
+    await page.waitForURL(/\/donor\/claims/);
+
+    await page.getByRole("link", { name: "Kindness is Magic" }).click();
+
+    // Regression: donor was missing from /dashboard roles → redirect loop → white screen
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
 
     await context.close();
   });
@@ -102,7 +129,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Email").fill(testData.donorEmail);
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/donor\/dashboard/);
+    await page.waitForURL(/\/dashboard/);
 
     // Navigate to browse families
     await page.getByRole("link", { name: "Browse Families" }).click();
@@ -133,7 +160,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Email").fill(testData.donorEmail);
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/donor\/dashboard/);
+    await page.waitForURL(/\/dashboard/);
 
     // Navigate to the family wish list directly
     await page.goto(`/families/${testData.familyId}/wish-list`);
@@ -177,7 +204,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Email").fill(testData.donorEmail);
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/donor\/dashboard/);
+    await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list
     await page.getByRole("link", { name: "My Claims" }).click();
@@ -206,7 +233,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Email").fill(testData.donorEmail);
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/donor\/dashboard/);
+    await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list, then to claim detail
     await page.getByRole("link", { name: "My Claims" }).click();
@@ -264,7 +291,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Email").fill(testData.donorEmail);
     await page.getByLabel("Password").fill(testData.donorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/donor\/dashboard/);
+    await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list
     await page.getByRole("link", { name: "My Claims" }).click();

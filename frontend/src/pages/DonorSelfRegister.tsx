@@ -56,7 +56,7 @@ export default function DonorSelfRegister() {
 
       // Backend auto-logs the user in via cookies. Update auth context and redirect.
       setUser(result.user);
-      navigate(ROUTES.DONOR_DASHBOARD, { replace: true });
+      navigate(ROUTES.DASHBOARD, { replace: true });
     } catch (err: unknown) {
       toast.error(formatApiError(err, "Registration failed. Please try again."));
     } finally {

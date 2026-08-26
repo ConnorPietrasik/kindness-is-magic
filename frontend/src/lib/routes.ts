@@ -48,7 +48,6 @@ export const ROUTES = {
   DELIVERY_PACKING_SLIPS: "/delivery/packing-slips",
 
   // ── Donor self-service ───────────────────────────────────
-  DONOR_DASHBOARD: "/donor/dashboard",
   DONOR_CLAIMS: "/donor/claims",
   DONOR_CLAIM_DETAIL: "/donor/claims/:id",
 

@@ -22,11 +22,9 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-      // Families and donors skip the main dashboard and go straight to their role dashboard
+      // Families skip the main dashboard and go straight to their family dashboard
       if (user.role === "family") {
         navigate(ROUTES.FAMILY_DASHBOARD, { replace: true });
-      } else if (user.role === "donor") {
-        navigate(ROUTES.DONOR_DASHBOARD, { replace: true });
       } else {
         navigate(from, { replace: true });
       }
