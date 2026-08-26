@@ -169,7 +169,6 @@ export default function Dashboard() {
               <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your approved families" />
               <NavCard to={ROUTES.REFERRER_FAMILY_INVITES} icon="⏳" label="Family Invites" desc="Invite families & review applications" />
               <NavCard to={ROUTES.REFERRER_WISH_REVIEW} icon="📋" label="Wish Review" desc="Review and approve family wishes" />
-              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
             </>
           )}
 
