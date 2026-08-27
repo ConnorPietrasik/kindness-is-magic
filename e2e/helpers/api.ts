@@ -134,6 +134,23 @@ export async function resetFamilyWishState(
 }
 
 /**
+ * Reset a referrer's sent family invite emails (admin API).
+ *
+ * Marks their "sent" invite rows as "reset": clears the lifetime invite cap
+ * and the 7-day per-recipient dedup. The rows stay in the email log.
+ */
+export async function resetReferrerSentEmailsViaApi(
+  request: APIRequestContext,
+  referrerId: number,
+): Promise<void> {
+  const resp = await request.post(`/api/admin/referrers/${referrerId}/reset-sent-emails`);
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`resetReferrerSentEmailsViaApi(${referrerId}) failed (${resp.status()}): ${body}`);
+  }
+}
+
+/**
  * List referrers (admin API).
  */
 export async function listReferrersViaApi(

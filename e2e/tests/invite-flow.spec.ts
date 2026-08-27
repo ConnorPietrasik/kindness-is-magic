@@ -7,6 +7,7 @@
  * Uses a random suffix on emails so re-runs without DB wipe don't collide.
  */
 import { test, expect } from "@playwright/test";
+import { listReferrersViaApi, loginViaApi, resetReferrerSentEmailsViaApi } from "../helpers/api";
 
 /* Unique suffix so re-runs without a DB wipe don't hit "Email already registered" */
 const SUFFIX = Math.random().toString(36).slice(2, 8);
@@ -153,5 +154,152 @@ test.describe("Invite and self-registration", () => {
 
     await adminContext.close();
     await guestContext2.close();
+  });
+});
+
+/**
+ * Referrer family invites + sent email log.
+ *
+ * Uses the CSV-seeded referrer (Sarah Chen, limit 10) end-to-end. The seeded
+ * referrer's lifetime invite cap accumulates across runs without a DB wipe, so
+ * beforeAll resets it via API (setup only). The admin's UI reset is exercised
+ * in the second test and verified through its visible effects (cap cleared,
+ * rows kept and marked "reset") rather than the API directly.
+ *
+ * describe.serial: the two tests share module state (invitee emails, referrer
+ * ID) and depend on each other's log rows.
+ *
+ * Cleanup: nothing to delete. The only records created are SentEmail log rows,
+ * which are intentionally permanent (reset, never deleted). Sarah Chen is
+ * CSV-seeded and must not be mutated (golden rule).
+ */
+test.describe.serial("Referrer family invites + sent email log", () => {
+  const inviteeEmail = `e2e-invitee-${SUFFIX}@example.com`;
+  const secondInviteeEmail = `e2e-invitee-2-${SUFFIX}@example.com`;
+  let sarahReferrerId: number | undefined;
+
+  test.beforeAll(async ({ request }) => {
+    const authed = await loginViaApi(request);
+    const { referrers } = await listReferrersViaApi(authed);
+    sarahReferrerId = referrers.find((r) => r.name === "Sarah Chen")?.id;
+    expect(sarahReferrerId).toBeDefined();
+    /* Clear invite cap + dedup accumulated across runs */
+    await resetReferrerSentEmailsViaApi(authed, sarahReferrerId!);
+    await authed.dispose();
+  });
+
+  test("referrer sends family invite; it appears in Sent Invites and the admin email log", async ({ browser }) => {
+    /* ── Referrer side ── */
+    const referrerContext = await browser.newContext({
+      storageState: "storage/referrer.json",
+    });
+    const referrerPage = await referrerContext.newPage();
+    await referrerPage.goto("/referrer/family-invites");
+    await expect(referrerPage.getByRole("heading", { name: "Family Invites" })).toBeVisible();
+
+    /* Cap is clear after the beforeAll reset */
+    await expect(referrerPage.getByText("0 of 10 invites used")).toBeVisible();
+
+    /* Send an invite through the dialog (the only form on the page) */
+    await referrerPage.getByRole("button", { name: "Send Invite" }).click();
+    await expect(referrerPage.getByText("Send Family Invite")).toBeVisible();
+    const dialogForm = referrerPage.locator("form");
+    await dialogForm.getByLabel("Email").fill(inviteeEmail);
+    await dialogForm.getByRole("button", { name: "Send Invite" }).click();
+
+    /* Row appears in the Sent Invites table with "Sent" status; cap increments */
+    const sentRow = referrerPage.getByRole("row").filter({ hasText: inviteeEmail });
+    await expect(sentRow).toBeVisible({ timeout: 10_000 });
+    await expect(sentRow).toContainText("Sent");
+    await expect(referrerPage.getByText("1 of 10 invites used")).toBeVisible();
+
+    await referrerContext.close();
+
+    /* ── Admin side — full log at /admin/emails ── */
+    const adminContext = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage = await adminContext.newPage();
+    await adminPage.goto("/admin/emails");
+    await expect(adminPage.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+
+    /* Search narrows the log down to this row (parallel tests add other rows) */
+    await adminPage.getByLabel("Search by recipient email").fill(inviteeEmail);
+    const adminRow = adminPage.getByRole("row").filter({ hasText: inviteeEmail });
+    await expect(adminRow).toBeVisible({ timeout: 10_000 });
+    await expect(adminRow).toContainText("Family Invite");
+    await expect(adminRow).toContainText("Sent");
+    /* Sender is the acting user's display name (CSV: "SARAH THE TESTER") */
+    await expect(adminRow).toContainText("SARAH THE TESTER");
+
+    await adminContext.close();
+  });
+
+  test("admin UI reset keeps the rows and lets the referrer invite again", async ({ browser }) => {
+    /* ── Admin resets via the referrers page kebab menu ── */
+    const adminContext = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage = await adminContext.newPage();
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
+
+    const sarahRow = adminPage.getByRole("row").filter({ hasText: "Sarah Chen" });
+    await sarahRow.getByRole("button", { name: "More actions" }).click();
+    await adminPage.getByRole("menuitem", { name: "Reset Sent Emails" }).click();
+
+    await expect(adminPage.getByText("Reset sent emails for referrer")).toBeVisible();
+    const resetResponse = adminPage.waitForResponse(
+      (r) => r.url().includes("/reset-sent-emails") && r.request().method() === "POST",
+    );
+    await adminPage.getByRole("button", { name: "Yes, reset" }).click();
+    expect((await resetResponse).ok()).toBe(true);
+
+    await adminContext.close();
+
+    /* ── Referrer side — fresh context so data refetches after the reset ── */
+    const referrerContext = await browser.newContext({
+      storageState: "storage/referrer.json",
+    });
+    const referrerPage = await referrerContext.newPage();
+    await referrerPage.goto("/referrer/family-invites");
+    await expect(referrerPage.getByRole("heading", { name: "Family Invites" })).toBeVisible();
+
+    /* Cap cleared, invite button enabled again */
+    await expect(referrerPage.getByText("0 of 10 invites used")).toBeVisible();
+    await expect(referrerPage.getByRole("button", { name: "Send Invite" })).toBeEnabled();
+
+    /* Row is kept in the history, now marked reset (no longer counted) */
+    const resetRow = referrerPage.getByRole("row").filter({ hasText: inviteeEmail });
+    await expect(resetRow).toContainText("Reset (not counted)");
+
+    /* The referrer can send again after the reset */
+    await referrerPage.getByRole("button", { name: "Send Invite" }).click();
+    await expect(referrerPage.getByText("Send Family Invite")).toBeVisible();
+    const dialogForm = referrerPage.locator("form");
+    await dialogForm.getByLabel("Email").fill(secondInviteeEmail);
+    await dialogForm.getByRole("button", { name: "Send Invite" }).click();
+    const newSentRow = referrerPage.getByRole("row").filter({ hasText: secondInviteeEmail });
+    await expect(newSentRow).toBeVisible({ timeout: 10_000 });
+    await expect(newSentRow).toContainText("Sent");
+    await expect(referrerPage.getByText("1 of 10 invites used")).toBeVisible();
+
+    await referrerContext.close();
+
+    /* ── Admin log — the reset row stays, marked "reset" ── */
+    const adminCtx2 = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage2 = await adminCtx2.newPage();
+    await adminPage2.goto("/admin/emails");
+    await expect(adminPage2.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+
+    await adminPage2.getByLabel("Search by recipient email").fill(inviteeEmail);
+    const adminRow = adminPage2.getByRole("row").filter({ hasText: inviteeEmail });
+    await expect(adminRow).toBeVisible({ timeout: 10_000 });
+    await expect(adminRow).toContainText("Family Invite");
+    await expect(adminRow).toContainText("Reset (not counted)");
+
+    await adminCtx2.close();
   });
 });

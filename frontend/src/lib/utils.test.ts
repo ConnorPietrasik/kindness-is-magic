@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatApiError,
   formatDateTime,
+  formatEmailStatus,
   fromDatetimeLocalValue,
   humanize,
   isFamilyLocked,
@@ -27,6 +28,25 @@ describe("formatDateTime", () => {
 
   it("returns em-dash for empty string", () => {
     expect(formatDateTime("")).toBe("—");
+  });
+});
+
+describe("formatEmailStatus", () => {
+  it("returns Sent for sent status", () => {
+    expect(formatEmailStatus("sent", null)).toBe("Sent");
+  });
+
+  it("returns Failed with the reason for failed status", () => {
+    expect(formatEmailStatus("failed", "SMTP error: connection refused")).toBe("Failed — SMTP error: connection refused");
+  });
+
+  it("returns Failed without a reason when none is available", () => {
+    expect(formatEmailStatus("failed", null)).toBe("Failed");
+    expect(formatEmailStatus("failed", undefined)).toBe("Failed");
+  });
+
+  it("returns Reset (not counted) for reset status", () => {
+    expect(formatEmailStatus("reset", null)).toBe("Reset (not counted)");
   });
 });
 

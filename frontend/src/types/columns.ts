@@ -73,6 +73,13 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "redeemed", label: "Redeemed", visible: true },
     { key: "referrer_approval_status", label: "Status", visible: true },
   ],
+  adminSentEmails: [
+    { key: "recipient_email", label: "Recipient", visible: true },
+    { key: "kind", label: "Kind", visible: true },
+    { key: "status", label: "Status", visible: true },
+    { key: "sender_name", label: "Sender", visible: true },
+    { key: "sent_at", label: "Sent", visible: true },
+  ],
 };
 
 /** Column key → backend field names (for aliases that need multiple fields). */
@@ -83,4 +90,5 @@ export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   claim: ["claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"],
   assigned_to: ["assigned_to_id", "assigned_to_name"],
   redeemed: ["redeemed", "redeemed_by_referrer_name"],
+  status: ["status", "failure_reason"],
 };

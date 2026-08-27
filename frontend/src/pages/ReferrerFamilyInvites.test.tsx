@@ -6,14 +6,15 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { ReferrerDetail } from "../types";
+import { formatDateTime } from "../lib/utils";
+import type { ReferrerDetail, ReferrerInviteEmailItem } from "../types";
 import ReferrerFamilyInvites from "./ReferrerFamilyInvites";
 
 /* ------------------------------------------------------------------ */
 /* Fixtures & helpers                                                  */
 /* ------------------------------------------------------------------ */
 
-function makeReferrer(overrides: Partial<ReferrerDetail>): ReferrerDetail {
+function makeReferrer(overrides: Partial<ReferrerDetail> = {}): ReferrerDetail {
   return {
     id: 1,
     name: "Jane Smith",
@@ -27,6 +28,17 @@ function makeReferrer(overrides: Partial<ReferrerDetail>): ReferrerDetail {
     created_at: "2025-01-01T00:00:00Z",
     deleted_at: null,
     invite_count: 0,
+    ...overrides,
+  };
+}
+
+function makeInviteEmail(overrides: Partial<ReferrerInviteEmailItem>): ReferrerInviteEmailItem {
+  return {
+    id: 10,
+    recipient_email: "family@example.com",
+    status: "sent",
+    failure_reason: null,
+    sent_at: "2025-06-01T12:00:00Z",
     ...overrides,
   };
 }
@@ -47,11 +59,12 @@ function wrap(qc: QueryClient) {
   );
 }
 
-function renderPage(referrer: ReferrerDetail) {
+function renderPage(referrer: ReferrerDetail, inviteEmails: ReferrerInviteEmailItem[] = []) {
   const qc = createQueryClient();
 
   vi.spyOn(api, "getReferrerMe").mockResolvedValue(referrer);
   vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
+  vi.spyOn(api, "listReferrerInviteEmails").mockResolvedValue(inviteEmails);
   vi.spyOn(api, "sendReferrerFamilyInvite").mockResolvedValue({ message: "sent" });
 
   render(<ReferrerFamilyInvites />, { wrapper: wrap(qc) });
@@ -72,6 +85,7 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
   beforeEach(() => {
     vi.spyOn(api, "getReferrerMe").mockClear();
     vi.spyOn(api, "listPendingFamilies").mockClear();
+    vi.spyOn(api, "listReferrerInviteEmails").mockClear();
     vi.spyOn(api, "sendReferrerFamilyInvite").mockClear();
   });
 
@@ -161,6 +175,88 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
     // referrerMe is invalidated so the limit state updates immediately
     await waitFor(() => {
       expect(api.getReferrerMe).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+describe("ReferrerFamilyInvites — sent invites history", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "getReferrerMe").mockClear();
+    vi.spyOn(api, "listPendingFamilies").mockClear();
+    vi.spyOn(api, "listReferrerInviteEmails").mockClear();
+    vi.spyOn(api, "sendReferrerFamilyInvite").mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("shows the empty state when no invites have been sent", async () => {
+    renderPage(makeReferrer(), []);
+
+    await waitFor(() => {
+      expect(screen.getByText("No invite emails sent yet.")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("columnheader", { name: "Recipient" })).not.toBeInTheDocument();
+  });
+
+  it("renders one row per invite with recipient, status, and sent date", async () => {
+    renderPage(makeReferrer({ invite_count: 3 }), [
+      makeInviteEmail({ id: 1, recipient_email: "alice@example.com", status: "sent", sent_at: "2025-06-01T12:00:00Z" }),
+      makeInviteEmail({
+        id: 2,
+        recipient_email: "bob@example.com",
+        status: "failed",
+        failure_reason: "SMTP error: connection refused",
+        sent_at: "2025-06-02T09:30:00Z",
+      }),
+      makeInviteEmail({ id: 3, recipient_email: "carol@example.com", status: "reset", sent_at: "2025-06-03T15:45:00Z" }),
+    ]);
+
+    await waitFor(() => {
+      expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    });
+
+    // Sent row
+    const sentRow = screen.getByText("alice@example.com").closest("tr")!;
+    expect(sentRow).toHaveTextContent("Sent");
+    expect(sentRow).toHaveTextContent(formatDateTime("2025-06-01T12:00:00Z"));
+
+    // Failed row — status includes the failure reason
+    const failedRow = screen.getByText("bob@example.com").closest("tr")!;
+    expect(failedRow).toHaveTextContent("Failed — SMTP error: connection refused");
+    expect(failedRow).toHaveTextContent(formatDateTime("2025-06-02T09:30:00Z"));
+
+    // Reset row
+    const resetRow = screen.getByText("carol@example.com").closest("tr")!;
+    expect(resetRow).toHaveTextContent("Reset (not counted)");
+    expect(resetRow).toHaveTextContent(formatDateTime("2025-06-03T15:45:00Z"));
+  });
+
+  it("refreshes the sent invites list after a successful send", async () => {
+    const user = userEvent.setup();
+    renderPage(makeReferrer({ family_limit: 5, invite_count: 2 }), [makeInviteEmail({ id: 1, recipient_email: "old@example.com" })]);
+
+    await waitFor(() => {
+      expect(screen.getByText("old@example.com")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Send Invite" }));
+    await waitFor(() => {
+      expect(screen.getByText("Send Family Invite")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("family@example.com"), "new@example.com");
+    await user.click(getDialogSubmitButton());
+
+    await waitFor(() => {
+      expect(api.sendReferrerFamilyInvite).toHaveBeenCalledWith("new@example.com", expect.anything());
+    });
+
+    // referrerInviteEmails is invalidated so the new invite shows up
+    await waitFor(() => {
+      expect(api.listReferrerInviteEmails).toHaveBeenCalledTimes(2);
     });
   });
 });

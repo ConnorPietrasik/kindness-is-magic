@@ -18,10 +18,17 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
-import { approveFamily, getReferrerMe, listPendingFamilies, rejectFamily, sendReferrerFamilyInvite } from "../lib/api";
-import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
+import {
+  approveFamily,
+  getReferrerMe,
+  listPendingFamilies,
+  listReferrerInviteEmails,
+  rejectFamily,
+  sendReferrerFamilyInvite,
+} from "../lib/api";
+import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerInviteEmails, referrerMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { formatApiError } from "../lib/utils";
+import { formatApiError, formatDateTime, formatEmailStatus } from "../lib/utils";
 
 /* ------------------------------------------------------------------ */
 /* Invite section — code display + send invite dialog                  */
@@ -52,6 +59,7 @@ function InviteSection() {
       setEmail("");
       toast.success("Invite email sent successfully!");
       queryClient.invalidateQueries({ queryKey: referrerMe });
+      queryClient.invalidateQueries({ queryKey: referrerInviteEmails });
     },
     onError: (err: unknown) => {
       setSendError(formatApiError(err, "Failed to send invite."));
@@ -170,9 +178,14 @@ function InviteSection() {
 export default function ReferrerFamilyInvites() {
   const queryClient = useQueryClient();
 
-  const { data: pendingFamilies, isLoading } = useQuery({
+  const { data: pendingFamilies, isLoading: pendingLoading } = useQuery({
     queryKey: PENDING_FAMILIES_KEY,
     queryFn: listPendingFamilies,
+  });
+
+  const { data: sentEmails, isLoading: emailsLoading } = useQuery({
+    queryKey: referrerInviteEmails,
+    queryFn: listReferrerInviteEmails,
   });
 
   const approveMut = useMutation({
@@ -194,9 +207,10 @@ export default function ReferrerFamilyInvites() {
 
   const [rejectId, setRejectId] = useState<number | null>(null);
 
-  if (isLoading) return <PageSpinner />;
+  if (pendingLoading || emailsLoading) return <PageSpinner />;
 
   const families = pendingFamilies ?? [];
+  const emails = sentEmails ?? [];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -207,6 +221,32 @@ export default function ReferrerFamilyInvites() {
 
         {/* ── Invite code + send ────────────────────────────────── */}
         <InviteSection />
+
+        {/* ── Sent invites history ──────────────────────────────── */}
+        <h3 className="mb-4 text-lg font-semibold text-gray-900">Sent Invites</h3>
+
+        {emails.length === 0 ? (
+          <Card className="mb-8 py-6 text-center text-sm text-gray-400">No invite emails sent yet.</Card>
+        ) : (
+          <div className="mb-8">
+            <Table>
+              <TableHead>
+                <Th>Recipient</Th>
+                <Th>Status</Th>
+                <Th>Sent</Th>
+              </TableHead>
+              <TableBody>
+                {emails.map((e) => (
+                  <Tr key={e.id}>
+                    <Td className="font-medium text-gray-900">{e.recipient_email}</Td>
+                    <Td>{formatEmailStatus(e.status, e.failure_reason)}</Td>
+                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(e.sent_at)}</Td>
+                  </Tr>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* ── Pending approvals ─────────────────────────────────── */}
         <h3 className="mb-4 text-lg font-semibold text-gray-900">Pending Family Approvals</h3>

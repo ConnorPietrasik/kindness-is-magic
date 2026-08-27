@@ -1,3 +1,5 @@
+import type { EmailStatus } from "../types";
+
 /**
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
@@ -89,6 +91,21 @@ export function formatDateTime(iso: string | null | undefined): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+/**
+ * formatEmailStatus — format an email send status for display.
+ *
+ * Failed sends show the backend failure reason when available; reset rows
+ * are the ones an admin cleared via reset-sent-emails (no longer counted
+ * toward rate limits).
+ */
+export function formatEmailStatus(status: EmailStatus, failureReason: string | null | undefined): string {
+  if (status === "failed") {
+    return failureReason ? `Failed — ${failureReason}` : "Failed";
+  }
+  if (status === "reset") return "Reset (not counted)";
+  return "Sent";
 }
 
 /**

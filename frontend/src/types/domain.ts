@@ -409,6 +409,45 @@ export interface FamilyReviewQueueItem {
 }
 
 // ---------------------------------------------------------------------------
+// Sent Emails
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend EmailKind enum. */
+export type EmailKind =
+  | "family_invite"
+  | "referrer_invite"
+  | "password_reset"
+  | "family_pending"
+  | "family_approved"
+  | "referrer_approved"
+  | "referrer_rejected"
+  | "claim_confirmation"
+  | "admin_failure_notice";
+
+/** Mirrors backend EmailStatus enum. */
+export type EmailStatus = "sent" | "failed" | "reset";
+
+/** One row of the referrer's family invite email history. Mirrors ReferrerInviteEmailItem. */
+export interface ReferrerInviteEmailItem {
+  id: number;
+  recipient_email: string;
+  status: EmailStatus;
+  failure_reason: string | null;
+  sent_at: string;
+}
+
+/** One row of the admin sent-email log. Mirrors SentEmailSummary. */
+export interface SentEmailSummary {
+  id: number;
+  recipient_email: string;
+  kind: EmailKind;
+  status: EmailStatus;
+  failure_reason: string | null;
+  sent_at: string;
+  sender_name: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Public Families (donor browse)
 // ---------------------------------------------------------------------------
 

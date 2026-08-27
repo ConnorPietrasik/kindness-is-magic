@@ -1,11 +1,14 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
 import type {
+  EmailKind,
+  EmailStatus,
   FamilyDetail,
   PersonDetail,
   PurchaserWishSummary,
   ReferrerDetail,
   ReferrerInviteSummary,
+  SentEmailSummary,
   UserDetail,
   WishListSummary,
 } from "./domain";
@@ -81,6 +84,13 @@ export interface AdminWishesListParams extends AdminListParams {
   wish_type?: string;
 }
 
+/** Query params for the admin sent-email log endpoint. */
+export interface AdminEmailsListParams extends AdminListParams {
+  search?: string;
+  kind?: EmailKind;
+  status?: EmailStatus;
+}
+
 // ---------------------------------------------------------------------------
 // Paginated list responses
 // ---------------------------------------------------------------------------
@@ -133,6 +143,15 @@ export interface InviteListResponse {
 /** Mirrors WishListResponse — paginated admin wish list. */
 export interface WishListResponse {
   wishes: WishListSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Mirrors EmailListResponse — paginated admin sent-email log. */
+export interface EmailListResponse {
+  emails: SentEmailSummary[];
   total: number;
   page: number;
   page_size: number;

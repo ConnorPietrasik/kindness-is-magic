@@ -78,6 +78,13 @@ export const adminDeletedUsers = ["adminDeletedUsers"] as const;
 export const adminInvites = ["adminInvites"] as const;
 
 // ---------------------------------------------------------------------------
+// Admin — Sent Email Log
+// ---------------------------------------------------------------------------
+
+/** Admin sent-email log list */
+export const adminSentEmails = ["adminSentEmails"] as const;
+
+// ---------------------------------------------------------------------------
 // Admin — Dropdown lookups
 // ---------------------------------------------------------------------------
 
@@ -119,6 +126,13 @@ export const referrerFamilyPeople = (id: string) => ["referrerFamilyPeople", id]
 
 /** Families pending referrer approval */
 export const pendingFamilies = ["pendingFamilies"] as const;
+
+// ---------------------------------------------------------------------------
+// Referrer — Sent invite emails
+// ---------------------------------------------------------------------------
+
+/** Referrer's family invite email history (unpaginated) */
+export const referrerInviteEmails = ["referrerInviteEmails"] as const;
 
 // ---------------------------------------------------------------------------
 // Referrer — Wish Review Queue

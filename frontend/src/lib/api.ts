@@ -11,6 +11,7 @@
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 import type {
+  AdminEmailsListParams,
   AdminFamiliesListParams,
   AdminPeopleListParams,
   AdminReferrersListParams,
@@ -24,6 +25,7 @@ import type {
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishPurchaseMark,
+  EmailListResponse,
   FamilyClaimDetail,
   FamilyClaimSummary,
   FamilyClaimUpdate,
@@ -52,6 +54,7 @@ import type {
   ReferrerDropdownItem,
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
+  ReferrerInviteEmailItem,
   ReferrerInviteResponse,
   ReferrerInviteSummary,
   ReferrerListResponse,
@@ -277,7 +280,7 @@ export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
   return apiPost(`/api/admin/referrers/${id}/reject`);
 }
 
-/** Admin hard-deletes the referrer's sent-invite email records (clears the invite cap + 7-day dedup). */
+/** Admin resets the referrer's sent family invite emails (clears the invite cap + 7-day dedup; rows remain in the log as "reset"). */
 export function adminResetReferrerSentEmails(id: number): Promise<ReferrerDetail> {
   return apiPost(`/api/admin/referrers/${id}/reset-sent-emails`);
 }
@@ -430,6 +433,15 @@ export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
 }
 
 // ---------------------------------------------------------------------------
+// Admin — Sent Email Log
+// ---------------------------------------------------------------------------
+
+export function adminListSentEmails(params?: AdminEmailsListParams): Promise<EmailListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/emails", p);
+}
+
+// ---------------------------------------------------------------------------
 // Admin — CSV Import
 // ---------------------------------------------------------------------------
 export function adminGetCsvSample(): Promise<string> {
@@ -574,6 +586,11 @@ export function rejectFamily(id: number): Promise<FamilyDetail> {
 /** Referrer sends a family invite email to a given address. */
 export function sendReferrerFamilyInvite(email: string): Promise<ReferrerFamilyInviteResponse> {
   return apiPost("/api/referrer/send-family-invite", { email });
+}
+
+/** Referrer's own family invite email history (all statuses, newest first). */
+export function listReferrerInviteEmails(): Promise<ReferrerInviteEmailItem[]> {
+  return apiGet("/api/referrer/invite-emails");
 }
 
 // ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ export const ROUTES = {
   ADMIN_WISH_REVIEW: "/admin/wish-review",
   ADMIN_PACKING_SLIPS: "/admin/packing-slips",
   ADMIN_WISHES: "/admin/wishes",
+  ADMIN_EMAILS: "/admin/emails",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
