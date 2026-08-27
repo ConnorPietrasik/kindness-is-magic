@@ -3,8 +3,7 @@
 ## Environment Constraints
 
 - **You are running inside a minimal Docker container.**
-- **No Docker-in-Docker.** Do not attempt `docker compose` or `docker run`.
-- **No root/sudo access.** You cannot install system packages.
+- **No root/sudo access.** You cannot install system packages or run Docker commands. If you want something that requires root, ask the user.
 - **Basic shell commands work:** `ls`, `grep`, `find`, `sed`, `awk`, etc.
 - **Shell sessions do not persist.** Each `bash` call is a separate invocation — `cd` does not carry over. Always use full paths or prefix commands with `cd /path && ...`.
 - **Git is available for inspection.** You can use `git diff`, `git log`, `git blame`, etc. However, do **not** commit or push changes.
@@ -17,6 +16,7 @@
 - When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
 - **No backward compatibility needed.** The app is not yet deployed. 
 - **Do not consider existing users.** The database is wiped regularly.
+- If something is easily verifiable, **check it instead of wasting time thinking.**
 
 ## Planning
 

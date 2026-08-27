@@ -42,8 +42,8 @@ export default function FamilyWishList() {
       <div className="min-h-screen bg-slate-50">
         <HeaderBar
           title="Kindness is Magic"
-          titleTo={ROUTES.PUBLIC_FAMILIES}
-          left={<BackToHome />}
+          titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
+          left={<BackToFamilies />}
           right={
             user ? (
               <span className="text-sm text-white/80">{user.display_name}</span>
@@ -69,8 +69,8 @@ export default function FamilyWishList() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
         title="Kindness is Magic"
-        titleTo={ROUTES.PUBLIC_FAMILIES}
-        left={<BackToHome />}
+        titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
+        left={<BackToFamilies />}
         right={
           user ? (
             <span className="text-sm text-white/80">{user.display_name}</span>
@@ -204,9 +204,9 @@ function hasNotes(people: { note: string | null }[]): boolean {
   return people.some((p) => p.note != null && p.note.length > 0);
 }
 
-function BackToHome() {
+function BackToFamilies() {
   return (
-    <Link to={ROUTES.ROOT} className="no-print text-sm text-white/80 transition-colors hover:text-white">
+    <Link to={ROUTES.PUBLIC_FAMILIES} className="no-print text-sm text-white/80 transition-colors hover:text-white">
       ← Back
     </Link>
   );

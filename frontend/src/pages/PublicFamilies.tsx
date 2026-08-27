@@ -7,11 +7,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
-import { HeaderBar } from "../components/HeaderBar";
+import { HeaderBar, LogoutButton } from "../components/HeaderBar";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
+import { useAuth } from "../context/AuthContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
 import { publicFamilies } from "../lib/queryKeys";
@@ -56,6 +57,8 @@ const DEFAULT_FILTERS: FilterState = {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PublicFamilies() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
 
@@ -99,23 +102,31 @@ export default function PublicFamilies() {
     queryFn: () => listPublicFamilies(apiParams),
   });
 
+  const handleLogout = async () => {
+    await logout();
+    navigate(ROUTES.LOGIN);
+  };
+
+  // Header adapts to auth state: title links to the dashboard and the right
+  // action becomes a sign-out button once the user is logged in.
+  const headerTitleTo = user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES;
+  const headerRight = user ? (
+    <LogoutButton onClick={handleLogout} />
+  ) : (
+    <Link
+      to={ROUTES.LOGIN}
+      className="rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
+    >
+      Sign in
+    </Link>
+  );
+
   if (isLoading) return <PageSpinner />;
 
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar
-          title="Kindness is Magic"
-          titleTo={ROUTES.PUBLIC_FAMILIES}
-          right={
-            <Link
-              to={ROUTES.LOGIN}
-              className="rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
-            >
-              Sign in
-            </Link>
-          }
-        />
+        <HeaderBar title="Kindness is Magic" titleTo={headerTitleTo} right={headerRight} />
         <main className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
           <h2 className="mb-2 text-xl font-bold text-gray-900">Unable to Load Families</h2>
           <p className="text-gray-500">Something went wrong. Please try again later.</p>
@@ -152,18 +163,7 @@ export default function PublicFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        title="Kindness is Magic"
-        titleTo={ROUTES.PUBLIC_FAMILIES}
-        right={
-          <Link
-            to={ROUTES.LOGIN}
-            className="rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
-          >
-            Sign in
-          </Link>
-        }
-      />
+      <HeaderBar title="Kindness is Magic" titleTo={headerTitleTo} right={headerRight} />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Page title */}

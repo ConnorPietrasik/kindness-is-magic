@@ -320,8 +320,9 @@ test.describe("Core Flow", () => {
       const adminReviewRow = adminPage.getByRole("row").filter({ hasText: TEST_FAMILY_NAME });
       await adminReviewRow.getByRole("button", { name: "Approve" }).click();
 
-      /* Queue should be empty after approval */
-      await expect(adminPage.getByText("No families awaiting wish approval")).toBeVisible({ timeout: 10_000 });
+      /* Our family should leave the queue (the queue is global — parallel test
+         files may legitimately leave their own rows behind) */
+      await expect(adminReviewRow).toHaveCount(0, { timeout: 10_000 });
 
       /* ═══════════════════════════════════════════════════════════
        * Step 11 — Guest views the public wish list

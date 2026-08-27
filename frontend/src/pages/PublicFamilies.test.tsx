@@ -3,8 +3,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import * as api from "../lib/api";
-import type { PublicFamilySummary } from "../types";
+import { auth } from "../lib/queryKeys";
+import type { PublicFamilySummary, User } from "../types";
 import PublicFamilies from "./PublicFamilies";
 
 /* ------------------------------------------------------------------ */
@@ -49,13 +51,31 @@ const mockResponse = {
   total_pages: 1,
 };
 
+const mockUser: User = {
+  id: 7,
+  email: "donor@example.com",
+  role: "donor",
+  display_name: "Donor",
+  referrer_id: null,
+  family_id: null,
+  created_at: "2025-01-14T12:00:00Z",
+};
+
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-const wrap = (ui: React.ReactElement, path = "/families") => {
+/**
+ * Renders the page inside router + query + auth providers.
+ * Pre-seeds the auth query cache (staleTime: Infinity) so no /api/auth/me
+ * request is made and the auth state is deterministic per test.
+ */
+const wrap = (ui: React.ReactElement, path = "/families", user: User | null = null) => {
   const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, user);
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>{ui}</AuthProvider>
+      </QueryClientProvider>
     </MemoryRouter>
   );
 };
@@ -155,13 +175,16 @@ describe("PublicFamilies", () => {
 
     const wishListPaths: string[] = [];
     const queryClient = createQueryClient();
+    queryClient.setQueryData(auth, null);
     render(
       <MemoryRouter initialEntries={["/families"]}>
         <QueryClientProvider client={queryClient}>
-          <Routes>
-            <Route path="/families" element={<PublicFamilies />} />
-            <Route path="/families/:id/wish-list" element={<div data-testid="wish-list-page">Wish List</div>} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/families" element={<PublicFamilies />} />
+              <Route path="/families/:id/wish-list" element={<div data-testid="wish-list-page">Wish List</div>} />
+            </Routes>
+          </AuthProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -247,6 +270,59 @@ describe("PublicFamilies", () => {
 
     // Pagination should show page buttons
     expect(screen.getByLabelText("Page 1")).toBeInTheDocument();
+  });
+
+  it("header shows sign in link and self link when logged out", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    });
+    // Centre title links to the page itself for guests
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/families");
+  });
+
+  it("header shows sign out button and dashboard link when logged in", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />, "/families", mockUser);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    });
+    // Centre title links to the dashboard for signed-in users
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("clicking sign out logs out and navigates to login", async () => {
+    const event = userEvent.setup();
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    const logoutSpy = vi.spyOn(api, "logoutRequest").mockResolvedValue(undefined);
+
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(auth, mockUser);
+    render(
+      <MemoryRouter initialEntries={["/families"]}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Routes>
+              <Route path="/families" element={<PublicFamilies />} />
+              <Route path="/login" element={<div data-testid="login-page">Login page</div>} />
+            </Routes>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    const signOutButton = await screen.findByRole("button", { name: "Sign out" });
+    await event.click(signOutButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("login-page")).toBeInTheDocument();
+    });
+    expect(logoutSpy).toHaveBeenCalledOnce();
   });
 
   it("clicking sort button cycles sort options", async () => {

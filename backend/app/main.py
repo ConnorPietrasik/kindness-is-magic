@@ -18,7 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth import get_password_hash
 from app.config import APP_BASE_URL
-from app.database import get_db
+from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.models import User, UserRole, default_display_name_from_email
 
 
@@ -60,6 +60,13 @@ class JsonFormatter(logging.Formatter):
 
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# Context vars so any module can include request/user info in its logs.
+# Defined before the filter below (and before any logging is configured) so
+# the filter's references resolve even for records logged at import time.
+_request_id_ctx = contextvars.ContextVar("request_id", default="-")
+_user_id_ctx = contextvars.ContextVar("user_id", default="-")
+
 _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(JsonFormatter())
 
@@ -95,10 +102,7 @@ for _quiet in ("uvicorn.access", "watchfiles"):
 logging.getLogger("slowapi").setLevel(logging.CRITICAL)
 
 logger = logging.getLogger(__name__)
-
-# Context vars so any module can include request/user info in its logs
-_request_id_ctx = contextvars.ContextVar("request_id", default="-")
-_user_id_ctx = contextvars.ContextVar("user_id", default="-")
+logger.info("database pool: size=%d max_overflow=%d", POOL_SIZE, MAX_OVERFLOW)
 
 
 # ---------------------------------------------------------------------------
