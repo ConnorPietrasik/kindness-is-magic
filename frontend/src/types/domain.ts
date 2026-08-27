@@ -522,6 +522,10 @@ export interface PurchaserWishSummary {
   person_id: number;
   person_given_name: string;
   family_id: number;
+  /** Presentational hierarchical position (e.g. "3-2-1"-style, family form "2-3"); "0" when not enumerated. */
+  family_display_id: string;
+  /** Gates the public wishlist link — only admin-locked families are publicly viewable. */
+  wish_lock_level: WishLockLevel | null;
   assigned_to_id: number | null;
   purchased_at: string | null;
   purchased_where: string | null;

@@ -14,6 +14,7 @@ from app.models import (
     User,
     UserRole,
     Wish,
+    WishLockLevel,
     WishType,
 )
 
@@ -135,6 +136,57 @@ class TestPurchaserListWishes:
             # Has family_id for wishlist linking
             assert "family_id" in w
             assert w["family_id"] == purchaser_wish_tree["family"].id
+            # Display ID — unscoped flat format {referrer_id}-{position}; the
+            # fixture family is the only active one, so position is 1
+            ref_id = purchaser_wish_tree["referrer"].id
+            assert w["family_display_id"] == f"{ref_id}-1"
+            # Family is created at default lock level — reported for link gating
+            assert w["wish_lock_level"] == WishLockLevel.family.value
+
+    def test_list_display_id_zero_for_unenumerated_family(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """A wish under a pending (unenumerated) family shows display_id '0'."""
+        fam2 = Family(
+            referrer_id=purchaser_wish_tree["referrer"].id,
+            family_name="Pending Family",
+            family_wish="Something",
+            contact_name="Pending Contact",
+            phone_number="555-000-0003",
+            approval_status=FamilyApprovalStatus.pending,
+        )
+        db.add(fam2)
+        db.flush()
+
+        person2 = Person(family_id=fam2.id, given_name="PendingChild", age=10)
+        db.add(person2)
+        db.flush()
+
+        w = Wish(person_id=person2.id, type=WishType.practical, description="A ball")
+        db.add(w)
+        db.flush()
+        w.assigned_to_id = purchaser_wish_tree["purchaser"].id
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+
+        by_family = {item["family_id"]: item for item in data["wishes"]}
+        ref_id = purchaser_wish_tree["referrer"].id
+        assert by_family[purchaser_wish_tree["family"].id]["family_display_id"] == f"{ref_id}-1"
+        assert by_family[fam2.id]["family_display_id"] == "0"
+
+    def test_list_wish_lock_level_reflects_admin_lock(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """wish_lock_level in list items tracks the family's current lock level."""
+        purchaser_wish_tree["family"].wish_lock_level = WishLockLevel.admin
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["wishes"]) == 2
+        for w in data["wishes"]:
+            assert w["wish_lock_level"] == WishLockLevel.admin.value
 
     def test_list_excludes_unassigned_wishes(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Unassigned wishes are not shown to the purchaser."""

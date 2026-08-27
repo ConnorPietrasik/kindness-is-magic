@@ -820,7 +820,11 @@ class WishListResponse(BaseModel):
 class PurchaserWishSummary(BaseModel):
     """Wish summary for purchaser self-service views.
 
-    Includes wish details, person context, and family_id for wishlist linking.
+    Includes wish details, person context, and family context for wishlist
+    linking: ``family_id`` (DB key for the route), ``family_display_id``
+    (presentational, unscoped flat format — same as the public wish-list
+    heading), and ``wish_lock_level`` (gates the public wishlist link on
+    admin lock; the public endpoint 404s for non-admin-locked families).
     No PII (family_name, contact_name, phone_number excluded).
     """
 
@@ -831,6 +835,8 @@ class PurchaserWishSummary(BaseModel):
     person_id: int
     person_given_name: str
     family_id: int
+    family_display_id: str = "0"
+    wish_lock_level: WishLockLevel | None = None
     assigned_to_id: int | None = None
     purchased_at: datetime | None = None
     purchased_where: str | None = None

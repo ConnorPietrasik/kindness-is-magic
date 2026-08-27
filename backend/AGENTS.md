@@ -90,22 +90,12 @@ See `.env` at the project root for runtime config: JWT secrets, token lifetimes,
 
 ## Running Tests
 
-Tests require a live Postgres test database. The user starts it with:
-```bash
-./run-compose.sh --profile test up test_db
-```
+Run tests only via `backend/run_tests.sh` (parallel, checks the test DB is up). Extra pytest args pass through (`./run_tests.sh tests/test_purchaser_routes.py`). If the DB check fails, ask the user to start it.
 
-Before running tests, verify the DB is reachable:
+Save output to a temp file, then inspect with `tail -5` (more for tracebacks):
 ```bash
-/dockerx/kindness-is-magic/.venv/bin/python3 -c "import psycopg; psycopg.connect('postgresql://KindDB:testpassword@localhost:5433/kindness_is_magic_test').close()" 2>/dev/null && echo "DB OK" || echo "DB DOWN"
+cd /dockerx/kindness-is-magic/backend && ./run_tests.sh > /tmp/test-output.txt 2>&1
 ```
-
-If that fails, ask the user to start the test DB. Once it's up, run tests via the persistent venv at `/dockerx/kindness-is-magic/.venv`. Save output to a temp file so you can inspect it without rerunning:
-```bash
-cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://KindDB:testpassword@localhost:5433/kindness_is_magic_test" /dockerx/kindness-is-magic/.venv/bin/pytest -n auto -q --tb=short > /tmp/test-output.txt 2>&1
-```
-
-Then read the summary with `tail -5 /tmp/test-output.txt`. If there are failures, read more of the file to inspect tracebacks.
 
 **When running tests after changes:** iterate until tests pass. Avoid pasting full test output unless a failure needs user input. Report: final test status, pass/fail count, and a brief summary of any fixes made. If a failure requires a design decision, ask the user.
 

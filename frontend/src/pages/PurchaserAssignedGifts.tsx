@@ -5,7 +5,8 @@
  *  - Filter: purchased / unpurchased / all
  *  - "Mark Purchased" dialog
  *  - Inline edit for purchaser note + received_at
- *  - Family ID linked to the public wishlist page
+ *  - Family display_id linked to the public wishlist page (only when the
+ *    family is admin-locked — the public endpoint 404s otherwise)
  *
  * Purchasers cannot unassign wishes or edit wish definitions.
  */
@@ -159,9 +160,13 @@ export default function PurchaserAssignedGifts() {
                   <Tr>
                     <Td>{w.person_given_name}</Td>
                     <Td>
-                      <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
-                        Family #{w.family_id}
-                      </Link>
+                      {w.wish_lock_level === "admin" ? (
+                        <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
+                          {w.family_display_id}
+                        </Link>
+                      ) : (
+                        <span>{w.family_display_id}</span>
+                      )}
                     </Td>
                     <Td>
                       <WishTypeBadge type={w.type} />

@@ -15,6 +15,7 @@ from app.models import Person, User, Wish
 from app.permissions import require_purchaser
 from app.response_builders import (
     build_wish_detail,
+    compute_display_ids,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -36,14 +37,20 @@ purchaser_router = APIRouter(
 )
 
 
-def _build_purchaser_wish_item(wish: Wish, person: Person) -> dict:
+def _build_purchaser_wish_item(wish: Wish, person: Person, family_display_id: str) -> dict:
     """Build a dict suitable for PurchaserWishSummary.
 
     Reuses ``build_wish_detail`` for the shared wish+person fields,
     then swaps ``person_family_name`` for ``family_id`` (no PII).
+    Includes ``wish_lock_level`` so the frontend can gate the
+    public wishlist link on admin lock (family is already loaded
+    via joinedload — no extra query), and ``family_display_id``
+    (pre-computed by the caller) for presentational display.
     """
     data = build_wish_detail(wish, person)
     data["family_id"] = person.family_id
+    data["family_display_id"] = family_display_id
+    data["wish_lock_level"] = person.family.wish_lock_level if person.family else None
     del data["person_family_name"]
     return data
 
@@ -80,7 +87,19 @@ def list_wishes(
     total = query.count()
     wishes = query.order_by(Wish.id).offset((page - 1) * page_size).limit(page_size).all()
 
-    items = [PurchaserWishSummary(**_build_purchaser_wish_item(w, w.person)) for w in wishes]
+    # Display IDs for the families on this page (unscoped flat format —
+    # same format the public wish-list page shows as its heading).
+    # The family rows come from the joinedload above (no N+1); computing
+    # positions issues a single ROW_NUMBER query for the page's referrers.
+    page_families = list({w.person.family.id: w.person.family for w in wishes if w.person.family}.values())
+    display_id_map = compute_display_ids(db, "family", page_families, scope=None)
+
+    items = [
+        PurchaserWishSummary(
+            **_build_purchaser_wish_item(w, w.person, display_id_map.get(w.person.family_id, "0"))
+        )
+        for w in wishes
+    ]
 
     logger.info("Purchaser %s listed wishes (page=%d, total=%d)", current_user.email, page, total)
 

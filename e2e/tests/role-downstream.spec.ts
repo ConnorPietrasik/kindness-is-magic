@@ -4,8 +4,12 @@
  * Self-contained: creates full data chain (referrer → family → person → wishes),
  * assigns data to purchaser/delivery users, and approves for public visibility.
  *
- * Module-level state (IDs, credentials) passes between tests within this file.
- * Tests run in order — setup is done once in beforeAll, cleanup in afterAll.
+ * Intentionally a plain describe, not .serial: no test depends on a mutation
+ * made by an earlier test, so the file can run fully in parallel. Under
+ * fullyParallel each worker re-imports this file (fresh SUFFIX/testData) and
+ * runs beforeAll/afterAll for its own data chain; tests within a worker run
+ * in file order. If a test ever depends on an earlier test's mutation,
+ * switch to test.describe.serial.
  */
 import { test, expect, request } from "@playwright/test";
 import {
@@ -27,7 +31,9 @@ const SUFFIX = Math.random().toString(36).slice(2, 6);
 const TEST_REFERRER_NAME = `E2E Downstream Ref ${SUFFIX}`;
 const TEST_REFERRER_EMAIL = `e2e-ds-ref-${SUFFIX}@example.com`;
 const TEST_FAMILY_NAME = `E2E Downstream Family ${SUFFIX}`;
+const TEST_FAMILY2_NAME = `E2E Downstream Early Family ${SUFFIX}`;
 const TEST_PERSON_NAME = `Child ${SUFFIX}`;
+const TEST_PERSON2_NAME = `Early Child ${SUFFIX}`;
 const TEST_PURCHASER_EMAIL = `e2e-purchaser-${SUFFIX}@example.com`;
 const TEST_DELIVERY_EMAIL = `e2e-delivery-${SUFFIX}@example.com`;
 const PASSWORD = "Password123!";
@@ -36,6 +42,7 @@ const PASSWORD = "Password123!";
 const testData: {
   referrerId?: number;
   familyId?: number;
+  secondFamilyId?: number;
   purchaserUserId?: number;
   deliveryUserId?: number;
 } = {};
@@ -121,7 +128,32 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
   }
   await assignFamiliesToDeliveryViaApi(apiContext, [testData.familyId], testData.deliveryUserId);
 
-  // Approve the wish chain so family is publicly visible
+  // Second family: wishes NOT fully reviewed (wish lock stays at "family",
+  // though the family itself is approved — admin-created ones auto-approve)
+  // but has a wish assigned to the purchaser — simulates early purchasing
+  // before the review chain completes.
+  const family2 = await createFamilyViaApi(apiContext, referrer.referrerId, {
+    familyName: TEST_FAMILY2_NAME,
+    familyWish: "Early family — not yet reviewed",
+    contactName: "Early Contact",
+    phoneNumber: "555-333-4444",
+  });
+  testData.secondFamilyId = family2.familyId;
+
+  await createPersonViaApi(apiContext, family2.familyId, {
+    givenName: TEST_PERSON2_NAME,
+    age: 9,
+    wish: "Early practical wish",
+    funWish: "Early fun wish",
+  });
+
+  const wishes2 = await listWishesViaApi(apiContext, { purchased: "false", familyId: family2.familyId });
+  if (wishes2.wishes.length === 0) {
+    throw new Error("No wishes found for second family — cannot test early-purchase link gating");
+  }
+  await batchAssignWishesViaApi(apiContext, wishes2.wishes.slice(0, 1).map((w) => w.id), testData.purchaserUserId);
+
+  // Approve the wish chain so family 1 is publicly visible
   await approveWishChain(apiContext, family.familyId, TEST_REFERRER_EMAIL, PASSWORD);
 }
 
@@ -135,6 +167,9 @@ test.describe("Role Downstream", () => {
   test.afterAll(async ({ request: req }) => {
     const authed = await loginViaApi(req);
     // Clean up in reverse creation order
+    if (testData.secondFamilyId) {
+      await deleteFamilyViaApi(authed, testData.secondFamilyId);
+    }
     if (testData.familyId) {
       await deleteFamilyViaApi(authed, testData.familyId);
     }
@@ -210,7 +245,7 @@ test.describe("Role Downstream", () => {
     await context.close();
   });
 
-  test("purchaser sees family link to wishlist", async ({ browser }) => {
+  test("purchaser sees family link to wishlist only when admin-locked", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
 
@@ -223,9 +258,24 @@ test.describe("Role Downstream", () => {
     await page.goto("/purchaser/assigned-gifts");
     await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
 
-    // Family column should contain a link (to the public wishlist page)
-    const familyLink = page.getByRole("cell").filter({ hasText: /Family #/ }).first();
-    await expect(familyLink.locator("a")).toBeVisible();
+    // Rows are identified by exact person-name cell (family display_id is dynamic)
+    const approvedRows = page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: new RegExp(`^${TEST_PERSON_NAME}$`) }) });
+    await expect(approvedRows.first()).toBeVisible({ timeout: 10_000 });
+    // Every row's family cell shows the display_id and links to the public wishlist page
+    const approvedLinks = approvedRows.getByRole("link");
+    await expect(approvedLinks).toHaveCount(await approvedRows.count());
+    await expect(approvedLinks.first()).toHaveText(/^\d+(?:-\d+)*$/);
+
+    // Not admin-locked — display_id is plain text, no link (public page would 404)
+    const earlyRows = page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: new RegExp(`^${TEST_PERSON2_NAME}$`) }) });
+    await expect(earlyRows.first()).toBeVisible({ timeout: 10_000 });
+    await expect(earlyRows.getByRole("link")).toHaveCount(0);
+    // Exactly one cell per row carries the display_id
+    await expect(earlyRows.first().getByRole("cell").filter({ hasText: /^\d+(?:-\d+)*$/ })).toHaveCount(1);
 
     await context.close();
   });
@@ -342,6 +392,23 @@ test.describe("Role Downstream", () => {
       timeout: 10_000,
     });
     await expect(page.getByText("This wish list doesn't exist or has been removed.")).toBeVisible();
+
+    await context.close();
+  });
+
+  test("guest sees 404 for non-admin-locked family wish list", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    if (!testData.secondFamilyId) {
+      throw new Error("Missing second family ID — cannot verify non-admin-locked 404");
+    }
+
+    await page.goto(`/families/${testData.secondFamilyId}/wish-list`);
+
+    await expect(page.getByRole("heading", { name: "Family Not Found" })).toBeVisible({
+      timeout: 10_000,
+    });
 
     await context.close();
   });
