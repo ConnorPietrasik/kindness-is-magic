@@ -421,6 +421,105 @@ class TestAdminApproveReject:
 
 
 # ---------------------------------------------------------------------------
+# TestAdminResetSentEmails
+# ---------------------------------------------------------------------------
+
+
+class TestAdminResetSentEmails:
+    """Admin reset-sent-emails endpoint (hard-deletes invite email records)."""
+
+    def _create_approved_referrer(self, db: Session, family_limit: int = 5) -> "Referrer":  # noqa: F821
+        from app.models import Referrer, ReferrerApprovalStatus, User, UserRole
+        from app.auth import get_password_hash
+
+        ref = Referrer(
+            name="Reset Ref",
+            family_limit=family_limit,
+            phone_number="555-888-8888",
+            family_invite_code="KFI-RST001",
+            approval_status=ReferrerApprovalStatus.approved,
+        )
+        db.add(ref)
+        db.commit()
+        db.refresh(ref)
+
+        user = User(
+            email="resetref@test.com",
+            hashed_password=get_password_hash("ResetRef1234!"),
+            role=UserRole.referrer,
+            display_name=None,
+            referrer_id=ref.id,
+        )
+        db.add(user)
+        db.commit()
+        return ref
+
+    def test_reset_allows_resending_to_dedup_blocked_recipient(self, test_client: TestClient, admin_user, db: Session):
+        """After a reset, the referrer can send again, including to a
+        previously 7-day-blocked recipient."""
+        from app.models import ReferrerInviteEmail
+
+        ref = self._create_approved_referrer(db)
+        login_as(test_client, "resetref@test.com", "ResetRef1234!")
+
+        # First send succeeds; immediate resend is 7-day dedup blocked
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "fam@example.com"})
+        assert resp.status_code == 200
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "fam@example.com"})
+        assert resp.status_code == 429
+        assert "already been sent" in resp.json()["detail"]
+
+        # Admin reset hard-deletes the records
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{ref.id}/reset-sent-emails")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == ref.id
+        assert db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count() == 0
+
+        # Same recipient can be invited again right after the reset
+        login_as(test_client, "resetref@test.com", "ResetRef1234!")
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "fam@example.com"})
+        assert resp.status_code == 200
+
+    def test_reset_allows_sending_again_at_lifetime_cap(self, test_client: TestClient, admin_user, db: Session):
+        """A referrer at the lifetime cap can send again after a reset."""
+        from app.models import ReferrerInviteEmail
+
+        ref = self._create_approved_referrer(db, family_limit=1)
+        login_as(test_client, "resetref@test.com", "ResetRef1234!")
+
+        # Fill the lifetime cap, then get blocked
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "first@example.com"})
+        assert resp.status_code == 200
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "second@example.com"})
+        assert resp.status_code == 429
+        assert "reached the limit" in resp.json()["detail"]
+
+        # Reset clears the cap
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{ref.id}/reset-sent-emails")
+        assert resp.status_code == 200
+        assert db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count() == 0
+
+        # Referrer can send again after the reset
+        login_as(test_client, "resetref@test.com", "ResetRef1234!")
+        resp = test_client.post("/api/referrer/send-family-invite", json={"email": "second@example.com"})
+        assert resp.status_code == 200
+
+    def test_reset_nonexistent_referrer(self, test_client: TestClient, admin_user):
+        """Reset for a non-existent referrer returns 404."""
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/referrers/99999/reset-sent-emails")
+        assert resp.status_code == 404
+
+    def test_non_admin_cannot_reset(self, test_client: TestClient, referrer_user):
+        """Non-admin gets 403 on reset-sent-emails."""
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        resp = test_client.post("/api/admin/referrers/1/reset-sent-emails")
+        assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # TestAdminInviteCRUD
 # ---------------------------------------------------------------------------
 

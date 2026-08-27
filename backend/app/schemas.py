@@ -320,6 +320,7 @@ class ReferrerDetail(BaseModel):
     phone_number: str
     family_invite_code: str
     family_count: int
+    invite_count: int | None = None
     approval_status: ReferrerApprovalStatus
     approved_by_admin_name: str | None = None
     approved_at: datetime | None = None

@@ -92,6 +92,8 @@ export interface ReferrerDetail {
   approved_at: string | null;
   created_at: string;
   deleted_at: string | null;
+  /** Sent invite email count; only /api/referrer/me populates it (null elsewhere). */
+  invite_count: number | null;
 }
 
 /** Mirrors ReferrerInviteSummary. */

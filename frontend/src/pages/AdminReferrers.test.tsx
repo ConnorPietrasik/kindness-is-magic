@@ -25,6 +25,7 @@ function makeReferrer(overrides: Partial<ReferrerDetail>): ReferrerDetail {
     approved_at: null,
     created_at: "2025-01-01T00:00:00Z",
     deleted_at: null,
+    invite_count: null,
     ...overrides,
   };
 }
@@ -221,6 +222,33 @@ describe("AdminReferrers", () => {
 
     await waitFor(() => {
       expect(api.adminRejectReferrer).toHaveBeenCalledWith(1, expect.anything());
+    });
+  });
+
+  it("reset sent emails flow confirms and calls API", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+    vi.spyOn(api, "adminResetReferrerSentEmails").mockResolvedValue(makeReferrer(mockReferrer1));
+
+    wrap(<AdminReferrers />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
+    });
+
+    const triggers = screen.getAllByRole("button", { name: "More actions" });
+    await user.click(triggers[0]!);
+    await user.click(screen.getByRole("menuitem", { name: "Reset Sent Emails" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Reset sent emails for referrer/)).toBeInTheDocument();
+    });
+    expect(api.adminResetReferrerSentEmails).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Yes, reset" }));
+
+    await waitFor(() => {
+      expect(api.adminResetReferrerSentEmails).toHaveBeenCalledWith(1, expect.anything());
     });
   });
 

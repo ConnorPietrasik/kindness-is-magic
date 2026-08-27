@@ -37,6 +37,7 @@ import {
   adminListDeletedReferrers,
   adminListReferrers,
   adminRejectReferrer,
+  adminResetReferrerSentEmails,
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
@@ -56,6 +57,7 @@ export default function AdminReferrers() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
+  const [resetSentEmailsConfirm, setResetSentEmailsConfirm] = useState<number | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -68,6 +70,13 @@ export default function AdminReferrers() {
 
   const rejectMut = useMutation({
     mutationFn: adminRejectReferrer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminReferrers });
+    },
+  });
+
+  const resetSentEmailsMut = useMutation({
+    mutationFn: adminResetReferrerSentEmails,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminReferrers });
     },
@@ -326,12 +335,18 @@ export default function AdminReferrers() {
                                       ]
                                     : []),
                                   {
+                                    label: "Reset Sent Emails",
+                                    onClick: () => setResetSentEmailsConfirm(r.id),
+                                  },
+                                  {
                                     label: "Delete",
                                     variant: "danger" as const,
                                     onClick: () => confirmDelete(r.id),
                                   },
                                 ]}
-                                disabled={deleteMut?.isPending || approveMut.isPending || rejectMut.isPending}
+                                disabled={
+                                  deleteMut?.isPending || approveMut.isPending || rejectMut.isPending || resetSentEmailsMut.isPending
+                                }
                               />
                             </>
                           )}
@@ -454,6 +469,28 @@ export default function AdminReferrers() {
             confirmVariant="danger"
           />
 
+          {/* Reset sent emails confirmation */}
+          <ConfirmDialog
+            open={resetSentEmailsConfirm !== null}
+            title={
+              <>
+                Reset sent emails for referrer <strong>#{resetSentEmailsConfirm}</strong>?
+              </>
+            }
+            description="Clears the record of their sent invite emails so they can send up to their limit again."
+            onConfirm={() => {
+              if (resetSentEmailsConfirm != null) {
+                resetSentEmailsMut.mutate(resetSentEmailsConfirm);
+                setResetSentEmailsConfirm(null);
+              }
+            }}
+            onCancel={() => setResetSentEmailsConfirm(null)}
+            loading={resetSentEmailsMut.isPending}
+            confirmLabel="Yes, reset"
+            loadingLabel="Resetting…"
+            confirmVariant="secondary"
+          />
+
           {/* Pagination */}
           <Pagination
             page={pagination.page}
@@ -467,7 +504,7 @@ export default function AdminReferrers() {
 
         {/* Errors */}
         <MutationErrors
-          mutations={[createMut, updateMut, deleteMut, restoreMut, approveMut, rejectMut].filter(
+          mutations={[createMut, updateMut, deleteMut, restoreMut, approveMut, rejectMut, resetSentEmailsMut].filter(
             (m): m is NonNullable<typeof m> => m != null
           )}
         />

@@ -17,6 +17,7 @@ import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { approveFamily, getReferrerMe, listPendingFamilies, rejectFamily, sendReferrerFamilyInvite } from "../lib/api";
 import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -26,6 +27,8 @@ import { formatApiError } from "../lib/utils";
 /* Invite section — code display + send invite dialog                  */
 /* ------------------------------------------------------------------ */
 function InviteSection() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const { data: referrerInfo } = useQuery({
     queryKey: referrerMe,
     queryFn: getReferrerMe,
@@ -34,16 +37,21 @@ function InviteSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [sendError, setSendError] = useState("");
-  const [sendSuccess, setSendSuccess] = useState(false);
 
   const isApproved = referrerInfo?.approval_status === "approved";
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
+  const inviteCount = referrerInfo?.invite_count ?? null;
+  const limitReached = inviteCount != null && referrerInfo != null && inviteCount >= referrerInfo.family_limit;
+
   const sendInviteMut = useMutation({
     mutationFn: sendReferrerFamilyInvite,
     onSuccess: () => {
-      setSendSuccess(true);
+      setDialogOpen(false);
+      setSendError("");
       setEmail("");
+      toast.success("Invite email sent successfully!");
+      queryClient.invalidateQueries({ queryKey: referrerMe });
     },
     onError: (err: unknown) => {
       setSendError(formatApiError(err, "Failed to send invite."));
@@ -53,21 +61,18 @@ function InviteSection() {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     setSendError("");
-    setSendSuccess(false);
     sendInviteMut.mutate(email.trim());
   };
 
   const handleOpenDialog = () => {
     setDialogOpen(true);
     setSendError("");
-    setSendSuccess(false);
     setEmail("");
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setSendError("");
-    setSendSuccess(false);
     setEmail("");
   };
 
@@ -100,10 +105,27 @@ function InviteSection() {
             <div className="text-sm text-gray-500">Your code</div>
             <div className="text-2xl font-mono font-bold tracking-wider text-brand-dark">{code ?? ""}</div>
           </div>
-          <Button onClick={handleOpenDialog} disabled={!code || !isApproved}>
+          <Button onClick={handleOpenDialog} disabled={!code || !isApproved || limitReached}>
             Send Invite
           </Button>
         </div>
+
+        {referrerInfo && (
+          <div>
+            <p className="text-xs text-gray-500">
+              {inviteCount ?? 0} of {referrerInfo.family_limit} invites used
+            </p>
+            {limitReached && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm text-amber-800">
+                  You've reached your limit of {referrerInfo.family_limit} invite emails. You can still share your invite code and signup
+                  link directly with families, but only up to {referrerInfo.family_limit} families can be accepted under your referral. An
+                  admin can reset your sent invites.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* ── Send invite dialog ──────────────────────────────────── */}
@@ -115,9 +137,6 @@ function InviteSection() {
 
             <form onSubmit={handleSend} className="space-y-3">
               {sendError && <ErrorBox message={sendError} />}
-              {sendSuccess && (
-                <div className="rounded-lg bg-green-50 px-3 py-2.5 text-sm text-green-700">Invite email sent successfully!</div>
-              )}
               <FormField
                 label="Email"
                 type="email"

@@ -94,12 +94,7 @@ def list_wishes(
     page_families = list({w.person.family.id: w.person.family for w in wishes if w.person.family}.values())
     display_id_map = compute_display_ids(db, "family", page_families, scope=None)
 
-    items = [
-        PurchaserWishSummary(
-            **_build_purchaser_wish_item(w, w.person, display_id_map.get(w.person.family_id, "0"))
-        )
-        for w in wishes
-    ]
+    items = [PurchaserWishSummary(**_build_purchaser_wish_item(w, w.person, display_id_map.get(w.person.family_id, "0"))) for w in wishes]
 
     logger.info("Purchaser %s listed wishes (page=%d, total=%d)", current_user.email, page, total)
 

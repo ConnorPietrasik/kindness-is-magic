@@ -70,7 +70,10 @@ def get_self(
     db: Session = Depends(get_db),
 ) -> ReferrerDetail:
     ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
-    return ReferrerDetail(**build_referrer_detail(ref, db))
+    detail = build_referrer_detail(ref, db)
+    # Only /me populates invite_count (sent-invite email count)
+    detail["invite_count"] = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count()
+    return ReferrerDetail(**detail)
 
 
 @router.patch("/me")
@@ -520,8 +523,8 @@ async def send_family_invite(
     Rate limits:
     * A recipient can receive at most one invite email every 7 days (global,
       across all referrers) to protect SMTP reputation.
-    * A referrer can send at most ``family_limit`` invite emails per 24-hour
-      rolling window.
+    * A referrer can send at most ``family_limit`` invite emails in total
+      (lifetime cap, counted across all time).
     """
     from app.mail import build_family_invite_email, send_email
 
@@ -558,20 +561,12 @@ async def send_family_invite(
             detail="An invite has already been sent to this email. Try again in 7 days.",
         )
 
-    # --- Per-referrer daily cap (24-hour rolling window) ---
-    twenty_four_hours_ago = now - timedelta(hours=24)
-    daily_count = (
-        db.query(ReferrerInviteEmail)
-        .filter(
-            ReferrerInviteEmail.referrer_id == ref.id,
-            ReferrerInviteEmail.sent_at >= twenty_four_hours_ago,
-        )
-        .count()
-    )
-    if daily_count >= ref.family_limit:
+    # --- Per-referrer lifetime cap (all time) ---
+    lifetime_count = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count()
+    if lifetime_count >= ref.family_limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Daily invite limit of {ref.family_limit} reached. Try again tomorrow.",
+            detail=f"You've reached the limit of {ref.family_limit} family invite emails. You can still share your invite code and the signup link directly with families, but only up to {ref.family_limit} families can be accepted under your referral.",
         )
 
     html_body = build_family_invite_email(

@@ -277,6 +277,11 @@ export function adminRejectReferrer(id: number): Promise<ReferrerDetail> {
   return apiPost(`/api/admin/referrers/${id}/reject`);
 }
 
+/** Admin hard-deletes the referrer's sent-invite email records (clears the invite cap + 7-day dedup). */
+export function adminResetReferrerSentEmails(id: number): Promise<ReferrerDetail> {
+  return apiPost(`/api/admin/referrers/${id}/reset-sent-emails`);
+}
+
 /** Fetch soft-deleted referrers (separate /deleted endpoint). */
 export function adminListDeletedReferrers(params?: AdminReferrersListParams): Promise<ReferrerListResponse> {
   const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;

@@ -1108,7 +1108,7 @@ class TestSendFamilyInvite:
         assert resp.status_code == 429
         assert "already been sent" in resp.json()["detail"]
 
-    def test_daily_limit_blocks_after_family_limit(self, test_client: TestClient, referrer_with_full_tree):
+    def test_lifetime_limit_blocks_after_family_limit(self, test_client: TestClient, referrer_with_full_tree):
         """After sending family_limit invites, further sends return 429."""
         from unittest.mock import patch
 
@@ -1135,16 +1135,15 @@ class TestSendFamilyInvite:
         )
         assert resp.status_code == 429
 
-    def test_daily_limit_resets_after_24h(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        """After 24 hours pass, the per-referrer daily limit resets."""
-        from unittest.mock import patch
+    def test_lifetime_limit_counts_records_older_than_24h(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """The cap is lifetime — records older than 24h still count."""
         from datetime import datetime, timedelta, timezone
         from app.models import ReferrerInviteEmail
 
         ref = referrer_with_full_tree["referrer"]
         limit = ref.family_limit
 
-        # Seed old records (25 hours ago — should not count)
+        # Seed old records (25 hours ago) — they still count toward the lifetime cap
         old_time = datetime.now(timezone.utc) - timedelta(hours=25)
         for i in range(limit):
             db.add(
@@ -1156,17 +1155,13 @@ class TestSendFamilyInvite:
             )
         db.commit()
 
-        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
-            return {"sent": True, "reason": None}
-
         _tree_referrer_login(test_client)
-        with patch("app.mail.send_email", side_effect=fake_send_email):
-            # Should still be able to send (old records expired)
-            resp = test_client.post(
-                "/api/referrer/send-family-invite",
-                json={"email": "fresh@example.com"},
-            )
-        assert resp.status_code == 200
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "fresh@example.com"},
+        )
+        assert resp.status_code == 429
+        assert "reached the limit" in resp.json()["detail"]
 
     def test_seven_day_window_allows_resend(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """After 7 days, the global per-recipient block expires."""

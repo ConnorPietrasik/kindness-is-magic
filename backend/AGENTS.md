@@ -112,4 +112,9 @@ After making code changes:
 
 - Use `ruff check .` and `ruff format --check .` to validate code quality. You can also use `python3 -c "import ..."` to verify imports and basic logic.
 
+## Definition of Done
+
+- `ruff check .` and `ruff format --check .` clean
+- `./run_tests.sh` green
+
 

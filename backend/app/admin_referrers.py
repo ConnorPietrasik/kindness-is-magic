@@ -13,7 +13,7 @@ from sqlalchemy import func
 
 from app.auth import generate_unique_family_invite_code
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User
+from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, ReferrerInviteEmail, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -276,6 +276,26 @@ async def reject_referrer(
     # Send rejection email
     await _send_referrer_rejected_email(ref, db)
 
+    return ReferrerDetail(**build_referrer_detail(ref, db))
+
+
+@referrer_admin_router.post("/{ref_id}/reset-sent-emails", status_code=200)
+def reset_sent_emails(
+    ref_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> ReferrerDetail:
+    """Hard-delete all of the referrer's sent-invite email records.
+
+    This clears the per-referrer lifetime invite cap and the 7-day
+    per-recipient dedup, so the referrer can send up to their limit again
+    (including to previously invited addresses).
+    """
+    ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
+    deleted = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).delete(synchronize_session=False)
+    db.commit()
+    db.refresh(ref)
+    logger.info("Admin %s reset %d sent invite emails for referrer (id=%s)", _admin.email, deleted, ref_id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 

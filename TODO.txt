@@ -1,8 +1,31 @@
-Add logo to site (I don’t think I have it)
-Payment processing - some way to accept credit card payments. Qwen recommends Stripe
-Donor payment integration - probably automatically marking as fulfilled if paid, and unclaiming if no payment within a day
+See sent emails in the invite screen for referrers
+Make family_wish a type of Wish bound to family instead of person. It should show in all the usual places that Wishes show.
+Admins need a way to see their assigned wishes (frontend assigned wishes tile like purchasers have)
+Make “Manage people” for families have bigger bolder text and above the profile so it’s one of the first things they see
+Family invite email get rid of last sentence / make it more clear
+Make address not optional; default help text “If no address, write ‘none’”
+Family title should be required with drop down options, and it should be changed to “role”. Drop down options: “Son, Daughter, Grandson, Granddaughter, Mother, Father, Grandfather, Grandmother”. Should have help text “To help with choosing gifts; choose whichever is closest”
+Frontend wish size field default grey text add “Toddler 3T, Boys M, Mens M” examples
+Change family “request approval” to an obvious DONE button with a label: “Click here to submit once finished adding people.”
+Family approval wording change for referrers: “confirm these are your correct referred families”. Change “approval_status” to “known” or something
+Referrer denial emails to families: {Referrer Name} did not recognize you
+Referrer can lock families without waiting for them to request it
+Change claim to sponsor wording for all public stuff (so they sponsor a family instead of claiming it)
+Checkmarks to batch mark things purchased at the same place in admin and purchaser assigned-wish views
+Also filtering for purchaser view (for easier checkmark mark all)
+An easy method for purchasers to mark that they purchased something yesterday (or whatever date they choose)
+Hide CSV import - maybe make a nested view for rarely-used admin functions? It’s mostly used for demo and testing
+Admin page with everything, kinda like a spreadsheet
+Maybe move the password change thing into a more general “update user” area
+Add wish display_id: format is 1-1-1A/B/F where A/B are for practical / fun, adult gifts are just the person display_id, and F is for family wishes.
+Admins should see delivery slips too
+Payment processing - some way to accept credit card payments. Looking like Zeffy
+Donor payment integration - Shopping cart for cash-claimed families, unclaim if not paid within a day. $500 per family for gifts + optional $100 per family for groceries
 Anonymous donors - accept payments for families without requiring a donor account
-Add deadlines: family info, donor bringing gifts, others?
+Add deadlines: family info, donor bringing gifts, others? - admin set
+Packing slip: move family wish down to be more clear make all the wish info black (for all wishes) so it’s easier to read
+Packing slips: more per print page, ideally with page breaks
+Adding color to practical wishes - like size
 Donor reminder emails before deadline
 EVENTUALLY - Automated database backups
 EVENTUALLY - Email families a week before their pickup window
@@ -10,9 +33,4 @@ EVENTUALLY - Add button for admins to email families directly using their own em
 EVENTUALLY - Email "opened" tracking via a logo?
 
 Things that need clarification:
-Should families get emails on referrer rejection / admin approval?
-Ideal purchaser workflow? Currently, admins assign them wishes and then they can purchase their assigned gifts and mark them as purchased. Could also just get rid of the assignment thing and have them use the whole list, but that does induce risk of overlap
-Delivery people email; should it be an admin button or a scheduled thing a few days before?
-Family people limit? Currently set to 10, and only admins can add more beyond that. Last year highest was 9.
-For claiming and giving money, how much? $ Per person or per family?
-Gift donor claim limit? Current set claiming 5 families with gifts, unlimited money
+Delivery people getting email with their list; should it be an admin button or a scheduled thing a few days before?

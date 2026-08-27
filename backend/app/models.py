@@ -356,7 +356,7 @@ class ReferrerInviteEmail(Base):
 
     Used to enforce rate limits:
     * Global per-recipient dedup (7-day window) to protect SMTP reputation.
-    * Per-referrer daily cap tied to ``family_limit``.
+    * Per-referrer lifetime cap tied to ``family_limit``.
     """
 
     __tablename__ = "referrer_invite_emails"

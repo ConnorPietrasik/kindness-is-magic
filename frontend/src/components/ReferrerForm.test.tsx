@@ -16,6 +16,7 @@ const mockReferrerDetail: ReferrerDetail = {
   approved_at: "2025-01-01T00:00:00Z",
   created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
+  invite_count: null,
 };
 
 describe("ReferrerForm", () => {
