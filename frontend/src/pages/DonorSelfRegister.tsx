@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { FormField } from "../components/FormField";
+import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { registerDonor } from "../lib/api";
@@ -67,6 +68,7 @@ export default function DonorSelfRegister() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <div className="w-full max-w-md rounded-2xl bg-white px-8 py-10 shadow-lg">
+        <Logo className="mx-auto mb-4 h-16 w-16" />
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Donor Registration</h1>
         <p className="mb-6 text-center text-sm text-gray-500">Create an account to claim and support families</p>
 

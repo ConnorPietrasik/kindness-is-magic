@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { ROUTES } from "../lib/routes";
@@ -40,8 +41,8 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 shadow-lg">
-        <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Kindness is Magic</h1>
-        <h2 className="mb-6 text-center text-base text-gray-500 font-normal">Sign in</h2>
+        <Logo className="mx-auto mb-4" />
+        <h1 className="mb-6 text-center text-base text-gray-500 font-normal">Sign in</h1>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">

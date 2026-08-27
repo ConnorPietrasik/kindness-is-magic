@@ -7,6 +7,8 @@
 - **Basic shell commands work:** `ls`, `grep`, `find`, `sed`, `awk`, etc.
 - **Shell sessions do not persist.** Each `bash` call is a separate invocation — `cd` does not carry over. Always use full paths or prefix commands with `cd /path && ...`.
 - **Git is available for inspection.** You can use `git diff`, `git log`, `git blame`, etc. However, do **not** commit or push changes.
+- If a tool or package would save significant time, ask the user to install it before rolling your own or working around it.
+- **Persistent Python venv at the project root (`.venv`)**
 
 ## General Rules
 
@@ -24,6 +26,8 @@
 - **Keep plans concise.** A plan should describe the changes being made, the approach, and important considerations. Do not reproduce exact code diffs or inline implementations. Save detailed code changes for the implementation phase.
 
 ## Project Structure
+
+Each directory keeps its own AGENTS.md — **read it before doing anything in that directory**.
 
 - `backend/` — FastAPI + SQLAlchemy backend (Python). See `backend/AGENTS.md`.
 - `frontend/` — React + Vite frontend (TypeScript). See `frontend/AGENTS.md`.

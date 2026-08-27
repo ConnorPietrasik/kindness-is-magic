@@ -97,12 +97,12 @@ Tests require a live Postgres test database. The user starts it with:
 
 Before running tests, verify the DB is reachable:
 ```bash
-/dockerx/.venv/bin/python3 -c "import psycopg; psycopg.connect('postgresql://KindDB:testpassword@localhost:5433/kindness_is_magic_test').close()" 2>/dev/null && echo "DB OK" || echo "DB DOWN"
+/dockerx/kindness-is-magic/.venv/bin/python3 -c "import psycopg; psycopg.connect('postgresql://KindDB:testpassword@localhost:5433/kindness_is_magic_test').close()" 2>/dev/null && echo "DB OK" || echo "DB DOWN"
 ```
 
-If that fails, ask the user to start the test DB. Once it's up, run tests via the persistent venv at `/dockerx/.venv`. Save output to a temp file so you can inspect it without rerunning:
+If that fails, ask the user to start the test DB. Once it's up, run tests via the persistent venv at `/dockerx/kindness-is-magic/.venv`. Save output to a temp file so you can inspect it without rerunning:
 ```bash
-cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://KindDB:testpassword@localhost:5433/kindness_is_magic_test" /dockerx/.venv/bin/pytest -n auto -q --tb=short > /tmp/test-output.txt 2>&1
+cd /dockerx/kindness-is-magic/backend && DATABASE_URL="postgresql+psycopg://KindDB:testpassword@localhost:5433/kindness_is_magic_test" /dockerx/kindness-is-magic/.venv/bin/pytest -n auto -q --tb=short > /tmp/test-output.txt 2>&1
 ```
 
 Then read the summary with `tail -5 /tmp/test-output.txt`. If there are failures, read more of the file to inspect tracebacks.

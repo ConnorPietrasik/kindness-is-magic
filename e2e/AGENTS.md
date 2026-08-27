@@ -2,15 +2,13 @@
 
 ## Running
 
-E2E tests require the full stack. Check it first:
+Check if the stack is up first:
 
 ```bash
 curl -sf http://localhost/login > /dev/null 2>&1 && echo "up" || echo "down"
 ```
 
 If the stack is down, **ask the user to bring it up** before proceeding.
-
-Additionally, `DEBUG=true` **and** `SUPPRESS_SEND` must not be `0` in `.env` — `global-setup.ts` will abort if either condition is not met.
 
 Run and capture output:
 

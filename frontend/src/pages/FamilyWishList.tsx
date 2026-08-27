@@ -12,6 +12,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClaimModal } from "../components/ClaimModal";
 import { HeaderBar } from "../components/HeaderBar";
+import { Logo } from "../components/Logo";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +42,7 @@ export default function FamilyWishList() {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar
+          className="no-print"
           title="Kindness is Magic"
           titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
           left={<BackToFamilies />}
@@ -68,6 +70,7 @@ export default function FamilyWishList() {
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
+        className="no-print"
         title="Kindness is Magic"
         titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
         left={<BackToFamilies />}
@@ -83,9 +86,18 @@ export default function FamilyWishList() {
       />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        {/* Branded header — print only */}
+        <div className="print-only mb-6 items-center gap-4 border-b border-gray-200 pb-4">
+          <Logo className="h-14 w-14" />
+          <div className="text-left">
+            <div className="text-lg font-bold text-gray-900">{data.display_id}</div>
+            <div className="text-sm text-gray-500">Kindness is Magic — Family Wish List</div>
+          </div>
+        </div>
+
         {/* Family header */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">{data.display_id}</h2>
+          <h2 className="no-print text-2xl font-bold tracking-tight text-gray-900">{data.display_id}</h2>
           {data.bio && <p className="mt-2 text-gray-600">{data.bio}</p>}
           <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
@@ -185,8 +197,10 @@ export default function FamilyWishList() {
 
       {/* Print styles */}
       <style>{`
+        .print-only { display: none; }
         @media print {
           .no-print { display: none !important; }
+          .print-only { display: flex !important; }
           body { background: white; }
           table { border-collapse: collapse !important; }
           th, td { border: 1px solid #d1d5db !important; padding: 0.5rem !important; }

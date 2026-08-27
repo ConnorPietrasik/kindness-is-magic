@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Logo } from "../components/Logo";
 import { useToast } from "../context/ToastContext";
 import { forgotPasswordRequest } from "../lib/api";
 import { ROUTES } from "../lib/routes";
@@ -30,6 +31,7 @@ export default function ForgotPassword() {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
         <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 text-center shadow-lg">
+          <Logo className="mx-auto mb-4 h-16 w-16" />
           <h1 className="mb-2 text-2xl font-bold text-brand-dark">Check Your Email</h1>
           <p className="mb-4 text-sm text-gray-700">
             If an account exists for <strong>{email}</strong>, a password reset link has been sent.
@@ -48,6 +50,7 @@ export default function ForgotPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-10 text-center shadow-lg">
+        <Logo className="mx-auto mb-4 h-16 w-16" />
         <h1 className="mb-1 text-2xl font-bold text-brand-dark">Forgot Password?</h1>
         <p className="mb-6 text-sm text-gray-500">Enter your email and we&apos;ll send you a reset link.</p>
 

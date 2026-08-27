@@ -1,12 +1,15 @@
 import { memo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../lib/routes";
+import { Logo } from "./Logo";
 
 interface HeaderBarProps {
   title: string;
   titleTo?: string;
   left?: ReactNode;
   right?: ReactNode;
+  /** Extra classes for the <header> element (e.g. "no-print"). */
+  className?: string;
 }
 
 /**
@@ -15,9 +18,14 @@ interface HeaderBarProps {
  * @param titleTo  Where the centred title links to (default: dashboard).
  *                 Pass a public route on unauthenticated pages.
  */
-export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, left, right }: HeaderBarProps) => (
-  <header className="relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6">
-    <div className="z-10">{left}</div>
+export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, left, right, className = "" }: HeaderBarProps) => (
+  <header
+    className={`relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6 ${className}`}
+  >
+    <div className="z-10 flex items-center gap-3">
+      <Logo className="h-9 w-9" />
+      {left}
+    </div>
     <Link to={titleTo} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
       {title}
     </Link>

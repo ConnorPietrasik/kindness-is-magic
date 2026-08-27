@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { ROUTES } from "../lib/routes";
 import { humanize } from "../lib/utils";
@@ -19,6 +20,7 @@ export default function AlreadyLoggedIn() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
       <Card className="w-full max-w-sm text-center">
+        <Logo className="mx-auto mb-3 h-14 w-14" />
         <h1 className="mb-2 text-xl font-bold text-brand-dark">You&apos;re already logged in</h1>
         {user && (
           <p className="mb-4 text-sm text-gray-500">
