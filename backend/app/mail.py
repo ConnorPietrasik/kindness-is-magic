@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
 from app.config import APP_BASE_URL
-from app.models import EmailPreference
+from app.models import EmailKind, EmailPreference, EmailStatus, SentEmail
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +83,31 @@ def check_unsubscribed(email: str, db: Session) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _record_sent_email(
+    db: Session,
+    to_addr: str,
+    kind: EmailKind,
+    user_id: int | None,
+    status: EmailStatus,
+    failure_reason: str | None,
+) -> None:
+    """Insert + commit one ``SentEmail`` row for a send attempt.
+
+    Exception to the "no ``commit()`` in helper functions" rule: ``send_email``
+    owns the send outcome, and the log row must persist independently of the
+    caller's transaction (e.g. a failed send that the route turns into a 500).
+    """
+    db.add(SentEmail(user_id=user_id, recipient_email=to_addr, kind=kind, status=status, failure_reason=failure_reason))
+    db.commit()
+
+
 async def send_email(
     to: str,
     subject: str,
     html_body: str,
     db: Session,
+    kind: EmailKind,
+    user_id: int | None = None,
     exempt_unsubscribe: bool = False,
     include_unsubscribe_link: bool = True,
 ) -> dict:
@@ -95,6 +115,8 @@ async def send_email(
 
     * Checks unsubscribe unless ``exempt_unsubscribe=True``.
     * Wraps body with a branded header and optional unsubscribe footer.
+    * Records one ``SentEmail`` log row per attempt (``user_id`` is the actor
+      whose action triggered the send, NULL when unauthenticated).
     * SMTP failures are logged at ERROR level.
     * Returns ``{"sent": bool, "reason": str | None}``.
     """
@@ -103,6 +125,7 @@ async def send_email(
     # Unsubscribe gate (skip for exempt emails like password resets)
     if not exempt_unsubscribe and check_unsubscribed(to_addr, db):
         logger.info("Email suppressed (unsubscribed): %s", to_addr)
+        _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "unsubscribed")
         return {"sent": False, "reason": "unsubscribed"}
 
     # Build full HTML with branded header and optional unsubscribe footer
@@ -119,9 +142,11 @@ async def send_email(
     try:
         await mail_manager.send_message(message)
         logger.info("Email sent: to=%s subject=%s", to_addr, subject)
+        _record_sent_email(db, to_addr, kind, user_id, EmailStatus.sent, None)
         return {"sent": True, "reason": None}
     except Exception as exc:  # noqa: BLE001
         logger.error("SMTP error sending email to %s: %s", to_addr, exc)
+        _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "smtp_error")
         return {"sent": False, "reason": "smtp_error"}
 
 
@@ -362,6 +387,8 @@ async def send_admin_notification(
     subject: str,
     body_html: str,
     db: Session,
+    kind: EmailKind,
+    user_id: int | None = None,
 ) -> dict:
     """Send a notification email to the admin address.
 
@@ -377,6 +404,8 @@ async def send_admin_notification(
         subject=f"[Kindness Is Magic] {subject}",
         html_body=body_html,
         db=db,
+        kind=kind,
+        user_id=user_id,
         exempt_unsubscribe=True,
         include_unsubscribe_link=False,
     )

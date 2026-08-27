@@ -380,7 +380,9 @@ class TestSendAdminNotification:
         monkeypatch.setattr(mail_mod, "ADMIN_EMAIL", "")
         mock_db = MagicMock()
 
-        result = await mail_mod.send_admin_notification("Test Subject", "<p>Body</p>", mock_db)
+        from app.models import EmailKind
+
+        result = await mail_mod.send_admin_notification("Test Subject", "<p>Body</p>", mock_db, kind=EmailKind.admin_failure_notice)
         assert result == {"sent": False, "reason": "no_admin_email"}
 
     async def test_sends_to_admin_email_when_configured(self, monkeypatch):
@@ -391,9 +393,11 @@ class TestSendAdminNotification:
         async def _fake_send(*args, **kwargs):
             return {"sent": True, "reason": None}
 
+        from app.models import EmailKind
+
         mock_db = MagicMock()
         with patch.object(mail_mod, "send_email", new=_fake_send):
-            result = await mail_mod.send_admin_notification("Test Subject", "<p>Body</p>", mock_db)
+            result = await mail_mod.send_admin_notification("Test Subject", "<p>Body</p>", mock_db, kind=EmailKind.admin_failure_notice)
 
         assert result == {"sent": True, "reason": None}
 
@@ -410,9 +414,11 @@ class TestSendAdminNotification:
             captured["html_body"] = html_body
             return {"sent": True, "reason": None}
 
+        from app.models import EmailKind
+
         mock_db = MagicMock()
         with patch.object(mail_mod, "send_email", new=_capture):
-            await mail_mod.send_admin_notification("Something Failed", "<p>Body</p>", mock_db)
+            await mail_mod.send_admin_notification("Something Failed", "<p>Body</p>", mock_db, kind=EmailKind.admin_failure_notice)
 
         assert captured["subject"] == "[Kindness Is Magic] Something Failed"
         assert captured["to"] == "admin@example.com"
@@ -483,7 +489,7 @@ class TestClaimConfirmationEmailOnCreation:
 
         admin_notifications = []
 
-        async def _capture_admin(subject, body_html, db=None):
+        async def _capture_admin(subject, body_html, db=None, **kwargs):
             admin_notifications.append({"subject": subject, "body": body_html})
             return {"sent": True, "reason": None}
 
@@ -629,7 +635,7 @@ class TestClaimConfirmationEmailOnCreation:
         async def _fail_send(to, subject, html_body, db=None, **kwargs):
             return {"sent": False, "reason": "smtp_error"}
 
-        async def _fail_admin(subject, body_html, db=None):
+        async def _fail_admin(subject, body_html, db=None, **kwargs):
             raise Exception("Admin SMTP also broken")
 
         with patch("app.families_routes.send_email", new=_fail_send):

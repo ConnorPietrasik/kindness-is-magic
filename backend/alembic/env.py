@@ -13,15 +13,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.database import Base
 from app.models import (  # noqa: F401
     CommitmentType,
+    EmailKind,
     EmailPreference,
+    EmailStatus,
     Family,
     FamilyClaim,
     PasswordResetToken,
     Person,
     Referrer,
-    ReferrerInviteEmail,
     ReferrerInviteToken,
     RefreshToken,
+    SentEmail,
     User,
     Wish,
     WishLockLevel,

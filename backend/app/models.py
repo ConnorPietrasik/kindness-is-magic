@@ -351,23 +351,58 @@ class RefreshToken(Base):
     user: Mapped["User"] = relationship("User", backref="refresh_tokens")
 
 
-class ReferrerInviteEmail(Base):
-    """Audit log of invite emails referrers send to families.
+class EmailKind(str, enum.Enum):
+    """Type of email the application sends (log category)."""
 
-    Used to enforce rate limits:
-    * Global per-recipient dedup (7-day window) to protect SMTP reputation.
-    * Per-referrer lifetime cap tied to ``family_limit``.
+    family_invite = "family_invite"
+    referrer_invite = "referrer_invite"
+    password_reset = "password_reset"
+    family_pending = "family_pending"
+    family_approved = "family_approved"
+    referrer_approved = "referrer_approved"
+    referrer_rejected = "referrer_rejected"
+    claim_confirmation = "claim_confirmation"
+    admin_failure_notice = "admin_failure_notice"
+
+
+class EmailStatus(str, enum.Enum):
+    """Outcome of an email send attempt.
+
+    * ``sent`` — the SMTP send succeeded.
+    * ``failed`` — the send was blocked or errored (``failure_reason`` set).
+    * ``reset`` — an admin cleared the record via reset-sent-emails so the
+      send no longer counts toward rate limits.
     """
 
-    __tablename__ = "referrer_invite_emails"
+    sent = "sent"
+    failed = "failed"
+    reset = "reset"
+
+
+class SentEmail(Base):
+    """Log of every email send attempt made by the application.
+
+    ``user_id`` is the *actor* whose action triggered the send (e.g. a
+    referrer sending a family invite, an admin approving a referrer) —
+    NULL for unauthenticated requests (e.g. password reset).
+
+    Referrer invite rate limits only count rows with
+    ``kind == family_invite AND status == 'sent'``.
+    """
+
+    __tablename__ = "sent_emails"
     __table_args__ = (
-        Index("ix_referrer_invite_emails_referrer_sent", "referrer_id", "sent_at"),
-        Index("ix_referrer_invite_emails_recipient_sent", "recipient_email", "sent_at"),
+        Index("ix_sent_emails_user_sent", "user_id", "sent_at"),
+        Index("ix_sent_emails_recipient_sent", "recipient_email", "sent_at"),
+        Index("ix_sent_emails_kind_sent", "kind", "sent_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    referrer_id: Mapped[int] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     recipient_email: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[EmailKind] = mapped_column(SAEnum(EmailKind, name="email_kind", create_constraint=True), nullable=False)
+    status: Mapped[EmailStatus] = mapped_column(SAEnum(EmailStatus, name="email_status", create_constraint=True), nullable=False)
+    failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     @validates("recipient_email")

@@ -13,12 +13,14 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
+    EmailKind,
+    EmailStatus,
     Family,
     FamilyApprovalStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
-    ReferrerInviteEmail,
+    SentEmail,
     User,
     WishLockLevel,
 )
@@ -52,6 +54,7 @@ from app.schemas import (
     ReferrerDetail,
     ReferrerFamilyUpdate,
     ReferrerUpdate,
+    ReferrerInviteEmailItem,
     SendFamilyInviteRequest,
     SendFamilyInviteResponse,
 )
@@ -72,7 +75,15 @@ def get_self(
     ref = get_or_404(db, Referrer, user.referrer_id, "Referrer record not found")
     detail = build_referrer_detail(ref, db)
     # Only /me populates invite_count (sent-invite email count)
-    detail["invite_count"] = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count()
+    detail["invite_count"] = (
+        db.query(SentEmail)
+        .filter(
+            SentEmail.user_id == user.id,
+            SentEmail.kind == EmailKind.family_invite,
+            SentEmail.status == EmailStatus.sent,
+        )
+        .count()
+    )
     return ReferrerDetail(**detail)
 
 
@@ -294,6 +305,7 @@ async def approve_family(
     await _send_family_approved_email(
         fam=fam,
         db=db,
+        referrer_user_id=owner.user.id,
         referrer_display_name=owner.user.display_name,
     )
 
@@ -443,6 +455,7 @@ def referrer_reject_wishes(
 async def _send_family_approved_email(
     fam: Family,
     db: Session,
+    referrer_user_id: int,
     referrer_display_name: str,
 ) -> None:
     """Send a notification email to the family contact when approved."""
@@ -458,6 +471,8 @@ async def _send_family_approved_email(
         subject="Your family has been approved — Kindness Is Magic ✨",
         html_body=html_body,
         db=db,
+        kind=EmailKind.family_approved,
+        user_id=referrer_user_id,
     )
 
 
@@ -541,12 +556,16 @@ async def send_family_invite(
     now = datetime.now(timezone.utc)
 
     # --- Global per-recipient dedup (7-day window) ---
+    # Only actually-sent family invites count (other email kinds, failed and
+    # admin-reset rows are ignored).
     seven_days_ago = now - timedelta(days=7)
     existing = (
-        db.query(ReferrerInviteEmail)
+        db.query(SentEmail)
         .filter(
-            ReferrerInviteEmail.recipient_email == recipient,
-            ReferrerInviteEmail.sent_at >= seven_days_ago,
+            SentEmail.recipient_email == recipient,
+            SentEmail.kind == EmailKind.family_invite,
+            SentEmail.status == EmailStatus.sent,
+            SentEmail.sent_at >= seven_days_ago,
         )
         .first()
     )
@@ -554,7 +573,7 @@ async def send_family_invite(
         logger.info(
             "Invite to %s blocked (already sent in last 7 days by referrer %s)",
             recipient,
-            existing.referrer_id,
+            existing.user_id,
         )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -562,7 +581,15 @@ async def send_family_invite(
         )
 
     # --- Per-referrer lifetime cap (all time) ---
-    lifetime_count = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count()
+    lifetime_count = (
+        db.query(SentEmail)
+        .filter(
+            SentEmail.user_id == user.id,
+            SentEmail.kind == EmailKind.family_invite,
+            SentEmail.status == EmailStatus.sent,
+        )
+        .count()
+    )
     if lifetime_count >= ref.family_limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -573,32 +600,23 @@ async def send_family_invite(
         code=ref.family_invite_code,
         referrer_name=ref.name,
     )
+    # send_email records the SentEmail log row (sent or failed) itself
     result = await send_email(
         to=body.email,
         subject="You're invited to join Kindness Is Magic",
         html_body=html_body,
         db=db,
+        kind=EmailKind.family_invite,
+        user_id=user.id,
     )
 
-    # Record the send and return the appropriate status
-    if result["sent"]:
-        try:
-            db.add(
-                ReferrerInviteEmail(
-                    referrer_id=ref.id,
-                    recipient_email=recipient,
-                    sent_at=now,
-                )
-            )
-            db.commit()
-        except Exception:
-            logger.exception("Failed to record invite email for referrer %s", ref.id)
-    elif result["reason"] == "unsubscribed":
+    # Return the appropriate status
+    if result["reason"] == "unsubscribed":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This email address has unsubscribed.",
         )
-    else:
+    if not result["sent"]:
         # smtp_error or other infrastructure failure
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -612,3 +630,25 @@ async def send_family_invite(
     )
 
     return SendFamilyInviteResponse()
+
+
+@router.get("/invite-emails", response_model=list[ReferrerInviteEmailItem])
+def list_invite_emails(
+    user: User = Depends(require_referrer),
+    db: Session = Depends(get_db),
+) -> list[ReferrerInviteEmailItem]:
+    """This referrer's family invite email history (all statuses, newest first).
+
+    Unpaginated — the result is bounded by the referrer's ``family_limit``
+    plus failed/reset attempts.
+    """
+    emails = (
+        db.query(SentEmail)
+        .filter(
+            SentEmail.user_id == user.id,
+            SentEmail.kind == EmailKind.family_invite,
+        )
+        .order_by(SentEmail.sent_at.desc(), SentEmail.id.desc())
+        .all()
+    )
+    return [ReferrerInviteEmailItem.model_validate(e) for e in emails]

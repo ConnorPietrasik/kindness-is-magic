@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
+from app.models import EmailKind
 
 # ---------------------------------------------------------------------------
 # Mail module unit tests
@@ -85,7 +86,13 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+                result = await send_email(
+                    "test@example.com",
+                    "Test Subject",
+                    "<p>Body</p>",
+                    mock_db,
+                    kind=EmailKind.password_reset,
+                )
 
         assert result == {"sent": True, "reason": None}
 
@@ -94,7 +101,13 @@ class TestSendEmail:
 
         mock_db = MagicMock()
         with patch("app.mail.check_unsubscribed", return_value=True):
-            result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+            result = await send_email(
+                "test@example.com",
+                "Test Subject",
+                "<p>Body</p>",
+                mock_db,
+                kind=EmailKind.password_reset,
+            )
 
         assert result == {"sent": False, "reason": "unsubscribed"}
 
@@ -113,6 +126,7 @@ class TestSendEmail:
                     "Test Subject",
                     "<p>Body</p>",
                     mock_db,
+                    kind=EmailKind.password_reset,
                     exempt_unsubscribe=True,
                 )
 
@@ -127,7 +141,13 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", side_effect=_raise):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                result = await send_email("test@example.com", "Test Subject", "<p>Body</p>", mock_db)
+                result = await send_email(
+                    "test@example.com",
+                    "Test Subject",
+                    "<p>Body</p>",
+                    mock_db,
+                    kind=EmailKind.password_reset,
+                )
 
         assert result == {"sent": False, "reason": "smtp_error"}
 
@@ -141,7 +161,13 @@ class TestSendEmail:
         mock_db = MagicMock()
         with patch("app.mail.mail_manager.send_message", mock_send):
             with patch("app.mail.check_unsubscribed", return_value=False):
-                await send_email("test@example.com", "Test Subject", "<p>Custom Body</p>", mock_db)
+                await send_email(
+                    "test@example.com",
+                    "Test Subject",
+                    "<p>Custom Body</p>",
+                    mock_db,
+                    kind=EmailKind.family_invite,
+                )
 
         # Verify the HTML passed to send_message includes branding
         call_args = mock_send.call_args
@@ -165,6 +191,8 @@ class TestSendEmail:
                     "Test Subject",
                     "<p>Body</p>",
                     mock_db,
+                    kind=EmailKind.admin_failure_notice,
+                    user_id=1,
                     exempt_unsubscribe=True,
                     include_unsubscribe_link=False,
                 )
@@ -380,3 +408,118 @@ class TestUnsubscribeEndpoint:
         token = jwt.encode({"sub": "123"}, SECRET_KEY, algorithm=ALGORITHM)
         resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
         assert resp.status_code == 400
+
+
+class TestSendEmailLogging:
+    """send_email records one SentEmail row per attempt."""
+
+    def _make_actor(self, db: Session):
+        from app.models import User, UserRole
+        from app.auth import get_password_hash
+
+        user = User(
+            email="actor@example.com",
+            hashed_password=get_password_hash("ActorPass123!"),
+            role=UserRole.referrer,
+            display_name="Actor",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    async def test_records_sent_row(self, db: Session):
+        from app.mail import send_email
+        from app.models import EmailKind, EmailStatus, SentEmail
+
+        actor = self._make_actor(db)
+
+        async def _no_op(*args, **kwargs):
+            return None
+
+        with patch("app.mail.mail_manager.send_message", MagicMock(side_effect=_no_op)):
+            result = await send_email(
+                "Log@Example.com",
+                "Subject",
+                "<p>Body</p>",
+                db,
+                kind=EmailKind.family_invite,
+                user_id=actor.id,
+            )
+        assert result == {"sent": True, "reason": None}
+
+        rows = db.query(SentEmail).all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.recipient_email == "log@example.com"  # lowercased
+        assert row.kind == EmailKind.family_invite
+        assert row.status == EmailStatus.sent
+        assert row.user_id == actor.id
+        assert row.failure_reason is None
+        assert row.sent_at is not None
+
+    async def test_records_failed_row_on_unsubscribe(self, db: Session):
+        from app.mail import send_email
+        from app.models import EmailKind, EmailPreference, EmailStatus, SentEmail
+
+        db.add(EmailPreference(email="nope@example.com", unsubscribed_at=datetime.now(timezone.utc)))
+        db.commit()
+
+        result = await send_email(
+            "nope@example.com",
+            "Subject",
+            "<p>Body</p>",
+            db,
+            kind=EmailKind.claim_confirmation,
+        )
+        assert result == {"sent": False, "reason": "unsubscribed"}
+
+        rows = db.query(SentEmail).all()
+        assert len(rows) == 1
+        assert rows[0].kind == EmailKind.claim_confirmation
+        assert rows[0].status == EmailStatus.failed
+        assert rows[0].failure_reason == "unsubscribed"
+        assert rows[0].user_id is None  # not provided
+
+    async def test_records_failed_row_on_smtp_error(self, db: Session):
+        from app.mail import send_email
+        from app.models import EmailKind, EmailStatus, SentEmail
+
+        actor = self._make_actor(db)
+
+        async def _raise(*args, **kwargs):
+            raise Exception("Connection refused")
+
+        with patch("app.mail.mail_manager.send_message", side_effect=_raise):
+            result = await send_email(
+                "broken@example.com",
+                "Subject",
+                "<p>Body</p>",
+                db,
+                kind=EmailKind.admin_failure_notice,
+                user_id=actor.id,
+            )
+        assert result == {"sent": False, "reason": "smtp_error"}
+
+        rows = db.query(SentEmail).all()
+        assert len(rows) == 1
+        assert rows[0].kind == EmailKind.admin_failure_notice
+        assert rows[0].status == EmailStatus.failed
+        assert rows[0].failure_reason == "smtp_error"
+        assert rows[0].user_id == actor.id
+
+    async def test_one_row_per_attempt(self, db: Session):
+        """Two consecutive attempts produce two rows."""
+        from app.mail import send_email
+        from app.models import EmailKind, EmailStatus, SentEmail
+
+        async def _no_op(*args, **kwargs):
+            return None
+
+        with patch("app.mail.mail_manager.send_message", MagicMock(side_effect=_no_op)):
+            await send_email("twice@example.com", "S", "<p>B</p>", db, kind=EmailKind.password_reset)
+            await send_email("twice@example.com", "S", "<p>B</p>", db, kind=EmailKind.password_reset)
+
+        rows = db.query(SentEmail).order_by(SentEmail.id).all()
+        assert len(rows) == 2
+        assert all(r.status == EmailStatus.sent for r in rows)

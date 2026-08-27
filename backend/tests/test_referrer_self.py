@@ -1062,18 +1062,13 @@ class TestSendFamilyInvite:
 
     def test_global_per_recipient_block(self, test_client: TestClient, referrer_with_full_tree, another_referrer):
         """A second referrer cannot send to an address that already received an invite."""
-        from unittest.mock import patch
-
-        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
-            return {"sent": True, "reason": None}
-
-        # First referrer sends to the address
+        # First referrer sends to the address (send_email records the log row;
+        # SMTP is suppressed in tests)
         _tree_referrer_login(test_client)
-        with patch("app.mail.send_email", side_effect=fake_send_email):
-            resp = test_client.post(
-                "/api/referrer/send-family-invite",
-                json={"email": "family@example.com"},
-            )
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
         assert resp.status_code == 200
 
         # Second referrer tries the same address — 429
@@ -1087,17 +1082,11 @@ class TestSendFamilyInvite:
 
     def test_same_referrer_resend_to_same_address_blocked(self, test_client: TestClient, referrer_with_full_tree):
         """The same referrer re-sending to the same address is also blocked."""
-        from unittest.mock import patch
-
-        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
-            return {"sent": True, "reason": None}
-
         _tree_referrer_login(test_client)
-        with patch("app.mail.send_email", side_effect=fake_send_email):
-            resp = test_client.post(
-                "/api/referrer/send-family-invite",
-                json={"email": "family@example.com"},
-            )
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "family@example.com"},
+        )
         assert resp.status_code == 200
 
         # Same referrer, same address — 429
@@ -1110,23 +1099,17 @@ class TestSendFamilyInvite:
 
     def test_lifetime_limit_blocks_after_family_limit(self, test_client: TestClient, referrer_with_full_tree):
         """After sending family_limit invites, further sends return 429."""
-        from unittest.mock import patch
-
         ref = referrer_with_full_tree["referrer"]
         limit = ref.family_limit  # 5
 
-        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
-            return {"sent": True, "reason": None}
-
         _tree_referrer_login(test_client)
-        with patch("app.mail.send_email", side_effect=fake_send_email):
-            # Send up to the limit
-            for i in range(limit):
-                resp = test_client.post(
-                    "/api/referrer/send-family-invite",
-                    json={"email": f"user{i}@example.com"},
-                )
-                assert resp.status_code == 200, f"Request {i} should succeed"
+        # Send up to the limit (send_email records the log rows; SMTP suppressed)
+        for i in range(limit):
+            resp = test_client.post(
+                "/api/referrer/send-family-invite",
+                json={"email": f"user{i}@example.com"},
+            )
+            assert resp.status_code == 200, f"Request {i} should succeed"
 
         # One past the limit — 429
         resp = test_client.post(
@@ -1138,18 +1121,21 @@ class TestSendFamilyInvite:
     def test_lifetime_limit_counts_records_older_than_24h(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """The cap is lifetime — records older than 24h still count."""
         from datetime import datetime, timedelta, timezone
-        from app.models import ReferrerInviteEmail
+        from app.models import EmailKind, EmailStatus, SentEmail
 
         ref = referrer_with_full_tree["referrer"]
+        user = referrer_with_full_tree["user"]
         limit = ref.family_limit
 
         # Seed old records (25 hours ago) — they still count toward the lifetime cap
         old_time = datetime.now(timezone.utc) - timedelta(hours=25)
         for i in range(limit):
             db.add(
-                ReferrerInviteEmail(
-                    referrer_id=ref.id,
+                SentEmail(
+                    user_id=user.id,
                     recipient_email=f"old{i}@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.sent,
                     sent_at=old_time,
                 )
             )
@@ -1165,30 +1151,314 @@ class TestSendFamilyInvite:
 
     def test_seven_day_window_allows_resend(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """After 7 days, the global per-recipient block expires."""
-        from unittest.mock import patch
         from datetime import datetime, timedelta, timezone
-        from app.models import ReferrerInviteEmail
-
-        ref = referrer_with_full_tree["referrer"]
+        from app.models import EmailKind, EmailStatus, SentEmail
 
         # Seed an old record (8 days ago — should not block)
         old_time = datetime.now(timezone.utc) - timedelta(days=8)
         db.add(
-            ReferrerInviteEmail(
-                referrer_id=ref.id,
+            SentEmail(
+                user_id=referrer_with_full_tree["user"].id,
                 recipient_email="stale@example.com",
+                kind=EmailKind.family_invite,
+                status=EmailStatus.sent,
                 sent_at=old_time,
             )
         )
         db.commit()
 
-        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
-            return {"sent": True, "reason": None}
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "stale@example.com"},
+        )
+        assert resp.status_code == 200
+
+    # --- Rate limits only count sent family_invite rows ---
+
+    def test_dedup_ignores_other_kinds(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """A non-invite email to the same address (e.g. claim confirmation)
+        does not block a family invite."""
+        from app.models import EmailKind, EmailStatus, SentEmail, User, UserRole
+        from app.auth import get_password_hash
+
+        donor = User(
+            email="cap_donor@example.com",
+            hashed_password=get_password_hash("DonorPass123!"),
+            role=UserRole.donor,
+            display_name="Cap Donor",
+        )
+        db.add(donor)
+        db.commit()
+        db.refresh(donor)
+
+        db.add(
+            SentEmail(
+                user_id=donor.id,
+                recipient_email="sameaddress@example.com",
+                kind=EmailKind.claim_confirmation,
+                status=EmailStatus.sent,
+            )
+        )
+        db.commit()
 
         _tree_referrer_login(test_client)
-        with patch("app.mail.send_email", side_effect=fake_send_email):
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "sameaddress@example.com"},
+        )
+        assert resp.status_code == 200
+
+    def test_dedup_ignores_failed_and_reset_rows(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Failed and admin-reset family invites do not block a resend."""
+        from app.models import EmailKind, EmailStatus, SentEmail
+
+        user = referrer_with_full_tree["user"]
+        db.add_all(
+            [
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="failed@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.failed,
+                    failure_reason="smtp_error",
+                ),
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="reset@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.reset,
+                ),
+            ]
+        )
+        db.commit()
+
+        _tree_referrer_login(test_client)
+        for addr in ("failed@example.com", "reset@example.com"):
             resp = test_client.post(
                 "/api/referrer/send-family-invite",
-                json={"email": "stale@example.com"},
+                json={"email": addr},
             )
+            assert resp.status_code == 200, addr
+
+    def test_lifetime_cap_ignores_other_kinds_and_statuses(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Rows that are not sent family invites don't count toward the cap."""
+        from app.models import EmailKind, EmailStatus, SentEmail, User, UserRole
+        from app.auth import get_password_hash
+
+        ref = referrer_with_full_tree["referrer"]
+        user = referrer_with_full_tree["user"]
+        limit = ref.family_limit  # 5
+
+        donor = User(
+            email="cap2_donor@example.com",
+            hashed_password=get_password_hash("DonorPass123!"),
+            role=UserRole.donor,
+            display_name="Cap2 Donor",
+        )
+        db.add(donor)
+        db.commit()
+        db.refresh(donor)
+
+        # Fill the cap with rows that must NOT count:
+        # - limit rows of a different kind (sent)
+        # - limit rows of the right kind but failed
+        # - limit rows of the right kind but reset
+        for i in range(limit):
+            db.add(
+                SentEmail(
+                    user_id=donor.id,
+                    recipient_email=f"otherkind{i}@example.com",
+                    kind=EmailKind.claim_confirmation,
+                    status=EmailStatus.sent,
+                )
+            )
+            db.add(
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email=f"capfailed{i}@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.failed,
+                    failure_reason="smtp_error",
+                )
+            )
+            db.add(
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email=f"capreset{i}@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.reset,
+                )
+            )
+        db.commit()
+
+        # Cap not reached — the referrer can still send
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "fresh@example.com"},
+        )
         assert resp.status_code == 200
+
+    def test_invite_count_in_me_reflects_filters(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """/me invite_count counts only sent family_invite rows for this referrer."""
+        from app.models import EmailKind, EmailStatus, SentEmail
+
+        user = referrer_with_full_tree["user"]
+        from app.models import User, UserRole
+        from app.auth import get_password_hash
+
+        other = User(
+            email="count_other@example.com",
+            hashed_password=get_password_hash("OtherPass123!"),
+            role=UserRole.referrer,
+            display_name="Count Other",
+        )
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+
+        db.add_all(
+            [
+                # counts
+                SentEmail(user_id=user.id, recipient_email="a@example.com", kind=EmailKind.family_invite, status=EmailStatus.sent),
+                # other referrer's sent invite — excluded
+                SentEmail(user_id=other.id, recipient_email="b@example.com", kind=EmailKind.family_invite, status=EmailStatus.sent),
+                # own row, other kind — excluded
+                SentEmail(user_id=user.id, recipient_email="c@example.com", kind=EmailKind.family_approved, status=EmailStatus.sent),
+                # own row, failed — excluded
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="d@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.failed,
+                    failure_reason="smtp_error",
+                ),
+            ]
+        )
+        db.commit()
+
+        _tree_referrer_login(test_client)
+        resp = test_client.get("/api/referrer/me")
+        assert resp.status_code == 200
+        assert resp.json()["invite_count"] == 1
+
+
+# =========================================================================
+# Referrer — Invite Email History
+# =========================================================================
+
+
+class TestReferrerInviteEmails:
+    """GET /api/referrer/invite-emails"""
+
+    def test_401_unauthenticated(self, test_client: TestClient, referrer_with_full_tree):
+        resp = test_client.get("/api/referrer/invite-emails")
+        assert resp.status_code == 401
+
+    def test_403_non_referrer(self, test_client: TestClient, family_user):
+        login_as(test_client, "family@test.com", "FamPass1234!")
+        resp = test_client.get("/api/referrer/invite-emails")
+        assert resp.status_code == 403
+
+    def test_empty_list(self, test_client: TestClient, referrer_with_full_tree):
+        _tree_referrer_login(test_client)
+        resp = test_client.get("/api/referrer/invite-emails")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_returns_only_own_family_invite_rows_all_statuses(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Only this referrer's family_invite rows are returned, all statuses,
+        newest first, with the documented item fields."""
+        from datetime import datetime, timedelta, timezone
+        from app.models import EmailKind, EmailStatus, SentEmail, User, UserRole
+        from app.auth import get_password_hash
+
+        user = referrer_with_full_tree["user"]
+        other = User(
+            email="hist_other@example.com",
+            hashed_password=get_password_hash("OtherPass123!"),
+            role=UserRole.referrer,
+            display_name="Hist Other",
+        )
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+
+        now = datetime.now(timezone.utc)
+        db.add_all(
+            [
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="newest@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.sent,
+                    sent_at=now,
+                ),
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="failed@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.failed,
+                    failure_reason="unsubscribed",
+                    sent_at=now - timedelta(days=1),
+                ),
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="reset@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.reset,
+                    sent_at=now - timedelta(days=2),
+                ),
+                # Excluded: other user's family invite
+                SentEmail(
+                    user_id=other.id,
+                    recipient_email="other@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.sent,
+                    sent_at=now,
+                ),
+                # Excluded: own row but other kind
+                SentEmail(
+                    user_id=user.id,
+                    recipient_email="approved@example.com",
+                    kind=EmailKind.family_approved,
+                    status=EmailStatus.sent,
+                    sent_at=now,
+                ),
+            ]
+        )
+        db.commit()
+
+        _tree_referrer_login(test_client)
+        resp = test_client.get("/api/referrer/invite-emails")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert [i["recipient_email"] for i in items] == [
+            "newest@example.com",
+            "failed@example.com",
+            "reset@example.com",
+        ]
+        # Item fields
+        assert set(items[0].keys()) == {"id", "recipient_email", "status", "failure_reason", "sent_at"}
+        assert items[0]["status"] == "sent"
+        assert items[0]["failure_reason"] is None
+        assert items[1]["status"] == "failed"
+        assert items[1]["failure_reason"] == "unsubscribed"
+        assert items[2]["status"] == "reset"
+
+    def test_rows_appear_after_sending(self, test_client: TestClient, referrer_with_full_tree):
+        """A send via /send-family-invite shows up in the history immediately."""
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "justsent@example.com"},
+        )
+        assert resp.status_code == 200
+
+        resp = test_client.get("/api/referrer/invite-emails")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) == 1
+        assert items[0]["recipient_email"] == "justsent@example.com"
+        assert items[0]["status"] == "sent"

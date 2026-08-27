@@ -28,6 +28,7 @@ from app.auth import (
 from app.mail import send_email, build_invite_email, build_password_reset_email, build_family_pending_email
 from app.database import get_db
 from app.models import (
+    EmailKind,
     EmailPreference,
     Family,
     FamilyApprovalStatus,
@@ -360,6 +361,7 @@ async def forgot_password(request: Request, data: ForgotPassword, db: Session = 
         subject="Reset your Kindness Is Magic password",
         html_body=html_body,
         db=db,
+        kind=EmailKind.password_reset,
         exempt_unsubscribe=True,
         include_unsubscribe_link=False,
     )
@@ -461,6 +463,8 @@ async def invite_referrer(
             subject="You're invited to join Kindness Is Magic",
             html_body=html_body,
             db=db,
+            kind=EmailKind.referrer_invite,
+            user_id=_admin.id,
         )
         if not result["sent"]:
             if result["reason"] == "unsubscribed":
@@ -635,6 +639,8 @@ async def register_family(
             subject=f"New family awaiting approval — {data.family_name}",
             html_body=html_body,
             db=db,
+            kind=EmailKind.family_pending,
+            user_id=user.id,
         )
 
     # 6. Build response

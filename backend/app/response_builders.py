@@ -22,6 +22,7 @@ from app.models import (
     Person,
     Referrer,
     ReferrerInviteToken,
+    SentEmail,
     User,
     Wish,
     WishType,
@@ -216,6 +217,14 @@ PUBLIC_FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "person_count": FAMILY_PERSON_COUNT,
     "min_age": FAMILY_MIN_AGE,
     "max_age": FAMILY_MAX_AGE,
+}
+
+EMAIL_SORT_FIELDS: dict[str, ColumnElement] = {
+    "recipient_email": SentEmail.recipient_email,
+    "kind": SentEmail.kind,
+    "status": SentEmail.status,
+    "sent_at": SentEmail.sent_at,
+    "id": SentEmail.id,
 }
 
 

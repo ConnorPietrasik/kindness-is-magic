@@ -13,7 +13,7 @@ from sqlalchemy import func
 
 from app.auth import generate_unique_family_invite_code
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, ReferrerInviteEmail, User
+from app.models import EmailKind, EmailStatus, Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, SentEmail, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -253,7 +253,7 @@ async def approve_referrer(
     logger.info("Admin %s approved referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
 
     # Send approval email
-    await _send_referrer_approved_email(ref, db)
+    await _send_referrer_approved_email(ref, db, user_id=_admin.id)
 
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
@@ -274,7 +274,7 @@ async def reject_referrer(
     logger.info("Admin %s rejected referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
 
     # Send rejection email
-    await _send_referrer_rejected_email(ref, db)
+    await _send_referrer_rejected_email(ref, db, user_id=_admin.id)
 
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
@@ -285,21 +285,33 @@ def reset_sent_emails(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
-    """Hard-delete all of the referrer's sent-invite email records.
+    """Mark the referrer's sent invite emails as ``reset``.
 
     This clears the per-referrer lifetime invite cap and the 7-day
     per-recipient dedup, so the referrer can send up to their limit again
-    (including to previously invited addresses).
+    (including to previously invited addresses). The history rows are kept —
+    they simply no longer count toward the limits.
     """
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
-    deleted = db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).delete(synchronize_session=False)
+    referrer_user = db.query(User).filter(User.referrer_id == ref.id).first()
+    reset_count = 0
+    if referrer_user:
+        reset_count = (
+            db.query(SentEmail)
+            .filter(
+                SentEmail.user_id == referrer_user.id,
+                SentEmail.kind == EmailKind.family_invite,
+                SentEmail.status == EmailStatus.sent,
+            )
+            .update({SentEmail.status: EmailStatus.reset}, synchronize_session=False)
+        )
     db.commit()
     db.refresh(ref)
-    logger.info("Admin %s reset %d sent invite emails for referrer (id=%s)", _admin.email, deleted, ref_id)
+    logger.info("Admin %s reset %d sent invite emails for referrer (id=%s)", _admin.email, reset_count, ref_id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
-async def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
+async def _send_referrer_approved_email(ref: Referrer, db: Session, user_id: int) -> None:
     """Send approval notification email to the referrer."""
     from app.mail import build_referrer_approved_email, send_email
 
@@ -313,10 +325,12 @@ async def _send_referrer_approved_email(ref: Referrer, db: Session) -> None:
         subject="Your Kindness Is Magic account has been approved ✨",
         html_body=html_body,
         db=db,
+        kind=EmailKind.referrer_approved,
+        user_id=user_id,
     )
 
 
-async def _send_referrer_rejected_email(ref: Referrer, db: Session) -> None:
+async def _send_referrer_rejected_email(ref: Referrer, db: Session, user_id: int) -> None:
     """Send rejection notification email to the referrer."""
     from app.mail import build_referrer_rejected_email, send_email
 
@@ -330,4 +344,6 @@ async def _send_referrer_rejected_email(ref: Referrer, db: Session) -> None:
         subject="Update on your Kindness Is Magic account",
         html_body=html_body,
         db=db,
+        kind=EmailKind.referrer_rejected,
+        user_id=user_id,
     )

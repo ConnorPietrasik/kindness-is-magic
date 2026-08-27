@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, field_validator, model_serializer, model_
 
 from app.models import (
     CommitmentType,
+    EmailKind,
+    EmailStatus,
     FamilyApprovalStatus,
     ReferrerApprovalStatus,
     UserRole,
@@ -378,6 +380,49 @@ class ReferrerInviteSummary(BaseModel):
 
 class InviteListResponse(BaseModel):
     invites: list[ReferrerInviteSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+class ReferrerInviteEmailItem(BaseModel):
+    """Referrer-facing history entry for one family invite email attempt.
+
+    All statuses are included (sent / failed / reset) — the referrer can see
+    what happened to each address they invited.
+    """
+
+    id: int
+    recipient_email: str
+    status: EmailStatus
+    failure_reason: str | None = None
+    sent_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin sent-email log schemas
+# ---------------------------------------------------------------------------
+
+
+class SentEmailSummary(BaseModel):
+    """Sent-email log entry for the admin log view."""
+
+    id: int
+    recipient_email: str
+    kind: EmailKind
+    status: EmailStatus
+    failure_reason: str | None = None
+    sent_at: datetime
+    sender_name: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class EmailListResponse(BaseModel):
+    emails: list[SentEmailSummary]
     total: int = 0
     page: int = 1
     page_size: int = 50

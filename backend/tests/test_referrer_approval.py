@@ -457,9 +457,10 @@ class TestAdminResetSentEmails:
     def test_reset_allows_resending_to_dedup_blocked_recipient(self, test_client: TestClient, admin_user, db: Session):
         """After a reset, the referrer can send again, including to a
         previously 7-day-blocked recipient."""
-        from app.models import ReferrerInviteEmail
+        from app.models import EmailKind, EmailStatus, SentEmail, User
 
         ref = self._create_approved_referrer(db)
+        referrer_user = db.query(User).filter(User.email == "resetref@test.com").first()
         login_as(test_client, "resetref@test.com", "ResetRef1234!")
 
         # First send succeeds; immediate resend is 7-day dedup blocked
@@ -469,12 +470,22 @@ class TestAdminResetSentEmails:
         assert resp.status_code == 429
         assert "already been sent" in resp.json()["detail"]
 
-        # Admin reset hard-deletes the records
+        # Admin reset marks the sent invite row as 'reset' (the row is kept)
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/referrers/{ref.id}/reset-sent-emails")
         assert resp.status_code == 200
         assert resp.json()["id"] == ref.id
-        assert db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count() == 0
+        rows = (
+            db.query(SentEmail)
+            .filter(
+                SentEmail.user_id == referrer_user.id,
+                SentEmail.kind == EmailKind.family_invite,
+            )
+            .all()
+        )
+        assert len(rows) == 1
+        assert rows[0].status == EmailStatus.reset
+        assert rows[0].failure_reason is None
 
         # Same recipient can be invited again right after the reset
         login_as(test_client, "resetref@test.com", "ResetRef1234!")
@@ -483,9 +494,10 @@ class TestAdminResetSentEmails:
 
     def test_reset_allows_sending_again_at_lifetime_cap(self, test_client: TestClient, admin_user, db: Session):
         """A referrer at the lifetime cap can send again after a reset."""
-        from app.models import ReferrerInviteEmail
+        from app.models import EmailKind, EmailStatus, SentEmail, User
 
         ref = self._create_approved_referrer(db, family_limit=1)
+        referrer_user = db.query(User).filter(User.email == "resetref@test.com").first()
         login_as(test_client, "resetref@test.com", "ResetRef1234!")
 
         # Fill the lifetime cap, then get blocked
@@ -495,16 +507,110 @@ class TestAdminResetSentEmails:
         assert resp.status_code == 429
         assert "reached the limit" in resp.json()["detail"]
 
-        # Reset clears the cap
+        # Reset clears the cap (row kept, marked 'reset')
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/referrers/{ref.id}/reset-sent-emails")
         assert resp.status_code == 200
-        assert db.query(ReferrerInviteEmail).filter(ReferrerInviteEmail.referrer_id == ref.id).count() == 0
+        rows = (
+            db.query(SentEmail)
+            .filter(
+                SentEmail.user_id == referrer_user.id,
+                SentEmail.kind == EmailKind.family_invite,
+            )
+            .all()
+        )
+        assert len(rows) == 1
+        assert rows[0].status == EmailStatus.reset
 
         # Referrer can send again after the reset
         login_as(test_client, "resetref@test.com", "ResetRef1234!")
         resp = test_client.post("/api/referrer/send-family-invite", json={"email": "second@example.com"})
         assert resp.status_code == 200
+
+    def test_reset_only_marks_sent_family_invites(self, test_client: TestClient, admin_user, db: Session):
+        """Reset leaves other kinds, failed rows, and other referrers' rows alone."""
+        from app.models import (
+            EmailKind,
+            EmailStatus,
+            Referrer,
+            ReferrerApprovalStatus,
+            SentEmail,
+            User,
+            UserRole,
+        )
+        from app.auth import get_password_hash
+
+        ref = self._create_approved_referrer(db)
+        referrer_user = db.query(User).filter(User.email == "resetref@test.com").first()
+
+        # A second referrer with a sent invite of their own
+        other_ref = Referrer(
+            name="Other Ref",
+            family_limit=5,
+            phone_number="555-777-7777",
+            family_invite_code="KFI-RST002",
+            approval_status=ReferrerApprovalStatus.approved,
+        )
+        db.add(other_ref)
+        db.commit()
+        db.refresh(other_ref)
+        other_user = User(
+            email="otherref@test.com",
+            hashed_password=get_password_hash("OtherRef1234!"),
+            role=UserRole.referrer,
+            display_name=None,
+            referrer_id=other_ref.id,
+        )
+        db.add(other_user)
+        db.commit()
+        db.refresh(other_user)
+
+        db.add_all(
+            [
+                # Target: the reset referrer's sent family invite
+                SentEmail(
+                    user_id=referrer_user.id,
+                    recipient_email="a@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.sent,
+                ),
+                # Own but a different kind — untouched
+                SentEmail(
+                    user_id=referrer_user.id,
+                    recipient_email="b@example.com",
+                    kind=EmailKind.family_approved,
+                    status=EmailStatus.sent,
+                ),
+                # Own but failed — untouched
+                SentEmail(
+                    user_id=referrer_user.id,
+                    recipient_email="c@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.failed,
+                    failure_reason="smtp_error",
+                ),
+                # Other referrer's sent invite — untouched
+                SentEmail(
+                    user_id=other_user.id,
+                    recipient_email="d@example.com",
+                    kind=EmailKind.family_invite,
+                    status=EmailStatus.sent,
+                ),
+            ]
+        )
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{ref.id}/reset-sent-emails")
+        assert resp.status_code == 200
+
+        by_email = {
+            r.recipient_email: r for r in db.query(SentEmail).filter(SentEmail.user_id.in_([referrer_user.id, other_user.id])).all()
+        }
+        assert by_email["a@example.com"].status == EmailStatus.reset
+        assert by_email["b@example.com"].status == EmailStatus.sent
+        assert by_email["c@example.com"].status == EmailStatus.failed
+        assert by_email["d@example.com"].status == EmailStatus.sent
 
     def test_reset_nonexistent_referrer(self, test_client: TestClient, admin_user):
         """Reset for a non-existent referrer returns 404."""

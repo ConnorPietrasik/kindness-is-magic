@@ -24,6 +24,7 @@ from app.mail import (
 from app.permissions import require_claim_capable
 from app.models import (
     CommitmentType,
+    EmailKind,
     Family,
     FamilyApprovalStatus,
     FamilyClaim,
@@ -326,6 +327,8 @@ async def _send_claim_confirmation(
             subject=f"Claim Confirmation — Family {display_id}",
             html_body=body,
             db=db,
+            kind=EmailKind.claim_confirmation,
+            user_id=user.id,
         )
 
         if result["sent"]:
@@ -355,6 +358,8 @@ async def _send_claim_confirmation(
                 subject="Claim Confirmation Email Failed",
                 body_html=admin_body,
                 db=db,
+                kind=EmailKind.admin_failure_notice,
+                user_id=user.id,
             )
         except Exception:  # noqa: BLE001
             logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
@@ -375,6 +380,8 @@ async def _send_claim_confirmation(
                 subject="Claim Confirmation Email Failed",
                 body_html=admin_body,
                 db=db,
+                kind=EmailKind.admin_failure_notice,
+                user_id=user.id,
             )
         except Exception:  # noqa: BLE001
             logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
