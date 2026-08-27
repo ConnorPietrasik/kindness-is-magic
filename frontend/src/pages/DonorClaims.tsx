@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/Card";
 import { HeaderBar } from "../components/HeaderBar";
+import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { donorListClaims } from "../lib/api";
@@ -25,6 +26,7 @@ export default function DonorClaims() {
     data: claims,
     isLoading,
     isError,
+    error,
   } = useQuery({
     queryKey: [...donorClaims, statusFilter],
     queryFn: () =>
@@ -37,10 +39,7 @@ export default function DonorClaims() {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar title="Kindness is Magic" />
-        <main className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6">
-          <h2 className="mb-2 text-xl font-bold text-gray-900">Unable to Load Claims</h2>
-          <p className="text-gray-500">Something went wrong. Please try again later.</p>
-        </main>
+        <PageError error={error} heading="Unable to Load Claims" fallback="Something went wrong. Please try again later." />
       </div>
     );
   }

@@ -202,24 +202,18 @@ def get_family_wish_list(
     """Return the public wish list for a family.
 
     * No authentication required.
-    * Soft-deleted families return 404.
+    * Non-existent or soft-deleted families return 404.
+    * Families that haven't been fully reviewed (wish_lock_level != admin)
+      return 403.
     * Soft-deleted people are excluded from the people list.
     * If authenticated, includes claim status info.
     """
-    # Look up family (skip soft-deleted and non-admin-locked)
-    fam = (
-        db.query(Family)
-        .filter(
-            Family.id == family_id,
-            Family.deleted_at.is_(None),
-            Family.wish_lock_level == WishLockLevel.admin,
-        )
-        .first()
-    )
-    if fam is None:
+    fam = get_active_or_404(db, Family, family_id, "Family not found")
+
+    if fam.wish_lock_level != WishLockLevel.admin:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Family not found",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This family hasn't been fully approved yet.",
         )
 
     # Active people ordered by id
@@ -397,13 +391,19 @@ async def claim_family(
     """Claim a family (gift promise or cash commitment).
 
     * Requires authentication with a claim-capable role.
+    * Family must be fully reviewed (wish_lock_level == admin) — otherwise 403.
     * Validates family is not already actively claimed.
     * If commitment_type == "gifts", user must have < 5 active gift claims.
     * Cash claims have no limit.
     * For gift claims, a confirmation email is sent to the donor.
     """
-    # 1. Validate family exists and is active
+    # 1. Validate family exists, is active, and is fully reviewed
     fam = get_active_or_404(db, Family, family_id, "Family not found")
+    if fam.wish_lock_level != WishLockLevel.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This family hasn't been fully approved yet.",
+        )
 
     # 2. Check family is not already actively claimed
     existing_claim = (

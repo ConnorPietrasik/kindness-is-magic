@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import * as api from "../lib/api";
@@ -38,6 +38,7 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
  * Renders the page inside router + query + auth providers.
  * Pre-seeds the auth query cache (staleTime: Infinity) so no /api/auth/me
  * request is made and the auth state is deterministic per test.
+ * A real Route is needed so useParams resolves the family id.
  */
 const wrap = (user: User | null = null) => {
   const queryClient = createQueryClient();
@@ -46,7 +47,9 @@ const wrap = (user: User | null = null) => {
     <MemoryRouter initialEntries={["/families/1/wish-list"]}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <FamilyWishList />
+          <Routes>
+            <Route path="/families/:id/wish-list" element={<FamilyWishList />} />
+          </Routes>
         </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>
@@ -87,5 +90,35 @@ describe("FamilyWishList header", () => {
     });
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Tests — error state                                                 */
+/* ------------------------------------------------------------------ */
+
+describe("FamilyWishList error state", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows the API error detail when the request is rejected (403 not fully approved)", async () => {
+    const error = new Error("Request failed with status code 403") as Error & { response?: { data?: { detail?: string } } };
+    error.response = { data: { detail: "This family hasn't been fully approved yet." } };
+    vi.spyOn(api, "getFamilyWishList").mockRejectedValue(error);
+
+    wrap();
+
+    await screen.findByText("This family hasn't been fully approved yet.");
+    expect(screen.getByRole("heading", { name: "Unable to Load Wish List" })).toBeInTheDocument();
+  });
+
+  it("shows the fallback message when the error has no detail", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockRejectedValue(new Error("Network Error"));
+
+    wrap();
+
+    await screen.findByText("Network Error");
   });
 });

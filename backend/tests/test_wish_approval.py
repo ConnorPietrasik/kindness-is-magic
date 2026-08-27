@@ -563,8 +563,9 @@ class TestReviewQueues:
 
 class TestPublicWishListFiltering:
     def test_only_admin_locked_families_appear(self, test_client, family):
+        # Default lock level is "family" — not fully approved yet
         resp = test_client.get(f"/api/families/{family.id}/wish-list")
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_admin_locked_family_is_visible(self, test_client, family, db):
         family.wish_lock_level = "admin"
@@ -576,4 +577,4 @@ class TestPublicWishListFiltering:
         family.wish_lock_level = "referrer"
         db.commit()
         resp = test_client.get(f"/api/families/{family.id}/wish-list")
-        assert resp.status_code == 404
+        assert resp.status_code == 403

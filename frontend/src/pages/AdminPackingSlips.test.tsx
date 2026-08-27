@@ -162,13 +162,25 @@ describe("AdminPackingSlips", () => {
     expect(screen.getByText("None of the selected families are ready for packing.")).toBeInTheDocument();
   });
 
-  it("shows error state on API failure", async () => {
-    vi.spyOn(api, "adminGetPackingSlips").mockRejectedValue(new Error("API error"));
+  it("shows error state with API detail on failure", async () => {
+    const error = new Error("Request failed with status code 500") as Error & { response?: { data?: { detail?: string } } };
+    error.response = { data: { detail: "An internal database error occurred" } };
+    vi.spyOn(api, "adminGetPackingSlips").mockRejectedValue(error);
 
     wrap(<AdminPackingSlips />);
 
     await waitFor(() => {
-      expect(screen.getByText("Unable to load packing slips. Please try again.")).toBeInTheDocument();
+      expect(screen.getByText("An internal database error occurred")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the fallback message when the error has no detail", async () => {
+    vi.spyOn(api, "adminGetPackingSlips").mockRejectedValue(new Error("Network Error"));
+
+    wrap(<AdminPackingSlips />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Network Error")).toBeInTheDocument();
     });
   });
 

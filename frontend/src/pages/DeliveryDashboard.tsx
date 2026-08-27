@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import { deliveryListFamilies } from "../lib/api";
 import { deliveryFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
+import { formatApiError } from "../lib/utils";
 import type { DeliveryFamilySummary } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -26,6 +27,7 @@ export default function DeliveryDashboard() {
     data: families,
     isLoading,
     isError,
+    error,
   } = useQuery({
     queryKey: deliveryFamilies,
     queryFn: deliveryListFamilies,
@@ -58,7 +60,7 @@ export default function DeliveryDashboard() {
 
         {isError || !families ? (
           <Card>
-            <p className="py-8 text-center text-gray-400">Unable to load families. Please try again.</p>
+            <p className="py-8 text-center text-gray-400">{formatApiError(error, "Unable to load families. Please try again.")}</p>
           </Card>
         ) : families.length === 0 ? (
           <Card>

@@ -119,6 +119,18 @@ def test_wish_list_returns_404_for_nonexistent_family(test_client: TestClient):
 
 
 # ---------------------------------------------------------------------------
+# 403 — family not fully approved yet
+# ---------------------------------------------------------------------------
+
+
+def test_wish_list_returns_403_for_non_admin_locked_family(test_client: TestClient, family_record):
+    """An active family with wish_lock_level != admin returns 403 with an approval note."""
+    resp = test_client.get(f"/api/families/{family_record.id}/wish-list")
+    assert resp.status_code == 403
+    assert "fully approved" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
 # 404 — soft-deleted family
 # ---------------------------------------------------------------------------
 

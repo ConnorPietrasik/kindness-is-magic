@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { deliveryGetPackingSlips } from "../lib/api";
 import { deliveryPackingSlips } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
+import { formatApiError } from "../lib/utils";
 import type { PackingSlipItem } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -21,7 +22,7 @@ import type { PackingSlipItem } from "../types";
 export default function DeliveryPackingSlips() {
   const { logout } = useAuth();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: deliveryPackingSlips,
     queryFn: deliveryGetPackingSlips,
   });
@@ -46,7 +47,7 @@ export default function DeliveryPackingSlips() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {isError || !data ? (
           <div className="rounded-xl border border-gray-200 bg-white py-12 text-center shadow-sm">
-            <p className="text-gray-500">Unable to load packing slips. Please try again.</p>
+            <p className="text-gray-500">{formatApiError(error, "Unable to load packing slips. Please try again.")}</p>
           </div>
         ) : data.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white py-12 text-center shadow-sm">

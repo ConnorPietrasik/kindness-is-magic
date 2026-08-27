@@ -7,6 +7,7 @@ import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
+import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
@@ -23,7 +24,7 @@ export default function DonorClaimDetail() {
   const claimId = id ? parseInt(id, 10) : NaN;
   const { user, isAdmin } = useAuth();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: donorClaim(claimId),
     queryFn: () => donorGetClaim(claimId),
     enabled: !Number.isNaN(claimId),
@@ -35,13 +36,13 @@ export default function DonorClaimDetail() {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar title="Kindness is Magic" left={<BackToClaims />} />
-        <main className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6">
-          <h2 className="mb-2 text-xl font-bold text-gray-900">Claim Not Found</h2>
-          <p className="text-gray-500">This claim doesn't exist or you don't have access.</p>
-          <Link to={ROUTES.DONOR_CLAIMS} className="mt-4 inline-block text-sm font-medium text-violet-600 hover:underline">
-            ← Back to my claims
-          </Link>
-        </main>
+        <PageError
+          error={error}
+          heading="Unable to Load Claim"
+          fallback="This claim doesn't exist or you don't have access."
+          to={ROUTES.DONOR_CLAIMS}
+          linkLabel="← Back to my claims"
+        />
       </div>
     );
   }

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
 import { HeaderBar, LogoutButton } from "../components/HeaderBar";
+import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
@@ -97,7 +98,7 @@ export default function PublicFamilies() {
   if (debouncedFilters.maxAge) apiParams.max_age = parseInt(debouncedFilters.maxAge, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: [...publicFamilies, apiParams],
     queryFn: () => listPublicFamilies(apiParams),
   });
@@ -127,13 +128,13 @@ export default function PublicFamilies() {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar title="Kindness is Magic" titleTo={headerTitleTo} right={headerRight} />
-        <main className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
-          <h2 className="mb-2 text-xl font-bold text-gray-900">Unable to Load Families</h2>
-          <p className="text-gray-500">Something went wrong. Please try again later.</p>
-          <Link to={ROUTES.ROOT} className="mt-4 inline-block text-sm font-medium text-violet-600 hover:underline">
-            ← Back to home
-          </Link>
-        </main>
+        <PageError
+          error={error}
+          heading="Unable to Load Families"
+          fallback="Something went wrong. Please try again later."
+          to={ROUTES.ROOT}
+          linkLabel="← Back to home"
+        />
       </div>
     );
   }

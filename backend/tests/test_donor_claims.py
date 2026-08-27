@@ -336,6 +336,30 @@ class TestClaimCreation:
         )
         assert resp.status_code == 404
 
+    def test_claim_not_fully_approved_family(self, test_client: TestClient, db: Session):
+        """Claim a family that hasn't been fully reviewed → 403."""
+        _create_donor(test_client)
+        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+
+        fam = Family(
+            family_name="Unapproved Family",
+            family_wish="A wish",
+            contact_name="Pending Contact",
+            phone_number="555-000-0000",
+            approval_status=FamilyApprovalStatus.approved,
+            wish_lock_level=WishLockLevel.family,
+        )
+        db.add(fam)
+        db.commit()
+        db.refresh(fam)
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "This family hasn't been fully approved yet."
+
 
 # =========================================================================
 # Claim CRUD

@@ -268,7 +268,7 @@ test.describe("Role Downstream", () => {
     await expect(approvedLinks).toHaveCount(await approvedRows.count());
     await expect(approvedLinks.first()).toHaveText(/^\d+(?:-\d+)*$/);
 
-    // Not admin-locked — display_id is plain text, no link (public page would 404)
+    // Not admin-locked — display_id is plain text, no link (public page would 403: not fully approved)
     const earlyRows = page
       .getByRole("row")
       .filter({ has: page.getByRole("cell", { name: new RegExp(`^${TEST_PERSON2_NAME}$`) }) });
@@ -382,33 +382,34 @@ test.describe("Role Downstream", () => {
     await context.close();
   });
 
-  test("guest sees 404 for non-existent family", async ({ browser }) => {
+  test("guest sees 404 detail for non-existent family", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
 
     await page.goto("/families/99999/wish-list");
 
-    await expect(page.getByRole("heading", { name: "Family Not Found" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Unable to Load Wish List" })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText("This wish list doesn't exist or has been removed.")).toBeVisible();
+    await expect(page.getByText("Family not found")).toBeVisible();
 
     await context.close();
   });
 
-  test("guest sees 404 for non-admin-locked family wish list", async ({ browser }) => {
+  test("guest sees 403 for non-admin-locked family wish list", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
 
     if (!testData.secondFamilyId) {
-      throw new Error("Missing second family ID — cannot verify non-admin-locked 404");
+      throw new Error("Missing second family ID — cannot verify non-admin-locked 403");
     }
 
     await page.goto(`/families/${testData.secondFamilyId}/wish-list`);
 
-    await expect(page.getByRole("heading", { name: "Family Not Found" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Unable to Load Wish List" })).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByText("This family hasn't been fully approved yet.")).toBeVisible();
 
     await context.close();
   });

@@ -13,6 +13,7 @@ import { Button } from "../components/Button";
 import { ClaimModal } from "../components/ClaimModal";
 import { HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
+import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
@@ -30,7 +31,7 @@ export default function FamilyWishList() {
   const location = useLocation();
   const [showClaimModal, setShowClaimModal] = useState(false);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: familyWishList(familyId),
     queryFn: () => getFamilyWishList(familyId),
     enabled: !Number.isNaN(familyId),
@@ -56,13 +57,13 @@ export default function FamilyWishList() {
             )
           }
         />
-        <main className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6">
-          <h2 className="mb-2 text-xl font-bold text-gray-900">Family Not Found</h2>
-          <p className="text-gray-500">This wish list doesn't exist or has been removed.</p>
-          <Link to={ROUTES.ROOT} className="mt-4 inline-block text-sm font-medium text-violet-600 hover:underline">
-            ← Back to home
-          </Link>
-        </main>
+        <PageError
+          error={error}
+          heading="Unable to Load Wish List"
+          fallback="This wish list doesn't exist or has been removed."
+          to={ROUTES.ROOT}
+          linkLabel="← Back to home"
+        />
       </div>
     );
   }
