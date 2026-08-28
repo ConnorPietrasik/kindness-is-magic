@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     User,
@@ -82,7 +82,7 @@ def list_families(
     search_contact: str | None = Query(None),
     search_phone: str | None = Query(None),
     search_wish: str | None = Query(None),
-    approval_status: str | None = Query(None),
+    verification_status: str | None = Query(None),
     wish_lock_level: WishLockLevel | None = Query(None),
     min_person_count: int | None = Query(None, ge=0),
     max_person_count: int | None = Query(None, ge=0),
@@ -99,9 +99,9 @@ def list_families(
     same group to shift up and fill the gap.
 
     Scoped view (referrer_id set): shows all active families for that referrer.
-    Approved families get sequential numbering matching the referrer's own view.
+    Verified families get sequential numbering matching the referrer's own view.
     Pending/rejected families get display_id "PENDING"/"REJECTED" so they
-    don't disrupt the approved numbering.
+    don't disrupt the verified numbering.
     """
     # Build the base query for active families
     query = db.query(Family).filter(Family.deleted_at.is_(None))
@@ -129,8 +129,8 @@ def list_families(
     if search_wish is not None:
         query = query.filter(Family.family_wish.ilike(f"%{search_wish}%"))
 
-    if approval_status is not None:
-        query = query.filter(Family.approval_status == approval_status)
+    if verification_status is not None:
+        query = query.filter(Family.verification_status == verification_status)
 
     if wish_lock_level is not None:
         query = query.filter(Family.wish_lock_level == wish_lock_level)
@@ -236,7 +236,7 @@ def get_packing_slips(
 ) -> list[PackingSlipItem]:
     """Return packing-slip data for families with admin-locked wishes.
 
-    * No ``family_ids`` param → all approved, non-deleted families where
+    * No ``family_ids`` param → all verified, non-deleted families where
       ``wish_lock_level == admin``.
     * With ``family_ids`` → only the specified families (404 for any ID that
       is deleted or does not exist).
@@ -263,15 +263,15 @@ def get_packing_slips(
             if f.deleted_at is not None:
                 raise HTTPException(status_code=404, detail=f"Family {f.id} not found or deleted")
 
-        # Filter to approved only (among the requested)
-        families = [f for f in families if f.approval_status == FamilyApprovalStatus.approved]
+        # Filter to verified only (among the requested)
+        families = [f for f in families if f.verification_status == FamilyVerificationStatus.verified]
     else:
-        # Default: all admin-locked, approved, non-deleted families
+        # Default: all admin-locked, verified, non-deleted families
         families = (
             db.query(Family)
             .filter(
                 Family.deleted_at.is_(None),
-                Family.approval_status == FamilyApprovalStatus.approved,
+                Family.verification_status == FamilyVerificationStatus.verified,
                 Family.wish_lock_level == WishLockLevel.admin,
             )
             .order_by(Family.id)
@@ -369,7 +369,7 @@ def create_family(
         address=body.address,
         phone_number=body.phone_number,
         pickup_window=body.pickup_window,
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()

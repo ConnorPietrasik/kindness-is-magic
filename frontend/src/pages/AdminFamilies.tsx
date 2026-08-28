@@ -81,7 +81,7 @@ export default function AdminFamilies() {
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState<number | null>(null);
   const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
-  const [approvalFilter, setApprovalFilter] = useState<string>("");
+  const [verificationFilter, setVerificationFilter] = useState<string>("");
   const [lockLevelFilter, setLockLevelFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchName, setSearchName] = useState("");
@@ -126,7 +126,7 @@ export default function AdminFamilies() {
       search_contact: debouncedSearchContact || undefined,
       search_phone: debouncedSearchPhone || undefined,
       search_wish: debouncedSearchWish || undefined,
-      approval_status: approvalFilter || undefined,
+      verification_status: verificationFilter || undefined,
       wish_lock_level: lockLevelFilter || undefined,
       min_person_count: debouncedMinPersonCount !== "" ? parseInt(debouncedMinPersonCount, 10) : undefined,
       max_person_count: debouncedMaxPersonCount !== "" ? parseInt(debouncedMaxPersonCount, 10) : undefined,
@@ -142,7 +142,7 @@ export default function AdminFamilies() {
       debouncedSearchWish,
       debouncedMinPersonCount,
       debouncedMaxPersonCount,
-      approvalFilter,
+      verificationFilter,
       lockLevelFilter,
       sortField,
     ]
@@ -281,17 +281,17 @@ export default function AdminFamilies() {
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
-              aria-label="Approval status filter"
-              value={approvalFilter}
+              aria-label="Verification status filter"
+              value={verificationFilter}
               onChange={(e) => {
-                setApprovalFilter(e.target.value);
+                setVerificationFilter(e.target.value);
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             >
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
+              <option value="verified">Verified</option>
               <option value="rejected">Rejected</option>
             </select>
             <select
@@ -446,7 +446,7 @@ export default function AdminFamilies() {
                   </button>
                 </Th>
               )}
-              {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
+              {visibleColumns.includes("verification_status") && <Th>Verification</Th>}
               {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
               {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
               {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
@@ -526,9 +526,9 @@ export default function AdminFamilies() {
                       )}
                       {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
                       {visibleColumns.includes("person_count") && <Td>{f.person_count ?? 0}</Td>}
-                      {visibleColumns.includes("approval_status") && (
+                      {visibleColumns.includes("verification_status") && (
                         <Td>
-                          <ApprovalBadge status={f.approval_status} />
+                          <ApprovalBadge status={f.verification_status} />
                         </Td>
                       )}
                       {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}

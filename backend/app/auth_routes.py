@@ -31,7 +31,7 @@ from app.models import (
     EmailKind,
     EmailPreference,
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     PasswordResetToken,
     Referrer,
     ReferrerApprovalStatus,
@@ -607,7 +607,7 @@ async def register_family(
         bio=data.bio,
         address=data.address,
         phone_number=data.phone_number,
-        approval_status=FamilyApprovalStatus.pending,
+        verification_status=FamilyVerificationStatus.pending,
     )
     db.add(family)
     db.flush()  # Get family.id
@@ -636,7 +636,7 @@ async def register_family(
         html_body = build_family_pending_email(data.family_name, display_name)
         await send_email(
             to=referrer_user.email,
-            subject=f"New family awaiting approval — {data.family_name}",
+            subject=f"New family awaiting your verification — {data.family_name}",
             html_body=html_body,
             db=db,
             kind=EmailKind.family_pending,
@@ -646,7 +646,7 @@ async def register_family(
     # 6. Build response
     person_count = 0  # No persons yet
     # Pending families use "PENDING" display_id (they don't have a stable
-    # position yet — the referrer's view only shows approved families).
+    # position yet — the referrer's view only shows verified families).
     return FamilySelfRegisterResponse(
         user=UserResponse.model_validate(user),
         family=FamilySummary(
@@ -656,7 +656,7 @@ async def register_family(
             family_wish=family.family_wish,
             contact_name=family.contact_name,
             referrer_id=family.referrer_id,
-            approval_status=family.approval_status,
+            verification_status=family.verification_status,
             pickup_window=family.pickup_window,
             deleted_at=family.deleted_at,
             person_count=person_count,

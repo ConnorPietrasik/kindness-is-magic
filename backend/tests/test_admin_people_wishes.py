@@ -16,7 +16,7 @@ from tests.conftest import login_as
 
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
@@ -58,7 +58,7 @@ def person_with_wishes(db: Session):
         family_wish="Warm clothes",
         contact_name="Wish Contact",
         phone_number="555-000-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -98,7 +98,7 @@ def adult_person_with_wish(db: Session):
         family_wish="Books",
         contact_name="Adult Contact",
         phone_number="555-000-0012",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -136,7 +136,7 @@ def adult_person_no_wishes(db: Session):
         family_wish="Books",
         contact_name="Adult2 Contact",
         phone_number="555-000-0032",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -196,7 +196,7 @@ class TestListPersonWishes:
             family_wish="Nothing",
             contact_name="Empty Contact",
             phone_number="555-000-0022",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -270,7 +270,7 @@ class TestCreatePersonWish:
             family_wish="Toys",
             contact_name="Size Contact",
             phone_number="555-000-0042",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -446,7 +446,7 @@ class TestUpdatePersonWish:
             family_wish="Other wish",
             contact_name="Other Contact",
             phone_number="555-000-0052",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -555,7 +555,7 @@ class TestDeletePersonWish:
             family_wish="Other wish",
             contact_name="Other Contact",
             phone_number="555-000-0062",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -667,7 +667,7 @@ class TestRestorePersonWish:
             family_wish="Other wish",
             contact_name="Other Contact",
             phone_number="555-000-0072",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()

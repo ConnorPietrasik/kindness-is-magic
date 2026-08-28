@@ -267,10 +267,10 @@ class TestReferrerCreateFamily:
         assert body["phone_number"] == "555-333-3333"
 
     def test_family_limit_enforced(self, test_client: TestClient, another_referrer, db: Session):
-        from app.models import Family, FamilyApprovalStatus, Referrer
+        from app.models import Family, FamilyVerificationStatus, Referrer
 
         ref = another_referrer["referrer"]
-        # Set limit to 1 and create 1 approved family
+        # Set limit to 1 and create 1 verified family
         db.query(Referrer).filter(Referrer.id == ref.id).update({"family_limit": 1}, synchronize_session=False)
         existing = Family(
             referrer_id=ref.id,
@@ -278,7 +278,7 @@ class TestReferrerCreateFamily:
             family_wish="A roof",
             contact_name="Limit Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(existing)
         db.commit()
@@ -652,7 +652,7 @@ class TestReferrerPendingFamilies:
         assert body == []
 
     def test_200_list_pending_only(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         # Create a pending family
@@ -662,7 +662,7 @@ class TestReferrerPendingFamilies:
             family_wish="A roof",
             contact_name="Pending Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -675,11 +675,11 @@ class TestReferrerPendingFamilies:
         assert len(body) == 1
         assert body[0]["id"] == pending.id
         assert body[0]["family_name"] == "Pending Family"
-        assert body[0]["approval_status"] == "pending"
+        assert body[0]["verification_status"] == "pending"
         assert body[0]["person_count"] == 0
 
-    def test_excludes_approved_families(self, test_client: TestClient, referrer_with_full_tree):
-        # The tree family is already approved — should not appear
+    def test_excludes_unverified_families(self, test_client: TestClient, referrer_with_full_tree):
+        # The tree family is already verified — should not appear
         _tree_referrer_login(test_client)
         resp = test_client.get("/api/referrer/pending-families")
         assert resp.status_code == 200
@@ -687,7 +687,7 @@ class TestReferrerPendingFamilies:
         assert all(f["family_name"] != "Tree Family" for f in body)
 
     def test_excludes_other_referrer_families(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         other_ref = another_referrer["referrer"]
         pending = Family(
@@ -696,7 +696,7 @@ class TestReferrerPendingFamilies:
             family_wish="A car",
             contact_name="Other Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -717,32 +717,32 @@ class TestReferrerPendingFamilies:
         assert resp.status_code == 403
 
 
-class TestReferrerApproveFamily:
-    def test_200_approve_pending(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+class TestReferrerVerifyFamily:
+    def test_200_verify_pending(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
             referrer_id=ref.id,
-            family_name="To Approve",
+            family_name="To Verify",
             family_wish="A roof",
-            contact_name="Approve Contact",
+            contact_name="Verify Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
         db.refresh(pending)
 
         _tree_referrer_login(test_client)
-        resp = test_client.post(f"/api/referrer/families/{pending.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
         assert resp.status_code == 200
         body = resp.json()
         assert body["id"] == pending.id
-        assert body["approval_status"] == "approved"
+        assert body["verification_status"] == "verified"
 
-    def test_approve_increases_family_count(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+    def test_verify_increases_family_count(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -751,32 +751,32 @@ class TestReferrerApproveFamily:
             family_wish="A roof",
             contact_name="Count Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
 
         _tree_referrer_login(test_client)
-        # Before: 1 approved family (Tree Family)
+        # Before: 1 verified family (Tree Family)
         resp = test_client.get("/api/referrer/me")
         assert resp.json()["family_count"] == 1
 
-        # Approve the pending family
-        resp = test_client.post(f"/api/referrer/families/{pending.id}/approve")
+        # Verify the pending family
+        resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
         assert resp.status_code == 200
 
-        # After: 2 approved families
+        # After: 2 verified families
         resp = test_client.get("/api/referrer/me")
         assert resp.json()["family_count"] == 2
 
-    def test_400_cannot_approve_already_approved(self, test_client: TestClient, referrer_with_full_tree):
+    def test_400_cannot_verify_already_verified(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
-        resp = test_client.post(f"/api/referrer/families/{fam.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{fam.id}/verify")
         assert resp.status_code == 400
 
-    def test_400_cannot_approve_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+    def test_400_cannot_verify_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         rejected = Family(
@@ -785,29 +785,29 @@ class TestReferrerApproveFamily:
             family_wish="A roof",
             contact_name="Rejected Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.rejected,
+            verification_status=FamilyVerificationStatus.rejected,
         )
         db.add(rejected)
         db.commit()
         db.refresh(rejected)
 
         _tree_referrer_login(test_client)
-        resp = test_client.post(f"/api/referrer/families/{rejected.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{rejected.id}/verify")
         assert resp.status_code == 400
 
-    def test_400_limit_exceeded_on_approve(self, test_client: TestClient, another_referrer, db: Session):
-        from app.models import Family, FamilyApprovalStatus, Referrer
+    def test_400_limit_exceeded_on_verify(self, test_client: TestClient, another_referrer, db: Session):
+        from app.models import Family, FamilyVerificationStatus, Referrer
 
         ref = another_referrer["referrer"]
         db.query(Referrer).filter(Referrer.id == ref.id).update({"family_limit": 1}, synchronize_session=False)
-        # Create 1 approved family (at limit)
-        approved = Family(
+        # Create 1 verified family (at limit)
+        verified = Family(
             referrer_id=ref.id,
             family_name="At Limit",
             family_wish="A roof",
             contact_name="Limit Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         # Create 1 pending family
         pending = Family(
@@ -816,19 +816,19 @@ class TestReferrerApproveFamily:
             family_wish="A car",
             contact_name="Over Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
-        db.add_all([approved, pending])
+        db.add_all([verified, pending])
         db.commit()
         db.refresh(pending)
 
         _another_referrer_login(test_client)
-        resp = test_client.post(f"/api/referrer/families/{pending.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
         assert resp.status_code == 400
         assert "limit" in resp.json()["detail"].lower()
 
     def test_403_wrong_referrer(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -837,18 +837,18 @@ class TestReferrerApproveFamily:
             family_wish="A roof",
             contact_name="Not Yours",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
         db.refresh(pending)
 
         _another_referrer_login(test_client)
-        resp = test_client.post(f"/api/referrer/families/{pending.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
         assert resp.status_code == 403
 
     def test_401_unauthenticated(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -857,19 +857,19 @@ class TestReferrerApproveFamily:
             family_wish="A roof",
             contact_name="No Auth",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
         db.refresh(pending)
 
-        resp = test_client.post(f"/api/referrer/families/{pending.id}/approve")
+        resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
         assert resp.status_code == 401
 
 
 class TestReferrerRejectFamily:
     def test_200_reject_pending(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -878,7 +878,7 @@ class TestReferrerRejectFamily:
             family_wish="A roof",
             contact_name="Reject Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -889,16 +889,16 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 200
         body = resp.json()
         assert body["id"] == pending.id
-        assert body["approval_status"] == "rejected"
+        assert body["verification_status"] == "rejected"
 
-    def test_400_cannot_reject_already_approved(self, test_client: TestClient, referrer_with_full_tree):
+    def test_400_cannot_reject_already_verified(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
         resp = test_client.post(f"/api/referrer/families/{fam.id}/reject")
         assert resp.status_code == 400
 
     def test_400_cannot_reject_already_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         rejected = Family(
@@ -907,7 +907,7 @@ class TestReferrerRejectFamily:
             family_wish="A roof",
             contact_name="Rejected Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.rejected,
+            verification_status=FamilyVerificationStatus.rejected,
         )
         db.add(rejected)
         db.commit()
@@ -918,7 +918,7 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 400
 
     def test_403_wrong_referrer(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -927,7 +927,7 @@ class TestReferrerRejectFamily:
             family_wish="A roof",
             contact_name="Not Yours",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -938,7 +938,7 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 403
 
     def test_401_unauthenticated(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         pending = Family(
@@ -947,7 +947,7 @@ class TestReferrerRejectFamily:
             family_wish="A roof",
             contact_name="No Auth",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -1325,7 +1325,7 @@ class TestSendFamilyInvite:
                 # other referrer's sent invite — excluded
                 SentEmail(user_id=other.id, recipient_email="b@example.com", kind=EmailKind.family_invite, status=EmailStatus.sent),
                 # own row, other kind — excluded
-                SentEmail(user_id=user.id, recipient_email="c@example.com", kind=EmailKind.family_approved, status=EmailStatus.sent),
+                SentEmail(user_id=user.id, recipient_email="c@example.com", kind=EmailKind.family_verified, status=EmailStatus.sent),
                 # own row, failed — excluded
                 SentEmail(
                     user_id=user.id,
@@ -1421,8 +1421,8 @@ class TestReferrerInviteEmails:
                 # Excluded: own row but other kind
                 SentEmail(
                     user_id=user.id,
-                    recipient_email="approved@example.com",
-                    kind=EmailKind.family_approved,
+                    recipient_email="verified@example.com",
+                    kind=EmailKind.family_verified,
                     status=EmailStatus.sent,
                     sent_at=now,
                 ),

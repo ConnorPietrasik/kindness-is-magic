@@ -262,7 +262,7 @@ def test_list_families_excludes_soft_deleted(db, test_client: TestClient, family
 
 def test_list_families_excludes_pending(db, test_client: TestClient, family_record):
     """Pending families are excluded from the list."""
-    family_record.approval_status = "pending"
+    family_record.verification_status = "pending"
     family_record.wish_lock_level = "admin"
     db.commit()
     resp = test_client.get("/api/families")
@@ -273,7 +273,7 @@ def test_list_families_excludes_pending(db, test_client: TestClient, family_reco
 
 def test_list_families_excludes_rejected(db, test_client: TestClient, family_record):
     """Rejected families are excluded from the list."""
-    family_record.approval_status = "rejected"
+    family_record.verification_status = "rejected"
     family_record.wish_lock_level = "admin"
     db.commit()
     resp = test_client.get("/api/families")
@@ -284,7 +284,7 @@ def test_list_families_excludes_rejected(db, test_client: TestClient, family_rec
 
 def test_list_families_excludes_non_admin_lock(db, test_client: TestClient, family_record):
     """Families with wish_lock_level != admin are excluded."""
-    family_record.approval_status = "approved"
+    family_record.verification_status = "verified"
     family_record.wish_lock_level = "family"
     db.commit()
     resp = test_client.get("/api/families")
@@ -294,8 +294,8 @@ def test_list_families_excludes_non_admin_lock(db, test_client: TestClient, fami
 
 
 def test_list_families_includes_eligible(db, test_client: TestClient, family_record):
-    """Approved, non-deleted, admin-locked families appear in the list."""
-    family_record.approval_status = "approved"
+    """Verified, non-deleted, admin-locked families appear in the list."""
+    family_record.verification_status = "verified"
     family_record.wish_lock_level = "admin"
     db.commit()
     resp = test_client.get("/api/families")
@@ -313,13 +313,13 @@ def test_list_families_includes_eligible(db, test_client: TestClient, family_rec
 
 def test_list_families_pagination(db, test_client: TestClient, referrer_with_families):
     """Pagination works correctly with multiple families."""
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     families = referrer_with_families["families"]
     # Set all existing families as eligible
     for fam in families:
         fam.wish_lock_level = "admin"
-        fam.approval_status = FamilyApprovalStatus.approved
+        fam.verification_status = FamilyVerificationStatus.verified
 
     # Create more families to test pagination
     for i in range(5):
@@ -329,7 +329,7 @@ def test_list_families_pagination(db, test_client: TestClient, referrer_with_fam
             family_wish="Something",
             contact_name=f"Contact {i}",
             phone_number=f"555-000-{9000 + i}",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level="admin",
         )
         db.add(fam)
@@ -371,14 +371,14 @@ def test_list_families_filter_min_person_count(db, test_client: TestClient, fami
     _make_person(db, family_record.id, "Alice", 8)
 
     # Create another family with 2 people
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Big Family",
         family_wish="Lots of stuff",
         contact_name="Big Contact",
         phone_number="555-999-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -402,14 +402,14 @@ def test_list_families_filter_max_person_count(db, test_client: TestClient, fami
     _make_person(db, family_record.id, "Alice", 8)
 
     # Create another family with 2 people
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Big Family",
         family_wish="Lots of stuff",
         contact_name="Big Contact",
         phone_number="555-999-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -431,7 +431,7 @@ def test_list_families_filter_person_count_range(db, test_client: TestClient, fa
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     # Family with 2 people
     fam2 = Family(
@@ -439,7 +439,7 @@ def test_list_families_filter_person_count_range(db, test_client: TestClient, fa
         family_wish="Stuff",
         contact_name="Med Contact",
         phone_number="555-999-0003",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -454,7 +454,7 @@ def test_list_families_filter_person_count_range(db, test_client: TestClient, fa
         family_wish="More stuff",
         contact_name="Big Contact",
         phone_number="555-999-0004",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam3)
@@ -482,14 +482,14 @@ def test_list_families_filter_min_age(db, test_client: TestClient, family_record
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Young Family",
         family_wish="Stuff",
         contact_name="Young Contact",
         phone_number="555-999-0005",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -510,14 +510,14 @@ def test_list_families_filter_max_age(db, test_client: TestClient, family_record
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Old Family",
         family_wish="Stuff",
         contact_name="Old Contact",
         phone_number="555-999-0006",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -543,14 +543,14 @@ def test_list_families_sort_person_count(db, test_client: TestClient, family_rec
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Big Family",
         family_wish="Stuff",
         contact_name="Big Contact",
         phone_number="555-999-0007",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -578,14 +578,14 @@ def test_list_families_sort_min_age(db, test_client: TestClient, family_record):
     _make_person(db, family_record.id, "Alice", 10)
     _make_person(db, family_record.id, "Bob", 14)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Young Family",
         family_wish="Stuff",
         contact_name="Young Contact",
         phone_number="555-999-0008",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)
@@ -614,14 +614,14 @@ def test_list_families_sort_max_age(db, test_client: TestClient, family_record):
     _make_person(db, family_record.id, "Alice", 8)
     _make_person(db, family_record.id, "Bob", 10)
 
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam2 = Family(
         family_name="Old Family",
         family_wish="Stuff",
         contact_name="Old Contact",
         phone_number="555-999-0009",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level="admin",
     )
     db.add(fam2)

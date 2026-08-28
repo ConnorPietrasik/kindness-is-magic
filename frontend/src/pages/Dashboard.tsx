@@ -117,13 +117,13 @@ export default function Dashboard() {
         {/* Referrer profile card */}
         {user?.role === "referrer" && referrerInfo && <ReferrerInfoCard referrerInfo={referrerInfo} />}
 
-        {/* Referrer pending approvals alert */}
+        {/* Referrer pending verification alert */}
         {user?.role === "referrer" && pendingFamilies && pendingFamilies.length > 0 && (
           <Link
             to={ROUTES.REFERRER_FAMILY_INVITES}
             className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
           >
-            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your approval →
+            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your verification →
           </Link>
         )}
 
@@ -167,7 +167,7 @@ export default function Dashboard() {
 
           {user?.role === "referrer" && (
             <>
-              <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your approved families" />
+              <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your verified families" />
               <NavCard to={ROUTES.REFERRER_FAMILY_INVITES} icon="⏳" label="Family Invites" desc="Invite families & review applications" />
               <NavCard to={ROUTES.REFERRER_WISH_REVIEW} icon="📋" label="Wish Review" desc="Review and approve family wishes" />
             </>

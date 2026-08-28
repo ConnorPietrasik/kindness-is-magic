@@ -27,7 +27,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "claim", label: "Claim", visible: false },
     { key: "phone_number", label: "Phone", visible: false },
     { key: "person_count", label: "Person Count", visible: false },
-    { key: "approval_status", label: "Approval", visible: false },
+    { key: "verification_status", label: "Verification", visible: false },
     { key: "pickup_window", label: "Pickup Window", visible: false },
     { key: "wish_lock_level", label: "Lock Level", visible: false },
     { key: "wish_review_requested_at", label: "Review Requested", visible: false },

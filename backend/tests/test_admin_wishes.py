@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
@@ -40,7 +40,7 @@ def wish_tree(db: Session):
         family_wish="Warm clothes",
         contact_name="Wish Contact",
         phone_number="555-000-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -89,7 +89,7 @@ def second_family_with_wishes(db: Session, wish_tree):
         family_wish="Food",
         contact_name="Second Contact",
         phone_number="555-000-0003",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam2)
     db.commit()

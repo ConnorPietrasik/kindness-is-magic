@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, User, Wish
+from app.models import Family, FamilyVerificationStatus, Person, User, Wish
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
@@ -87,7 +87,7 @@ def list_people(
     query = query.filter(
         Person.deleted_at.is_(None),
         Family.deleted_at.is_(None),
-        Family.approval_status == FamilyApprovalStatus.approved,
+        Family.verification_status == FamilyVerificationStatus.verified,
     )
     if family_id is not None:
         query = query.filter(Person.family_id == family_id)

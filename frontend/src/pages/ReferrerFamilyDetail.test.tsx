@@ -29,7 +29,7 @@ const mockFamily: FamilyDetail = {
   contact_name: "Mom Smith",
   deleted_at: null,
   person_count: 3,
-  approval_status: "approved",
+  verification_status: "verified",
   pickup_window: null,
   wish_lock_level: "family",
   wish_review_requested_at: null,

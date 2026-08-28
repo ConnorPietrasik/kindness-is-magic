@@ -114,8 +114,8 @@ export interface ReferrerInviteSummary {
 // Family
 // ---------------------------------------------------------------------------
 
-/** Family approval status — mirrors backend FamilyApprovalStatus enum. */
-export type FamilyApprovalStatus = "pending" | "approved" | "rejected";
+/** Family verification status — mirrors backend FamilyVerificationStatus enum. */
+export type FamilyVerificationStatus = "pending" | "verified" | "rejected";
 
 /** Wish lock level — who has final edit control on a family's wishes. */
 export type WishLockLevel = "family" | "referrer" | "admin";
@@ -132,7 +132,7 @@ export interface FamilySummary {
   delivery_user_name: string | null;
   deleted_at: string | null;
   person_count: number;
-  approval_status: FamilyApprovalStatus;
+  verification_status: FamilyVerificationStatus;
   pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
@@ -156,7 +156,7 @@ export interface FamilyDetail {
   contact_name: string;
   deleted_at: string | null;
   person_count: number;
-  approval_status: FamilyApprovalStatus;
+  verification_status: FamilyVerificationStatus;
   pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
@@ -183,7 +183,7 @@ export interface FamilySelfServiceDetail {
   contact_name: string;
   deleted_at: string | null;
   person_count: number;
-  approval_status: FamilyApprovalStatus;
+  verification_status: FamilyVerificationStatus;
   pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
@@ -383,14 +383,14 @@ export interface ReferrerFamilyInviteResponse {
   message: string;
 }
 
-/** Summary for pending families awaiting referrer approval. */
+/** Summary for pending families awaiting referrer verification. */
 export interface PendingFamilySummary {
   id: number;
   display_id: string;
   family_name: string;
   family_wish: string;
   contact_name: string;
-  approval_status: FamilyApprovalStatus;
+  verification_status: FamilyVerificationStatus;
   person_count: number;
   created_at: string | null;
   pickup_window: string | null;
@@ -419,7 +419,7 @@ export type EmailKind =
   | "referrer_invite"
   | "password_reset"
   | "family_pending"
-  | "family_approved"
+  | "family_verified"
   | "referrer_approved"
   | "referrer_rejected"
   | "claim_confirmation"

@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, FamilyApprovalStatus, Person, User
+from app.models import Family, FamilyVerificationStatus, Person, User
 from app.permissions import require_delivery
 from app.response_builders import (
     batch_load_person_wishes,
@@ -39,14 +39,14 @@ def list_families(
     """List families assigned to the current delivery person.
 
     Returns summary info: display_id, family_name, address, phone_number,
-    contact_name, person_count.  Only approved, non-deleted families are
+    contact_name, person_count.  Only verified, non-deleted families are
     included.
     """
     families = (
         db.query(Family)
         .filter(
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
             Family.delivery_user_id == current_user.id,
         )
         .order_by(Family.id)
@@ -94,13 +94,13 @@ def get_packing_slips(
 ) -> list[PackingSlipItem]:
     """Return packing-slip data for families assigned to the current delivery person.
 
-    Only approved, non-deleted families are included.
+    Only verified, non-deleted families are included.
     """
     families = (
         db.query(Family)
         .filter(
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
             Family.delivery_user_id == current_user.id,
         )
         .order_by(Family.id)

@@ -45,7 +45,7 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_orphan_families_get_0_prefix(self, test_client: TestClient, admin_user, db: Session):
         """Orphan families (no referrer) get display_id 0-1, 0-2, ..."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         for i in range(3):
             f = Family(
@@ -53,7 +53,7 @@ class TestAdminFamilyDisplayIdFlat:
                 family_wish="Wish",
                 contact_name="Contact",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
             )
             db.add(f)
         db.commit()
@@ -69,7 +69,7 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_referrer_families_get_referrer_prefix(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Families with a referrer get display_id {referrer_id}-{n}."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         for i in range(3):
             f = Family(
@@ -78,7 +78,7 @@ class TestAdminFamilyDisplayIdFlat:
                 family_wish="Wish",
                 contact_name="Contact",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
             )
             db.add(f)
         db.commit()
@@ -95,7 +95,7 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_mixed_referrer_and_orphan(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Mixed orphan and referrer families are in separate enumeration groups."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         # Orphan first (lower id)
         f1 = Family(
@@ -103,7 +103,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(f1)
         db.commit()
@@ -116,7 +116,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(f2)
         db.commit()
@@ -133,7 +133,7 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_multiple_referrers_independent_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Families from different referrers have independent counters (each starts at 1)."""
-        from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus
+        from app.models import Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus
 
         # Create a second referrer
         ref2 = Referrer(
@@ -154,7 +154,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=ref2.id,
@@ -162,7 +162,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2])
         db.commit()
@@ -178,15 +178,15 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_pending_families_included_in_flat_view(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Flat admin view includes pending families (unlike referrer's view)."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         f1 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved Family",
+            family_name="Verified Family",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=referrer_record.id,
@@ -194,7 +194,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add_all([f1, f2])
         db.commit()
@@ -203,23 +203,23 @@ class TestAdminFamilyDisplayIdFlat:
         resp = test_client.get("/api/admin/families")
         assert resp.status_code == 200
         body = resp.json()
-        # Both approved and pending appear in flat view
+        # Both verified and pending appear in flat view
         assert len(body["families"]) == 2
         names = {f["family_name"] for f in body["families"]}
-        assert "Approved Family" in names
+        assert "Verified Family" in names
         assert "Pending Family" in names
 
-    def test_pending_does_not_disrupt_approved_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Pending families interleaved between approved ones don't shift approved numbering."""
-        from app.models import Family, FamilyApprovalStatus
+    def test_pending_does_not_disrupt_verified_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Pending families interleaved between verified ones don't shift verified numbering."""
+        from app.models import Family, FamilyVerificationStatus
 
         f1 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved First",
+            family_name="Verified First",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=referrer_record.id,
@@ -227,15 +227,15 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         f3 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved Second",
+            family_name="Verified Second",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2, f3])
         db.commit()
@@ -246,25 +246,25 @@ class TestAdminFamilyDisplayIdFlat:
         body = resp.json()
         assert len(body["families"]) == 3
 
-        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
-        pending = [f for f in body["families"] if f["approval_status"] == "pending"]
-        # Approved families keep sequential numbering (1, 2) despite pending in between
-        assert approved[0]["display_id"] == f"{referrer_record.id}-1"
-        assert approved[1]["display_id"] == f"{referrer_record.id}-2"
+        verified = [f for f in body["families"] if f["verification_status"] == "verified"]
+        pending = [f for f in body["families"] if f["verification_status"] == "pending"]
+        # Verified families keep sequential numbering (1, 2) despite pending in between
+        assert verified[0]["display_id"] == f"{referrer_record.id}-1"
+        assert verified[1]["display_id"] == f"{referrer_record.id}-2"
         # Pending family gets a status label, not a numeric ID
         assert pending[0]["display_id"] == "PENDING"
 
-    def test_rejected_does_not_disrupt_approved_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Rejected families interleaved between approved ones don't shift approved numbering."""
-        from app.models import Family, FamilyApprovalStatus
+    def test_rejected_does_not_disrupt_verified_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Rejected families interleaved between verified ones don't shift verified numbering."""
+        from app.models import Family, FamilyVerificationStatus
 
         f1 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved First",
+            family_name="Verified First",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=referrer_record.id,
@@ -272,15 +272,15 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.rejected,
+            verification_status=FamilyVerificationStatus.rejected,
         )
         f3 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved Second",
+            family_name="Verified Second",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2, f3])
         db.commit()
@@ -291,17 +291,17 @@ class TestAdminFamilyDisplayIdFlat:
         body = resp.json()
         assert len(body["families"]) == 3
 
-        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
-        rejected = [f for f in body["families"] if f["approval_status"] == "rejected"]
-        # Approved families keep sequential numbering (1, 2) despite rejected in between
-        assert approved[0]["display_id"] == f"{referrer_record.id}-1"
-        assert approved[1]["display_id"] == f"{referrer_record.id}-2"
+        verified = [f for f in body["families"] if f["verification_status"] == "verified"]
+        rejected = [f for f in body["families"] if f["verification_status"] == "rejected"]
+        # Verified families keep sequential numbering (1, 2) despite rejected in between
+        assert verified[0]["display_id"] == f"{referrer_record.id}-1"
+        assert verified[1]["display_id"] == f"{referrer_record.id}-2"
         # Rejected family gets a status label, not a numeric ID
         assert rejected[0]["display_id"] == "REJECTED"
 
-    def test_flat_approved_display_id_matches_scoped(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        """Approved family display_id is consistent between flat and scoped views (minus prefix)."""
-        from app.models import Family, FamilyApprovalStatus
+    def test_flat_verified_display_id_matches_scoped(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Verified family display_id is consistent between flat and scoped views (minus prefix)."""
+        from app.models import Family, FamilyVerificationStatus
 
         f1 = Family(
             referrer_id=referrer_record.id,
@@ -309,7 +309,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=referrer_record.id,
@@ -317,7 +317,7 @@ class TestAdminFamilyDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2])
         db.commit()
@@ -343,7 +343,7 @@ class TestAdminFamilyDisplayIdScoped:
     """Admin family list scoped to a single referrer."""
 
     def test_scoped_uses_simple_enumeration(self, test_client: TestClient, admin_user, referrer_with_families):
-        """Scoped list uses simple {n} enumeration (approved only)."""
+        """Scoped list uses simple {n} enumeration (verified only)."""
         _admin_login(test_client)
         ref = referrer_with_families["referrer"]
         resp = test_client.get(f"/api/admin/families?referrer_id={ref.id}")
@@ -356,20 +356,20 @@ class TestAdminFamilyDisplayIdScoped:
     def test_scoped_includes_pending_with_label(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Scoped admin view includes pending families with 'PENDING' display_id.
 
-        Approved families keep their sequential numbering; pending families
+        Verified families keep their sequential numbering; pending families
         are interleaved but don't disrupt the numbering.
         """
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_families["referrer"]
-        # Add a pending family between the two approved ones by ID
+        # Add a pending family between the two verified ones by ID
         pending = Family(
             referrer_id=ref.id,
             family_name="Pending Family",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0099",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -378,20 +378,20 @@ class TestAdminFamilyDisplayIdScoped:
         resp = test_client.get(f"/api/admin/families?referrer_id={ref.id}")
         assert resp.status_code == 200
         body = resp.json()
-        # All three families appear (2 approved + 1 pending)
+        # All three families appear (2 verified + 1 pending)
         assert len(body["families"]) == 3
         # Pending family has PENDING display_id
         pending_f = next(f for f in body["families"] if f["family_name"] == "Pending Family")
         assert pending_f["display_id"] == "PENDING"
-        # Approved families still have sequential numbering (1, 2)
-        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
-        assert len(approved) == 2
-        assert approved[0]["display_id"] == "1"
-        assert approved[1]["display_id"] == "2"
+        # Verified families still have sequential numbering (1, 2)
+        verified = [f for f in body["families"] if f["verification_status"] == "verified"]
+        assert len(verified) == 2
+        assert verified[0]["display_id"] == "1"
+        assert verified[1]["display_id"] == "2"
 
     def test_scoped_includes_rejected_with_label(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Scoped admin view includes rejected families with 'REJECTED' display_id."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_families["referrer"]
         rejected = Family(
@@ -400,7 +400,7 @@ class TestAdminFamilyDisplayIdScoped:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0088",
-            approval_status=FamilyApprovalStatus.rejected,
+            verification_status=FamilyVerificationStatus.rejected,
         )
         db.add(rejected)
         db.commit()
@@ -409,20 +409,20 @@ class TestAdminFamilyDisplayIdScoped:
         resp = test_client.get(f"/api/admin/families?referrer_id={ref.id}")
         assert resp.status_code == 200
         body = resp.json()
-        # All three families appear (2 approved + 1 rejected)
+        # All three families appear (2 verified + 1 rejected)
         assert len(body["families"]) == 3
         # Rejected family has REJECTED display_id
         rejected_f = next(f for f in body["families"] if f["family_name"] == "Rejected Family")
         assert rejected_f["display_id"] == "REJECTED"
-        # Approved families still have sequential numbering (1, 2)
-        approved = [f for f in body["families"] if f["approval_status"] == "approved"]
-        assert len(approved) == 2
-        assert approved[0]["display_id"] == "1"
-        assert approved[1]["display_id"] == "2"
+        # Verified families still have sequential numbering (1, 2)
+        verified = [f for f in body["families"] if f["verification_status"] == "verified"]
+        assert len(verified) == 2
+        assert verified[0]["display_id"] == "1"
+        assert verified[1]["display_id"] == "2"
 
-    def test_scoped_approved_matches_referrer_view(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
-        """Approved families in admin scoped view have same display_ids as referrer's view."""
-        from app.models import Family, FamilyApprovalStatus, User, UserRole
+    def test_scoped_verified_matches_referrer_view(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
+        """Verified families in admin scoped view have same display_ids as referrer's view."""
+        from app.models import Family, FamilyVerificationStatus, User, UserRole
         from app.auth import get_password_hash
 
         ref = referrer_with_families["referrer"]
@@ -433,7 +433,7 @@ class TestAdminFamilyDisplayIdScoped:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0099",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(pending)
         db.commit()
@@ -461,10 +461,10 @@ class TestAdminFamilyDisplayIdScoped:
         assert ref_resp.status_code == 200
         ref_body = ref_resp.json()
 
-        # Admin's approved families match referrer's view (same display_ids)
-        admin_approved = [f for f in admin_body["families"] if f["approval_status"] == "approved"]
-        assert len(admin_approved) == len(ref_body["families"])
-        for admin_f, ref_f in zip(admin_approved, ref_body["families"]):
+        # Admin's verified families match referrer's view (same display_ids)
+        admin_verified = [f for f in admin_body["families"] if f["verification_status"] == "verified"]
+        assert len(admin_verified) == len(ref_body["families"])
+        for admin_f, ref_f in zip(admin_verified, ref_body["families"]):
             assert admin_f["display_id"] == ref_f["display_id"]
             assert admin_f["family_name"] == ref_f["family_name"]
 
@@ -496,7 +496,7 @@ class TestAdminFamilyDisplayIdDeleted:
 
     def test_deleted_skipped_in_counter(self, test_client: TestClient, admin_user, db: Session):
         """Deleted families don't consume enumeration numbers in the main list."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         # Create 3 families
         f1 = Family(
@@ -504,21 +504,21 @@ class TestAdminFamilyDisplayIdDeleted:
             family_wish="W",
             contact_name="C",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             family_name="Second",
             family_wish="W",
             contact_name="C",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f3 = Family(
             family_name="Third",
             family_wish="W",
             contact_name="C",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2, f3])
         db.commit()
@@ -568,7 +568,7 @@ class TestAdminFamilyDisplayIdPagination:
 
     def test_continuity_across_pages(self, test_client: TestClient, admin_user, db: Session):
         """Display IDs continue across page boundaries."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         for i in range(5):
             f = Family(
@@ -576,7 +576,7 @@ class TestAdminFamilyDisplayIdPagination:
                 family_wish="Wish",
                 contact_name="Contact",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
             )
             db.add(f)
         db.commit()
@@ -638,7 +638,7 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_referrer_family_people(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People in referrer families get {ref_id}-{fam_n}-{per_n}."""
-        from app.models import Family, FamilyApprovalStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
 
         fam = Family(
             referrer_id=referrer_record.id,
@@ -646,7 +646,7 @@ class TestAdminPeopleDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -674,7 +674,7 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_multiple_families_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People across multiple families get correct family and person enumeration."""
-        from app.models import Family, FamilyApprovalStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
 
         # Two families under same referrer
         f1 = Family(
@@ -683,7 +683,7 @@ class TestAdminPeopleDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f2 = Family(
             referrer_id=referrer_record.id,
@@ -691,7 +691,7 @@ class TestAdminPeopleDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2])
         db.commit()
@@ -726,19 +726,19 @@ class TestAdminPeopleDisplayIdFlat:
     def test_people_in_pending_family_skipped_in_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People in pending/rejected families don't appear in the active people list.
 
-        When a pending family is approved, its people get family positions based on
-        the approved-family enumeration (pending families are skipped).
+        When a pending family is verified, its people get family positions based on
+        the verified-family enumeration (pending families are skipped).
         """
-        from app.models import Family, FamilyApprovalStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
 
-        # Approved family (first by id)
+        # Verified family (first by id)
         f1 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved Family",
+            family_name="Verified Family",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         # Pending family (second by id)
         f2 = Family(
@@ -747,16 +747,16 @@ class TestAdminPeopleDisplayIdFlat:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
-        # Another approved family (third by id)
+        # Another verified family (third by id)
         f3 = Family(
             referrer_id=referrer_record.id,
-            family_name="Approved Family 2",
+            family_name="Verified Family 2",
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f1, f2, f3])
         db.commit()
@@ -784,16 +784,16 @@ class TestAdminPeopleDisplayIdFlat:
         assert resp.status_code == 200
         body = resp.json()
 
-        # Only people from approved families appear in the active list
+        # Only people from verified families appear in the active list
         assert len(body["people"]) == 2
-        # f1 is approved family 1, f3 is approved family 2 (f2 skipped)
-        assert body["people"][0]["display_id"] == f"{referrer_record.id}-1-1"  # Alice in approved family 1
-        assert body["people"][1]["display_id"] == f"{referrer_record.id}-2-1"  # Charlie in approved family 2
+        # f1 is verified family 1, f3 is verified family 2 (f2 skipped)
+        assert body["people"][0]["display_id"] == f"{referrer_record.id}-1-1"  # Alice in verified family 1
+        assert body["people"][1]["display_id"] == f"{referrer_record.id}-2-1"  # Charlie in verified family 2
 
-        # Now approve the pending family — its people get family position 2
+        # Now verify the pending family — its people get family position 2
         # (f2.id < f3.id so f2 slots in between f1 and f3 by id order)
         db.query(Family).filter(Family.id == f2.id).update(
-            {Family.approval_status: FamilyApprovalStatus.approved}, synchronize_session=False
+            {Family.verification_status: FamilyVerificationStatus.verified}, synchronize_session=False
         )
         db.commit()
 
@@ -956,7 +956,7 @@ class TestReferrerFamilyDisplayId:
 
     def test_sequential_enumeration(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """Families are numbered 1, 2, 3... by DB id order."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         # Create additional families
@@ -966,7 +966,7 @@ class TestReferrerFamilyDisplayId:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         f3 = Family(
             referrer_id=ref.id,
@@ -974,7 +974,7 @@ class TestReferrerFamilyDisplayId:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add_all([f2, f3])
         db.commit()
@@ -1082,7 +1082,7 @@ class TestComputePositionMapsBatching:
     """
 
     def test_batched_matches_per_family_scoped(self, referrer_record, db: Session):
-        from app.models import Family, FamilyApprovalStatus, Person
+        from app.models import Family, FamilyVerificationStatus, Person
         from app.response_builders import compute_position_maps
 
         fams = []
@@ -1093,7 +1093,7 @@ class TestComputePositionMapsBatching:
                 family_wish="Wish",
                 contact_name="Contact",
                 phone_number=f"555-006-000{i}",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
             )
             db.add(f)
             db.commit()

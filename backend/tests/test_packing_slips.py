@@ -32,13 +32,13 @@ def _family_login(client: TestClient) -> dict:
 
 @pytest.fixture()
 def packing_slip_families(db: Session, referrer_record):
-    """Create two approved families with admin-locked wishes, people, and wishes.
+    """Create two verified families with admin-locked wishes, people, and wishes.
 
     Family 1: wish_lock_level=admin (should appear in default query)
     Family 2: wish_lock_level=admin (should appear in default query)
     Family 3: wish_lock_level=referrer (should NOT appear in default query)
     """
-    from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
     # Family 1 — admin locked
     fam1 = Family(
@@ -47,7 +47,7 @@ def packing_slip_families(db: Session, referrer_record):
         family_wish="Winter coats for everyone",
         contact_name="Contact One",
         phone_number="555-001-0001",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
     )
     db.add(fam1)
@@ -61,7 +61,7 @@ def packing_slip_families(db: Session, referrer_record):
         family_wish="School supplies",
         contact_name="Contact Two",
         phone_number="555-001-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
     )
     db.add(fam2)
@@ -75,7 +75,7 @@ def packing_slip_families(db: Session, referrer_record):
         family_wish="Not ready yet",
         contact_name="Contact Three",
         phone_number="555-001-0003",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.referrer,
     )
     db.add(fam3)
@@ -188,7 +188,7 @@ class TestPackingSlipsDefaultFilter:
         assert fam1_id not in ids
 
     def test_excludes_pending_families(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         pending_fam = Family(
             referrer_id=referrer_record.id,
@@ -196,7 +196,7 @@ class TestPackingSlipsDefaultFilter:
             family_wish="Something",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(pending_fam)
@@ -236,7 +236,7 @@ class TestPackingSlipsFamilyIdsFilter:
         assert body[0]["id"] == fam1_id
 
     def test_404_deleted_family_in_filter(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         # Create and delete a family
         fam = Family(
@@ -244,7 +244,7 @@ class TestPackingSlipsFamilyIdsFilter:
             family_wish="Something",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
             deleted_at=datetime.now(timezone.utc),
         )
@@ -262,7 +262,7 @@ class TestPackingSlipsFamilyIdsFilter:
         assert resp.status_code == 404
 
     def test_filters_to_approved_when_family_ids_given(self, test_client: TestClient, admin_user, db: Session, referrer_record):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         # Create a pending family with admin lock
         pending = Family(
@@ -271,7 +271,7 @@ class TestPackingSlipsFamilyIdsFilter:
             family_wish="Something",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(pending)
@@ -413,7 +413,7 @@ class TestPackingSlipsEdgeCases:
         assert resp.status_code == 400
 
     def test_family_with_no_people(self, test_client: TestClient, admin_user, db: Session, referrer_record):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         fam = Family(
             referrer_id=referrer_record.id,
@@ -421,7 +421,7 @@ class TestPackingSlipsEdgeCases:
             family_wish="Nothing yet",
             contact_name="Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(fam)
@@ -514,7 +514,7 @@ class TestPackingSlipsDisplayIds:
 
     def test_pending_family_does_not_shift_family_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """A pending family by id doesn't consume a family position."""
-        from app.models import Family, FamilyApprovalStatus, Person, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, Person, WishLockLevel
 
         fam_a = Family(
             referrer_id=referrer_record.id,
@@ -522,7 +522,7 @@ class TestPackingSlipsDisplayIds:
             family_wish="Wish",
             contact_name="Contact A",
             phone_number="555-005-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         fam_b = Family(
@@ -531,7 +531,7 @@ class TestPackingSlipsDisplayIds:
             family_wish="Wish",
             contact_name="Contact B",
             phone_number="555-005-0002",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
             wish_lock_level=WishLockLevel.admin,
         )
         fam_c = Family(
@@ -540,7 +540,7 @@ class TestPackingSlipsDisplayIds:
             family_wish="Wish",
             contact_name="Contact C",
             phone_number="555-005-0003",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add_all([fam_a, fam_b, fam_c])

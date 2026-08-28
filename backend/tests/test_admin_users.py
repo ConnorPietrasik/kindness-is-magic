@@ -425,7 +425,7 @@ class TestAdminCreateUser:
         assert resp.status_code == 422
 
     def test_422_family_fk_soft_deleted(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         _admin_login(test_client)
         fam = Family(
@@ -433,7 +433,7 @@ class TestAdminCreateUser:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-999-9999",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         fam.deleted_at = datetime.now(timezone.utc)
         db.add(fam)

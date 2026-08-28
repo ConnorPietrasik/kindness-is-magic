@@ -1,9 +1,9 @@
 /**
- * Referrer Families — approved families CRUD page.
+ * Referrer Families — verified families CRUD page.
  *
  * Extracted from the old ReferrerDashboard. Shows the families table
  * with Manage / Edit / Delete actions, plus the inline add/edit forms.
- * Also shows a pending approvals alert when there are pending families.
+ * Also shows a pending verification alert when there are pending families.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -108,14 +108,14 @@ export default function ReferrerFamilies() {
             to={ROUTES.REFERRER_FAMILY_INVITES}
             className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
           >
-            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your approval →
+            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your verification →
           </Link>
         )}
 
         {/* ── Families ────────────────────────────────────────── */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-gray-900">Approved Families</h3>
+            <h3 className="text-base font-semibold text-gray-900">Verified Families</h3>
             <span className="text-xs font-mono text-gray-400">
               {familyCount} / {familyLimit}
             </span>

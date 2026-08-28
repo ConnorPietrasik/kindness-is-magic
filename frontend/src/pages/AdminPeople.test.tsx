@@ -90,7 +90,7 @@ const mockFamilyDetail: FamilyDetail = {
   contact_name: "",
   deleted_at: null,
   person_count: 2,
-  approval_status: "approved",
+  verification_status: "verified",
   pickup_window: null,
   wish_lock_level: "family",
   wish_review_requested_at: null,

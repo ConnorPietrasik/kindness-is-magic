@@ -37,15 +37,15 @@ def _create_donor(client: TestClient) -> dict:
 
 
 def _create_claimed_family(db: Session) -> dict:
-    """Create an approved, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+    """Create a verified, admin-locked family with people and wishes."""
+    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Claimed Family",
         family_wish="Warm clothes",
         contact_name="Claim Contact",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
         bio="A family in need of warm clothes.",
     )
@@ -74,14 +74,14 @@ def _create_claimed_family(db: Session) -> dict:
 
 def _create_family_with_adult(db: Session) -> dict:
     """Create a family with an adult person."""
-    from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Adult Family",
         family_wish="Food",
         contact_name="Adult Contact",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
         bio="An adult needing help.",
     )
@@ -107,15 +107,15 @@ def _create_family_with_adult(db: Session) -> dict:
 
 
 def _create_empty_family(db: Session) -> dict:
-    """Create an approved family with no people."""
-    from app.models import Family, FamilyApprovalStatus, WishLockLevel
+    """Create a verified family with no people."""
+    from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
     fam = Family(
         family_name="Empty Family",
         family_wish="Support",
         contact_name="Empty Contact",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
     )
     db.add(fam)

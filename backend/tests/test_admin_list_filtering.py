@@ -1,7 +1,7 @@
 """Tests for admin list endpoint filtering, searching, and sorting.
 
 Covers the new query params added across all admin list endpoints:
-- search, approval_status, wish_lock_level, wish_type, sort
+- search, approval_status (referrers), verification_status (families), wish_lock_level, wish_type, sort
 - deleted endpoints sort by deleted_at DESC
 """
 
@@ -42,7 +42,7 @@ def _make_referrers(db: Session, names: list[str], statuses: list[str] | None = 
 
 def _make_families(db: Session, names: list[str], statuses: list[str] | None = None, lock_levels: list[str] | None = None):
     """Create multiple families with given names and optional statuses."""
-    from app.models import Family, FamilyApprovalStatus, WishLockLevel
+    from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
     families = []
     for i, name in enumerate(names):
@@ -51,7 +51,7 @@ def _make_families(db: Session, names: list[str], statuses: list[str] | None = N
             family_wish="A wish",
             contact_name=f"Contact {i}",
             phone_number=f"555-111-{i:04d}",
-            approval_status=statuses[i] if statuses else FamilyApprovalStatus.approved,
+            verification_status=statuses[i] if statuses else FamilyVerificationStatus.verified,
             wish_lock_level=lock_levels[i] if lock_levels else WishLockLevel.family,
         )
         db.add(f)
@@ -193,7 +193,7 @@ class TestReferrersSort:
 
 
 # =========================================================================
-# Families — search, approval_status, wish_lock_level, sort
+# Families — search, verification_status, wish_lock_level, sort
 # =========================================================================
 
 
@@ -225,14 +225,14 @@ class TestFamiliesSearch:
         assert resp.json()["total"] == 1
 
     def test_search_by_wish(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         f1 = Family(
             family_name="Alpha",
             family_wish="Bicycle for the kids",
             contact_name="C1",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         f2 = Family(
@@ -240,7 +240,7 @@ class TestFamiliesSearch:
             family_wish="Winter coats please",
             contact_name="C2",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         db.add_all([f1, f2])
@@ -287,14 +287,14 @@ class TestFamiliesSearch:
         assert resp.json()["total"] == 1
 
     def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         f1 = Family(
             family_name="Smith Family",
             family_wish="Bicycle",
             contact_name="John Smith",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         f2 = Family(
@@ -302,7 +302,7 @@ class TestFamiliesSearch:
             family_wish="Coats",
             contact_name="Jane Doe",
             phone_number="555-000-0002",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         f3 = Family(
@@ -310,7 +310,7 @@ class TestFamiliesSearch:
             family_wish="Bicycle",
             contact_name="Bob Jones",
             phone_number="555-000-0003",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         db.add_all([f1, f2, f3])
@@ -328,20 +328,20 @@ class TestFamiliesSearch:
         assert body["families"][0]["contact_name"] == "John Smith"
 
 
-class TestFamiliesApprovalStatus:
-    def test_filter_approved(self, test_client: TestClient, admin_user, db: Session):
-        _make_families(db, ["A", "B", "C"], ["approved", "pending", "approved"])
+class TestFamiliesVerificationStatus:
+    def test_filter_verified(self, test_client: TestClient, admin_user, db: Session):
+        _make_families(db, ["A", "B", "C"], ["verified", "pending", "verified"])
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/families", params={"approval_status": "approved"})
+        resp = test_client.get("/api/admin/families", params={"verification_status": "verified"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 2
 
     def test_filter_pending(self, test_client: TestClient, admin_user, db: Session):
-        _make_families(db, ["A", "B"], ["approved", "pending"])
+        _make_families(db, ["A", "B"], ["verified", "pending"])
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/families", params={"approval_status": "pending"})
+        resp = test_client.get("/api/admin/families", params={"verification_status": "pending"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
@@ -811,10 +811,10 @@ class TestDeletedReferrersSort:
 
 class TestDeletedFamiliesSort:
     def test_deleted_sorted_by_deleted_at_desc(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
-        f1 = Family(family_name="First", family_wish="W", contact_name="C", approval_status=FamilyApprovalStatus.approved)
-        f2 = Family(family_name="Second", family_wish="W", contact_name="C", approval_status=FamilyApprovalStatus.approved)
+        f1 = Family(family_name="First", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
+        f2 = Family(family_name="Second", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
         db.add_all([f1, f2])
         db.commit()
 

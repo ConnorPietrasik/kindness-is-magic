@@ -9,7 +9,7 @@ from app.models import (
     CommitmentType,
     EmailKind,
     EmailStatus,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     ReferrerApprovalStatus,
     UserRole,
     WishLockLevel,
@@ -553,7 +553,7 @@ class FamilyDetail(BaseModel):
     phone_number: str
     family_wish: str
     contact_name: str
-    approval_status: FamilyApprovalStatus
+    verification_status: FamilyVerificationStatus
     pickup_window: datetime | None = None
     deleted_at: datetime | None = None
     person_count: int
@@ -583,7 +583,7 @@ class FamilySelfServiceDetail(BaseModel):
     phone_number: str
     family_wish: str
     contact_name: str
-    approval_status: FamilyApprovalStatus
+    verification_status: FamilyVerificationStatus
     pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int
@@ -603,7 +603,7 @@ class FamilySummary(BaseModel):
     referrer_id: int | None
     delivery_user_id: int | None = None
     delivery_user_name: Optional[str] = None
-    approval_status: FamilyApprovalStatus
+    verification_status: FamilyVerificationStatus
     pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int = 0
@@ -641,14 +641,14 @@ class FamilyReviewList(BaseModel):
 
 
 class PendingFamilySummary(BaseModel):
-    """Like FamilySummary but adds approval_status and created_at for the approval queue."""
+    """Like FamilySummary but adds verification_status and created_at for the verification queue."""
 
     id: int
     display_id: str
     family_name: str
     family_wish: str
     contact_name: str
-    approval_status: FamilyApprovalStatus
+    verification_status: FamilyVerificationStatus
     pickup_window: datetime | None = None
     person_count: int = 0
     created_at: datetime

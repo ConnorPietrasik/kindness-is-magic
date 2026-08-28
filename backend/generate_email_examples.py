@@ -20,9 +20,9 @@ from app.mail import (
     _wrap_email,
     build_admin_email_failure_notice,
     build_claim_confirmation_email,
-    build_family_approved_email,
     build_family_invite_email,
     build_family_pending_email,
+    build_family_verified_email,
     build_invite_email,
     build_password_reset_email,
     build_referrer_approved_email,
@@ -65,7 +65,7 @@ EXAMPLES = [
     },
     {
         "filename": "04-family-pending.html",
-        "label": "Family Pending Approval (to referrer)",
+        "label": "Family Pending Verification (to referrer)",
         "body": build_family_pending_email(
             family_name="The Rodriguez Family",
             referrer_name="Sarah Johnson",
@@ -73,9 +73,9 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "05-family-approved.html",
-        "label": "Family Approved (to family)",
-        "body": build_family_approved_email(
+        "filename": "05-family-verified.html",
+        "label": "Family Verified (to family)",
+        "body": build_family_verified_email(
             family_name="The Rodriguez Family",
             referrer_name="Sarah Johnson",
         ),

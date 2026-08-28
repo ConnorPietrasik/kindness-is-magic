@@ -14,7 +14,7 @@ from tests.conftest import login_as
 
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Referrer,
     ReferrerApprovalStatus,
     WishLockLevel,
@@ -54,7 +54,7 @@ def locked_family(db: Session):
         family_wish="Toys",
         contact_name="Reset Contact",
         phone_number="555-000-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.family,
     )
     db.add(fam)
@@ -84,7 +84,7 @@ def referrer_locked_family_with_review(db: Session):
         family_wish="Clothes",
         contact_name="Review Contact",
         phone_number="555-000-0012",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.referrer,
         wish_review_requested_at=datetime.now(timezone.utc),
         wish_rejection_reason=None,
@@ -116,7 +116,7 @@ def admin_locked_family(db: Session):
         family_wish="Books",
         contact_name="AdminLock Contact",
         phone_number="555-000-0022",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
     )
     db.add(fam)

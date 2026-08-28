@@ -43,7 +43,7 @@ def non_delivery_user(db):
 @pytest.fixture()
 def family_for_delivery(db, referrer_record):
     """Create a family with no delivery person assigned."""
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     fam = Family(
         referrer_id=referrer_record.id,
@@ -51,7 +51,7 @@ def family_for_delivery(db, referrer_record):
         family_wish="A blanket",
         contact_name="Test Contact",
         phone_number="555-400-0001",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()

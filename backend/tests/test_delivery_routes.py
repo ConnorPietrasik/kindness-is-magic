@@ -25,7 +25,7 @@ def delivery_user(db):
 @pytest.fixture()
 def delivery_assigned_families(db, delivery_user, referrer_record):
     """Create families assigned to a delivery person."""
-    from app.models import Family, FamilyApprovalStatus, Person, Wish, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
 
     fam1 = Family(
         referrer_id=referrer_record.id,
@@ -34,7 +34,7 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
         contact_name="Contact A",
         phone_number="555-300-0001",
         address="100 Elm St",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         delivery_user_id=delivery_user.id,
     )
     fam2 = Family(
@@ -44,7 +44,7 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
         contact_name="Contact B",
         phone_number="555-300-0002",
         address="200 Pine St",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         delivery_user_id=delivery_user.id,
     )
     # Family not assigned to this delivery person
@@ -54,7 +54,7 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
         family_wish="A toy",
         contact_name="Contact C",
         phone_number="555-300-0003",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         delivery_user_id=None,
     )
     db.add_all([fam1, fam2, fam3])

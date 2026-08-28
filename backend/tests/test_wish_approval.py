@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from app.models import Family, FamilyApprovalStatus, Person, Referrer, ReferrerApprovalStatus, User, UserRole, Wish, WishType
+from app.models import Family, FamilyVerificationStatus, Person, Referrer, ReferrerApprovalStatus, User, UserRole, Wish, WishType
 from app.auth import get_password_hash
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def family(db, referrer):
         family_wish="World peace",
         contact_name="Contact Person",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(f)
     db.commit()
@@ -111,7 +111,7 @@ def second_family(db, referrer):
         family_wish="Warm clothes",
         contact_name="Second Contact",
         phone_number="555-000-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(f)
     db.commit()
@@ -157,7 +157,7 @@ def family_for_another_referrer(db, another_referrer):
         family_wish="A computer",
         contact_name="Another Contact",
         phone_number="555-200-2000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(f)
     db.commit()

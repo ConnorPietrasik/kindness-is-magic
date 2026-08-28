@@ -578,7 +578,7 @@ class TestAdminResetSentEmails:
                 SentEmail(
                     user_id=referrer_user.id,
                     recipient_email="b@example.com",
-                    kind=EmailKind.family_approved,
+                    kind=EmailKind.family_verified,
                     status=EmailStatus.sent,
                 ),
                 # Own but failed — untouched

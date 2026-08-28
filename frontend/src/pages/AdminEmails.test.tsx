@@ -51,7 +51,7 @@ describe("KIND_LABELS", () => {
     "referrer_invite",
     "password_reset",
     "family_pending",
-    "family_approved",
+    "family_verified",
     "referrer_approved",
     "referrer_rejected",
     "claim_confirmation",

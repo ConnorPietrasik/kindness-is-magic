@@ -217,19 +217,19 @@ def build_password_reset_email(reset_link: str) -> str:
 
 
 def build_family_pending_email(family_name: str, referrer_name: str) -> str:
-    """Build the HTML body for a "new family pending approval" notification to the referrer."""
+    """Build the HTML body for a "new family pending verification" notification to the referrer."""
     base = APP_BASE_URL
     return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
-<p>A new family, <strong>{family_name}</strong>, has registered through your family invite code and is awaiting your approval.</p>
-<p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Review Pending Families</a></p>
-<p>They can start adding family members while they wait for your approval. You can approve or reject them from your dashboard.</p>"""
+<p>A new family, <strong>{family_name}</strong>, has registered using your family invite code. Please confirm this is a family you intended to refer.</p>
+<p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Verify Pending Families</a></p>
+<p>They can start adding family members while they wait for your confirmation. You can confirm or reject them from your dashboard.</p>"""
 
 
-def build_family_approved_email(family_name: str, referrer_name: str) -> str:
-    """Build the HTML body for a "family approved" notification to the family contact."""
+def build_family_verified_email(family_name: str, referrer_name: str) -> str:
+    """Build the HTML body for a "family verified" notification to the family contact."""
     base = APP_BASE_URL
     return f"""<p>Great news, <strong>{family_name}</strong>!</p>
-<p>Your family has been <strong>approved</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
+<p>Your family has been <strong>confirmed</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
 <p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""
 
 

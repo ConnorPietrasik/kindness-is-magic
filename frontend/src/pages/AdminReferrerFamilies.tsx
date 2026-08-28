@@ -308,7 +308,7 @@ function FamiliesTable({
         {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
         {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
         {visibleColumns.includes("person_count") && <Th>People</Th>}
-        {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
+        {visibleColumns.includes("verification_status") && <Th>Verification</Th>}
         {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
         {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
         {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
@@ -365,9 +365,9 @@ function FamiliesTable({
               )}
               {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
               {visibleColumns.includes("person_count") && <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>}
-              {visibleColumns.includes("approval_status") && (
+              {visibleColumns.includes("verification_status") && (
                 <Td>
-                  <ApprovalBadge status={f.approval_status} />
+                  <ApprovalBadge status={f.verification_status} />
                 </Td>
               )}
               {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}

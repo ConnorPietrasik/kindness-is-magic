@@ -922,7 +922,7 @@ describe("auth invite API functions", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Referrer — Pending Families (invite approvals)
+// Referrer — Pending Families (verification queue)
 // ---------------------------------------------------------------------------
 describe("referrer pending family API functions", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -934,18 +934,18 @@ describe("referrer pending family API functions", () => {
     expect(result).toEqual([{ id: 1, family_name: "Smiths" }]);
   });
 
-  it("approveFamily — POST /api/referrer/families/:id/approve", async () => {
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "approved" } });
-    const result = await apiModule.approveFamily(5);
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/approve");
-    expect(result).toEqual({ id: 5, approval_status: "approved" });
+  it("verifyFamily — POST /api/referrer/families/:id/verify", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, verification_status: "verified" } });
+    const result = await apiModule.verifyFamily(5);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/verify");
+    expect(result).toEqual({ id: 5, verification_status: "verified" });
   });
 
   it("rejectFamily — POST /api/referrer/families/:id/reject", async () => {
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, approval_status: "rejected" } });
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, verification_status: "rejected" } });
     const result = await apiModule.rejectFamily(5);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/referrer/families/5/reject");
-    expect(result).toEqual({ id: 5, approval_status: "rejected" });
+    expect(result).toEqual({ id: 5, verification_status: "rejected" });
   });
 
   it("sendReferrerFamilyInvite — POST /api/referrer/send-family-invite with email", async () => {

@@ -13,7 +13,7 @@ from sqlalchemy import func
 
 from app.auth import generate_unique_family_invite_code
 from app.database import get_db
-from app.models import EmailKind, EmailStatus, Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, SentEmail, User
+from app.models import EmailKind, EmailStatus, Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, SentEmail, User
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -95,7 +95,7 @@ def list_referrers(
             .filter(
                 Family.referrer_id.in_(referrer_ids),
                 Family.deleted_at.is_(None),
-                Family.approval_status == FamilyApprovalStatus.approved,
+                Family.verification_status == FamilyVerificationStatus.verified,
             )
             .group_by(Family.referrer_id)
             .all()
@@ -140,7 +140,7 @@ def list_deleted_referrers(
             .filter(
                 Family.referrer_id.in_(referrer_ids),
                 Family.deleted_at.is_(None),
-                Family.approval_status == FamilyApprovalStatus.approved,
+                Family.verification_status == FamilyVerificationStatus.verified,
             )
             .group_by(Family.referrer_id)
             .all()

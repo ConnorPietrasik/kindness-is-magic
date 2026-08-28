@@ -684,7 +684,7 @@ class TestFamilySelfRegister:
         assert body["family"]["family_name"] == "The Smiths"
         assert body["family"]["family_wish"] == "A warm blanket"
         assert body["family"]["contact_name"] == "Mom Smith"
-        assert body["family"]["approval_status"] == "pending"
+        assert body["family"]["verification_status"] == "pending"
         assert body["family"]["person_count"] == 0
 
         # Auth cookies set (auto-login)
@@ -915,4 +915,4 @@ class TestFamilySelfRegister:
         body = resp.json()
         assert len(body) == 1
         assert body[0]["family_name"] == "Pending Joneses"
-        assert body[0]["approval_status"] == "pending"
+        assert body[0]["verification_status"] == "pending"

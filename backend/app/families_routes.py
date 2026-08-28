@@ -26,7 +26,7 @@ from app.models import (
     CommitmentType,
     EmailKind,
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     FamilyClaim,
     Person,
     User,
@@ -75,10 +75,10 @@ def list_public_families(
     access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(get_db),
 ) -> PublicFamilyListResponse:
-    """List approved families for the public donor browse page.
+    """List verified families for the public donor browse page.
 
     * No authentication required.
-    * Only returns families that are: approved, not soft-deleted, and
+    * Only returns families that are: verified, not soft-deleted, and
       wish_lock_level == admin (fully reviewed).
     * Supports pagination, filtering by person count / age range, and sorting.
     * If authenticated, sets ``claimed_by_current_user`` on families the
@@ -93,10 +93,10 @@ def list_public_families(
         except Exception:
             pass
 
-    # Base query: active, approved, admin-locked families
+    # Base query: active, verified, admin-locked families
     query = db.query(Family).filter(
         Family.deleted_at.is_(None),
-        Family.approval_status == FamilyApprovalStatus.approved,
+        Family.verification_status == FamilyVerificationStatus.verified,
         Family.wish_lock_level == WishLockLevel.admin,
     )
 

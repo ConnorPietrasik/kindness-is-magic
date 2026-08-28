@@ -78,7 +78,7 @@ class TestApplyColumnFilter:
             family_wish="Peace",
             contact_name="Jane",
             referrer_id=None,
-            approval_status="approved",
+            verification_status="verified",
             phone_number="555-0000",
             person_count=0,
             wish_lock_level="family",
@@ -106,7 +106,7 @@ class TestApplyColumnFilter:
         assert "address" not in result[0]
         assert "referrer_notes" not in result[0]
         # Required fields always included
-        assert "approval_status" in result[0]
+        assert "verification_status" in result[0]
         assert "contact_name" in result[0]
 
     def test_always_include_forced(self, family_item):
@@ -158,7 +158,7 @@ class TestAdminFamiliesColumns:
         assert "id" in family
         assert "family_name" in family
         # Required fields always included
-        assert "approval_status" in family
+        assert "verification_status" in family
         assert "contact_name" in family
         # Optional non-requested fields excluded
         assert "bio" not in family

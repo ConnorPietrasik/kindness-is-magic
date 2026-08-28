@@ -40,7 +40,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_password_hash, generate_unique_family_invite_code
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
@@ -440,7 +440,7 @@ def _process_families(
             bio=bio,
             address=address,
             phone_number=phone_number,
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(family)
         db.flush()

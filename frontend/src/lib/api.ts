@@ -569,14 +569,14 @@ export function createReferrerFamilyPerson(fid: number, data: PersonPayload): Pr
 }
 
 // ---------------------------------------------------------------------------
-// Referrer — Pending Families (invite approvals)
+// Referrer — Pending Families (verification queue)
 // ---------------------------------------------------------------------------
 export function listPendingFamilies(): Promise<PendingFamilySummary[]> {
   return apiGet("/api/referrer/pending-families");
 }
 
-export function approveFamily(id: number): Promise<FamilyDetail> {
-  return apiPost(`/api/referrer/families/${id}/approve`);
+export function verifyFamily(id: number): Promise<FamilyDetail> {
+  return apiPost(`/api/referrer/families/${id}/verify`);
 }
 
 export function rejectFamily(id: number): Promise<FamilyDetail> {

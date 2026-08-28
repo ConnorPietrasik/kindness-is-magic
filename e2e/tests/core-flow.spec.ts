@@ -7,7 +7,7 @@
  *  3. Admin approves the referrer
  *  4. Referrer views their dashboard (family invite code is visible)
  *  5. Guest registers as a family using the referrer's family invite code
- *  6. Referrer approves the family
+ *  6. Referrer confirms the family
  *  7. Family adds a person with wishes
  *  8. Family requests review
  *  9. Referrer sees the notification and approves wishes (submits to admin)
@@ -193,15 +193,15 @@ test.describe("Core Flow", () => {
       await familyGuestContext.close();
 
       /* ═══════════════════════════════════════════════════════════
-       * Step 6 — Referrer approves the family
+       * Step 6 — Referrer confirms the family
        * ═══════════════════════════════════════════════════════════ */
-      /* Referrer dashboard should show pending approval notification */
+      /* Referrer dashboard should show pending verification notification */
       await referrerPage.goto("/dashboard");
       await expect(referrerPage.getByRole("heading", { name: "Welcome back!" })).toBeVisible();
-      await expect(referrerPage.getByText(/family.*awaiting your approval/)).toBeVisible({ timeout: 10_000 });
+      await expect(referrerPage.getByText(/family.*awaiting your verification/)).toBeVisible({ timeout: 10_000 });
 
       /* Click the notification link to go to pending families */
-      await referrerPage.getByRole("link", { name: /awaiting your approval/ }).click();
+      await referrerPage.getByRole("link", { name: /awaiting your verification/ }).click();
       await expect(referrerPage.getByRole("heading", { name: "Family Invites" })).toBeVisible({
         timeout: 10_000,
       });
@@ -209,12 +209,12 @@ test.describe("Core Flow", () => {
       /* Wait for the family to appear in the pending table */
       await expect(referrerPage.getByRole("table")).toContainText(TEST_FAMILY_NAME, { timeout: 10_000 });
 
-      /* Click Approve on the family row */
+      /* Click Confirm on the family row */
       const familyRow = referrerPage.getByRole("row").filter({ hasText: TEST_FAMILY_NAME });
-      await familyRow.getByRole("button", { name: "Approve" }).click();
+      await familyRow.getByRole("button", { name: "Confirm" }).click();
 
       /* Family should disappear from pending list */
-      await expect(referrerPage.getByText("No families waiting for approval")).toBeVisible({ timeout: 10_000 });
+      await expect(referrerPage.getByText("No families waiting for verification")).toBeVisible({ timeout: 10_000 });
 
       /* ═══════════════════════════════════════════════════════════
        * Step 7 — Family adds a person with wishes

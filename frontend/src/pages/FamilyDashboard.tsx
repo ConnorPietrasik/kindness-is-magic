@@ -97,10 +97,10 @@ export default function FamilyDashboard() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Dashboard</h2>
 
-        {/* ── Pending approval banner (legacy) ────────────────── */}
-        {familyInfo?.approval_status === "pending" && (
+        {/* ── Pending verification banner (legacy) ────────────── */}
+        {familyInfo?.verification_status === "pending" && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-800 shadow-sm">
-            Your family is awaiting approval from your referrer. You can still add and edit family members while you wait.
+            Your family is awaiting verification from your referrer. You can still add and edit family members while you wait.
           </div>
         )}
 

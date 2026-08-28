@@ -22,8 +22,10 @@
 
 ## Planning
 
-- **Break large changes into independently testable parts.** When practical, split changes that touch multiple areas into sections that can each be validated on their own. This keeps implementation steps small and reduces the risk of cascading failures.
-- **Keep plans concise.** A plan should describe the changes being made, the approach, and important considerations. Do not reproduce exact code diffs or inline implementations. Save detailed code changes for the implementation phase.
+- **Plans are contracts, not scripts.** Capture what makes the change *right* and what's expensive to rediscover: goal, scope boundaries (including what's explicitly out of scope), naming/behavior decisions, non-obvious traps, and stage gates. Omit what's easily verifiable during implementation — line numbers, exact code or string literals, predicted command output. Brittle detail biases the agent toward following the plan instead of the code, and a single stale detail can derail execution.
+- **Decisions are expressed as outcomes in the plan** (the chosen name, the chosen approach) — not restated in a separate "approved decisions" section.
+- **Break large changes into independently testable stages**, each with a validation gate before the next stage begins. Always do backend before frontend.
+- **Length is fine when every line earns its place.** A complex change with many traps needs a longer plan. Cut detail the code will answer anyway. A plan carries the results of blast-radius investigation: every *exception* to the change pattern — where a mechanical pattern match would do the wrong thing (out-of-scope matches that look identical, shared components, same name, different concept). Don't enumerate the sites that *should* change — `rg` finds them and doing them right is the default. Traps are where it isn't.
 
 ## Project Structure
 

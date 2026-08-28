@@ -16,7 +16,7 @@ from app.models import (
     EmailKind,
     EmailStatus,
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
@@ -116,7 +116,7 @@ def list_families(
         .filter(
             Family.referrer_id == user.referrer_id,
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
         )
         .order_by(Family.id)
         .all()
@@ -144,13 +144,13 @@ def create_family(
 ) -> FamilyDetail:
     referrer_id = user.referrer_id
 
-    # Check family_limit not exceeded (only approved, non-deleted families count)
+    # Check family_limit not exceeded (only verified, non-deleted families count)
     current_count = (
         db.query(Family)
         .filter(
             Family.referrer_id == referrer_id,
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
         )
         .count()
     )
@@ -171,7 +171,7 @@ def create_family(
         bio=body.bio,
         address=body.address,
         phone_number=body.phone_number,
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -223,7 +223,7 @@ def delete_family(
 
 
 # ---------------------------------------------------------------------------
-# Referrer — Pending Families (approval queue)
+# Referrer — Pending Families (verification queue)
 # ---------------------------------------------------------------------------
 
 
@@ -232,13 +232,13 @@ def list_pending_families(
     user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> list[PendingFamilySummary]:
-    """List families awaiting this referrer's approval."""
+    """List families awaiting this referrer's verification."""
     families = (
         db.query(Family)
         .filter(
             Family.referrer_id == user.referrer_id,
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.pending,
+            Family.verification_status == FamilyVerificationStatus.pending,
         )
         .all()
     )
@@ -254,7 +254,7 @@ def list_pending_families(
             family_name=f.family_name,
             family_wish=f.family_wish,
             contact_name=f.contact_name,
-            approval_status=f.approval_status,
+            verification_status=f.verification_status,
             pickup_window=f.pickup_window,
             person_count=count_map.get(f.id, 0),
             created_at=f.created_at,
@@ -263,28 +263,28 @@ def list_pending_families(
     ]
 
 
-@router.post("/families/{fam_id}/approve", status_code=200)
-async def approve_family(
+@router.post("/families/{fam_id}/verify", status_code=200)
+async def verify_family(
     fam_id: int,
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    """Approve a pending family."""
+    """Verify a pending family (confirm it is one the referrer referred)."""
     fam = owner.family
 
-    if fam.approval_status != FamilyApprovalStatus.pending:
+    if fam.verification_status != FamilyVerificationStatus.pending:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Family is not in pending status",
         )
 
-    # Check family_limit before approving
+    # Check family_limit before verifying
     current_count = (
         db.query(Family)
         .filter(
             Family.referrer_id == owner.user.referrer_id,
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
         )
         .count()
     )
@@ -293,16 +293,16 @@ async def approve_family(
     if current_count >= ref.family_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Family limit of {ref.family_limit} reached. Cannot approve without freeing a slot.",
+            detail=f"Family limit of {ref.family_limit} reached. Cannot verify without freeing a slot.",
         )
 
-    fam.approval_status = FamilyApprovalStatus.approved
+    fam.verification_status = FamilyVerificationStatus.verified
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s approved family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer %s verified family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
 
-    # Send approval notification email to the family
-    await _send_family_approved_email(
+    # Send verification notification email to the family
+    await _send_family_verified_email(
         fam=fam,
         db=db,
         referrer_user_id=owner.user.id,
@@ -321,13 +321,13 @@ def reject_family(
     """Reject a pending family."""
     fam = owner.family
 
-    if fam.approval_status != FamilyApprovalStatus.pending:
+    if fam.verification_status != FamilyVerificationStatus.pending:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Family is not in pending status",
         )
 
-    fam.approval_status = FamilyApprovalStatus.rejected
+    fam.verification_status = FamilyVerificationStatus.rejected
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s rejected family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
@@ -459,26 +459,26 @@ def referrer_reject_wishes(
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
-async def _send_family_approved_email(
+async def _send_family_verified_email(
     fam: Family,
     db: Session,
     referrer_user_id: int,
     referrer_display_name: str,
 ) -> None:
-    """Send a notification email to the family contact when approved."""
-    from app.mail import build_family_approved_email, send_email
+    """Send a notification email to the family contact when verified."""
+    from app.mail import build_family_verified_email, send_email
 
     family_user = db.query(User).filter(User.family_id == fam.id).first()
     if not family_user:
         return
 
-    html_body = build_family_approved_email(fam.family_name, referrer_display_name)
+    html_body = build_family_verified_email(fam.family_name, referrer_display_name)
     await send_email(
         to=family_user.email,
-        subject="Your family has been approved — Kindness Is Magic ✨",
+        subject="Your family has been confirmed — Kindness Is Magic ✨",
         html_body=html_body,
         db=db,
-        kind=EmailKind.family_approved,
+        kind=EmailKind.family_verified,
         user_id=referrer_user_id,
     )
 

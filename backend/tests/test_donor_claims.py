@@ -43,15 +43,15 @@ def _create_donor(client: TestClient) -> dict:
 
 
 def _create_claimed_family(db: Session) -> dict:
-    """Create an approved, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+    """Create a verified, admin-locked family with people and wishes."""
+    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Claimed Family",
         family_wish="Warm clothes",
         contact_name="Claim Contact",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
         wish_lock_level=WishLockLevel.admin,
     )
     db.add(fam)
@@ -203,14 +203,14 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(5):
-            from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cap Family {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
                 wish_lock_level=WishLockLevel.admin,
             )
             db.add(fam)
@@ -237,7 +237,7 @@ class TestClaimCreation:
             family_wish="A wish",
             contact_name="Contact 6",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(fam6)
@@ -262,14 +262,14 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(6):
-            from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cash Family {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
                 wish_lock_level=WishLockLevel.admin,
             )
             db.add(fam)
@@ -314,7 +314,7 @@ class TestClaimCreation:
     def test_claim_deleted_family(self, test_client: TestClient, db: Session):
         """Claim soft-deleted family → 404."""
         _create_donor(test_client)
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
         from datetime import datetime, timezone
 
         fam = Family(
@@ -322,7 +322,7 @@ class TestClaimCreation:
             family_wish="A wish",
             contact_name="Deleted Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
             deleted_at=datetime.now(timezone.utc),
         )
@@ -339,14 +339,14 @@ class TestClaimCreation:
     def test_claim_not_fully_approved_family(self, test_client: TestClient, db: Session):
         """Claim a family that hasn't been fully reviewed → 403."""
         _create_donor(test_client)
-        from app.models import Family, FamilyApprovalStatus, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, WishLockLevel
 
         fam = Family(
             family_name="Unapproved Family",
             family_wish="A wish",
             contact_name="Pending Contact",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
         db.add(fam)
@@ -568,14 +568,14 @@ class TestClaimCRUD:
         # Create 5 gift claims
         claim_ids = []
         for i in range(5):
-            from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cap Test {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
                 wish_lock_level=WishLockLevel.admin,
             )
             db.add(fam)
@@ -605,7 +605,7 @@ class TestClaimCRUD:
             family_wish="A wish",
             contact_name="Contact 6",
             phone_number="555-000-0000",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(fam6)
@@ -715,14 +715,14 @@ class TestMarkPurchased:
         fam = data["family"]
 
         # Create another family with wishes
-        from app.models import Family, FamilyApprovalStatus, Person, Wish, WishLockLevel, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
 
         other_fam = Family(
             family_name="Other Family",
             family_wish="A wish",
             contact_name="Other Contact",
             phone_number="555-000-0001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
         db.add(other_fam)

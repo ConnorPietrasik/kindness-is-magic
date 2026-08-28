@@ -32,7 +32,7 @@ const mockResponse: FamilySelfRegisterResponse = {
     delivery_user_name: null,
     deleted_at: null,
     person_count: 0,
-    approval_status: "approved",
+    verification_status: "verified",
     pickup_window: null,
     wish_lock_level: "family",
     wish_review_requested_at: null,

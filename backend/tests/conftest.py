@@ -289,14 +289,14 @@ def referrer_user(db: Session, referrer_record):
 @pytest.fixture()
 def family_record(db: Session):
     """Create a Family row."""
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     f = Family(
         family_name="TestFamily",
         family_wish="World peace",
         contact_name="Contact Person",
         phone_number="555-000-0000",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(f)
     db.commit()
@@ -341,7 +341,7 @@ def login_as(client: Any, email: str, password: str) -> dict:
 @pytest.fixture()
 def referrer_with_families(db: Session, referrer_record):
     """Create a Referrer with 1-2 Family rows."""
-    from app.models import Family, FamilyApprovalStatus
+    from app.models import Family, FamilyVerificationStatus
 
     f1 = Family(
         referrer_id=referrer_record.id,
@@ -349,7 +349,7 @@ def referrer_with_families(db: Session, referrer_record):
         family_wish="A new roof",
         contact_name="Jane Smith",
         phone_number="555-010-0101",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     f2 = Family(
         referrer_id=referrer_record.id,
@@ -357,7 +357,7 @@ def referrer_with_families(db: Session, referrer_record):
         family_wish="Warm clothes",
         contact_name="Bob Jones",
         phone_number="555-010-0102",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add_all([f1, f2])
     db.commit()
@@ -406,7 +406,7 @@ def referrer_with_full_tree(db: Session):
 
     Returns a dict with keys: referrer, family, person, user.
     """
-    from app.models import FamilyApprovalStatus, Family, Person, Referrer, ReferrerApprovalStatus, User, UserRole
+    from app.models import FamilyVerificationStatus, Family, Person, Referrer, ReferrerApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
     ref = Referrer(
@@ -426,7 +426,7 @@ def referrer_with_full_tree(db: Session):
         family_wish="A new home",
         contact_name="Tree Contact",
         phone_number="555-100-1001",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -502,7 +502,7 @@ def another_family(db: Session, referrer_record):
 
     Returns a dict with keys: family, user.
     """
-    from app.models import Family, FamilyApprovalStatus, User, UserRole
+    from app.models import Family, FamilyVerificationStatus, User, UserRole
     from app.auth import get_password_hash
 
     fam = Family(
@@ -511,7 +511,7 @@ def another_family(db: Session, referrer_record):
         family_wish="A computer",
         contact_name="Another Contact",
         phone_number="555-200-2001",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()

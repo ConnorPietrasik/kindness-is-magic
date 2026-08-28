@@ -49,7 +49,7 @@ export interface AdminFamiliesListParams extends AdminListParams {
   search_contact?: string;
   search_phone?: string;
   search_wish?: string;
-  approval_status?: string;
+  verification_status?: string;
   wish_lock_level?: string;
   min_person_count?: number;
   max_person_count?: number;

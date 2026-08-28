@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from app.config import MAX_FAMILY_PERSONS
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     FamilyClaim,
     Person,
     Referrer,
@@ -168,7 +168,7 @@ FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "family_name": Family.family_name,
     "id": Family.id,
     "created_at": Family.created_at,
-    "approval_status": Family.approval_status,
+    "verification_status": Family.verification_status,
     "wish_lock_level": Family.wish_lock_level,
     "referrer_id": func.coalesce(Family.referrer_id, 0),
     "person_count": FAMILY_PERSON_COUNT,
@@ -263,7 +263,7 @@ def build_referrer_detail(
 ) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count.
 
-    Only *approved*, non-deleted families count toward the family count.
+    Only *verified*, non-deleted families count toward the family count.
     Pass ``family_count`` to skip the query when it is already known.
     Pass ``admin_map`` (id → display_name) to resolve the approving admin
     name without a per-referrer query when building a list response.
@@ -274,7 +274,7 @@ def build_referrer_detail(
             .filter(
                 Family.referrer_id == ref.id,
                 Family.deleted_at.is_(None),
-                Family.approval_status == FamilyApprovalStatus.approved,
+                Family.verification_status == FamilyVerificationStatus.verified,
             )
             .count()
         )
@@ -650,7 +650,7 @@ def build_family_detail(
         "phone_number": fam.phone_number,
         "family_wish": fam.family_wish,
         "contact_name": fam.contact_name,
-        "approval_status": fam.approval_status,
+        "verification_status": fam.verification_status,
         "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
@@ -778,7 +778,7 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
         "bio": fam.bio,
         "address": fam.address,
         "phone_number": fam.phone_number,
-        "approval_status": fam.approval_status,
+        "verification_status": fam.verification_status,
         "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": ctx.count_map.get(fam.id, 0),
@@ -1093,18 +1093,18 @@ def compute_position_maps(
     # page_referrer_ids approach (resolved from the page's families).
     if entity_type == "family" and scope is not None:
         # Scoped family view (e.g. admin with referrer_id, or referrer's
-        # own view).  Compute over all approved families for that referrer.
+        # own view).  Compute over all verified families for that referrer.
         fam_filter = [
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
             Family.referrer_id == scope,
         ]
     else:
-        # Flat family view or any person view — compute over all approved
+        # Flat family view or any person view — compute over all verified
         # families whose referrer_id appears on the current page.
         fam_filter = [
             Family.deleted_at.is_(None),
-            Family.approval_status == FamilyApprovalStatus.approved,
+            Family.verification_status == FamilyVerificationStatus.verified,
             func.coalesce(Family.referrer_id, 0).in_(page_referrer_ids),
         ]
 
@@ -1173,10 +1173,10 @@ def compute_display_ids(
     """Compute stable display IDs for a page of entities.
 
     Display IDs are hierarchical positions based on ROW_NUMBER over *active
-    only* entities (approved, non-deleted).  Positions are ordered by database
+    only* entities (verified, non-deleted).  Positions are ordered by database
     ``id`` so they are stable across viewers and pagination — a position shifts
     only when an entity before it is created, deleted, restored, or changes
-    approval status.
+    verification status.
 
     Format by view:
 
@@ -1230,7 +1230,7 @@ def compute_display_ids(
                     if entity.deleted_at is not None:
                         result[eid] = "DELETED"
                     else:
-                        result[eid] = entity.approval_status.value.upper()
+                        result[eid] = entity.verification_status.value.upper()
                 else:
                     result[eid] = "0"
 

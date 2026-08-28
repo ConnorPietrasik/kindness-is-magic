@@ -116,7 +116,7 @@ class TestReferrerSetNotes:
         _tree_referrer_login(test_client)
 
         # Create a family under another referrer
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         other_fam = Family(
             referrer_id=another_referrer["referrer"].id,
@@ -124,7 +124,7 @@ class TestReferrerSetNotes:
             family_wish="Something",
             contact_name="Other Contact",
             phone_number="555-999-9999",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(other_fam)
         db.commit()
@@ -316,7 +316,7 @@ class TestAdminNotes:
 class TestFamilyCannotAccessNotes:
     def test_family_cannot_modify_notes(self, test_client: TestClient, db: Session):
         """Family self-update cannot modify referrer_notes (field not in FamilyUpdate)."""
-        from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User, UserRole
+        from app.models import Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, User, UserRole
         from app.auth import get_password_hash
 
         # Create a referrer
@@ -338,7 +338,7 @@ class TestFamilyCannotAccessNotes:
             family_wish="Peace",
             contact_name="Note Contact",
             phone_number="555-300-3001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam)
         db.commit()
@@ -372,7 +372,7 @@ class TestFamilyCannotAccessNotes:
 
     def test_referrer_notes_absent_from_family_me(self, test_client: TestClient, db: Session):
         """referrer_notes key should not be present in GET /api/family/me response."""
-        from app.models import Family, FamilyApprovalStatus, Referrer, ReferrerApprovalStatus, User, UserRole
+        from app.models import Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, User, UserRole
         from app.auth import get_password_hash
 
         ref = Referrer(
@@ -392,7 +392,7 @@ class TestFamilyCannotAccessNotes:
             family_wish="Joy",
             contact_name="Absent Contact",
             phone_number="555-400-4001",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             referrer_notes="Secret note that family should not see",
         )
         db.add(fam)

@@ -171,11 +171,15 @@ class Referrer(Base):
     approved_by_admin: Mapped["User | None"] = relationship("User", foreign_keys=[approved_by_admin_id])
 
 
-class FamilyApprovalStatus(str, enum.Enum):
-    """Approval state for families that self-register via invite."""
+class FamilyVerificationStatus(str, enum.Enum):
+    """Verification state for families that self-register via invite.
+
+    The referrer confirms that a referred family is one they intended to
+    refer (families sometimes share invite codes).
+    """
 
     pending = "pending"
-    approved = "approved"
+    verified = "verified"
     rejected = "rejected"
 
 
@@ -222,8 +226,8 @@ class Family(Base):
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
     family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
-    approval_status: Mapped[FamilyApprovalStatus] = mapped_column(
-        SAEnum(FamilyApprovalStatus, name="family_approval_status", create_constraint=True),
+    verification_status: Mapped[FamilyVerificationStatus] = mapped_column(
+        SAEnum(FamilyVerificationStatus, name="family_verification_status", create_constraint=True),
         server_default="pending",
         nullable=False,
     )
@@ -358,7 +362,7 @@ class EmailKind(str, enum.Enum):
     referrer_invite = "referrer_invite"
     password_reset = "password_reset"
     family_pending = "family_pending"
-    family_approved = "family_approved"
+    family_verified = "family_verified"
     referrer_approved = "referrer_approved"
     referrer_rejected = "referrer_rejected"
     claim_confirmation = "claim_confirmation"

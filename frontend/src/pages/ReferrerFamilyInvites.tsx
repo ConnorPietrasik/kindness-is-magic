@@ -2,8 +2,8 @@
  * Referrer Family Invites
  *
  * Shows the referrer's family invite code with a "Send Invite" button,
- * plus the approval queue below — families that self-registered via invite
- * and are awaiting the referrer's approval.
+ * plus the verification queue below — families that self-registered via invite
+ * and are awaiting the referrer's confirmation.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,12 +19,12 @@ import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import {
-  approveFamily,
   getReferrerMe,
   listPendingFamilies,
   listReferrerInviteEmails,
   rejectFamily,
   sendReferrerFamilyInvite,
+  verifyFamily,
 } from "../lib/api";
 import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerInviteEmails, referrerMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -188,8 +188,8 @@ export default function ReferrerFamilyInvites() {
     queryFn: listReferrerInviteEmails,
   });
 
-  const approveMut = useMutation({
-    mutationFn: approveFamily,
+  const verifyMut = useMutation({
+    mutationFn: verifyFamily,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PENDING_FAMILIES_KEY });
       queryClient.invalidateQueries({ queryKey: referrerFamilies });
@@ -248,11 +248,14 @@ export default function ReferrerFamilyInvites() {
           </div>
         )}
 
-        {/* ── Pending approvals ─────────────────────────────────── */}
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">Pending Family Approvals</h3>
+        {/* ── Pending verification ──────────────────────────────── */}
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Families to Verify</h3>
+          <p className="mt-1 text-sm text-gray-500">Confirm these are the correct families you referred.</p>
+        </div>
 
         {families.length === 0 ? (
-          <Card className="py-12 text-center text-gray-400">No families waiting for approval.</Card>
+          <Card className="py-12 text-center text-gray-400">No families waiting for verification.</Card>
         ) : (
           <Table>
             <TableHead>
@@ -274,17 +277,17 @@ export default function ReferrerFamilyInvites() {
                       <Button
                         variant="success"
                         className="h-7 px-2 text-xs"
-                        onClick={() => approveMut.mutate(f.id)}
-                        loading={approveMut.isPending && approveMut.variables === f.id}
-                        disabled={approveMut.isPending || rejectMut.isPending}
+                        onClick={() => verifyMut.mutate(f.id)}
+                        loading={verifyMut.isPending && verifyMut.variables === f.id}
+                        disabled={verifyMut.isPending || rejectMut.isPending}
                       >
-                        Approve
+                        Confirm
                       </Button>
                       <Button
                         variant="danger"
                         className="h-7 px-2 text-xs"
                         onClick={() => setRejectId(f.id)}
-                        disabled={approveMut.isPending || rejectMut.isPending}
+                        disabled={verifyMut.isPending || rejectMut.isPending}
                       >
                         Reject
                       </Button>
@@ -315,7 +318,7 @@ export default function ReferrerFamilyInvites() {
         />
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        <MutationErrors mutations={[approveMut, rejectMut]} />
+        <MutationErrors mutations={[verifyMut, rejectMut]} />
       </main>
     </div>
   );

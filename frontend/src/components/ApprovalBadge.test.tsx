@@ -13,6 +13,12 @@ describe("ApprovalBadge", () => {
     expect(badge).toHaveClass("bg-green-100", "text-green-700");
   });
 
+  it("renders 'verified' with green styling", () => {
+    render(<ApprovalBadge status="verified" />);
+    const badge = screen.getByText("verified");
+    expect(badge).toHaveClass("bg-green-100", "text-green-700");
+  });
+
   it("renders 'pending' with amber styling", () => {
     render(<ApprovalBadge status="pending" />);
     const badge = screen.getByText("pending");

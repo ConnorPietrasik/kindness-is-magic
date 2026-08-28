@@ -247,7 +247,7 @@ class TestAdminReferrersDropdown:
 class TestAdminFamiliesDropdown:
     def test_200_returns_minimal_entries(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Returns all active families as {id, family_name} pairs."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         _admin_login(test_client)
         # Add a second family
@@ -256,7 +256,7 @@ class TestAdminFamiliesDropdown:
             family_wish="A bike",
             contact_name="Second Contact",
             phone_number="555-333-3333",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(f2)
         db.commit()
@@ -277,7 +277,7 @@ class TestAdminFamiliesDropdown:
 
     def test_200_ordered_by_id(self, test_client: TestClient, admin_user, db: Session):
         """Results are ordered by id ascending."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         _admin_login(test_client)
         for i in range(3):
@@ -286,7 +286,7 @@ class TestAdminFamiliesDropdown:
                 family_wish="Wish",
                 contact_name=f"Contact {i}",
                 phone_number="555-000-0000",
-                approval_status=FamilyApprovalStatus.approved,
+                verification_status=FamilyVerificationStatus.verified,
             )
             db.add(f)
         db.commit()
@@ -299,7 +299,7 @@ class TestAdminFamiliesDropdown:
 
     def test_excludes_soft_deleted(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Soft-deleted families do not appear in the dropdown."""
-        from app.models import Family, FamilyApprovalStatus
+        from app.models import Family, FamilyVerificationStatus
 
         _admin_login(test_client)
         deleted_fam = Family(
@@ -307,7 +307,7 @@ class TestAdminFamiliesDropdown:
             family_wish="Wish",
             contact_name="Deleted Contact",
             phone_number="555-444-4444",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
             deleted_at=datetime.now(timezone.utc),
         )
         db.add(deleted_fam)

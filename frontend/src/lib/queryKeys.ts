@@ -106,7 +106,7 @@ export const referrerMe = ["referrerMe"] as const;
 // Referrer — Families
 // ---------------------------------------------------------------------------
 
-/** Referrer's approved families list */
+/** Referrer's verified families list */
 export const referrerFamilies = ["referrerFamilies"] as const;
 /** Key prefix for a single referrer family detail (invalidate all details) */
 export const referrerFamily = ["referrerFamily"] as const;
@@ -121,10 +121,10 @@ export const referrerFamilyDetail = (id: string) => ["referrerFamily", id] as co
 export const referrerFamilyPeople = (id: string) => ["referrerFamilyPeople", id] as const;
 
 // ---------------------------------------------------------------------------
-// Referrer — Pending approvals
+// Referrer — Pending verification
 // ---------------------------------------------------------------------------
 
-/** Families pending referrer approval */
+/** Families pending referrer verification */
 export const pendingFamilies = ["pendingFamilies"] as const;
 
 // ---------------------------------------------------------------------------

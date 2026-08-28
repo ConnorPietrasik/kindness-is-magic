@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Family,
-    FamilyApprovalStatus,
+    FamilyVerificationStatus,
     Person,
     Referrer,
     ReferrerApprovalStatus,
@@ -41,7 +41,7 @@ def purchaser_wish_tree(db: Session):
         family_wish="Warm clothes",
         contact_name="Purchaser Contact",
         phone_number="555-000-0002",
-        approval_status=FamilyApprovalStatus.approved,
+        verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
     db.commit()
@@ -151,7 +151,7 @@ class TestPurchaserListWishes:
             family_wish="Something",
             contact_name="Pending Contact",
             phone_number="555-000-0003",
-            approval_status=FamilyApprovalStatus.pending,
+            verification_status=FamilyVerificationStatus.pending,
         )
         db.add(fam2)
         db.flush()
@@ -512,7 +512,7 @@ class TestAdminMarkPurchasedSkipRedundantWrite:
             family_wish="Test wish",
             contact_name="Admin Mark Contact",
             phone_number="555-000-0099",
-            approval_status=FamilyApprovalStatus.approved,
+            verification_status=FamilyVerificationStatus.verified,
         )
         db.add(fam2)
         db.commit()
