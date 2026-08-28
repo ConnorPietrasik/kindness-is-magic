@@ -630,6 +630,7 @@ class FamilyReviewList(BaseModel):
     """Review queue item for referrer and admin review list endpoints."""
 
     id: int
+    display_id: str
     family_name: str
     contact_name: str
     referrer_id: int | None = None

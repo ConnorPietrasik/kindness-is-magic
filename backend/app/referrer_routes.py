@@ -380,8 +380,15 @@ def list_review_queue(
         if ref:
             referrer_map[user.referrer_id] = ref.name
 
+    # Scoped view — display_id is the family position within this referrer
+    display_map = compute_display_ids(db, "family", families, scope=user.referrer_id)
+
     return [
-        FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map))
+        FamilyReviewList(
+            **build_family_review_summary(
+                f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map, display_id=display_map.get(f.id, "0")
+            )
+        )
         for f in families
     ]
 

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DisplayId } from "../components/DisplayId";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { RejectReasonModal } from "../components/RejectReasonModal";
@@ -94,6 +95,7 @@ export default function ReferrerReviewQueue() {
         ) : (
           <Table>
             <TableHead>
+              <Th>ID</Th>
               <Th>Family</Th>
               <Th>Contact</Th>
               <Th>People</Th>
@@ -146,9 +148,11 @@ interface ReviewRowProps {
 function ReviewRow({ item, onApprove, onRejectOpen, isPending }: ReviewRowProps) {
   return (
     <Tr key={item.id} data-id={item.id}>
+      <Td className="whitespace-nowrap text-xs text-gray-400">
+        <DisplayId displayId={item.display_id} familyId={item.id} referrerId={item.referrer_id} />
+      </Td>
       <Td>
         <div className="font-medium text-gray-900">{item.family_name}</div>
-        <div className="text-xs text-gray-400">ID {item.id}</div>
       </Td>
       <Td>{item.contact_name}</Td>
       <Td>

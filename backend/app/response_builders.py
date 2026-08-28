@@ -794,13 +794,19 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
 
 
 def build_family_review_summary(
-    fam: Family, db: Session, *, person_count: int | None = None, referrer_map: dict[int, str] | None = None
+    fam: Family,
+    db: Session,
+    *,
+    person_count: int | None = None,
+    referrer_map: dict[int, str] | None = None,
+    display_id: str | None = None,
 ) -> dict:
     """Build a dict suitable for FamilyReviewList (review queue items).
 
     Includes referrer_name resolution.  Pass ``person_count`` to skip the
     query when it is already known.  Pass ``referrer_map`` (id → name) to
-    avoid per-family referrer lookups when building a list response.
+    avoid per-family referrer lookups when building a list response.  Pass
+    ``display_id`` (from ``compute_display_ids``) for the presentational ID.
     """
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
@@ -816,6 +822,7 @@ def build_family_review_summary(
 
     return {
         "id": fam.id,
+        "display_id": display_id if display_id is not None else "0",
         "family_name": fam.family_name,
         "contact_name": fam.contact_name,
         "referrer_id": fam.referrer_id,

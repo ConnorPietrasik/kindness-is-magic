@@ -399,6 +399,7 @@ export interface PendingFamilySummary {
 /** Item in the review queue list (referrer and admin queues). Mirrors backend FamilyReviewList. */
 export interface FamilyReviewQueueItem {
   id: number;
+  display_id: string;
   family_name: string;
   contact_name: string;
   referrer_id: number | null;

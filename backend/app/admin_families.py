@@ -210,8 +210,15 @@ def list_review_queue(
         for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
             referrer_map[ref.id] = ref.name
 
+    # Flat admin view — display_id is "{referrer_id_or_0}-{position}"
+    display_map = compute_display_ids(db, "family", families, scope=None)
+
     return [
-        FamilyReviewList(**build_family_review_summary(f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map))
+        FamilyReviewList(
+            **build_family_review_summary(
+                f, db, person_count=count_map.get(f.id, 0), referrer_map=referrer_map, display_id=display_map.get(f.id, "0")
+            )
+        )
         for f in families
     ]
 

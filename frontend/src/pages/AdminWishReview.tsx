@@ -7,9 +7,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DisplayId } from "../components/DisplayId";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { RejectReasonModal } from "../components/RejectReasonModal";
@@ -18,7 +20,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { adminApproveWishes, adminRejectWishes, listAdminReviewQueue } from "../lib/api";
 import { adminPackingSlips, adminReviewQueue, adminWishes } from "../lib/queryKeys";
-import { ROUTES } from "../lib/routes";
+import { ROUTES, route } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
 import type { FamilyReviewQueueItem } from "../types";
 
@@ -97,6 +99,7 @@ export default function AdminWishReview() {
         ) : (
           <Table>
             <TableHead>
+              <Th>ID</Th>
               <Th>Family</Th>
               <Th>Contact</Th>
               <Th>Referrer</Th>
@@ -150,9 +153,11 @@ interface ReviewRowProps {
 function ReviewRow({ item, onApprove, onRejectOpen, isPending }: ReviewRowProps) {
   return (
     <Tr key={item.id} data-id={item.id}>
+      <Td className="whitespace-nowrap text-xs text-gray-400">
+        <DisplayId displayId={item.display_id} familyId={item.id} referrerId={item.referrer_id} />
+      </Td>
       <Td>
         <div className="font-medium text-gray-900">{item.family_name}</div>
-        <div className="text-xs text-gray-400">ID {item.id}</div>
       </Td>
       <Td>{item.contact_name}</Td>
       <Td>{item.referrer_name ?? "—"}</Td>
@@ -164,6 +169,12 @@ function ReviewRow({ item, onApprove, onRejectOpen, isPending }: ReviewRowProps)
       <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(item.wish_review_requested_at)}</Td>
       <Td>
         <div className="flex items-center gap-2">
+          <Link
+            to={route.adminFamilyPeople(item.id)}
+            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            View
+          </Link>
           <Button variant="success" className="h-7 px-2 text-xs" onClick={() => onApprove(item.id)} disabled={isPending}>
             {isPending ? "…" : "Approve"}
           </Button>
