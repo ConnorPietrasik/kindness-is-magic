@@ -171,6 +171,55 @@ export function isFamilyLocked(family: FamilyLockFields | null | undefined): boo
 }
 
 /**
+ * Pending claim — remember which family a guest clicked to claim before
+ * signing up, so donor self-registration can take them straight back to the
+ * claim flow for that family.
+ *
+ * Entries expire after `PENDING_CLAIM_FAMILY_TTL_MS` so an old click doesn't
+ * surprise the user on a later, unrelated signup.
+ */
+const PENDING_CLAIM_FAMILY_KEY = "kim:pending-claim-family-id";
+const PENDING_CLAIM_FAMILY_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+interface PendingClaimFamilyEntry {
+  id: number;
+  setAt: number;
+}
+
+export function setPendingClaimFamilyId(familyId: number): void {
+  const entry: PendingClaimFamilyEntry = { id: familyId, setAt: Date.now() };
+  localStorage.setItem(PENDING_CLAIM_FAMILY_KEY, JSON.stringify(entry));
+}
+
+export function getPendingClaimFamilyId(): number | null {
+  const raw = localStorage.getItem(PENDING_CLAIM_FAMILY_KEY);
+  if (raw == null) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+
+  const entry = parsed as Partial<PendingClaimFamilyEntry>;
+  const id = entry?.id;
+  const setAt = entry?.setAt;
+  const valid =
+    typeof id === "number" &&
+    Number.isInteger(id) &&
+    id > 0 &&
+    typeof setAt === "number" &&
+    Date.now() - setAt <= PENDING_CLAIM_FAMILY_TTL_MS;
+  if (!valid) clearPendingClaimFamilyId();
+  return valid ? id : null;
+}
+
+export function clearPendingClaimFamilyId(): void {
+  localStorage.removeItem(PENDING_CLAIM_FAMILY_KEY);
+}
+
+/**
  * formatApiError — extract a user-facing error string from an axios error.
  *
  * Tries these sources in order:

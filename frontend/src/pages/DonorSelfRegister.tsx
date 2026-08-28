@@ -6,8 +6,8 @@ import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { registerDonor } from "../lib/api";
-import { ROUTES } from "../lib/routes";
-import { formatApiError } from "../lib/utils";
+import { ROUTES, route } from "../lib/routes";
+import { clearPendingClaimFamilyId, formatApiError, getPendingClaimFamilyId } from "../lib/utils";
 
 interface SelfRegisterForm {
   display_name: string;
@@ -57,7 +57,16 @@ export default function DonorSelfRegister() {
 
       // Backend auto-logs the user in via cookies. Update auth context and redirect.
       setUser(result.user);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+
+      // If they got here by trying to claim a family, take them straight
+      // back to it with the claim modal open.
+      const pendingFamilyId = getPendingClaimFamilyId();
+      clearPendingClaimFamilyId();
+      if (pendingFamilyId != null) {
+        navigate(route.familyWishList(pendingFamilyId), { replace: true, state: { openClaim: true } });
+      } else {
+        navigate(ROUTES.DASHBOARD, { replace: true });
+      }
     } catch (err: unknown) {
       toast.error(formatApiError(err, "Registration failed. Please try again."));
     } finally {

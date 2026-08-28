@@ -493,12 +493,6 @@ export async function createReferrerWithUserAndCredentials(
 }
 
 /**
- * Create a complete isolated test scenario: referrer → family → person with wishes.
- * All entities use unique names so parallel test workers don't collide.
- *
- * Returns all created IDs for cleanup.
- */
-/**
  * Create a donor user via the admin API.
  *
  * Returns { userId, email, password }.

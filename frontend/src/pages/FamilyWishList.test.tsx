@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import type { FamilyWishListResponse, User } from "../types";
@@ -40,17 +42,31 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
  * request is made and the auth state is deterministic per test.
  * A real Route is needed so useParams resolves the family id.
  */
-const wrap = (user: User | null = null) => {
+interface WrapOptions {
+  user?: User | null;
+  state?: unknown;
+}
+
+/** Renders the page's router state so tests can assert on navigation state. */
+function StateProbe() {
+  const location = useLocation();
+  return <div data-testid="location-state">{JSON.stringify(location.state)}</div>;
+}
+
+const wrap = ({ user = null, state }: WrapOptions = {}) => {
   const queryClient = createQueryClient();
   queryClient.setQueryData(auth, user);
   return render(
-    <MemoryRouter initialEntries={["/families/1/wish-list"]}>
+    <MemoryRouter initialEntries={[{ pathname: "/families/1/wish-list", state }]}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/families/:id/wish-list" element={<FamilyWishList />} />
-          </Routes>
-        </AuthProvider>
+        <ToastContainer>
+          <AuthProvider>
+            <StateProbe />
+            <Routes>
+              <Route path="/families/:id/wish-list" element={<FamilyWishList />} />
+            </Routes>
+          </AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -83,7 +99,7 @@ describe("FamilyWishList header", () => {
   it("title links to /dashboard and shows display name when logged in", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
-    wrap(mockUser);
+    wrap({ user: mockUser });
 
     await waitFor(() => {
       expect(screen.getByText("Donor")).toBeInTheDocument();
@@ -120,5 +136,66 @@ describe("FamilyWishList error state", () => {
     wrap();
 
     await screen.findByText("Network Error");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Tests — claim modal auto-open (post-registration redirect)          */
+/* ------------------------------------------------------------------ */
+
+describe("FamilyWishList claim modal auto-open", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("opens the claim modal for a claim-capable user when arriving with openClaim state", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap({ user: mockUser, state: { openClaim: true } });
+
+    // Modal content for an authenticated claim-capable user
+    await screen.findByRole("heading", { name: "Claim This Family" });
+    expect(screen.getByRole("button", { name: "Claim Family" })).toBeInTheDocument();
+  });
+
+  it("does not open the claim modal when logged out, even with openClaim state", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap({ state: { openClaim: true } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Claim this family" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not open the claim modal without openClaim state", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap({ user: mockUser });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Claim this family" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("clears the one-shot router state when the auto-opened modal is closed", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap({ user: mockUser, state: { openClaim: true } });
+
+    const modalHeading = await screen.findByRole("heading", { name: "Claim This Family" });
+    expect(modalHeading).toBeInTheDocument();
+    expect(screen.getByTestId("location-state")).toHaveTextContent('{"openClaim":true}');
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-state")).toHaveTextContent("null");
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

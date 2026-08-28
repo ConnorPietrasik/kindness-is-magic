@@ -7,6 +7,7 @@ import { useToast } from "../context/ToastContext";
 import { claimFamily } from "../lib/api";
 import { donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
+import { setPendingClaimFamilyId } from "../lib/utils";
 import type { CommitmentType } from "../types";
 import { Button } from "./Button";
 import { MutationErrors } from "./MutationErrors";
@@ -52,10 +53,30 @@ function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: num
           You need to be signed in to claim a family. Create a free donor account to get started.
         </p>
         <div className="flex gap-3">
-          <Link to={ROUTES.LOGIN} state={{ from: currentLocation }} className="flex-1" onClick={onClose}>
+          <Link
+            to={ROUTES.LOGIN}
+            state={{ from: currentLocation }}
+            className="flex-1"
+            onClick={() => {
+              // Remember this family so a successful sign-in is taken straight
+              // back to the claim flow. Only the dialog buttons set this —
+              // signing in via the header link does not.
+              setPendingClaimFamilyId(familyId);
+              onClose();
+            }}
+          >
             <Button className="w-full">Sign in</Button>
           </Link>
-          <Link to={ROUTES.DONOR_SELF_REGISTER} state={{ from: currentLocation }} className="flex-1" onClick={onClose}>
+          <Link
+            to={ROUTES.DONOR_SELF_REGISTER}
+            className="flex-1"
+            onClick={() => {
+              // Remember this family so the new account is taken straight
+              // back to the claim flow after registration.
+              setPendingClaimFamilyId(familyId);
+              onClose();
+            }}
+          >
             <Button variant="secondary" className="w-full">
               Register
             </Button>

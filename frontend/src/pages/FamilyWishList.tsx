@@ -7,8 +7,8 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClaimModal } from "../components/ClaimModal";
 import { HeaderBar } from "../components/HeaderBar";
@@ -29,7 +29,26 @@ export default function FamilyWishList() {
   const familyId = id ? parseInt(id, 10) : NaN;
   const { user, isClaimCapable } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // One-shot flag set by donor self-registration when the user got here by
+  // trying to claim this family: open the claim modal on arrival.
+  const openClaimRequested = location.state?.openClaim === true;
   const [showClaimModal, setShowClaimModal] = useState(false);
+
+  useEffect(() => {
+    if (openClaimRequested && isClaimCapable) {
+      setShowClaimModal(true);
+    }
+  }, [openClaimRequested, isClaimCapable]);
+
+  const closeClaimModal = () => {
+    setShowClaimModal(false);
+    // Clear the one-shot flag so back/forward navigation doesn't reopen the modal.
+    if (openClaimRequested) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  };
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: familyWishList(familyId),
@@ -194,7 +213,7 @@ export default function FamilyWishList() {
       </main>
 
       {/* Claim modal */}
-      <ClaimModal familyId={familyId} open={showClaimModal} onClose={() => setShowClaimModal(false)} currentLocation={location} />
+      <ClaimModal familyId={familyId} open={showClaimModal} onClose={closeClaimModal} currentLocation={location} />
 
       {/* Print styles */}
       <style>{`

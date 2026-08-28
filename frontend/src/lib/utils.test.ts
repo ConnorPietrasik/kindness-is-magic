@@ -1,13 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  clearPendingClaimFamilyId,
   formatApiError,
   formatDateTime,
   formatEmailStatus,
   fromDatetimeLocalValue,
+  getPendingClaimFamilyId,
   humanize,
   isFamilyLocked,
   normalizePayload,
   normalizeUpdatePayload,
+  setPendingClaimFamilyId,
   toDatetimeLocalValue,
 } from "./utils";
 
@@ -329,6 +332,48 @@ describe("formatApiError", () => {
       },
     };
     expect(formatApiError(error)).toBe("Plain error string; Object error");
+  });
+});
+
+describe("pending claim family id", () => {
+  const HOUR_MS = 60 * 60 * 1000;
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("round-trips a family id", () => {
+    setPendingClaimFamilyId(42);
+    expect(getPendingClaimFamilyId()).toBe(42);
+  });
+
+  it("returns null when nothing is stored", () => {
+    expect(getPendingClaimFamilyId()).toBeNull();
+  });
+
+  it("accepts entries set within the TTL", () => {
+    localStorage.setItem("kim:pending-claim-family-id", JSON.stringify({ id: 9, setAt: Date.now() - HOUR_MS }));
+    expect(getPendingClaimFamilyId()).toBe(9);
+  });
+
+  it("returns null for entries older than the TTL and clears them", () => {
+    localStorage.setItem("kim:pending-claim-family-id", JSON.stringify({ id: 9, setAt: Date.now() - 3 * HOUR_MS }));
+    expect(getPendingClaimFamilyId()).toBeNull();
+    expect(localStorage.getItem("kim:pending-claim-family-id")).toBeNull();
+  });
+
+  it("returns null for malformed values and clears them", () => {
+    for (const bad of ["abc", "0", "-3", "1.5", ""] as const) {
+      localStorage.setItem("kim:pending-claim-family-id", bad);
+      expect(getPendingClaimFamilyId()).toBeNull();
+      expect(localStorage.getItem("kim:pending-claim-family-id")).toBeNull();
+    }
+  });
+
+  it("clear removes the stored id", () => {
+    setPendingClaimFamilyId(7);
+    clearPendingClaimFamilyId();
+    expect(getPendingClaimFamilyId()).toBeNull();
   });
 });
 

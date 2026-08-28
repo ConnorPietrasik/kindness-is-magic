@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { ROUTES } from "../lib/routes";
+import { ROUTES, route } from "../lib/routes";
+import { clearPendingClaimFamilyId, getPendingClaimFamilyId } from "../lib/utils";
 
 export default function Login() {
   const { login } = useAuth();
@@ -23,9 +24,17 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
+
+      // If they got here by trying to claim a family (claim dialog "Sign in"),
+      // take them straight back to it with the claim modal open.
+      const pendingFamilyId = getPendingClaimFamilyId();
+      clearPendingClaimFamilyId();
+
       // Families skip the main dashboard and go straight to their family dashboard
       if (user.role === "family") {
         navigate(ROUTES.FAMILY_DASHBOARD, { replace: true });
+      } else if (pendingFamilyId != null) {
+        navigate(route.familyWishList(pendingFamilyId), { replace: true, state: { openClaim: true } });
       } else {
         navigate(from, { replace: true });
       }

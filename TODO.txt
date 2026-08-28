@@ -1,5 +1,4 @@
 Sending emails should invalidate the admin frontend email cache
-Remember which family an unauthenticated person clicked for signup so that it directly claims them (since they got there by trying to claim them)
 Family invite email get rid of last sentence / make it more clear
 Referrer denial emails to families: {Referrer Name} did not recognize you
 Make address not optional; default help text “If no address, write ‘none’”
