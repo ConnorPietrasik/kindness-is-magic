@@ -1,4 +1,5 @@
-Make “Manage people” for families have bigger bolder text and above the profile so it’s one of the first things they see
+Change family “request approval” to an obvious DONE button with a label: “Click here to submit once finished adding people.”
+Remember which family an unauthenticated person clicked for signup so that it directly claims them (since they got there by trying to claim them)
 Family invite email get rid of last sentence / make it more clear
 Referrer denial emails to families: {Referrer Name} did not recognize you
 Make address not optional; default help text “If no address, write ‘none’”
@@ -9,7 +10,6 @@ Add wish display_id: format is 1-1-1A/B/F where A/B are for practical / fun, adu
 Packing slip: move family wish down to be more clear make all the wish info black (for all wishes) so it’s easier to read
 Packing slips: more per print page, ideally with page breaks
 Change claim to sponsor wording for all public stuff (so they sponsor a family instead of claiming it)
-Change family “request approval” to an obvious DONE button with a label: “Click here to submit once finished adding people.”
 Family approval wording change for referrers: “confirm these are your correct referred families”. Change “approval_status” to “known” or something
 Referrer can lock families without waiting for them to request it
 Admins need a way to see their assigned wishes (frontend assigned wishes tile like purchasers have)

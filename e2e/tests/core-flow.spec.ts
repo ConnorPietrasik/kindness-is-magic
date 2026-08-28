@@ -264,11 +264,11 @@ test.describe("Core Flow", () => {
       await familyPage.goto("/family/dashboard");
       await expect(familyPage.getByRole("heading", { name: "Family Dashboard" })).toBeVisible();
 
-      /* Click "Request Review" */
-      await familyPage.getByRole("button", { name: "Request Review" }).click();
+      /* Click "DONE" */
+      await familyPage.getByRole("button", { name: "DONE" }).click();
 
       /* Confirm the dialog */
-      await familyPage.getByRole("button", { name: "Yes, request review" }).click();
+      await familyPage.getByRole("button", { name: "Yes, I am done" }).click();
 
       /* Banner should change to "Awaiting referrer review" */
       await expect(familyPage.getByText("Awaiting referrer review")).toBeVisible({ timeout: 10_000 });

@@ -117,6 +117,29 @@ export default function FamilyDashboard() {
           />
         )}
 
+        {/* ── Manage people (prominent, shown above profile) ──── */}
+        <Link
+          to={ROUTES.FAMILY_PEOPLE}
+          className={`group mb-6 flex items-center gap-4 rounded-xl border px-6 py-5 shadow-sm transition-all ${
+            isLocked
+              ? "border-gray-100 bg-gray-50 opacity-60"
+              : "border-gray-200 bg-white hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
+          }`}
+          onClick={(e) => {
+            if (isLocked) e.preventDefault();
+          }}
+        >
+          <span className="text-3xl">✨</span>
+          <span className="flex flex-col">
+            <span className={`text-xl font-bold ${isLocked ? "text-gray-400" : "text-gray-900 group-hover:text-btn-start"}`}>
+              Manage People
+            </span>
+            <span className="text-sm text-gray-500">
+              {isLocked ? "Locked — contact your referrer to request changes" : "Add, edit, and delete family members and their wishes"}
+            </span>
+          </span>
+        </Link>
+
         {/* ── Family info card ──────────────────────────────── */}
         <Card className="mb-6">
           <div className="mb-4 flex items-center justify-between">
@@ -152,29 +175,6 @@ export default function FamilyDashboard() {
             )
           )}
         </Card>
-
-        {/* ── Quick nav cards ───────────────────────────────── */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            to={ROUTES.FAMILY_PEOPLE}
-            className={`group flex flex-col gap-2 rounded-xl border px-5 py-5 shadow-sm transition-all ${
-              isLocked
-                ? "border-gray-100 bg-gray-50 opacity-60"
-                : "border-gray-200 bg-white hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
-            }`}
-            onClick={(e) => {
-              if (isLocked) e.preventDefault();
-            }}
-          >
-            <span className="text-2xl">✨</span>
-            <span className={`text-sm font-semibold ${isLocked ? "text-gray-400" : "text-gray-900 group-hover:text-btn-start"}`}>
-              Manage People
-            </span>
-            <span className="text-xs text-gray-400">
-              {isLocked ? "Locked — contact your referrer to request changes" : "Add, edit, and delete family members and their wishes"}
-            </span>
-          </Link>
-        </div>
 
         {/* ── Errors ────────────────────────────────────────── */}
         <MutationErrors mutations={[updateSelfMut, requestReviewMut, cancelReviewMut]} />

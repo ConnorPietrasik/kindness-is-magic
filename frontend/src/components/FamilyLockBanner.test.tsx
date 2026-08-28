@@ -20,32 +20,41 @@ describe("FamilyLockBanner", () => {
 
   /* ── Editable state (family, no request, no rejection) ──── */
 
-  it("shows 'ready for editing' message in editable state", () => {
+  it("shows 'add everyone, then click DONE' message in editable state", () => {
     render(<FamilyLockBanner {...defaultProps} />);
 
-    expect(screen.getByText("Your profile is ready for editing.")).toBeInTheDocument();
+    expect(screen.getByText("Add everyone in your family, then click DONE.")).toBeInTheDocument();
   });
 
-  it("shows 'Request Review' button in editable state", () => {
+  it("shows help text explaining that changes are locked after approval", () => {
     render(<FamilyLockBanner {...defaultProps} />);
 
-    expect(screen.getByRole("button", { name: "Request Review" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Click DONE when you are finished adding people and wishes. This sends everything to your referrer\./)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/After your referrer approves it, you will no longer be able to make changes\./)).toBeInTheDocument();
   });
 
-  it("opens confirmation dialog when Request Review is clicked", async () => {
+  it("shows 'DONE' button in editable state", () => {
+    render(<FamilyLockBanner {...defaultProps} />);
+
+    expect(screen.getByRole("button", { name: "DONE" })).toBeInTheDocument();
+  });
+
+  it("opens confirmation dialog when DONE is clicked", async () => {
     const user = userEvent.setup();
     render(<FamilyLockBanner {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Request Review" }));
-    expect(screen.getByText("Request review from your referrer?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "DONE" }));
+    expect(screen.getByText("Send your information to your referrer?")).toBeInTheDocument();
   });
 
   it("calls onRequestReview after confirming", async () => {
     const user = userEvent.setup();
     render(<FamilyLockBanner {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Request Review" }));
-    await user.click(screen.getByRole("button", { name: "Yes, request review" }));
+    await user.click(screen.getByRole("button", { name: "DONE" }));
+    await user.click(screen.getByRole("button", { name: "Yes, I am done" }));
 
     expect(defaultProps.onRequestReview).toHaveBeenCalledTimes(1);
   });
@@ -54,12 +63,12 @@ describe("FamilyLockBanner", () => {
     const user = userEvent.setup();
     render(<FamilyLockBanner {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Request Review" }));
-    expect(screen.getByText("Request review from your referrer?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "DONE" }));
+    expect(screen.getByText("Send your information to your referrer?")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
-      expect(screen.queryByText("Request review from your referrer?")).not.toBeInTheDocument();
+      expect(screen.queryByText("Send your information to your referrer?")).not.toBeInTheDocument();
     });
   });
 
@@ -72,18 +81,18 @@ describe("FamilyLockBanner", () => {
     expect(screen.getByText("Your referrer sent this back for revisions:")).toBeInTheDocument();
   });
 
-  it("shows 'Request Review' button after referrer rejection", () => {
+  it("shows 'DONE' button after referrer rejection", () => {
     render(<FamilyLockBanner {...defaultProps} lockLevel="family" requestedAt={null} rejectionReason="Needs revision" />);
 
-    expect(screen.getByRole("button", { name: "Request Review" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "DONE" })).toBeInTheDocument();
   });
 
-  it("shows re-request confirmation title after referrer rejection", async () => {
+  it("shows re-send confirmation title after referrer rejection", async () => {
     const user = userEvent.setup();
     render(<FamilyLockBanner {...defaultProps} lockLevel="family" requestedAt={null} rejectionReason="Needs revision" />);
 
-    await user.click(screen.getByRole("button", { name: "Request Review" }));
-    expect(screen.getByText("Re-request review from your referrer?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "DONE" }));
+    expect(screen.getByText("Send your changes to your referrer?")).toBeInTheDocument();
   });
 
   /* ── Awaiting referrer review (family + requested) ──────── */
@@ -108,10 +117,10 @@ describe("FamilyLockBanner", () => {
     expect(defaultProps.onCancelReview).toHaveBeenCalledTimes(1);
   });
 
-  it("does not show 'Request Review' button when awaiting review", () => {
+  it("does not show 'DONE' button when awaiting review", () => {
     render(<FamilyLockBanner {...defaultProps} lockLevel="family" requestedAt="2025-01-01T00:00:00Z" rejectionReason={null} />);
 
-    expect(screen.queryByRole("button", { name: "Request Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "DONE" })).not.toBeInTheDocument();
   });
 
   /* ── Rejected by admin (referrer + rejection) ───────────── */
@@ -132,7 +141,7 @@ describe("FamilyLockBanner", () => {
   it("does not show any action buttons for admin rejection", () => {
     render(<FamilyLockBanner {...defaultProps} lockLevel="referrer" requestedAt={null} rejectionReason="Wishes too vague" />);
 
-    expect(screen.queryByRole("button", { name: "Request Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "DONE" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Request" })).not.toBeInTheDocument();
   });
 
@@ -157,7 +166,7 @@ describe("FamilyLockBanner", () => {
   it("shows loading text on request button when pending", () => {
     render(<FamilyLockBanner {...defaultProps} requestMutPending={true} />);
 
-    expect(screen.getByText("Requesting…")).toBeInTheDocument();
+    expect(screen.getByText("Sending…")).toBeInTheDocument();
   });
 
   it("shows loading text on cancel button when pending", () => {

@@ -40,28 +40,29 @@ export function FamilyLockBanner({
   if (lockLevel === "family" && !requestedAt && !rejectionReason) {
     return (
       <>
-        <div className="mb-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
           <div>
-            <p className="text-sm font-medium text-gray-700">Your profile is ready for editing.</p>
-            <p className="text-xs text-gray-500">
-              When ready, request a review from your referrer. Once reviewed, your profile will be locked.
+            <p className="text-base font-semibold text-gray-900">Add everyone in your family, then click DONE.</p>
+            <p className="text-sm text-gray-600">
+              Click DONE when you are finished adding people and wishes. This sends everything to your referrer. After your referrer
+              approves it, you will no longer be able to make changes.
             </p>
           </div>
           <Button
-            className="h-9 px-4 text-xs whitespace-nowrap flex-shrink-0"
+            className="h-11 px-6 text-sm font-bold whitespace-nowrap flex-shrink-0"
             onClick={() => setShowConfirmDialog(true)}
             loading={requestMutPending}
           >
-            {requestMutPending ? "Requesting…" : "Request Review"}
+            {requestMutPending ? "Sending…" : "DONE"}
           </Button>
         </div>
         <ConfirmDialog
           open={showConfirmDialog}
-          title="Request review from your referrer?"
+          title="Send your information to your referrer?"
           description={
             <>
-              Once your referrer reviews and confirms, your profile will be locked. You won't be able to edit your family info, members, or
-              wishes afterward. Contact your referrer if you need changes after review, but changes may not be approved.
+              After your referrer approves it, you will no longer be able to make changes. If you need to make changes after that, you must
+              ask your referrer.
             </>
           }
           onConfirm={() => {
@@ -70,8 +71,8 @@ export function FamilyLockBanner({
           }}
           onCancel={() => setShowConfirmDialog(false)}
           loading={requestMutPending}
-          confirmLabel="Yes, request review"
-          loadingLabel="Requesting…"
+          confirmLabel="Yes, I am done"
+          loadingLabel="Sending…"
           confirmVariant="primary"
         />
       </>
@@ -87,23 +88,26 @@ export function FamilyLockBanner({
           <p className="mt-1 italic">{rejectionReason}</p>
           <p className="mt-2 text-xs text-amber-700">You can make changes below and request review again.</p>
         </div>
-        <div className="mb-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
-          <p className="text-sm text-gray-600">Make your changes and request review when ready.</p>
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
+          <p className="text-sm text-gray-600">
+            Make the changes above, then click DONE to send it back to your referrer. After your referrer approves it, you will no longer be
+            able to make changes.
+          </p>
           <Button
-            className="h-9 px-4 text-xs whitespace-nowrap flex-shrink-0"
+            className="h-11 px-6 text-sm font-bold whitespace-nowrap flex-shrink-0"
             onClick={() => setShowConfirmDialog(true)}
             loading={requestMutPending}
           >
-            {requestMutPending ? "Requesting…" : "Request Review"}
+            {requestMutPending ? "Sending…" : "DONE"}
           </Button>
         </div>
         <ConfirmDialog
           open={showConfirmDialog}
-          title="Re-request review from your referrer?"
+          title="Send your changes to your referrer?"
           description={
             <>
-              Once your referrer reviews and confirms, your profile will be locked. You won't be able to edit your family info, members, or
-              wishes afterward.
+              After your referrer approves it, you will no longer be able to make changes. If you need to make changes after that, you must
+              ask your referrer.
             </>
           }
           onConfirm={() => {
@@ -112,8 +116,8 @@ export function FamilyLockBanner({
           }}
           onCancel={() => setShowConfirmDialog(false)}
           loading={requestMutPending}
-          confirmLabel="Yes, request review"
-          loadingLabel="Requesting…"
+          confirmLabel="Yes, I am done"
+          loadingLabel="Sending…"
           confirmVariant="primary"
         />
       </>
