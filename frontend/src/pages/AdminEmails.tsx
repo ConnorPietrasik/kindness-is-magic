@@ -68,6 +68,7 @@ export default function AdminEmails() {
   const { data: listData, isLoading } = useQuery({
     queryKey: [...adminSentEmails, listParams],
     queryFn: () => adminListSentEmails(listParams),
+    staleTime: 0, // read-only audit log — always refetch when viewed (global default is 5min)
   });
 
   const pageInfo = useMemo(
