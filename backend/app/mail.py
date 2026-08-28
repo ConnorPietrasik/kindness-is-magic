@@ -237,10 +237,10 @@ def build_family_invite_email(code: str, referrer_name: str) -> str:
     """Build the HTML body for a family invite email sent by a referrer."""
     base = APP_BASE_URL
     return f"""<p>Hi there,</p>
-<p><strong>{referrer_name}</strong> would like to connect your family with Kindness Is Magic. Use the invite code below to sign up:</p>
+<p>This is an invitation to join <strong>Kindness Is Magic</strong>, a program where supporters give holiday gifts to families. <strong>{referrer_name}</strong> has invited your family to take part.</p>
+<p>Use the invite code below to register:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
-<p style="text-align:center;"><a href="{base}/register-family?code={code}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
-<p style="margin-top:16px;">Once you register, your family will be reviewed and you'll be able to share your wishes.</p>"""
+<p style="text-align:center;"><a href="{base}/register-family?code={code}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>"""
 
 
 def build_referrer_approved_email(referrer_name: str) -> str:
