@@ -30,6 +30,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   password_reset: "Password Reset",
   family_pending: "Family Pending Verification",
   family_verified: "Family Verified",
+  family_rejected: "Family Rejected",
   referrer_approved: "Referrer Approved",
   referrer_rejected: "Referrer Rejected",
   claim_confirmation: "Claim Confirmation",

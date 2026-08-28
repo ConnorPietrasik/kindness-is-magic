@@ -420,6 +420,7 @@ export type EmailKind =
   | "password_reset"
   | "family_pending"
   | "family_verified"
+  | "family_rejected"
   | "referrer_approved"
   | "referrer_rejected"
   | "claim_confirmation"

@@ -233,6 +233,13 @@ def build_family_verified_email(family_name: str, referrer_name: str) -> str:
 <p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""
 
 
+def build_family_rejected_email(family_name: str, referrer_name: str) -> str:
+    """Build the HTML body for a "family rejected by referrer" notification to the family contact."""
+    return f"""<p>Hi <strong>{family_name}</strong>,</p>
+<p><strong>{referrer_name}</strong> did not recognize you, so your family has not been confirmed on Kindness Is Magic.</p>
+<p>If you believe this was a mistake, please contact <strong>{referrer_name}</strong> to sort it out.</p>"""
+
+
 def build_family_invite_email(code: str, referrer_name: str) -> str:
     """Build the HTML body for a family invite email sent by a referrer."""
     base = APP_BASE_URL

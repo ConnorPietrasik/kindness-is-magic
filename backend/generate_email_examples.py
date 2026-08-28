@@ -22,6 +22,7 @@ from app.mail import (
     build_claim_confirmation_email,
     build_family_invite_email,
     build_family_pending_email,
+    build_family_rejected_email,
     build_family_verified_email,
     build_invite_email,
     build_password_reset_email,
@@ -82,7 +83,16 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "06-family-invite.html",
+        "filename": "06-family-rejected.html",
+        "label": "Family Rejected (to family)",
+        "body": build_family_rejected_email(
+            family_name="The Rodriguez Family",
+            referrer_name="Sarah Johnson",
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "07-family-invite.html",
         "label": "Family Invite (from referrer)",
         "body": build_family_invite_email(
             code="KFI-JKL34MNO",
@@ -91,7 +101,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "07-referrer-approved.html",
+        "filename": "08-referrer-approved.html",
         "label": "Referrer Approved",
         "body": build_referrer_approved_email(
             referrer_name="David Park",
@@ -99,7 +109,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "08-referrer-rejected.html",
+        "filename": "09-referrer-rejected.html",
         "label": "Referrer Rejected",
         "body": build_referrer_rejected_email(
             referrer_name="David Park",
@@ -107,7 +117,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "09-claim-confirmation.html",
+        "filename": "10-claim-confirmation.html",
         "label": "Donor Claim Confirmation",
         "body": build_claim_confirmation_email(
             donor_name="Alex Thompson",
@@ -144,7 +154,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "10-admin-email-failure.html",
+        "filename": "11-admin-email-failure.html",
         "label": "Admin Email Failure Notice",
         "body": build_admin_email_failure_notice(
             donor_email="alex.thompson@example.com",

@@ -363,6 +363,7 @@ class EmailKind(str, enum.Enum):
     password_reset = "password_reset"
     family_pending = "family_pending"
     family_verified = "family_verified"
+    family_rejected = "family_rejected"
     referrer_approved = "referrer_approved"
     referrer_rejected = "referrer_rejected"
     claim_confirmation = "claim_confirmation"

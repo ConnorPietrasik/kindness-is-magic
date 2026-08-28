@@ -313,7 +313,7 @@ async def verify_family(
 
 
 @router.post("/families/{fam_id}/reject", status_code=200)
-def reject_family(
+async def reject_family(
     fam_id: int,
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
@@ -331,6 +331,14 @@ def reject_family(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s rejected family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+
+    # Send rejection notification email to the family
+    await _send_family_rejected_email(
+        fam=fam,
+        db=db,
+        referrer_user_id=owner.user.id,
+        referrer_display_name=owner.user.display_name,
+    )
 
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
@@ -457,6 +465,30 @@ def referrer_reject_wishes(
     db.refresh(fam)
     logger.info("Referrer %s rejected wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+
+
+async def _send_family_rejected_email(
+    fam: Family,
+    db: Session,
+    referrer_user_id: int,
+    referrer_display_name: str,
+) -> None:
+    """Send a notification email to the family contact when rejected."""
+    from app.mail import build_family_rejected_email, send_email
+
+    family_user = db.query(User).filter(User.family_id == fam.id).first()
+    if not family_user:
+        return
+
+    html_body = build_family_rejected_email(fam.family_name, referrer_display_name)
+    await send_email(
+        to=family_user.email,
+        subject="Your family was not confirmed — Kindness Is Magic",
+        html_body=html_body,
+        db=db,
+        kind=EmailKind.family_rejected,
+        user_id=referrer_user_id,
+    )
 
 
 async def _send_family_verified_email(
