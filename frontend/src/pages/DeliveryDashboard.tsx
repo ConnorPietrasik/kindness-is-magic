@@ -96,7 +96,7 @@ function FamilyCard({ family }: FamilyCardProps) {
             <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">#{family.display_id}</span>
           </div>
           <div className="mt-1 space-y-0.5 text-sm text-gray-500">
-            {family.address && <p className="truncate">{family.address}</p>}
+            <p className="truncate">{family.address}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <span>{family.contact_name}</span>
               {family.phone_number && <span>{family.phone_number}</span>}

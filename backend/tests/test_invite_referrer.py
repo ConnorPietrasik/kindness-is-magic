@@ -670,6 +670,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Mom Smith",
                 "email": "smith@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -722,6 +723,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Nobody",
                 "email": "nobody@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -741,6 +743,7 @@ class TestFamilySelfRegister:
                 "contact_name": "First",
                 "email": "dup@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -759,6 +762,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Second",
                 "email": "dup@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -823,6 +827,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Case",
                 "email": "UPPERCASE@TEST.COM",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -847,6 +852,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Mom Smith",
                 "email": "pending@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -890,6 +896,7 @@ class TestFamilySelfRegister:
                 "contact_name": "Dad Jones",
                 "email": "pending2@test.com",
                 "password": "GoodPass1234!",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )

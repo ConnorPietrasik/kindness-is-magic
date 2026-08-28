@@ -908,6 +908,7 @@ describe("auth invite API functions", () => {
       contact_name: "Mom",
       email: "family@example.com",
       password: "secret123",
+      address: "none",
     });
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/register-family", {
       code: "KFI-XYZ",
@@ -916,6 +917,7 @@ describe("auth invite API functions", () => {
       contact_name: "Mom",
       email: "family@example.com",
       password: "secret123",
+      address: "none",
     });
     expect(result).toEqual({ user: { id: 2 }, family: { id: 5 } });
   });

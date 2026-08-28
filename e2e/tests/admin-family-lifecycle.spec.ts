@@ -38,6 +38,7 @@ test.describe("Admin Family Lifecycle — delete/restore", () => {
     await page.getByLabel("Family Name", { exact: true }).fill(DELETE_RESTORE_FAMILY);
     await page.getByLabel("Contact Name", { exact: true }).fill("DR Contact");
     await page.getByLabel("Family Wish", { exact: true }).fill("DR wish");
+    await page.getByLabel("Address", { exact: true }).fill("none");
     await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 
@@ -103,6 +104,7 @@ test.describe("Admin Family Lifecycle — cascade delete", () => {
     await page.getByLabel("Family Name", { exact: true }).fill(familyName);
     await page.getByLabel("Contact Name", { exact: true }).fill("Cascade Contact");
     await page.getByLabel("Family Wish", { exact: true }).fill("Cascade wish");
+    await page.getByLabel("Address", { exact: true }).fill("none");
     await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 
@@ -198,6 +200,7 @@ test.describe("Admin Family Lifecycle — fully approve", () => {
     await page.getByLabel("Family Name", { exact: true }).fill(FULLY_APPROVE_FAMILY);
     await page.getByLabel("Contact Name", { exact: true }).fill("FA Contact");
     await page.getByLabel("Family Wish", { exact: true }).fill("FA wish");
+    await page.getByLabel("Address", { exact: true }).fill("none");
     await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
     await page.getByRole("button", { name: "Create" }).click();
 

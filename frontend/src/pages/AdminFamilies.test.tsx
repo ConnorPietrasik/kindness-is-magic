@@ -25,7 +25,7 @@ function makeFamily(overrides: Partial<FamilyDetail>): FamilyDetail {
     display_id: null,
     family_name: "The Default",
     bio: null,
-    address: null,
+    address: "123 Main St",
     phone_number: "",
     family_wish: "",
     contact_name: "",
@@ -499,6 +499,7 @@ describe("AdminFamilies", () => {
     await user.type(screen.getByLabelText("Family Name"), "The Browns");
     await user.type(screen.getByLabelText("Contact Name"), "Bob Brown");
     await user.type(screen.getByLabelText("Family Wish"), "Toys");
+    await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByPlaceholderText("555-123-4567"), "5559998888");
 
     // Referrer select is required on create
@@ -513,6 +514,7 @@ describe("AdminFamilies", () => {
           family_name: "The Browns",
           contact_name: "Bob Brown",
           family_wish: "Toys",
+          address: "none",
           phone_number: "5559998888",
           referrer_id: 1,
         }),

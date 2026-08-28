@@ -295,8 +295,8 @@ export async function createFamilyViaApi(
     familyWish: string;
     contactName: string;
     phoneNumber: string;
+    address: string;
     bio?: string;
-    address?: string;
   },
 ): Promise<{ familyId: number }> {
   const resp = await request.post("/api/admin/families", {
@@ -533,6 +533,7 @@ export async function createIsolatedFamilyScenario(
   suffix: string,
   opts?: {
     familyWish?: string;
+    familyAddress?: string;
     personName?: string;
     personAge?: number;
     personWish?: string;
@@ -562,6 +563,7 @@ export async function createIsolatedFamilyScenario(
     familyWish: opts?.familyWish ?? "A warm blanket for everyone",
     contactName: `Contact ${suffix}`,
     phoneNumber: "555-111-2222",
+    address: opts?.familyAddress ?? "none",
   });
 
   const personName = opts?.personName ?? `Child ${suffix}`;

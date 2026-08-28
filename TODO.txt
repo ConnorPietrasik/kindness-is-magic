@@ -1,4 +1,3 @@
-Make address not optional; default help text “If no address, write ‘none’”
 Family title should be required with drop down options, and it should be changed to “role”. Drop down options: “Son, Daughter, Grandson, Granddaughter, Mother, Father, Grandfather, Grandmother”. Should have help text “To help with choosing gifts; choose whichever is closest”
 Adding color to practical wishes - like size
 Make family_wish a type of Wish bound to family instead of person. It should show in all the usual places that Wishes show.

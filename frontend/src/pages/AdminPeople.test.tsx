@@ -84,7 +84,7 @@ const mockFamilyDetail: FamilyDetail = {
   display_id: "F-101",
   family_name: "The Johnsons",
   bio: null,
-  address: null,
+  address: "123 Main St",
   phone_number: "",
   family_wish: "",
   contact_name: "",

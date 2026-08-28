@@ -18,7 +18,7 @@ export const defaultFamilyForm: FamilyFormState = {
   family_wish: "",
   contact_name: "",
   bio: null,
-  address: null,
+  address: "",
   phone_number: "",
   pickup_window: null,
   referrer_notes: null,
@@ -34,7 +34,7 @@ export interface FamilyFormState {
   family_wish: string;
   contact_name: string;
   bio: string | null;
-  address: string | null;
+  address: string;
   phone_number: string;
   pickup_window: string | null;
   referrer_notes: string | null;

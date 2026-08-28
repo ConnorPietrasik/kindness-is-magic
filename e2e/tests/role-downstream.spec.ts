@@ -68,6 +68,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
     familyWish: "A warm blanket for everyone",
     contactName: "Test Contact",
     phoneNumber: "555-111-2222",
+    address: "none",
   });
   testData.familyId = family.familyId;
 
@@ -137,6 +138,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
     familyWish: "Early family — not yet reviewed",
     contactName: "Early Contact",
     phoneNumber: "555-333-4444",
+    address: "123 Early Street",
   });
   testData.secondFamilyId = family2.familyId;
 

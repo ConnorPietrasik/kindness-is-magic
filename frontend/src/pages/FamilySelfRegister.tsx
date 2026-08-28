@@ -89,7 +89,7 @@ export default function FamilySelfRegister() {
         email: form.email,
         password: form.password,
         bio: form.bio || null,
-        address: form.address || null,
+        address: form.address,
         phone_number: form.phone_number,
       });
 
@@ -221,16 +221,17 @@ export default function FamilySelfRegister() {
           </div>
 
           <div>
-            <OptionalLabel text="Address" />
             <FormField
-              type="text"
+              label="Address"
               fieldProps={{
                 value: form.address,
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("address", e.target.value),
+                required: true,
                 maxLength: 200,
                 autoComplete: "street-address",
               }}
             />
+            <p className="mt-1 text-xs text-gray-400">If no address, write 'none'</p>
           </div>
 
           <PhoneInput value={form.phone_number} onChange={(val) => update("phone_number", val)} />

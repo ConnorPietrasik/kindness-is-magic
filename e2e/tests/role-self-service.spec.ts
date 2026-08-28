@@ -13,7 +13,6 @@ import {
   deleteFamilyViaApi,
   deleteUserViaApi,
   createReferrerWithUserAndCredentials,
-  createFamilyViaApi,
   loginViaApi,
 } from "../helpers/api";
 

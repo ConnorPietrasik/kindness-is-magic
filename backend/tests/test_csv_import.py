@@ -32,7 +32,7 @@ Test Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Test Ref,Test Fam,A wish,Contact,,,555-000-0002
+Test Ref,Test Fam,A wish,Contact,,789 Test Way,555-000-0002
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
@@ -52,7 +52,7 @@ Ref Two,20,555-100-1002
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
 Ref One,Family Alpha,Wish A,Mom Alpha,Bio A,123 Main St,555-200-2001
 Ref One,Family Beta,Wish B,Dad Beta,,456 Oak Ave,555-200-2002
-Ref Two,Family Gamma,Wish C,Sis Gamma,,,555-200-2003
+Ref Two,Family Gamma,Wish C,Sis Gamma,,789 Pine St,555-200-2003
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
@@ -77,7 +77,7 @@ ID Ref,5,555-999-9999
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-ID Ref,ID Fam,Wish,Contact,,,555-999-9998
+ID Ref,ID Fam,Wish,Contact,,1010 ID Lane,555-999-9998
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -271,7 +271,7 @@ name,family_limit,phone_number
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Missing Ref,Orphan Fam,A wish,Contact,,,555-000-0000
+Missing Ref,Orphan Fam,A wish,Contact,,42 Nowhere Blvd,555-000-0000
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -288,7 +288,7 @@ Missing Ref,Orphan Fam,A wish,Contact,,,555-000-0000
     def test_bad_referrer_id_for_family(self, test_client: TestClient, admin_user):
         csv_data = """# families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Does Not Exist,No Ref Fam,Wish,Contact,,,555-000-0000
+Does Not Exist,No Ref Fam,Wish,Contact,,43 Nowhere Blvd,555-000-0000
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -411,7 +411,7 @@ Dedup Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref,Dedup Fam,Wish,Contact,,,555-001-0010
+Dedup Ref,Dedup Fam,Wish,Contact,,501 Dup St,555-001-0010
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
@@ -433,8 +433,8 @@ Dedup Ref2,5,555-000-0002
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref2,Fam A,Wish A,Contact A,,,555-002-0020
-Dedup Ref2,Fam B,Wish B,Contact B,,,555-002-0021
+Dedup Ref2,Fam A,Wish A,Contact A,,502 Dup St,555-002-0020
+Dedup Ref2,Fam B,Wish B,Contact B,,503 Dup St,555-002-0021
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
@@ -456,7 +456,7 @@ Dedup Ref3,5,555-000-0003
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Dedup Ref3,Dedup Fam3,Wish,Contact,,,555-003-0030
+Dedup Ref3,Dedup Fam3,Wish,Contact,,504 Dup St,555-003-0030
 
 # people
 family_name,given_name,age,wish,size,fun_wish,title,note
@@ -525,7 +525,7 @@ Fam Ref,5,555-000-0001
 
 # families
 referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-Fam Ref,Fam Csv,Wish,Contact,,,555-004-0040
+Fam Ref,Fam Csv,Wish,Contact,,505 Dup St,555-004-0040
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id

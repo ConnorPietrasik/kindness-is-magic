@@ -146,43 +146,42 @@ export function FamilyForm({
             }}
           />
 
+          <div>
+            <FormField
+              label="Address"
+              fieldProps={{
+                value: form.address,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("address", e.target.value),
+                required: true,
+                maxLength: 200,
+                autoComplete: "street-address",
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-400">If no address, write 'none'</p>
+          </div>
+
+          <PhoneInput
+            value={form.phone_number || ""}
+            onChange={(val) => {
+              update("phone_number", val);
+              setPhoneError(null);
+            }}
+            error={phoneError}
+          />
+
           {showOptionalFields && (
-            <>
-              <div>
-                <OptionalLabel text="Bio" />
-                <FormField
-                  as="textarea"
-                  fieldProps={{
-                    value: form.bio || "",
-                    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("bio", e.target.value),
-                    rows: 3,
-                    autoComplete: "off",
-                  }}
-                />
-              </div>
-
-              <div>
-                <OptionalLabel text="Address" />
-                <FormField
-                  type="text"
-                  fieldProps={{
-                    value: form.address || "",
-                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("address", e.target.value),
-                    maxLength: 200,
-                    autoComplete: "off",
-                  }}
-                />
-              </div>
-
-              <PhoneInput
-                value={form.phone_number || ""}
-                onChange={(val) => {
-                  update("phone_number", val);
-                  setPhoneError(null);
+            <div>
+              <OptionalLabel text="Bio" />
+              <FormField
+                as="textarea"
+                fieldProps={{
+                  value: form.bio || "",
+                  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("bio", e.target.value),
+                  rows: 3,
+                  autoComplete: "off",
                 }}
-                error={phoneError}
               />
-            </>
+            </div>
           )}
 
           {/* Pickup Window — admin only */}

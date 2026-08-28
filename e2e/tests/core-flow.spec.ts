@@ -168,6 +168,7 @@ test.describe("Core Flow", () => {
       await familyGuestPage.getByLabel("Email").fill(TEST_FAMILY_EMAIL);
       await familyGuestPage.getByRole("textbox", { name: "Password", exact: true }).fill(PASSWORD);
       await familyGuestPage.getByLabel("Confirm Password").fill(PASSWORD);
+      await familyGuestPage.getByLabel("Address").fill("none");
       await familyGuestPage.getByLabel("Phone Number").fill("555-111-2222");
       await familyGuestPage.getByRole("button", { name: "Create Account" }).click();
 

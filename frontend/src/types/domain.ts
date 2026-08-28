@@ -150,7 +150,7 @@ export interface FamilyDetail {
   display_id: string | null;
   family_name: string;
   bio: string | null;
-  address: string | null;
+  address: string;
   phone_number: string;
   family_wish: string;
   contact_name: string;
@@ -177,7 +177,7 @@ export interface FamilySelfServiceDetail {
   display_id: string;
   family_name: string;
   bio: string | null;
-  address: string | null;
+  address: string;
   phone_number: string;
   family_wish: string;
   contact_name: string;
@@ -208,7 +208,7 @@ export interface FamilyPayload {
   delivery_user_id?: number | null;
   family_name?: string;
   bio?: string | null;
-  address?: string | null;
+  address?: string;
   phone_number?: string;
   family_wish?: string;
   contact_name?: string;
@@ -221,7 +221,7 @@ export interface FamilyPayload {
 export interface FamilySelfPayload {
   family_name?: string;
   bio?: string | null;
-  address?: string | null;
+  address?: string;
   phone_number?: string;
   family_wish?: string;
   contact_name?: string;
@@ -370,7 +370,7 @@ export interface FamilySelfRegisterPayload {
   email: string;
   password: string;
   bio?: string | null;
-  address?: string | null;
+  address: string;
   phone_number?: string;
 }
 export interface FamilySelfRegisterResponse {
@@ -546,7 +546,7 @@ export interface DeliveryFamilySummary {
   id: number;
   display_id: string;
   family_name: string;
-  address: string | null;
+  address: string;
   phone_number: string;
   contact_name: string;
   person_count: number;

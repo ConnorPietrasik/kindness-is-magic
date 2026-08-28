@@ -152,7 +152,7 @@ class FamilySelfRegister(BaseModel):
     email: str = Field(..., min_length=1, max_length=120)
     password: str = Field(..., min_length=8)
     bio: Optional[str] = None
-    address: Optional[str] = Field(None, max_length=200)
+    address: str = Field(..., min_length=1, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
 
     @field_validator("email")
@@ -160,12 +160,12 @@ class FamilySelfRegister(BaseModel):
     def check_email(cls, v: str) -> str:
         return validate_email(v)
 
-    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
+    @field_validator("family_name", "family_wish", "contact_name", "address", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
-    @field_validator("bio", "address")
+    @field_validator("bio")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:
@@ -440,16 +440,16 @@ class FamilyCreate(BaseModel):
     family_wish: str = Field(..., min_length=1, max_length=400)
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
-    address: Optional[str] = Field(None, max_length=200)
+    address: str = Field(..., min_length=1, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
     pickup_window: Optional[datetime] = None
 
-    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
+    @field_validator("family_name", "family_wish", "contact_name", "address", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
-    @field_validator("bio", "address")
+    @field_validator("bio")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:
@@ -468,7 +468,7 @@ class FamilyUpdate(BaseModel):
     family_wish: Optional[str] = Field(None, min_length=1, max_length=400)
     contact_name: Optional[str] = Field(None, min_length=1, max_length=40)
     bio: Optional[str] = None
-    address: Optional[str] = Field(None, max_length=200)
+    address: Optional[str] = Field(None, min_length=1, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
     pickup_window: datetime | None | object = Field(default=None)  # type: ignore[assignment]
 
@@ -549,7 +549,7 @@ class FamilyDetail(BaseModel):
     display_id: str | None = None
     family_name: str
     bio: Optional[str] = None
-    address: Optional[str] = None
+    address: str
     phone_number: str
     family_wish: str
     contact_name: str
@@ -579,7 +579,7 @@ class FamilySelfServiceDetail(BaseModel):
     display_id: str
     family_name: str
     bio: Optional[str]
-    address: Optional[str]
+    address: str
     phone_number: str
     family_wish: str
     contact_name: str
@@ -1227,15 +1227,15 @@ class FamilyCreateByReferrer(BaseModel):
     family_wish: str = Field(..., min_length=1, max_length=400)
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
-    address: Optional[str] = Field(None, max_length=200)
+    address: str = Field(..., min_length=1, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
 
-    @field_validator("family_name", "family_wish", "contact_name", "phone_number")
+    @field_validator("family_name", "family_wish", "contact_name", "address", "phone_number")
     @classmethod
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
-    @field_validator("bio", "address")
+    @field_validator("bio")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:

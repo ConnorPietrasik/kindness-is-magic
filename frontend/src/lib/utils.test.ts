@@ -74,9 +74,10 @@ describe("normalizePayload", () => {
     const input = { family_name: "Smith", bio: "", address: "", title: "" };
     const result = normalizePayload(input);
     expect(result.bio).toBeNull();
-    expect(result.address).toBeNull();
     expect(result.title).toBeNull();
     expect(result.family_name).toBe("Smith");
+    // address is required (never nullable) — empty string stays as-is
+    expect(result.address).toBe("");
   });
 
   it("leaves non-empty strings untouched", () => {

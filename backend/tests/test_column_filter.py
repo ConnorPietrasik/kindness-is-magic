@@ -80,6 +80,7 @@ class TestApplyColumnFilter:
             referrer_id=None,
             verification_status="verified",
             phone_number="555-0000",
+            address="123 Main St",
             person_count=0,
             wish_lock_level="family",
             deleted_at=None,
@@ -103,11 +104,11 @@ class TestApplyColumnFilter:
         assert "family_name" in result[0]
         # Optional non-requested fields excluded
         assert "bio" not in result[0]
-        assert "address" not in result[0]
         assert "referrer_notes" not in result[0]
         # Required fields always included
         assert "verification_status" in result[0]
         assert "contact_name" in result[0]
+        assert "address" in result[0]
 
     def test_always_include_forced(self, family_item):
         from app.response_builders import apply_column_filter
@@ -160,9 +161,9 @@ class TestAdminFamiliesColumns:
         # Required fields always included
         assert "verification_status" in family
         assert "contact_name" in family
+        assert "address" in family
         # Optional non-requested fields excluded
         assert "bio" not in family
-        assert "address" not in family
         assert "referrer_notes" not in family
 
     def test_unknown_column_returns_400(self, test_client: TestClient, admin_user, family_record):

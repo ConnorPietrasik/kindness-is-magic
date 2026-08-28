@@ -72,6 +72,8 @@ describe("FamilySelfRegister", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Address")).toBeRequired();
+    expect(screen.getByText("If no address, write 'none'")).toBeInTheDocument();
   });
 
   it("pre-fills invite code from URL param and locks the field", () => {
@@ -103,6 +105,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Email"), "family@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
+    await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
     await user.click(screen.getByRole("button", { name: "Create Account" }));
@@ -116,7 +119,7 @@ describe("FamilySelfRegister", () => {
         email: "family@example.com",
         password: "password123",
         bio: null,
-        address: null,
+        address: "none",
         phone_number: "5551234567",
       });
     });
@@ -133,6 +136,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Email"), "family@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "different1");
+    await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
     await user.click(screen.getByRole("button", { name: "Create Account" }));

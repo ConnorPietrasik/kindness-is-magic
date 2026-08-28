@@ -107,6 +107,8 @@ class TestFamilySchemasRejectHtml:
                 family_name=HTML_PAYLOAD,
                 family_wish="A wish",
                 contact_name="Contact",
+                phone_number="555-000-0001",
+                address="123 Main St",
             )
 
     def test_family_create_wish(self):
@@ -116,6 +118,8 @@ class TestFamilySchemasRejectHtml:
                 family_name="The Smiths",
                 family_wish=HTML_PAYLOAD,
                 contact_name="Contact",
+                phone_number="555-000-0001",
+                address="123 Main St",
             )
 
     def test_family_create_contact(self):
@@ -125,6 +129,8 @@ class TestFamilySchemasRejectHtml:
                 family_name="The Smiths",
                 family_wish="A wish",
                 contact_name=HTML_PAYLOAD,
+                phone_number="555-000-0001",
+                address="123 Main St",
             )
 
     def test_family_create_bio(self):
@@ -134,6 +140,8 @@ class TestFamilySchemasRejectHtml:
                 family_name="The Smiths",
                 family_wish="A wish",
                 contact_name="Contact",
+                phone_number="555-000-0001",
+                address="123 Main St",
                 bio=HTML_PAYLOAD,
             )
 
@@ -144,6 +152,7 @@ class TestFamilySchemasRejectHtml:
                 family_name="The Smiths",
                 family_wish="A wish",
                 contact_name="Contact",
+                phone_number="555-000-0001",
                 address=HTML_PAYLOAD,
             )
 
@@ -157,6 +166,8 @@ class TestFamilySchemasRejectHtml:
                 family_name=HTML_PAYLOAD,
                 family_wish="A wish",
                 contact_name="Contact",
+                phone_number="555-000-0001",
+                address="123 Main St",
             )
 
 
@@ -272,6 +283,7 @@ class TestValidInputPasses:
             family_wish="A   new    roof",
             contact_name="John Smith",
             phone_number="555-123-1234",
+            address="123 Main St",
         )
         assert f.family_name == "The Smiths"
         assert f.family_wish == "A new roof"
@@ -331,6 +343,7 @@ class TestPhoneNumberValidation:
                 family_wish="Wish",
                 contact_name="Contact",
                 phone_number="555-1234",
+                address="123 Main St",
             )
 
     def test_family_create_accepts_10_digits(self):
@@ -340,6 +353,7 @@ class TestPhoneNumberValidation:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="555-123-4567",
+            address="123 Main St",
         )
         assert f.phone_number == "555-123-4567"
 
@@ -350,6 +364,7 @@ class TestPhoneNumberValidation:
             family_wish="Wish",
             contact_name="Contact",
             phone_number="+1 (555) 123-4567",
+            address="123 Main St",
         )
         assert f.phone_number == "+1 (555) 123-4567"
 

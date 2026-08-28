@@ -13,7 +13,7 @@ const mockFamilyDetail: FamilyDetail = {
   display_id: "2-1",
   family_name: "The Smiths",
   bio: null,
-  address: null,
+  address: "123 Main St",
   phone_number: "555-123-4567",
   family_wish: "A warm blanket",
   contact_name: "Mom Smith",
@@ -127,6 +127,7 @@ describe("FamilyForm", () => {
     await user.type(screen.getByLabelText("Family Name"), "The Joneses");
     await user.type(screen.getByLabelText("Family Wish"), "A computer");
     await user.type(screen.getByLabelText("Contact Name"), "Dad Jones");
+    await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
     await user.click(screen.getByText("Create"));
@@ -136,6 +137,7 @@ describe("FamilyForm", () => {
         family_name: "The Joneses",
         family_wish: "A computer",
         contact_name: "Dad Jones",
+        address: "none",
         referrer_id: 1,
       })
     );
@@ -155,6 +157,23 @@ describe("FamilyForm", () => {
     render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} loading={true} />);
 
     expect(screen.getByText("Saving…")).toBeInTheDocument();
+  });
+
+  /* ── Address (always required) ─────────────────────── */
+
+  it("shows address as required with help text", () => {
+    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />);
+
+    expect(screen.getByLabelText("Address")).toBeRequired();
+    expect(screen.getByText("If no address, write 'none'")).toBeInTheDocument();
+  });
+
+  it("shows address and phone even when optional fields are hidden", () => {
+    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} showOptionalFields={false} />);
+
+    expect(screen.getByLabelText("Address")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone Number")).toBeInTheDocument();
+    expect(screen.queryByText("Bio (optional)")).not.toBeInTheDocument();
   });
 
   /* ── Pickup Window (admin only) ─────────────────────────── */
@@ -184,6 +203,7 @@ describe("FamilyForm", () => {
     await user.type(screen.getByLabelText("Family Name"), "The Joneses");
     await user.type(screen.getByLabelText("Family Wish"), "A computer");
     await user.type(screen.getByLabelText("Contact Name"), "Dad Jones");
+    await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
     // Set pickup window (find by type since OptionalLabel uses <span>, not <label>)

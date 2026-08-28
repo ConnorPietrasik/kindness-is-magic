@@ -403,13 +403,19 @@ def _process_families(
             except ValueError:
                 pass  # silently drop invalid optional bio
 
-        address_raw = rec.get("address", "").strip()
-        address: str | None = None
-        if address_raw:
-            try:
-                address = sanitize_plain_text(address_raw)
-            except ValueError:
-                pass
+        # address (required)
+        address = rec.get("address", "").strip()
+        if not address:
+            summary.rows.append(RowResult(row_num, "family", "error", "Missing 'address'"))
+            summary.families_errors += 1
+            continue
+
+        try:
+            address = sanitize_plain_text(address)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "family", "error", f"address: {exc}"))
+            summary.families_errors += 1
+            continue
 
         # phone_number (required)
         phone_number = rec.get("phone_number", "").strip()

@@ -238,6 +238,7 @@ class TestReferrerCreateFamily:
                 "family_name": "New Ref Family",
                 "family_wish": "A house",
                 "contact_name": "New Contact",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )
@@ -290,6 +291,7 @@ class TestReferrerCreateFamily:
                 "family_name": "Over Limit",
                 "family_wish": "Too many",
                 "contact_name": "Nope",
+                "address": "none",
                 "phone_number": "555-000-0000",
             },
         )

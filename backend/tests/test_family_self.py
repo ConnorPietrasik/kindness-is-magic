@@ -168,13 +168,22 @@ class TestFamilyUpdateSelf:
         _family_login(test_client)
         resp = test_client.patch(
             "/api/family/me",
-            json={"bio": "", "address": ""},
+            json={"bio": ""},
         )
         assert resp.status_code == 200
         body = resp.json()
         assert body["bio"] is None  # cleared
-        assert body["address"] is None  # cleared
+        assert body["address"] == "123 Main St"  # unchanged
         assert body["phone_number"] == "555-123-1234"  # unchanged
+
+    def test_422_empty_string_rejected_for_address(self, test_client: TestClient, family_user):
+        """Sending '' for address should be rejected — address is mandatory."""
+        _family_login(test_client)
+        resp = test_client.patch(
+            "/api/family/me",
+            json={"address": ""},
+        )
+        assert resp.status_code == 422
 
     def test_422_empty_string_rejected_for_phone_number(self, test_client: TestClient, family_user):
         """Sending '' for phone_number should be rejected — it is now mandatory."""
