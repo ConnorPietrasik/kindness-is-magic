@@ -175,7 +175,7 @@ def create_person(
         given_name=body.given_name,
         age=body.age,
         wishes=body.wishes,
-        title=body.title,
+        role=body.role,
         note=body.note,
     )
     db.commit()

@@ -18,7 +18,7 @@ const mockWishList: FamilyWishListResponse = {
   display_id: "0-1",
   bio: null,
   family_wish: "A warm winter for everyone.",
-  people: [{ given_name: "Alex", title: null, age: 8, note: null, wishes: [] }],
+  people: [{ given_name: "Alex", role: "son", age: 8, note: null, wishes: [] }],
   claimed_by_current_user: false,
   claim_status: null,
   claim_id: null,

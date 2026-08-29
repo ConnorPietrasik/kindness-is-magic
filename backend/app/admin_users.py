@@ -60,8 +60,8 @@ John Smith,The Johnsons,A fleece blanket,Mom Johnson,Family of four,123 Oak St,5
 Jane Doe,The Smiths,A coffee maker,Dad Smith,Young family,456 Main St,555-2222
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-The Johnsons,Mom,34,Black bathrobe,M,,,mother
+family_name,given_name,age,wish,size,fun_wish,role,note
+The Johnsons,Mom,34,Black bathrobe,M,,mother,
 The Johnsons,Dad,36,Electric shaving kit,,,father,
 The Johnsons,Alice,8,Backpack,,Doll set,daughter,
 The Johnsons,Bob,12,Tennis shoes,3Y,Board game,son,Allergic to peanuts

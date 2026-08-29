@@ -1,5 +1,4 @@
-Family title should be required with drop down options, and it should be changed to “role”. Drop down options: “Son, Daughter, Grandson, Granddaughter, Mother, Father, Grandfather, Grandmother”. Should have help text “To help with choosing gifts; choose whichever is closest”
-Adding color to practical wishes - like size
+Add color to practical wishes - basically the same function / constraints as size.
 Make family_wish a type of Wish bound to family instead of person. It should show in all the usual places that Wishes show.
 Add wish display_id: format is 1-1-1A/B/F where A/B are for practical / fun, adult gifts are just the person display_id, and F is for family wishes.
 Packing slip: move family wish down to be more clear make all the wish info black (for all wishes) so it’s easier to read

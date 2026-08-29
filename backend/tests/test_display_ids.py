@@ -613,10 +613,10 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_orphan_family_people_get_0_prefix(self, test_client: TestClient, admin_user, family_record, db: Session):
         """People in orphan families get 0-{fam_n}-{per_n}."""
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         for i in range(3):
-            p = Person(family_id=family_record.id, given_name=f"Child {i}", age=10)
+            p = Person(family_id=family_record.id, given_name=f"Child {i}", age=10, role=PersonRole.son)
             db.add(p)
             db.flush()
             db.add_all(
@@ -638,7 +638,7 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_referrer_family_people(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People in referrer families get {ref_id}-{fam_n}-{per_n}."""
-        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
         fam = Family(
             referrer_id=referrer_record.id,
@@ -653,7 +653,7 @@ class TestAdminPeopleDisplayIdFlat:
         db.refresh(fam)
 
         for i in range(2):
-            p = Person(family_id=fam.id, given_name=f"Child {i}", age=8)
+            p = Person(family_id=fam.id, given_name=f"Child {i}", age=8, role=PersonRole.son)
             db.add(p)
             db.flush()
             db.add_all(
@@ -674,7 +674,7 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_multiple_families_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People across multiple families get correct family and person enumeration."""
-        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
         # Two families under same referrer
         f1 = Family(
@@ -699,9 +699,9 @@ class TestAdminPeopleDisplayIdFlat:
         db.refresh(f2)
 
         # 2 people in f1, 1 person in f2
-        p1 = Person(family_id=f1.id, given_name="Alice", age=8)
-        p2 = Person(family_id=f1.id, given_name="Bob", age=10)
-        p3 = Person(family_id=f2.id, given_name="Charlie", age=12)
+        p1 = Person(family_id=f1.id, given_name="Alice", age=8, role=PersonRole.son)
+        p2 = Person(family_id=f1.id, given_name="Bob", age=10, role=PersonRole.son)
+        p3 = Person(family_id=f2.id, given_name="Charlie", age=12, role=PersonRole.son)
         db.add_all([p1, p2, p3])
         db.flush()
         for p in [p1, p2, p3]:
@@ -729,7 +729,7 @@ class TestAdminPeopleDisplayIdFlat:
         When a pending family is verified, its people get family positions based on
         the verified-family enumeration (pending families are skipped).
         """
-        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
         # Verified family (first by id)
         f1 = Family(
@@ -765,9 +765,9 @@ class TestAdminPeopleDisplayIdFlat:
         db.refresh(f3)
 
         # People in each family
-        p1 = Person(family_id=f1.id, given_name="Alice", age=8)
-        p2 = Person(family_id=f2.id, given_name="Bob", age=10)
-        p3 = Person(family_id=f3.id, given_name="Charlie", age=12)
+        p1 = Person(family_id=f1.id, given_name="Alice", age=8, role=PersonRole.son)
+        p2 = Person(family_id=f2.id, given_name="Bob", age=10, role=PersonRole.son)
+        p3 = Person(family_id=f3.id, given_name="Charlie", age=12, role=PersonRole.son)
         db.add_all([p1, p2, p3])
         db.flush()
         for p in [p1, p2, p3]:
@@ -849,11 +849,11 @@ class TestAdminPeopleDisplayIdDeleted:
 
     def test_deleted_skipped_in_counter(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Deleted people don't consume enumeration numbers in the main list."""
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        p1 = Person(family_id=family_record.id, given_name="First", age=8)
-        p2 = Person(family_id=family_record.id, given_name="Second", age=10)
-        p3 = Person(family_id=family_record.id, given_name="Third", age=12)
+        p1 = Person(family_id=family_record.id, given_name="First", age=8, role=PersonRole.son)
+        p2 = Person(family_id=family_record.id, given_name="Second", age=10, role=PersonRole.son)
+        p3 = Person(family_id=family_record.id, given_name="Third", age=12, role=PersonRole.son)
         db.add_all([p1, p2, p3])
         db.flush()
         for p in [p1, p2, p3]:
@@ -910,10 +910,10 @@ class TestAdminPeopleDisplayIdPagination:
 
     def test_continuity_across_pages(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Display IDs continue across page boundaries."""
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         for i in range(5):
-            p = Person(family_id=family_record.id, given_name=f"Child {i}", age=10)
+            p = Person(family_id=family_record.id, given_name=f"Child {i}", age=10, role=PersonRole.son)
             db.add(p)
             db.flush()
             db.add_all(
@@ -1006,12 +1006,12 @@ class TestReferrerFamilyPeopleDisplayId:
 
     def test_sequential_enumeration(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """People are numbered 1, 2, 3... by DB id order."""
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         fam = referrer_with_full_tree["family"]
         # Add more people
-        p2 = Person(family_id=fam.id, given_name="Second Person", age=6)
-        p3 = Person(family_id=fam.id, given_name="Third Person", age=8)
+        p2 = Person(family_id=fam.id, given_name="Second Person", age=6, role=PersonRole.son)
+        p3 = Person(family_id=fam.id, given_name="Third Person", age=8, role=PersonRole.son)
         db.add_all([p2, p3])
         db.flush()
         for p in [p2, p3]:
@@ -1043,11 +1043,11 @@ class TestFamilyPeopleDisplayId:
 
     def test_sequential_enumeration(self, test_client: TestClient, family_user, family_with_people, db: Session):
         """People are numbered 1, 2, 3... by DB id order."""
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         fam = family_with_people["family"]
         # Add another person
-        p3 = Person(family_id=fam.id, given_name="Third Child", age=4)
+        p3 = Person(family_id=fam.id, given_name="Third Child", age=4, role=PersonRole.son)
         db.add(p3)
         db.flush()
         db.add_all(
@@ -1082,7 +1082,7 @@ class TestComputePositionMapsBatching:
     """
 
     def test_batched_matches_per_family_scoped(self, referrer_record, db: Session):
-        from app.models import Family, FamilyVerificationStatus, Person
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole
         from app.response_builders import compute_position_maps
 
         fams = []
@@ -1103,7 +1103,7 @@ class TestComputePositionMapsBatching:
         # 1, 2, 3 people per family (uneven, to catch off-by-one numbering)
         for i, f in enumerate(fams):
             for j in range(i + 1):
-                p = Person(family_id=f.id, given_name=f"P{i}-{j}", age=8)
+                p = Person(family_id=f.id, given_name=f"P{i}-{j}", age=8, role=PersonRole.son)
                 db.add(p)
         db.commit()
 

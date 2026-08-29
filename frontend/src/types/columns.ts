@@ -39,7 +39,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "age", label: "Age", visible: true },
     { key: "wishes", label: "Wishes", visible: true },
     { key: "family_id", label: "Family", visible: true },
-    { key: "title", label: "Title", visible: false },
+    { key: "role", label: "Role", visible: false },
     { key: "note", label: "Note", visible: false },
     { key: "created_at", label: "Created", visible: false },
   ],

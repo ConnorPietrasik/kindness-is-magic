@@ -259,6 +259,31 @@ class Family(Base):
     delivery_user: Mapped["User | None"] = relationship("User", foreign_keys=[delivery_user_id])
 
 
+class PersonRole(str, enum.Enum):
+    """A person's family role, chosen by whoever enters the person.
+
+    Stored lowercase (like the other role/status enums); the UI capitalizes
+    for display. Member names and values match, so SQLAlchemy's default
+    name-based enum labels are identical to the stored values.
+    """
+
+    son = "son"
+    daughter = "daughter"
+    grandson = "grandson"
+    granddaughter = "granddaughter"
+    mother = "mother"
+    father = "father"
+    grandfather = "grandfather"
+    grandmother = "grandmother"
+    aunt = "aunt"
+    uncle = "uncle"
+    cousin = "cousin"
+    nephew = "nephew"
+    niece = "niece"
+    cat = "cat"
+    dog = "dog"
+
+
 class Person(Base):
     __tablename__ = "person"
     __table_args__ = (
@@ -270,7 +295,7 @@ class Person(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     family_id: Mapped[int] = mapped_column(Integer, ForeignKey("family.id"), nullable=False)
     given_name: Mapped[str] = mapped_column(String(40), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    role: Mapped[PersonRole] = mapped_column(SAEnum(PersonRole, name="person_role", create_constraint=True), nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str] = mapped_column(String(400), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
@@ -279,9 +304,9 @@ class Person(Base):
     family: Mapped["Family"] = relationship("Family", back_populates="persons")
     wishes: Mapped[list["Wish"]] = relationship("Wish", back_populates="person")
 
-    @validates("given_name", "title")
+    @validates("given_name")
     def _capitalize_name_fields(self, key: str, value: str | None) -> str | None:
-        """Always store given_name and title with the first letter capitalized."""
+        """Always store given_name with the first letter capitalized."""
         if value:
             return value[:1].upper() + value[1:]
         return value

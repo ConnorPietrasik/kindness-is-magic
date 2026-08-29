@@ -369,17 +369,19 @@ def referrer_with_families(db: Session, referrer_record):
 @pytest.fixture()
 def family_with_people(db: Session, family_record):
     """Create a Family with 1-2 Person rows, each with wishes."""
-    from app.models import Person, Wish, WishType
+    from app.models import Person, PersonRole, Wish, WishType
 
     p1 = Person(
         family_id=family_record.id,
         given_name="Alice",
         age=8,
+        role=PersonRole.son,
     )
     p2 = Person(
         family_id=family_record.id,
         given_name="Charlie",
         age=12,
+        role=PersonRole.son,
     )
     db.add_all([p1, p2])
     db.flush()
@@ -406,7 +408,7 @@ def referrer_with_full_tree(db: Session):
 
     Returns a dict with keys: referrer, family, person, user.
     """
-    from app.models import FamilyVerificationStatus, Family, Person, Referrer, ReferrerApprovalStatus, User, UserRole
+    from app.models import FamilyVerificationStatus, Family, Person, PersonRole, Referrer, ReferrerApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
     ref = Referrer(
@@ -436,6 +438,7 @@ def referrer_with_full_tree(db: Session):
         family_id=fam.id,
         given_name="Tree Person",
         age=10,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()
@@ -537,13 +540,14 @@ def person_in_another_family(db: Session, another_family):
 
     Returns a dict with keys: family, person.
     """
-    from app.models import Person
+    from app.models import Person, PersonRole
 
     fam = another_family["family"]
     person = Person(
         family_id=fam.id,
         given_name="Another Person",
         age=7,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()

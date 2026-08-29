@@ -56,6 +56,7 @@ import {
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminListParams, FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
+import { personRoleLabel } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -347,7 +348,7 @@ function PeopleTable({
                 <Th>Fun Wish</Th>
               </>
             )}
-            {visibleColumns.includes("title") && <Th>Title</Th>}
+            {visibleColumns.includes("role") && <Th>Role</Th>}
             {visibleColumns.includes("note") && <Th>Note</Th>}
             {visibleColumns.includes("created_at") && <Th>Created</Th>}
             <Th>Actions</Th>
@@ -368,7 +369,7 @@ function PeopleTable({
                         <WishCellType wishes={p.wishes} type="fun" />
                       </>
                     ))}
-                  {visibleColumns.includes("title") && <Td>{p.title || "—"}</Td>}
+                  {visibleColumns.includes("role") && <Td>{personRoleLabel(p.role)}</Td>}
                   {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
                   {visibleColumns.includes("created_at") && (
                     <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>

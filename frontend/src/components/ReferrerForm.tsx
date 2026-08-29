@@ -47,9 +47,15 @@ export function ReferrerForm({ title, initial, isEdit = false, onSubmit, onCance
   }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
+  // Re-populate only when the *referrer* being edited changes, not on every new
+  // `initial` object identity (background refetches of the same detail).
+  const referrerId = initial?.id;
+  const [loadedId, setLoadedId] = useState<number | undefined>(referrerId);
   useEffect(() => {
+    if (referrerId === loadedId) return;
+    setLoadedId(referrerId);
     setForm({ name: initial.name, phone_number: initial.phone_number, family_limit: initial.family_limit });
-  }, [initial]);
+  }, [initial, referrerId, loadedId]);
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
 

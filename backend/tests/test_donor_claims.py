@@ -44,7 +44,7 @@ def _create_donor(client: TestClient) -> dict:
 
 def _create_claimed_family(db: Session) -> dict:
     """Create a verified, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Claimed Family",
@@ -61,6 +61,7 @@ def _create_claimed_family(db: Session) -> dict:
         family_id=fam.id,
         given_name="Child",
         age=8,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()
@@ -203,7 +204,7 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(5):
-            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cap Family {i}",
@@ -216,7 +217,7 @@ class TestClaimCreation:
             db.add(fam)
             db.flush()
 
-            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5)
+            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5, role=PersonRole.son)
             db.add(person)
             db.flush()
 
@@ -242,7 +243,7 @@ class TestClaimCreation:
         )
         db.add(fam6)
         db.flush()
-        person6 = Person(family_id=fam6.id, given_name="Child 6", age=5)
+        person6 = Person(family_id=fam6.id, given_name="Child 6", age=5, role=PersonRole.son)
         db.add(person6)
         db.flush()
         db.add(Wish(person_id=person6.id, type=WishType.practical, description="A coat"))
@@ -262,7 +263,7 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(6):
-            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cash Family {i}",
@@ -274,7 +275,7 @@ class TestClaimCreation:
             )
             db.add(fam)
             db.flush()
-            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5)
+            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5, role=PersonRole.son)
             db.add(person)
             db.flush()
             db.add(Wish(person_id=person.id, type=WishType.practical, description="A coat"))
@@ -568,7 +569,7 @@ class TestClaimCRUD:
         # Create 5 gift claims
         claim_ids = []
         for i in range(5):
-            from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
             fam = Family(
                 family_name=f"Cap Test {i}",
@@ -580,7 +581,7 @@ class TestClaimCRUD:
             )
             db.add(fam)
             db.flush()
-            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5)
+            person = Person(family_id=fam.id, given_name=f"Child {i}", age=5, role=PersonRole.son)
             db.add(person)
             db.flush()
             db.add(Wish(person_id=person.id, type=WishType.practical, description="A coat"))
@@ -610,7 +611,7 @@ class TestClaimCRUD:
         )
         db.add(fam6)
         db.flush()
-        person6 = Person(family_id=fam6.id, given_name="Child 6", age=5)
+        person6 = Person(family_id=fam6.id, given_name="Child 6", age=5, role=PersonRole.son)
         db.add(person6)
         db.flush()
         db.add(Wish(person_id=person6.id, type=WishType.practical, description="A coat"))
@@ -715,7 +716,7 @@ class TestMarkPurchased:
         fam = data["family"]
 
         # Create another family with wishes
-        from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
         other_fam = Family(
             family_name="Other Family",
@@ -727,7 +728,7 @@ class TestMarkPurchased:
         )
         db.add(other_fam)
         db.flush()
-        other_person = Person(family_id=other_fam.id, given_name="Other Child", age=5)
+        other_person = Person(family_id=other_fam.id, given_name="Other Child", age=5, role=PersonRole.son)
         db.add(other_person)
         db.flush()
         other_wish = Wish(person_id=other_person.id, type=WishType.practical, description="A coat")

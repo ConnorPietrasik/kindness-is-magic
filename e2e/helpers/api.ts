@@ -328,11 +328,11 @@ export async function createPersonViaApi(
   familyId: number,
   personData: {
     givenName: string;
+    role: string;
     age: number;
     wish?: string;
     size?: string;
     funWish?: string;
-    title?: string;
     note?: string;
   },
 ): Promise<{ personId: number }> {
@@ -349,9 +349,9 @@ export async function createPersonViaApi(
     data: {
       family_id: familyId,
       given_name: personData.givenName,
+      role: personData.role,
       age: personData.age,
       wishes,
-      title: personData.title ?? null,
       note: personData.note ?? null,
     },
   });
@@ -535,6 +535,7 @@ export async function createIsolatedFamilyScenario(
     familyWish?: string;
     familyAddress?: string;
     personName?: string;
+    personRole?: string;
     personAge?: number;
     personWish?: string;
     personSize?: string;
@@ -569,6 +570,7 @@ export async function createIsolatedFamilyScenario(
   const personName = opts?.personName ?? `Child ${suffix}`;
   const person = await createPersonViaApi(request, family.familyId, {
     givenName: personName,
+    role: opts?.personRole ?? "son",
     age: opts?.personAge ?? 7,
     wish: opts?.personWish ?? "Warm winter coat",
     size: opts?.personSize ?? "7",

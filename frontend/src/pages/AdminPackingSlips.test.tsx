@@ -19,7 +19,7 @@ const mockFamily: PackingSlipItem = {
     {
       display_id: "1-1",
       given_name: "Alex",
-      title: null,
+      role: "son",
       age: 8,
       note: "Allergic to peanuts",
       wishes: [
@@ -52,7 +52,7 @@ const mockFamily: PackingSlipItem = {
     {
       display_id: "1-2",
       given_name: "Sam",
-      title: "Ms.",
+      role: "mother",
       age: 42,
       note: null,
       wishes: [
@@ -228,7 +228,7 @@ describe("AdminPackingSlips", () => {
         {
           display_id: "5-1",
           given_name: "Jordan",
-          title: null,
+          role: "father",
           age: 30,
           note: null,
           wishes: [
@@ -270,7 +270,7 @@ describe("AdminPackingSlips", () => {
         {
           display_id: "2-1",
           given_name: "Jordan",
-          title: null,
+          role: "son",
           age: 5,
           note: null,
           wishes: [],

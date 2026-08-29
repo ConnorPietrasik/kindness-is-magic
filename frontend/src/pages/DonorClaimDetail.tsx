@@ -16,8 +16,8 @@ import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurcha
 import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
-import type { CommitmentType, DonorWishPurchaseMark, FamilyClaimDetail, FamilyClaimUpdate, WishSummary } from "../types";
-import { getClaimStatus } from "../types";
+import type { CommitmentType, DonorWishPurchaseMark, FamilyClaimDetail, FamilyClaimUpdate, PersonRole, WishSummary } from "../types";
+import { getClaimStatus, personRoleLabel } from "../types";
 
 export default function DonorClaimDetail() {
   const { id } = useParams<{ id: string }>();
@@ -106,7 +106,7 @@ function WishTable({
   canAct,
   claimId,
 }: {
-  people: { given_name: string; title: string | null; age: number; note: string | null; wishes: WishSummary[] }[];
+  people: { given_name: string; role: PersonRole; age: number; note: string | null; wishes: WishSummary[] }[];
   commitmentType: CommitmentType;
   canAct: boolean;
   claimId: number;
@@ -129,7 +129,9 @@ function WishTable({
           const isAdult = person.age >= 18;
           return (
             <Tr key={idx}>
-              <Td className="font-medium text-gray-900">{person.title ? `${person.title} ${person.given_name}` : person.given_name}</Td>
+              <Td className="font-medium text-gray-900">
+                {personRoleLabel(person.role)} {person.given_name}
+              </Td>
               <Td>{person.age}</Td>
               {isAdult ? (
                 <Td colSpan={2} className="max-w-xs">

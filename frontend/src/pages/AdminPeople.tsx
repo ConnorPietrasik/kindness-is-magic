@@ -45,6 +45,7 @@ import { adminDeletedPeople, adminFamilies, adminFamiliesDropdown, adminPackingS
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminPeopleListParams, PersonPayload } from "../types";
+import { personRoleLabel } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -57,7 +58,7 @@ export default function AdminPeople() {
   const [familyFilter, setFamilyFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchName, setSearchName] = useState("");
-  const [searchTitle, setSearchTitle] = useState("");
+  const [searchRole, setSearchRole] = useState("");
   const [searchNote, setSearchNote] = useState("");
   const [searchWish, setSearchWish] = useState("");
   const [minAge, setMinAge] = useState("");
@@ -70,7 +71,7 @@ export default function AdminPeople() {
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
   const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
-  const debouncedSearchTitle = useDebouncedState(searchTitle, 1000, () => pagination.goToPage(1));
+  const debouncedSearchRole = useDebouncedState(searchRole, 1000, () => pagination.goToPage(1));
   const debouncedSearchNote = useDebouncedState(searchNote, 1000, () => pagination.goToPage(1));
   const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
   const debouncedMinAge = useDebouncedState(minAge, 1000, () => pagination.goToPage(1));
@@ -94,7 +95,7 @@ export default function AdminPeople() {
       family_id: familyFilter ?? undefined,
       search: debouncedSearch || undefined,
       search_name: debouncedSearchName || undefined,
-      search_title: debouncedSearchTitle || undefined,
+      search_role: debouncedSearchRole || undefined,
       search_note: debouncedSearchNote || undefined,
       search_wish: debouncedSearchWish || undefined,
       min_age: debouncedMinAge !== "" ? parseInt(debouncedMinAge, 10) : undefined,
@@ -107,7 +108,7 @@ export default function AdminPeople() {
       familyFilter,
       debouncedSearch,
       debouncedSearchName,
-      debouncedSearchTitle,
+      debouncedSearchRole,
       debouncedSearchNote,
       debouncedSearchWish,
       debouncedMinAge,
@@ -346,16 +347,16 @@ export default function AdminPeople() {
                 </Th>
               )}
               {visibleColumns.includes("family_id") && <Th>Family</Th>}
-              {visibleColumns.includes("title") && (
+              {visibleColumns.includes("role") && (
                 <Th>
                   <div className="flex flex-col gap-1">
-                    <span>Title</span>
+                    <span>Role</span>
                     <input
                       type="text"
                       placeholder="Filter…"
-                      aria-label="Filter by title"
-                      value={searchTitle}
-                      onChange={(e) => setSearchTitle(e.target.value)}
+                      aria-label="Filter by role"
+                      value={searchRole}
+                      onChange={(e) => setSearchRole(e.target.value)}
                       className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
                       autoComplete="off"
                     />
@@ -423,7 +424,7 @@ export default function AdminPeople() {
                           </Link>
                         </Td>
                       )}
-                      {visibleColumns.includes("title") && <Td>{p.title || "—"}</Td>}
+                      {visibleColumns.includes("role") && <Td>{personRoleLabel(p.role)}</Td>}
                       {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
                       {visibleColumns.includes("created_at") && (
                         <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>

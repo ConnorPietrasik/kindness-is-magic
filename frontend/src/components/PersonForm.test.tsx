@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PersonDetail } from "../types";
+import { PERSON_ROLES, personRoleLabel } from "../types";
 import { PersonForm } from "./PersonForm";
 
 const mockChildPerson: PersonDetail = {
@@ -9,7 +10,7 @@ const mockChildPerson: PersonDetail = {
   family_id: 5,
   display_id: "1",
   given_name: "Alice",
-  title: null,
+  role: "son",
   age: 8,
   note: null,
   created_at: "2025-01-01T00:00:00Z",
@@ -47,7 +48,7 @@ const mockAdultPerson: PersonDetail = {
   family_id: 5,
   display_id: "2",
   given_name: "Bob",
-  title: null,
+  role: "daughter",
   age: 25,
   note: null,
   created_at: "2025-01-01T00:00:00Z",
@@ -122,6 +123,48 @@ describe("PersonForm", () => {
   });
 
   /* ── Age-based conditional rendering ────────────────────── */
+
+  /* ── Role (required dropdown) ─────────────────────── */
+
+  it("shows role dropdown with all options, required, and help text", () => {
+    render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{}} />);
+
+    const roleSelect = screen.getByLabelText("Role");
+    expect(roleSelect).toBeRequired();
+    expect(screen.getByText("Select role…")).toBeInTheDocument();
+    for (const role of PERSON_ROLES) {
+      expect(screen.getByRole("option", { name: personRoleLabel(role) })).toHaveValue(role);
+    }
+    expect(screen.getByText("To help with choosing gifts; choose whichever is closest")).toBeInTheDocument();
+  });
+
+  it("populates role from existing person on edit", () => {
+    render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
+
+    expect(screen.getByLabelText("Role")).toHaveValue("son");
+  });
+
+  it("keeps user input when the same person refetches (new initial object identity)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
+    await user.type(screen.getByLabelText("Given Name"), "X");
+
+    // A background refetch delivers a new object for the same person id
+    rerender(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={{ ...mockChildPerson }} />);
+
+    expect(screen.getByLabelText("Given Name")).toHaveValue("AliceX");
+  });
+
+  it("repopulates the form when the edited person changes", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
+    await user.type(screen.getByLabelText("Given Name"), "X");
+
+    rerender(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockAdultPerson} />);
+
+    expect(screen.getByLabelText("Given Name")).toHaveValue("Bob");
+    expect(screen.getByLabelText("Role")).toHaveValue("daughter");
+  });
 
   it("hides wish fields and shows hint when age is not entered", () => {
     render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{}} />);
@@ -201,6 +244,7 @@ describe("PersonForm", () => {
 
     render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 8 }} onSubmit={onSubmit} onCancel={() => {}} />);
 
+    await user.selectOptions(screen.getByLabelText("Role"), "son");
     await user.type(screen.getByLabelText("Given Name"), "Charlie");
     await user.type(screen.getByLabelText("Practical Wish"), "Bike");
     await user.type(screen.getByLabelText("Size"), "S");
@@ -211,6 +255,7 @@ describe("PersonForm", () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         given_name: "Charlie",
+        role: "son",
         age: 8,
         wishes: [
           { type: "practical", description: "Bike", size: "S" },
@@ -226,6 +271,7 @@ describe("PersonForm", () => {
 
     render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 30 }} onSubmit={onSubmit} onCancel={() => {}} />);
 
+    await user.selectOptions(screen.getByLabelText("Role"), "mother");
     await user.type(screen.getByLabelText("Given Name"), "Diana");
     await user.type(screen.getByLabelText("Wish"), "Headphones");
     await user.type(screen.getByLabelText("Size"), "0");
@@ -235,6 +281,7 @@ describe("PersonForm", () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         given_name: "Diana",
+        role: "mother",
         age: 30,
         wishes: [{ type: "adult", description: "Headphones", size: null }],
       })
@@ -248,6 +295,7 @@ describe("PersonForm", () => {
     render(<PersonForm {...defaultProps} title="Add Person" isEdit={false} initial={{ age: 8 }} onSubmit={onSubmit} />);
 
     await user.selectOptions(screen.getByLabelText("Family"), "5");
+    await user.selectOptions(screen.getByLabelText("Role"), "daughter");
     await user.type(screen.getByLabelText("Given Name"), "Eve");
     await user.type(screen.getByLabelText("Practical Wish"), "Book");
     await user.type(screen.getByLabelText("Size"), "0");
@@ -259,6 +307,7 @@ describe("PersonForm", () => {
       expect.objectContaining({
         family_id: 5,
         given_name: "Eve",
+        role: "daughter",
         wishes: [
           expect.objectContaining({ type: "practical", description: "Book" }),
           expect.objectContaining({ type: "fun", description: "Puzzle" }),

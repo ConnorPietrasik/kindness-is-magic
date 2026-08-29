@@ -263,7 +263,7 @@ def get_family_wish_list(
         people=[
             PersonWishItem(
                 given_name=p.given_name,
-                title=p.title,
+                role=p.role,
                 age=p.age,
                 note=p.note,
                 wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],

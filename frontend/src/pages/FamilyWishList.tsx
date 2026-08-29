@@ -20,6 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { getFamilyWishList } from "../lib/api";
 import { familyWishList } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
+import { personRoleLabel } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -150,7 +151,7 @@ export default function FamilyWishList() {
                 return (
                   <Tr key={idx}>
                     <Td className="font-medium text-gray-900">
-                      {person.title ? `${person.title} ${person.given_name}` : person.given_name}
+                      {personRoleLabel(person.role)} {person.given_name}
                     </Td>
                     <Td>{person.age}</Td>
                     {isAdult ? (

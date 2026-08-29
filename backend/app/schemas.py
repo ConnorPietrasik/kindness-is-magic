@@ -10,6 +10,7 @@ from app.models import (
     EmailKind,
     EmailStatus,
     FamilyVerificationStatus,
+    PersonRole,
     ReferrerApprovalStatus,
     UserRole,
     WishLockLevel,
@@ -959,9 +960,9 @@ def validate_wishes_for_age(wishes: list[WishCreate], age: int) -> None:
 class PersonCreate(BaseModel):
     family_id: int
     given_name: str = Field(..., min_length=1, max_length=40)
+    role: PersonRole
     age: int = Field(..., ge=0, le=200)
     wishes: list[WishCreate]
-    title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
     @field_validator("given_name")
@@ -969,7 +970,7 @@ class PersonCreate(BaseModel):
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
-    @field_validator("title", "note")
+    @field_validator("note")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:
@@ -988,12 +989,12 @@ class PersonCreate(BaseModel):
 
 class PersonUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=40)
+    role: Optional[PersonRole] = None
     age: Optional[int] = Field(None, ge=0, le=200)
     wishes: list[WishCreate] | None = None
-    title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
-    @field_validator("given_name", "title", "note")
+    @field_validator("given_name", "note")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:
@@ -1025,7 +1026,7 @@ class PersonDetail(BaseModel):
     family_id: int
     display_id: str | None = None
     given_name: str
-    title: Optional[str] = None
+    role: PersonRole
     age: int
     note: Optional[str] = None
     created_at: datetime
@@ -1166,7 +1167,7 @@ class PersonWishItem(BaseModel):
     """Single person on the public wish list."""
 
     given_name: str
-    title: str | None = None
+    role: PersonRole
     age: int
     note: str | None = None
     wishes: list[WishSummary] = []
@@ -1200,7 +1201,7 @@ class PackingSlipPersonItem(BaseModel):
 
     display_id: str
     given_name: str
-    title: str | None = None
+    role: PersonRole
     age: int
     note: str | None = None
     wishes: list[WishSummary] = []
@@ -1253,9 +1254,9 @@ class PersonCreateInFamily(BaseModel):
     """Create a person inside a family — family_id is inferred from the URL or session."""
 
     given_name: str = Field(..., min_length=1, max_length=40)
+    role: PersonRole
     age: int = Field(..., ge=0, le=200)
     wishes: list[WishCreate]
-    title: Optional[str] = Field(None, max_length=40)
     note: Optional[str] = Field(None, max_length=400)
 
     @field_validator("given_name")
@@ -1263,7 +1264,7 @@ class PersonCreateInFamily(BaseModel):
     def clean_text(cls, v: str) -> str:
         return sanitize_plain_text(v)
 
-    @field_validator("title", "note")
+    @field_validator("note")
     @classmethod
     def clean_optional_text(cls, v: str | None) -> str | None:
         if v is None:

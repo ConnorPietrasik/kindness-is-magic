@@ -60,7 +60,7 @@ export interface AdminPeopleListParams extends AdminListParams {
   family_id?: number;
   search?: string;
   search_name?: string;
-  search_title?: string;
+  search_role?: string;
   search_note?: string;
   search_wish?: string;
   min_age?: number;

@@ -523,6 +523,7 @@ class TestReferrerCreateFamilyPerson:
             f"/api/referrer/families/{fam.id}/people",
             json={
                 "given_name": "New Person",
+                "role": "daughter",
                 "age": 6,
                 "wishes": [
                     {"type": "practical", "description": "A coat"},
@@ -549,13 +550,13 @@ class TestReferrerCreateFamilyPerson:
                     {"type": "practical", "description": "A coat", "size": "Small"},
                     {"type": "fun", "description": "A toy"},
                 ],
-                "title": "Ms.",
+                "role": "daughter",
                 "note": "Allergic to nuts",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["title"] == "Ms."
+        assert body["role"] == "daughter"
         assert body["note"] == "Allergic to nuts"
         assert len(body["wishes"]) == 2
 

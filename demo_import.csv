@@ -31,12 +31,12 @@ Father Miguel Santos,The Dubois Family,Backpack and notebooks,Emmanuel Dubois,Ha
 Father Miguel Santos,The Nkosi Family,A fleece blanket,Nomsa Nkosi,South African family adjusting to city life,603 Sedgwick Avenue,718-555-0221
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
+family_name,given_name,age,wish,size,fun_wish,role,note
 The Williams Family,Emily,32,A black bathrobe,M,,mother,
 The Williams Family,James,34,An electric shaving kit,,,father,
 The Williams Family,Emma,6,A navy blue puffer coat,6,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
 The Williams Family,Liam,4,Red snow boots,11C,Toy truck set,son,
-The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,,Play-Doh set,,Baby
+The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,,Play-Doh set,son,Baby
 The Rodriguez Family,Luis,65,A reading light,,,grandfather,
 The Rodriguez Family,Rosa,63,A knitting craft kit,,,grandmother,
 The Rodriguez Family,Sofia,11,A pink canvas backpack,,LEGO Friends set,granddaughter,Loves science
@@ -71,7 +71,7 @@ The Martinez Family,Rosa,33,Gray sweats,M,,mother,
 The Martinez Family,Miguel,35,A curling iron,,,father,
 The Martinez Family,Carmen,12,A black winter jacket,12,Wireless earbuds,daughter,
 The Martinez Family,Rafael,7,Blue tennis shoes,2,Basketball,son,
-The Martinez Family,Sofia,2,Diapers size 3 and onesies,,Toy kitchen set,,Baby
+The Martinez Family,Sofia,2,Diapers size 3 and onesies,,Toy kitchen set,daughter,Baby
 The Patel Family,Priya,28,Black pajamas,S,,mother,
 The Patel Family,Aanya,10,A navy blue coat,10,Jewelry making kit,daughter,
 The Patel Family,Arjun,5,Red sneakers,12C,LEGO City set,son,
@@ -91,7 +91,7 @@ The Singh Family,Raj,40,A step-on garbage can,,,father,
 The Singh Family,Priya,38,A curling iron,,,mother,
 The Singh Family,Anya,14,A gray winter jacket,14,Makeup set,daughter,Teenager
 The Singh Family,Neel,9,A black backpack,,LEGO Star Wars set,son,
-The Singh Family,Bibek,3,Green snow boots and red pajamas,3C,Bubble machine,,Baby
+The Singh Family,Bibek,3,Green snow boots and red pajamas,3C,Bubble machine,son,Baby
 The Jackson Family,Nicole,27,A hair dryer,,,mother,Single mom
 The Jackson Family,Amara,11,A pink coat,11,Makeup set,daughter,
 The Jackson Family,Isaiah,6,Black sneakers,1,Basketball,son,
@@ -103,7 +103,7 @@ The Harris Family,Andre,33,A portable charger with built-in cables,,,father,
 The Harris Family,Tamika,30,A gray bathrobe,M,,mother,
 The Harris Family,Marcus,12,A navy backpack,,Nintendo Switch game,son,
 The Harris Family,Zara,8,A yellow winter coat,8,1000-piece puzzle,daughter,
-The Harris Family,Lilou,2,Diapers size 4 and dinosaur pajamas,,Toy truck set,,Baby
+The Harris Family,Lilou,2,Diapers size 4 and dinosaur pajamas,,Toy truck set,daughter,Baby
 The Clark Family,Angela,26,A sleeping bag,,,mother,
 The Clark Family,Sophia,9,A pink coat,9,Large stuffed unicorn,daughter,
 The Clark Family,Liam,5,Black sneakers,1,Catan board game,son,
@@ -118,7 +118,7 @@ The Dubois Family,Sophie,7,Black sneakers,2,Fisher-Price tea set,daughter,
 The Nkosi Family,Nomsa,35,Gray sweats,M,,mother,
 The Nkosi Family,Thabo,11,A green winter jacket,11,Basketball,son,
 The Nkosi Family,Amahle,8,A purple coat,8,Board game,daughter,
-The Nkosi Family,Naledi,3,Red snow boots,3C,Large stuffed bear,,Baby
+The Nkosi Family,Naledi,3,Red snow boots,3C,Large stuffed bear,daughter,Baby
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id,display_name

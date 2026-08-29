@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models import WishType
+from app.models import PersonRole, WishType
 from app.schemas import (
     PersonCreate,
     PersonCreateInFamily,
@@ -160,6 +160,7 @@ class TestPersonCreateWishes:
         person = PersonCreate(
             family_id=1,
             given_name="Alice",
+            role=PersonRole.daughter,
             age=10,
             wishes=[
                 WishCreate(type=WishType.practical, description="A backpack"),
@@ -172,6 +173,7 @@ class TestPersonCreateWishes:
         person = PersonCreate(
             family_id=1,
             given_name="Bob",
+            role=PersonRole.father,
             age=25,
             wishes=[WishCreate(type=WishType.adult, description="A laptop")],
         )
@@ -220,6 +222,7 @@ class TestPersonCreateInFamilyWishes:
     def test_valid_child_person(self):
         person = PersonCreateInFamily(
             given_name="Alice",
+            role=PersonRole.daughter,
             age=8,
             wishes=[
                 WishCreate(type=WishType.practical, description="A backpack"),
@@ -231,6 +234,7 @@ class TestPersonCreateInFamilyWishes:
     def test_valid_adult_person(self):
         person = PersonCreateInFamily(
             given_name="Bob",
+            role=PersonRole.father,
             age=30,
             wishes=[WishCreate(type=WishType.adult, description="A laptop")],
         )

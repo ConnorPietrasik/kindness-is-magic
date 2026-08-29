@@ -154,7 +154,7 @@ def get_packing_slips(
                     PackingSlipPersonItem(
                         display_id=person_display_map.get(p.id, "0"),
                         given_name=p.given_name,
-                        title=p.title,
+                        role=p.role,
                         age=p.age,
                         note=p.note,
                         wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],

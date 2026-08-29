@@ -7,7 +7,7 @@ starting with ``#``.  Recognised section names (case-insensitive) are:
 
 - **referrers**  — name, family_limit, phone_number
 - **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number
-- **people**     — family_name, given_name, age, wish, size, fun_wish, title, note
+- **people**     — family_name, given_name, age, wish, size, fun_wish, role, note
 - **users**      — email, password, role, referrer_name_or_id, family_name_or_id
 
 Sections are processed in dependency order:
@@ -42,6 +42,7 @@ from app.models import (
     Family,
     FamilyVerificationStatus,
     Person,
+    PersonRole,
     Referrer,
     ReferrerApprovalStatus,
     User,
@@ -55,6 +56,9 @@ from app.user_validation import (
     validate_email,
     validate_user_role_consistency,
 )
+
+# Case-insensitive lookup for the people section's required `role` column.
+_PERSON_ROLE_BY_VALUE: dict[str, PersonRole] = {role.value.lower(): role for role in PersonRole}
 
 
 # ---------------------------------------------------------------------------
@@ -570,14 +574,19 @@ def _process_people(
                 summary.people_errors += 1
                 continue
 
-        # Optional fields
-        title = rec.get("title", "").strip() or None
-        if title:
-            try:
-                title = sanitize_plain_text(title)
-            except ValueError:
-                title = None
+        # role (required, matched case-insensitively against PersonRole)
+        role_raw = rec.get("role", "").strip()
+        role = _PERSON_ROLE_BY_VALUE.get(role_raw.lower()) if role_raw else None
+        if not role_raw:
+            summary.rows.append(RowResult(row_num, "person", "error", "Missing 'role'"))
+            summary.people_errors += 1
+            continue
+        if role is None:
+            summary.rows.append(RowResult(row_num, "person", "error", f"Invalid role: {role_raw}"))
+            summary.people_errors += 1
+            continue
 
+        # Optional fields
         note = rec.get("note", "").strip() or None
         if note:
             try:
@@ -602,8 +611,8 @@ def _process_people(
         person = Person(
             family_id=family_id,
             given_name=given_name,
+            role=role,
             age=age,
-            title=title,
             note=note,
         )
         db.add(person)

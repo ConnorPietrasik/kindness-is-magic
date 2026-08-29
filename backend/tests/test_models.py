@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     Family,
     Person,
+    PersonRole,
     PasswordResetToken,
     Referrer,
     User,
@@ -126,6 +127,7 @@ class TestPerson:
             family_id=family.id,
             given_name="Bob",
             age=10,
+            role=PersonRole.son,
         )
         db.add(person)
         db.commit()
@@ -134,51 +136,42 @@ class TestPerson:
         assert person.given_name == "Bob"
         assert person.wishes == []
 
-    def test_person_with_title(self, db: Session):
+    def test_person_with_role(self, db: Session):
         family = self._create_family(db)
 
         person = Person(
             family_id=family.id,
             given_name="Alice",
-            title="Miss",
+            role=PersonRole.mother,
             age=8,
             note="Loves reading",
         )
         db.add(person)
         db.commit()
         db.refresh(person)
-        assert person.title == "Miss"
+        assert person.role == PersonRole.mother
         assert person.note == "Loves reading"
 
-    def test_person_name_and_title_auto_capitalize(self, db: Session):
+    def test_person_given_name_auto_capitalize(self, db: Session):
         family = self._create_family(db)
 
         # Lowercase inputs should be capitalized on create
         person = Person(
             family_id=family.id,
             given_name="emma",
-            title="daughter",
+            role=PersonRole.daughter,
             age=6,
         )
         db.add(person)
         db.commit()
         db.refresh(person)
         assert person.given_name == "Emma"
-        assert person.title == "Daughter"
 
         # Updating with lowercase should also capitalize
         person.given_name = "maria-elena"
-        person.title = "granddaughter"
         db.commit()
         db.refresh(person)
         assert person.given_name == "Maria-elena"
-        assert person.title == "Granddaughter"
-
-        # None title should remain None
-        person.title = None
-        db.commit()
-        db.refresh(person)
-        assert person.title is None
 
 
 class TestWish:
@@ -197,6 +190,7 @@ class TestWish:
             family_id=family.id,
             given_name="TestChild",
             age=10,
+            role=PersonRole.son,
         )
         db.add(person)
         db.commit()

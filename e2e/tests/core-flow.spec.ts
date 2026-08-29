@@ -242,6 +242,7 @@ test.describe("Core Flow", () => {
       /* Fill the form — age must be entered first to reveal wish fields */
       await familyPage.getByLabel("Given Name").fill(TEST_CHILD_NAME);
       await familyPage.getByLabel("Age").fill("7");
+      await familyPage.getByLabel("Role").selectOption("son");
 
       /* Wait for wish fields to appear (they're conditionally rendered) */
       await expect(familyPage.getByLabel("Practical Wish")).toBeVisible({ timeout: 5_000 });

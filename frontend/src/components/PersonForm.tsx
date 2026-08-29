@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PersonDetail, PersonPayload, WishCreate, WishSummary } from "../types/domain";
-import { WISH_TYPE } from "../types/domain";
+import type { PersonDetail, PersonPayload, PersonRole, WishCreate, WishSummary } from "../types/domain";
+import { PERSON_ROLES, personRoleLabel, WISH_TYPE } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { defaultPersonForm } from "./defaults";
@@ -10,7 +10,9 @@ import { Spinner } from "./Spinner";
 
 interface PersonFormProps {
   title: string;
-  initial?: Partial<PersonDetail>;
+  /** Initial data — a server person on edit, or the default form state on create
+   *   (where role may be the unselected ""). */
+  initial?: Omit<Partial<PersonDetail>, "role"> & { role?: PersonRole | "" };
   isEdit?: boolean;
   familyMap?: Record<number, string>;
   familyOptionsLoading?: boolean;
@@ -23,7 +25,7 @@ interface PersonFormProps {
 interface FormState {
   given_name: string;
   age: number | "";
-  title: string;
+  role: PersonRole | "";
   wish_description: string;
   wish_size: string;
   fun_wish_description: string;
@@ -78,6 +80,23 @@ function buildWishes(form: Omit<FormState, "age"> & { age: number }): WishCreate
   ];
 }
 
+/** Build the flat form state from an `initial` payload (server person or defaults). */
+function formStateFromInitial(initial: PersonFormProps["initial"]): FormState {
+  const base: FormState = {
+    ...defaultPersonForm,
+    given_name: initial?.given_name ?? "",
+    age: initial?.age !== undefined ? initial.age : "",
+    role: initial?.role ?? "",
+    note: initial?.note ?? "",
+    family_id: initial?.family_id ?? 0,
+  };
+  // If editing, populate wish fields from existing wishes
+  if (initial?.wishes && initial.wishes.length > 0) {
+    return { ...base, ...wishesToFormFields(initial.wishes) };
+  }
+  return base;
+}
+
 /**
  * PersonForm — shared form for creating and editing people.
  *
@@ -89,38 +108,18 @@ function buildWishes(form: Omit<FormState, "age"> & { age: number }): WishCreate
  * - `familyMap` — shows a family selector on create.
  */
 export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoading, onSubmit, onCancel, loading }: PersonFormProps) {
-  const [form, setForm] = useState<FormState>(() => {
-    const base: FormState = {
-      ...defaultPersonForm,
-      given_name: initial?.given_name ?? "",
-      age: initial?.age !== undefined ? initial.age : "",
-      title: initial?.title ?? "",
-      note: initial?.note ?? "",
-      family_id: initial?.family_id ?? 0,
-    };
-    // If editing, populate wish fields from existing wishes
-    if (initial?.wishes && initial.wishes.length > 0) {
-      return { ...base, ...wishesToFormFields(initial.wishes) };
-    }
-    return base;
-  });
+  const [form, setForm] = useState<FormState>(() => formStateFromInitial(initial));
 
+  // Re-populate only when the *person* being edited changes — not on every new
+  // `initial` object identity, which happens on background refetches of the same
+  // detail and would silently wipe the user's in-progress input.
+  const personId = initial?.id;
+  const [loadedId, setLoadedId] = useState<number | undefined>(personId);
   useEffect(() => {
-    const base: FormState = {
-      ...defaultPersonForm,
-      given_name: initial?.given_name ?? "",
-      age: initial?.age !== undefined ? initial.age : "",
-      title: initial?.title ?? "",
-      note: initial?.note ?? "",
-      family_id: initial?.family_id ?? 0,
-    };
-    // If editing, populate wish fields from existing wishes
-    if (initial?.wishes && initial.wishes.length > 0) {
-      setForm({ ...base, ...wishesToFormFields(initial.wishes) });
-    } else {
-      setForm(base);
-    }
-  }, [initial]);
+    if (personId === loadedId) return;
+    setLoadedId(personId);
+    setForm(formStateFromInitial(initial));
+  }, [initial, personId, loadedId]);
 
   const update = (key: keyof FormState, val: string | number) => setForm((prev) => ({ ...prev, [key]: val }));
 
@@ -140,7 +139,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
       const payload: PersonPayload = {
         given_name: form.given_name,
         age: ageNum,
-        title: form.title || null,
+        role: form.role || undefined,
         note: form.note || null,
         wishes,
         ...(form.family_id > 0 ? { family_id: form.family_id } : {}),
@@ -227,16 +226,23 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
           </div>
 
           <div>
-            <OptionalLabel text="Title" />
             <FormField
-              type="text"
+              label="Role"
+              as="select"
               fieldProps={{
-                value: form.title || "",
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("title", e.target.value),
-                maxLength: 40,
-                autoComplete: "off",
+                value: form.role,
+                onChange: (e: React.ChangeEvent<HTMLSelectElement>) => update("role", e.target.value),
+                required: true,
               }}
-            />
+            >
+              <option value="">Select role…</option>
+              {PERSON_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {personRoleLabel(role)}
+                </option>
+              ))}
+            </FormField>
+            <p className="mt-1 text-xs text-gray-400">To help with choosing gifts; choose whichever is closest</p>
           </div>
 
           {/* Wish fields — hidden until age is entered */}

@@ -529,7 +529,13 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
     family_id: initial.family_id ?? null,
   }));
 
+  // Re-populate only when the *user* being edited changes, not on every new
+  // `initial` object identity (background refetches of the same detail).
+  const userId = initial?.id;
+  const [loadedId, setLoadedId] = useState<number | undefined>(userId);
   useEffect(() => {
+    if (userId === loadedId) return;
+    setLoadedId(userId);
     setForm({
       email: initial.email ?? "",
       display_name: initial.display_name ?? "",
@@ -539,7 +545,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
       referrer_id: initial.referrer_id ?? null,
       family_id: initial.family_id ?? null,
     });
-  }, [initial]);
+  }, [initial, userId, loadedId]);
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
 

@@ -20,6 +20,7 @@ from app.models import (
     FamilyVerificationStatus,
     FamilyClaim,
     Person,
+    PersonRole,
     Referrer,
     ReferrerInviteToken,
     SentEmail,
@@ -320,7 +321,7 @@ def build_person_detail(per: Person, db: Session) -> dict:
         "family_id": per.family_id,
         "display_id": display_id,
         "given_name": per.given_name,
-        "title": per.title,
+        "role": per.role,
         "age": per.age,
         "note": per.note,
         "created_at": per.created_at,
@@ -355,7 +356,7 @@ def build_person_list_item(p: Person, *, display_id: str | None, wishes: list[Wi
         "display_id": display_id,
         "family_id": p.family_id,
         "given_name": p.given_name,
-        "title": p.title,
+        "role": p.role,
         "age": p.age,
         "note": p.note,
         "created_at": p.created_at,
@@ -481,7 +482,7 @@ def create_person_with_wishes(
     age: int,
     wishes: list[WishCreate],
     *,
-    title: str | None = None,
+    role: PersonRole,
     note: str | None = None,
 ) -> Person:
     """Create a Person and their initial Wish records in a single call.
@@ -492,8 +493,8 @@ def create_person_with_wishes(
     per = Person(
         family_id=family_id,
         given_name=given_name,
+        role=role,
         age=age,
-        title=title,
         note=note,
     )
     db.add(per)

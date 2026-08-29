@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import String
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -64,7 +65,7 @@ def list_people(
     columns: str | None = Query(None),
     search: str | None = Query(None),
     search_name: str | None = Query(None),
-    search_title: str | None = Query(None),
+    search_role: str | None = Query(None),
     search_note: str | None = Query(None),
     search_wish: str | None = Query(None),
     min_age: int | None = Query(None, ge=0),
@@ -100,15 +101,15 @@ def list_people(
         query = query.filter(
             sql_or(
                 Person.given_name.ilike(pattern),
-                Person.title.ilike(pattern),
+                Person.role.cast(String).ilike(pattern),
                 Person.note.ilike(pattern),
                 Wish.description.ilike(pattern),
             )
         )
     if search_name is not None:
         query = query.filter(Person.given_name.ilike(f"%{search_name}%"))
-    if search_title is not None:
-        query = query.filter(Person.title.ilike(f"%{search_title}%"))
+    if search_role is not None:
+        query = query.filter(Person.role.cast(String).ilike(f"%{search_role}%"))
     if search_note is not None:
         query = query.filter(Person.note.ilike(f"%{search_note}%"))
     if search_wish is not None:
@@ -190,7 +191,7 @@ def create_person(
         given_name=body.given_name,
         age=body.age,
         wishes=body.wishes,
-        title=body.title,
+        role=body.role,
         note=body.note,
     )
     db.commit()

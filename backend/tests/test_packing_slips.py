@@ -38,7 +38,7 @@ def packing_slip_families(db: Session, referrer_record):
     Family 2: wish_lock_level=admin (should appear in default query)
     Family 3: wish_lock_level=referrer (should NOT appear in default query)
     """
-    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
     # Family 1 — admin locked
     fam1 = Family(
@@ -83,8 +83,8 @@ def packing_slip_families(db: Session, referrer_record):
     db.refresh(fam3)
 
     # People for family 1
-    p1a = Person(family_id=fam1.id, given_name="Alice", age=8, title="Ms.", note="Allergic to peanuts")
-    p1b = Person(family_id=fam1.id, given_name="Bob", age=10)
+    p1a = Person(family_id=fam1.id, given_name="Alice", age=8, role=PersonRole.daughter, note="Allergic to peanuts")
+    p1b = Person(family_id=fam1.id, given_name="Bob", age=10, role=PersonRole.son)
     db.add_all([p1a, p1b])
     db.flush()
 
@@ -105,7 +105,7 @@ def packing_slip_families(db: Session, referrer_record):
     )
 
     # People for family 2
-    p2a = Person(family_id=fam2.id, given_name="Carol", age=35)
+    p2a = Person(family_id=fam2.id, given_name="Carol", age=35, role=PersonRole.daughter)
     db.add(p2a)
     db.flush()
 
@@ -313,8 +313,8 @@ class TestPackingSlipsResponseShape:
                 assert "given_name" in person
                 assert "age" in person
                 assert "wishes" in person
-                # title and note may be present (nullable)
-                assert "title" in person
+                # role is always present; note may be present (nullable)
+                assert "role" in person
                 assert "note" in person
 
                 for wish in person["wishes"]:
@@ -390,11 +390,11 @@ class TestPackingSlipsResponseShape:
         assert resp.status_code == 200
         body = resp.json()
 
-        # Carol (adult) has no title
+        # Carol (adult) has no note; role is always present
         for item in body:
             for person in item["people"]:
                 if person["given_name"] == "Carol":
-                    assert person["title"] is None
+                    assert person["role"] == "daughter"
                     assert person["note"] is None
 
 
@@ -479,11 +479,11 @@ class TestPackingSlipsDisplayIds:
         assert fam2_people == {"Carol": "1"}
 
     def test_deleted_person_does_not_consume_number(self, test_client: TestClient, admin_user, packing_slip_families, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
         fam1 = packing_slip_families["families"][0]
         bob = packing_slip_families["people"]["fam1"][1]  # 2nd person by id
-        dave = Person(family_id=fam1.id, given_name="Dave", age=11)
+        dave = Person(family_id=fam1.id, given_name="Dave", age=11, role=PersonRole.son)
         db.add(dave)
         db.commit()
         # Soft-delete the middle person
@@ -514,7 +514,7 @@ class TestPackingSlipsDisplayIds:
 
     def test_pending_family_does_not_shift_family_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """A pending family by id doesn't consume a family position."""
-        from app.models import Family, FamilyVerificationStatus, Person, WishLockLevel
+        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, WishLockLevel
 
         fam_a = Family(
             referrer_id=referrer_record.id,
@@ -548,8 +548,8 @@ class TestPackingSlipsDisplayIds:
         db.refresh(fam_a)
         db.refresh(fam_c)
 
-        pa = Person(family_id=fam_a.id, given_name="Pasha", age=8)
-        pc = Person(family_id=fam_c.id, given_name="Cleo", age=9)
+        pa = Person(family_id=fam_a.id, given_name="Pasha", age=8, role=PersonRole.son)
+        pc = Person(family_id=fam_c.id, given_name="Cleo", age=9, role=PersonRole.son)
         db.add_all([pa, pc])
         db.commit()
 

@@ -3,7 +3,18 @@
 import pytest
 from datetime import datetime, timezone
 
-from app.models import Family, FamilyVerificationStatus, Person, Referrer, ReferrerApprovalStatus, User, UserRole, Wish, WishType
+from app.models import (
+    Family,
+    FamilyVerificationStatus,
+    Person,
+    PersonRole,
+    Referrer,
+    ReferrerApprovalStatus,
+    User,
+    UserRole,
+    Wish,
+    WishType,
+)
 from app.auth import get_password_hash
 
 # ---------------------------------------------------------------------------
@@ -92,6 +103,7 @@ def person_in_family(db, family):
         family_id=family.id,
         given_name="Alice",
         age=10,
+        role=PersonRole.son,
     )
     db.add(p)
     db.flush()
@@ -251,6 +263,7 @@ class TestFamilyLockEnforcement:
             "/api/family/people",
             json={
                 "given_name": "Bob",
+                "role": "son",
                 "age": 5,
                 "wishes": [{"type": "practical", "description": "Shoes"}, {"type": "fun", "description": "Ball"}],
             },
@@ -463,6 +476,7 @@ class TestReferrerLockEnforcement:
             f"/api/referrer/families/{family.id}/people",
             json={
                 "given_name": "Bob",
+                "role": "son",
                 "age": 5,
                 "wishes": [{"type": "practical", "description": "Shoes"}, {"type": "fun", "description": "Ball"}],
             },

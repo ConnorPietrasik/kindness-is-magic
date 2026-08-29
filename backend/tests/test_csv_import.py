@@ -35,8 +35,8 @@ referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
 Test Ref,Test Fam,A wish,Contact,,789 Test Way,555-000-0002
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-Test Fam,Alice,8,Backpack,,Doll,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+Test Fam,Alice,8,Backpack,,Doll,daughter,
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -55,11 +55,11 @@ Ref One,Family Beta,Wish B,Dad Beta,,456 Oak Ave,555-200-2002
 Ref Two,Family Gamma,Wish C,Sis Gamma,,789 Pine St,555-200-2003
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-Family Alpha,Kid One,5,Coat,,Puzzle,,
-Family Alpha,Kid Two,10,Shoes,,Game,,Allergic to peanuts
-Family Beta,Baby One,2,Bottles,,Blocks,Mrs.,
-Family Gamma,Tween,13,Bike,,Soccer,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+Family Alpha,Kid One,5,Coat,,Puzzle,son,
+Family Alpha,Kid Two,10,Shoes,,Game,daughter,Allergic to peanuts
+Family Beta,Baby One,2,Bottles,,Blocks,mother,
+Family Gamma,Tween,13,Bike,,Soccer,son,
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id
@@ -197,7 +197,7 @@ class TestCsvImportMinimal:
 
 class TestCsvImportFull:
     def test_creates_multiple_entities(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import User, Family, Person
+        from app.models import User, Family, Person, PersonRole
 
         _admin_login(test_client)
         resp = _post_csv(test_client, CSV_FULL_OPTIONALS)
@@ -220,7 +220,7 @@ class TestCsvImportFull:
         assert fam2.bio is None
 
         person = db.query(Person).filter(Person.given_name == "Baby One").first()
-        assert person.title == "Mrs."
+        assert person.role == PersonRole.mother
         assert person.note is None
 
         person2 = db.query(Person).filter(Person.given_name == "Kid Two").first()
@@ -297,13 +297,55 @@ Does Not Exist,No Ref Fam,Wish,Contact,,43 Nowhere Blvd,555-000-0000
 
     def test_bad_family_id_for_person(self, test_client: TestClient, admin_user):
         csv_data = """# people
-family_name,given_name,age,wish,size,fun_wish,title,note
-No Family,Kid,5,Coat,,Game,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+No Family,Kid,5,Coat,,Game,son,
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
         assert resp.status_code == 200
         assert resp.json()["summary"]["people"]["errors"] == 1
+
+    def test_person_missing_role(self, test_client: TestClient, admin_user):
+        csv_data = """# referrers
+name,family_limit,phone_number
+Role Ref,5,555-400-4001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Role Ref,Role Fam,A wish,Contact,,1 Role St,555-400-4002
+
+# people
+family_name,given_name,age,wish,size,fun_wish,role,note
+Role Fam,Alice,8,Backpack,,Doll,,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "person" and r["action"] == "error"]
+        assert error_rows[0]["message"] == "Missing 'role'"
+
+    def test_person_invalid_role(self, test_client: TestClient, admin_user):
+        csv_data = """# referrers
+name,family_limit,phone_number
+Role Ref2,5,555-401-4001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Role Ref2,Role Fam2,A wish,Contact,,2 Role St,555-401-4002
+
+# people
+family_name,given_name,age,wish,size,fun_wish,role,note
+Role Fam2,Alice,8,Backpack,,Doll,Mrs.,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "person" and r["action"] == "error"]
+        assert error_rows[0]["message"] == "Invalid role: Mrs."
 
     def test_bad_role_for_user(self, test_client: TestClient, admin_user):
         csv_data = """# users
@@ -414,9 +456,9 @@ referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
 Dedup Ref,Dedup Fam,Wish,Contact,,501 Dup St,555-001-0010
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-Dedup Fam,Alice,8,Backpack,,Doll,,
-Dedup Fam,Alice,8,Backpack,,Doll,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+Dedup Fam,Alice,8,Backpack,,Doll,daughter,
+Dedup Fam,Alice,8,Backpack,,Doll,daughter,
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -437,9 +479,9 @@ Dedup Ref2,Fam A,Wish A,Contact A,,502 Dup St,555-002-0020
 Dedup Ref2,Fam B,Wish B,Contact B,,503 Dup St,555-002-0021
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-Fam A,Alice,8,Backpack,,Doll,,
-Fam B,Alice,8,Coat,,Game,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+Fam A,Alice,8,Backpack,,Doll,daughter,
+Fam B,Alice,8,Coat,,Game,son,
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)
@@ -459,9 +501,9 @@ referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
 Dedup Ref3,Dedup Fam3,Wish,Contact,,504 Dup St,555-003-0030
 
 # people
-family_name,given_name,age,wish,size,fun_wish,title,note
-Dedup Fam3,Alice,8,Backpack,,Doll,,
-Dedup Fam3,Alice,12,Coat,,Game,,
+family_name,given_name,age,wish,size,fun_wish,role,note
+Dedup Fam3,Alice,8,Backpack,,Doll,daughter,
+Dedup Fam3,Alice,12,Coat,,Game,son,
 """
         _admin_login(test_client)
         resp = _post_csv(test_client, csv_data)

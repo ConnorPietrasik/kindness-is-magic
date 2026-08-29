@@ -399,10 +399,10 @@ class TestFamiliesSort:
 
 class TestPeopleSearch:
     def test_search_name(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
         for name in ["Alice", "Bob", "Charlie"]:
-            db.add(Person(family_id=family_record.id, given_name=name, age=10))
+            db.add(Person(family_id=family_record.id, given_name=name, age=10, role=PersonRole.son))
         db.commit()
         _admin_login(test_client)
 
@@ -412,23 +412,23 @@ class TestPeopleSearch:
         assert body["total"] == 1
         assert body["people"][0]["given_name"] == "Bob"
 
-    def test_search_title(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+    def test_search_role(self, test_client: TestClient, admin_user, family_record, db: Session):
+        from app.models import Person, PersonRole
 
-        db.add(Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr."))
-        db.add(Person(family_id=family_record.id, given_name="Bob", age=10, title="Mr."))
+        db.add(Person(family_id=family_record.id, given_name="Alice", age=10, role=PersonRole.son))
+        db.add(Person(family_id=family_record.id, given_name="Bob", age=10, role=PersonRole.mother))
         db.commit()
         _admin_login(test_client)
 
-        resp = test_client.get("/api/admin/people", params={"search_title": "Dr."})
+        resp = test_client.get("/api/admin/people", params={"search_role": "Son"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
     def test_search_note(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
-        db.add(Person(family_id=family_record.id, given_name="Alice", age=10, note="Allergic to peanuts"))
-        db.add(Person(family_id=family_record.id, given_name="Bob", age=10, note=""))
+        db.add(Person(family_id=family_record.id, given_name="Alice", age=10, note="Allergic to peanuts", role=PersonRole.son))
+        db.add(Person(family_id=family_record.id, given_name="Bob", age=10, note="", role=PersonRole.son))
         db.commit()
         _admin_login(test_client)
 
@@ -437,15 +437,15 @@ class TestPeopleSearch:
         assert resp.json()["total"] == 1
 
     def test_search_by_wish(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        p1 = Person(family_id=family_record.id, given_name="Alice", age=10)
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, role=PersonRole.son)
         db.add(p1)
         db.flush()
         db.add(Wish(person_id=p1.id, type=WishType.practical, description="Warm jacket size M"))
         db.add(Wish(person_id=p1.id, type=WishType.fun, description="Lego set"))
 
-        p2 = Person(family_id=family_record.id, given_name="Bob", age=10)
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, role=PersonRole.son)
         db.add(p2)
         db.flush()
         db.add(Wish(person_id=p2.id, type=WishType.practical, description="Backpack"))
@@ -460,15 +460,15 @@ class TestPeopleSearch:
         assert body["people"][0]["given_name"] == "Alice"
 
     def test_search_all_fields(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr.", note="Tall kid")
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, role=PersonRole.daughter, note="Tall kid")
         db.add(p1)
         db.flush()
         db.add(Wish(person_id=p1.id, type=WishType.practical, description="Science kit"))
         db.add(Wish(person_id=p1.id, type=WishType.fun, description="Board game"))
 
-        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, title="Mr.", note="Quiet")
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, role=PersonRole.son, note="Quiet")
         db.add(p2)
         db.flush()
         db.add(Wish(person_id=p2.id, type=WishType.practical, description="Jacket"))
@@ -480,8 +480,8 @@ class TestPeopleSearch:
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
-        # search across title
-        resp = test_client.get("/api/admin/people", params={"search": "Dr."})
+        # search across role
+        resp = test_client.get("/api/admin/people", params={"search": "Daughter"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
@@ -496,32 +496,32 @@ class TestPeopleSearch:
         assert resp.json()["total"] == 1
 
     def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        # Alice: title="Dr.", wish="Lego"
-        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, title="Dr.")
+        # Alice: role="Daughter", wish="Lego"
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, role=PersonRole.daughter)
         db.add(p1)
         db.flush()
         db.add(Wish(person_id=p1.id, type=WishType.fun, description="Lego set"))
 
-        # Bob: title="Dr.", wish="Art"
-        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, title="Dr.")
+        # Bob: role="Daughter", wish="Art"
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, role=PersonRole.daughter)
         db.add(p2)
         db.flush()
         db.add(Wish(person_id=p2.id, type=WishType.fun, description="Art supplies"))
 
-        # Charlie: title="Mr.", wish="Lego"
-        p3 = Person(family_id=family_record.id, given_name="Charlie", age=10, title="Mr.")
+        # Charlie: role="Son", wish="Lego"
+        p3 = Person(family_id=family_record.id, given_name="Charlie", age=10, role=PersonRole.son)
         db.add(p3)
         db.flush()
         db.add(Wish(person_id=p3.id, type=WishType.fun, description="Lego truck"))
         db.commit()
         _admin_login(test_client)
 
-        # search_title="Dr." + search_wish="Lego" → only Alice
+        # search_role="Daughter" + search_wish="Lego" → only Alice
         resp = test_client.get(
             "/api/admin/people",
-            params={"search_title": "Dr.", "search_wish": "Lego"},
+            params={"search_role": "Daughter", "search_wish": "Lego"},
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -531,10 +531,10 @@ class TestPeopleSearch:
 
 class TestPeopleSort:
     def test_sort_given_name_asc(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
         for name in ["Charlie", "Alice", "Bob"]:
-            db.add(Person(family_id=family_record.id, given_name=name, age=10))
+            db.add(Person(family_id=family_record.id, given_name=name, age=10, role=PersonRole.son))
         db.commit()
         _admin_login(test_client)
 
@@ -544,11 +544,11 @@ class TestPeopleSort:
         assert names == ["Alice", "Bob", "Charlie"]
 
     def test_sort_age_desc(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
-        db.add(Person(family_id=family_record.id, given_name="A", age=5))
-        db.add(Person(family_id=family_record.id, given_name="B", age=15))
-        db.add(Person(family_id=family_record.id, given_name="C", age=10))
+        db.add(Person(family_id=family_record.id, given_name="A", age=5, role=PersonRole.son))
+        db.add(Person(family_id=family_record.id, given_name="B", age=15, role=PersonRole.son))
+        db.add(Person(family_id=family_record.id, given_name="C", age=10, role=PersonRole.son))
         db.commit()
         _admin_login(test_client)
 
@@ -609,10 +609,10 @@ class TestUsersSort:
 
 class TestWishesWishType:
     def test_filter_adult(self, test_client: TestClient, admin_user, family_with_people, db: Session):
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         # Create an adult person with an adult wish
-        adult = Person(family_id=family_with_people["family"].id, given_name="Adult", age=25)
+        adult = Person(family_id=family_with_people["family"].id, given_name="Adult", age=25, role=PersonRole.son)
         db.add(adult)
         db.flush()
         db.add(Wish(person_id=adult.id, type=WishType.adult, description="Laptop"))
@@ -833,10 +833,10 @@ class TestDeletedFamiliesSort:
 
 class TestDeletedPeopleSort:
     def test_deleted_sorted_by_deleted_at_desc(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person
+        from app.models import Person, PersonRole
 
-        p1 = Person(family_id=family_record.id, given_name="First", age=10)
-        p2 = Person(family_id=family_record.id, given_name="Second", age=10)
+        p1 = Person(family_id=family_record.id, given_name="First", age=10, role=PersonRole.son)
+        p2 = Person(family_id=family_record.id, given_name="Second", age=10, role=PersonRole.son)
         db.add_all([p1, p2])
         db.commit()
 

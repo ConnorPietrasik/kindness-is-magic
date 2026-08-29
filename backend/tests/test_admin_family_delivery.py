@@ -198,10 +198,10 @@ def test_soft_delete_delivery_user_unassigns_families(test_client, admin_user, f
 
 
 def test_soft_delete_purchaser_unassigns_wishes(test_client, admin_user, family_for_delivery, non_delivery_user, db):
-    from app.models import Person, Wish, WishType
+    from app.models import Person, PersonRole, Wish, WishType
 
     # Create a person with wishes
-    person = Person(family_id=family_for_delivery.id, given_name="Test Person", age=8)
+    person = Person(family_id=family_for_delivery.id, given_name="Test Person", age=8, role=PersonRole.son)
     db.add(person)
     db.flush()
 

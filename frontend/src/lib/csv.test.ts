@@ -266,7 +266,7 @@ describe("validateCsvForImport", () => {
   it("handles people section headers", () => {
     const sections = {
       people: {
-        headers: ["family_name", "given_name", "age", "wish", "size", "fun_wish", "title", "note"],
+        headers: ["family_name", "given_name", "age", "wish", "size", "fun_wish", "role", "note"],
         rows: [["Smiths", "Alice", "8", "Bike", "", "Lego", "", ""]],
       },
     };

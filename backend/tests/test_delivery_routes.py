@@ -25,7 +25,7 @@ def delivery_user(db):
 @pytest.fixture()
 def delivery_assigned_families(db, delivery_user, referrer_record):
     """Create families assigned to a delivery person."""
-    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
     fam1 = Family(
         referrer_id=referrer_record.id,
@@ -64,7 +64,7 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
     db.refresh(fam3)
 
     # Add people to fam1
-    p1 = Person(family_id=fam1.id, given_name="Alice", age=8)
+    p1 = Person(family_id=fam1.id, given_name="Alice", age=8, role=PersonRole.son)
     db.add(p1)
     db.flush()
     db.add_all(
@@ -76,7 +76,7 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
     db.commit()
 
     # Add people to fam2
-    p2 = Person(family_id=fam2.id, given_name="Bob", age=12)
+    p2 = Person(family_id=fam2.id, given_name="Bob", age=12, role=PersonRole.son)
     db.add(p2)
     db.flush()
     db.add_all(
@@ -222,12 +222,12 @@ def test_delivery_packing_slips_no_family_pii(test_client, delivery_user, delive
 
 def test_delivery_packing_slips_display_ids_exact_values(test_client, delivery_user, delivery_assigned_families, referrer_record, db):
     """Family display_ids are flat {ref}-{pos}; person display_ids reset per family."""
-    from app.models import Person
+    from app.models import Person, PersonRole
 
     fam1 = delivery_assigned_families["fam1"]
     fam2 = delivery_assigned_families["fam2"]
     # Give fam1 a second person so the per-family reset is observable
-    dana = Person(family_id=fam1.id, given_name="Dana", age=9)
+    dana = Person(family_id=fam1.id, given_name="Dana", age=9, role=PersonRole.son)
     db.add(dana)
     db.commit()
 
@@ -251,12 +251,12 @@ def test_delivery_packing_slips_deleted_person_does_not_consume_number(test_clie
     """Soft-deleted people don't consume enumeration numbers."""
     from datetime import datetime, timezone
 
-    from app.models import Person
+    from app.models import Person, PersonRole
 
     fam1 = delivery_assigned_families["fam1"]
-    eve = Person(family_id=fam1.id, given_name="Eve", age=5)
-    frank = Person(family_id=fam1.id, given_name="Frank", age=7)
-    grace = Person(family_id=fam1.id, given_name="Grace", age=6)
+    eve = Person(family_id=fam1.id, given_name="Eve", age=5, role=PersonRole.son)
+    frank = Person(family_id=fam1.id, given_name="Frank", age=7, role=PersonRole.son)
+    grace = Person(family_id=fam1.id, given_name="Grace", age=6, role=PersonRole.son)
     db.add_all([eve, frank, grace])
     db.commit()
     # Soft-delete the second person by id (Eve)

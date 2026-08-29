@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from app.models import Person, Wish, WishType
+from app.models import Person, PersonRole, Wish, WishType
 
 # ---------------------------------------------------------------------------
 # 200 — valid family, correct fields returned
@@ -33,7 +33,7 @@ def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, fa
     for i, person in enumerate(people):
         assert data["people"][i]["given_name"] == person.given_name
         assert data["people"][i]["age"] == person.age
-        assert data["people"][i]["title"] == person.title
+        assert data["people"][i]["role"] == person.role.value
         assert data["people"][i]["note"] == person.note
         # Wishes are now returned as an array
         assert len(data["people"][i]["wishes"]) == 2
@@ -42,15 +42,15 @@ def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, fa
 
 
 def test_wish_list_includes_optional_fields(db, test_client: TestClient, family_record):
-    """Person title and note are included when set."""
+    """Person role and note are included."""
     from app.models import Wish, WishType
 
     family_record.wish_lock_level = "admin"
     person = Person(
         family_id=family_record.id,
         given_name="Bella",
+        role=PersonRole.daughter,
         age=5,
-        title="Miss",
         note="Allergic to peanuts",
     )
     db.add(person)
@@ -65,7 +65,7 @@ def test_wish_list_includes_optional_fields(db, test_client: TestClient, family_
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["people"]) == 1
-    assert data["people"][0]["title"] == "Miss"
+    assert data["people"][0]["role"] == "daughter"
     assert data["people"][0]["note"] == "Allergic to peanuts"
     assert len(data["people"][0]["wishes"]) == 2
 
@@ -79,6 +79,7 @@ def test_wish_list_people_ordered_by_id(db, test_client: TestClient, family_reco
         family_id=family_record.id,
         given_name="Zebra",
         age=10,
+        role=PersonRole.son,
     )
     db.add(p1)
     db.flush()
@@ -92,6 +93,7 @@ def test_wish_list_people_ordered_by_id(db, test_client: TestClient, family_reco
         family_id=family_record.id,
         given_name="Alice",
         age=8,
+        role=PersonRole.son,
     )
     db.add(p2)
     db.flush()
@@ -161,6 +163,7 @@ def test_wish_list_excludes_soft_deleted_people(db, test_client: TestClient, fam
         family_id=family_record.id,
         given_name="Active",
         age=6,
+        role=PersonRole.son,
     )
     db.add(active)
     db.flush()
@@ -173,6 +176,7 @@ def test_wish_list_excludes_soft_deleted_people(db, test_client: TestClient, fam
         given_name="Deleted",
         age=7,
         deleted_at=datetime.now(timezone.utc),
+        role=PersonRole.son,
     )
     db.add(deleted)
     db.flush()
@@ -210,7 +214,7 @@ def test_wish_list_empty_people_list(db, test_client: TestClient, family_record)
 
 def _make_person(db, family_id, given_name, age):
     """Helper: create a person with wishes for a family."""
-    p = Person(family_id=family_id, given_name=given_name, age=age)
+    p = Person(family_id=family_id, given_name=given_name, age=age, role=PersonRole.son)
     db.add(p)
     db.flush()
     db.add_all(

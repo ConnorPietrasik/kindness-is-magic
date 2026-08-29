@@ -9,6 +9,7 @@ from app.models import (
     Family,
     FamilyVerificationStatus,
     Person,
+    PersonRole,
     Referrer,
     ReferrerApprovalStatus,
     User,
@@ -50,6 +51,7 @@ def wish_tree(db: Session):
         family_id=fam.id,
         given_name="WishChild",
         age=10,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()
@@ -99,6 +101,7 @@ def second_family_with_wishes(db: Session, wish_tree):
         family_id=fam2.id,
         given_name="SecondChild",
         age=12,
+        role=PersonRole.son,
     )
     db.add(person2)
     db.flush()

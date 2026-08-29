@@ -74,7 +74,7 @@ class TestPersonGetShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, Wish, WishType
+        from app.models import Family, Person, PersonRole, Wish, WishType
 
         # Create a family and person under another_referrer
         other_fam = Family(
@@ -92,6 +92,7 @@ class TestPersonGetShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
+            role=PersonRole.son,
         )
         db.add(other_person)
         db.flush()
@@ -180,7 +181,7 @@ class TestPersonUpdateShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, Wish, WishType
+        from app.models import Family, Person, PersonRole, Wish, WishType
 
         other_fam = Family(
             referrer_id=another_referrer["referrer"].id,
@@ -197,6 +198,7 @@ class TestPersonUpdateShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
+            role=PersonRole.son,
         )
         db.add(other_person)
         db.flush()
@@ -231,35 +233,31 @@ class TestPersonUpdateShared:
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, family_user, family_with_people):
         """Sending null for a nullable field should leave it unchanged."""
         person = family_with_people["people"][0]
-        person.title = "Dr."
         person.note = "Important note"
         person._sa_instance_state.session.commit()
 
         _family_login(test_client)
         resp = test_client.patch(
             f"/api/people/{person.id}",
-            json={"title": None},
+            json={"note": None},
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["title"] == "Dr."  # unchanged
         assert body["note"] == "Important note"  # unchanged
 
     def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, family_user, family_with_people):
         """Sending '' for a nullable field should clear it to None."""
         person = family_with_people["people"][0]
-        person.title = "Dr."
         person.note = "Important note"
         person._sa_instance_state.session.commit()
 
         _family_login(test_client)
         resp = test_client.patch(
             f"/api/people/{person.id}",
-            json={"title": "", "note": ""},
+            json={"note": ""},
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["title"] is None  # cleared
         assert body["note"] is None  # cleared
 
     def test_422_bad_data(self, test_client: TestClient, referrer_with_full_tree):
@@ -316,7 +314,7 @@ class TestPersonDeleteShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, Wish, WishType
+        from app.models import Family, Person, PersonRole, Wish, WishType
 
         other_fam = Family(
             referrer_id=another_referrer["referrer"].id,
@@ -333,6 +331,7 @@ class TestPersonDeleteShared:
             family_id=other_fam.id,
             given_name="Other Person",
             age=5,
+            role=PersonRole.son,
         )
         db.add(other_person)
         db.flush()

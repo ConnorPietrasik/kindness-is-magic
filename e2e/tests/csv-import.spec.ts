@@ -37,25 +37,31 @@ test.describe("CSV Import", () => {
     await context.close();
   });
 
-  test("admin uploads malformed CSV and sees validation errors", async ({ browser }) => {
+  test("admin uploads CSV with bad data and sees server-side errors", async ({ browser }) => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
 
     await page.goto("/admin/csv-upload");
     await expect(page.getByRole("heading", { name: "CSV Import" })).toBeVisible();
 
-    /* Upload a malformed CSV */
+    /* Headers are correct (so client-side validation passes and the import runs),
+       but every row is bad data — the errors must come from the server.
+       Names are suffixed so a pre-existing record can't change which error fires.
+       Nothing is created, so no cleanup is needed. */
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const missingReferrer = `No Ref ${suffix}`;
+    const missingFamily = `No Fam ${suffix}`;
     const malformedCsv = `# referrers
 name,family_limit,phone_number
 ,abc,
 
 # families
-referrer_name,family_name,family_wish,contact_name
-NonExistent Referrer,Bad Family,Wish,Contact
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+${missingReferrer},${missingFamily},Wish,Contact,,,
 
 # people
-family_name,given_name,age,wish,size,fun_wish
-Bad Family,Test Person,not_a_number,Bike,,Lego
+family_name,given_name,age,wish,size,fun_wish,role,note
+${missingFamily},Test Person,not_a_number,Bike,,Lego,son,
 `;
 
     await page.setInputFiles('input[type="file"]', {
@@ -64,26 +70,20 @@ Bad Family,Test Person,not_a_number,Bike,,Lego
       buffer: Buffer.from(malformedCsv),
     });
 
-    /* Wait for file to be selected */
+    /* Wait for file to be selected and client-side validation to pass */
     await expect(page.getByText("malformed.csv")).toBeVisible();
-
-    /* Validation errors should appear */
-    await page.waitForTimeout(500);
-
-    /* The Import button should be disabled if validation found errors */
     const importBtn = page.getByRole("button", { name: "Import CSV" });
+    await expect(importBtn).toBeEnabled();
 
-    /* Even if client validation passes (some errors are server-side),
-       clicking import should show server errors for bad data */
-    if (!(await importBtn.isDisabled())) {
-      await importBtn.click();
-      /* Wait for results — should have errors */
-      await expect(page.getByRole("heading", { name: "Import Results" })).toBeVisible({
-        timeout: 15_000,
-      });
-      /* Should show some error rows */
-      await expect(page.getByText("error")).toBeVisible();
-    }
+    /* Import and wait for results */
+    await importBtn.click();
+    await expect(page.getByRole("heading", { name: "Import Results" })).toBeVisible({ timeout: 15_000 });
+
+    /* Row details are open by default when there are errors; each bad row
+       produced a specific server-side error */
+    await expect(page.getByText("Missing 'name'")).toBeVisible();
+    await expect(page.getByText(`Referrer '${missingReferrer}' not found`)).toBeVisible();
+    await expect(page.getByText(`Family '${missingFamily}' not found`)).toBeVisible();
 
     await context.close();
   });

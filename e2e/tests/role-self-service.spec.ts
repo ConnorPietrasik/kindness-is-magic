@@ -79,6 +79,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     /* Fill the form */
     await page.getByLabel("Given Name").fill(TEST_FAMILY_CHILD);
     await page.getByLabel("Age").fill("5");
+    await page.getByLabel("Role").selectOption("son");
     await page.getByLabel("Practical Wish").fill("Winter gloves");
     await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("Sticker book");
@@ -188,6 +189,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     /* Fill the form */
     await page.getByLabel("Given Name").fill(TEST_REFERRER_CHILD);
     await page.getByLabel("Age").fill("3");
+    await page.getByLabel("Role").selectOption("daughter");
     await page.getByLabel("Practical Wish").fill("Warm socks");
     await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("Coloring book");
@@ -284,7 +286,10 @@ test.describe("Role Self-Service — display name", () => {
   });
 
   test("referrer changes display name and it persists after refresh", async ({ browser }) => {
-    if (!displayNameData.email || !displayNameData.password) test.skip();
+    if (!displayNameData.email || !displayNameData.password) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();

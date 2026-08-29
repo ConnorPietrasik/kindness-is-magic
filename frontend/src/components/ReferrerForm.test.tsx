@@ -42,6 +42,27 @@ describe("ReferrerForm", () => {
     expect(screen.queryByText("Test Form")).not.toBeInTheDocument();
   });
 
+  it("keeps user input when the same referrer refetches (new initial object identity)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<ReferrerForm {...defaultProps} title="Edit" isEdit={true} initial={mockReferrerDetail} />);
+    await user.type(screen.getByLabelText("Name"), " X");
+
+    // A background refetch delivers a new object for the same referrer id
+    rerender(<ReferrerForm {...defaultProps} title="Edit" isEdit={true} initial={{ ...mockReferrerDetail }} />);
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Jane Smith X");
+  });
+
+  it("repopulates the form when the edited referrer changes", async () => {
+    const { rerender } = render(<ReferrerForm {...defaultProps} title="Edit" isEdit={true} initial={mockReferrerDetail} />);
+
+    rerender(
+      <ReferrerForm {...defaultProps} title="Edit" isEdit={true} initial={{ ...mockReferrerDetail, id: 99, name: "Other Referrer" }} />
+    );
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Other Referrer");
+  });
+
   it("renders Create button in create mode", () => {
     render(<ReferrerForm {...defaultProps} initial={{}} isEdit={false} />);
     expect(screen.getByText("Create")).toBeInTheDocument();

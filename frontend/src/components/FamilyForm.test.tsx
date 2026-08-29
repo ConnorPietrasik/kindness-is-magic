@@ -67,6 +67,32 @@ describe("FamilyForm", () => {
     expect(select.value).toBe("2"); // Jane Smith (ID 2) is the current referrer
   });
 
+  it("keeps user input when the same family refetches (new initial object identity)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    await user.type(screen.getByLabelText("Family Name"), " X");
+
+    // A background refetch delivers a new object for the same family id
+    rerender(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail }} />);
+
+    expect(screen.getByLabelText("Family Name")).toHaveValue("The Smiths X");
+  });
+
+  it("repopulates the form when the edited family changes", async () => {
+    const { rerender } = render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+
+    rerender(
+      <FamilyForm
+        {...defaultProps}
+        title="Edit Family"
+        isEdit={true}
+        initial={{ ...mockFamilyDetail, id: 99, family_name: "The Others" }}
+      />
+    );
+
+    expect(screen.getByLabelText("Family Name")).toHaveValue("The Others");
+  });
+
   it("includes referrer_id in submit payload when changed on edit", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

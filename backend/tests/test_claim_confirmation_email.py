@@ -38,7 +38,7 @@ def _create_donor(client: TestClient) -> dict:
 
 def _create_claimed_family(db: Session) -> dict:
     """Create a verified, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Claimed Family",
@@ -56,6 +56,7 @@ def _create_claimed_family(db: Session) -> dict:
         family_id=fam.id,
         given_name="Alice",
         age=8,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()
@@ -74,7 +75,7 @@ def _create_claimed_family(db: Session) -> dict:
 
 def _create_family_with_adult(db: Session) -> dict:
     """Create a family with an adult person."""
-    from app.models import Family, FamilyVerificationStatus, Person, Wish, WishLockLevel, WishType
+    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
     fam = Family(
         family_name="Adult Family",
@@ -92,6 +93,7 @@ def _create_family_with_adult(db: Session) -> dict:
         family_id=fam.id,
         given_name="Bob",
         age=25,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()

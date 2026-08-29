@@ -9,6 +9,7 @@ from app.models import (
     Family,
     FamilyVerificationStatus,
     Person,
+    PersonRole,
     Referrer,
     ReferrerApprovalStatus,
     User,
@@ -51,6 +52,7 @@ def purchaser_wish_tree(db: Session):
         family_id=fam.id,
         given_name="PurchaserChild",
         age=10,
+        role=PersonRole.son,
     )
     db.add(person)
     db.flush()
@@ -156,7 +158,7 @@ class TestPurchaserListWishes:
         db.add(fam2)
         db.flush()
 
-        person2 = Person(family_id=fam2.id, given_name="PendingChild", age=10)
+        person2 = Person(family_id=fam2.id, given_name="PendingChild", age=10, role=PersonRole.son)
         db.add(person2)
         db.flush()
 
@@ -522,6 +524,7 @@ class TestAdminMarkPurchasedSkipRedundantWrite:
             family_id=fam2.id,
             given_name="AdminMarkChild",
             age=10,
+            role=PersonRole.son,
         )
         db.add(person2)
         db.flush()

@@ -676,7 +676,7 @@ class TestAdminListPeople:
         assert body["total_pages"] == 1
 
     def test_pagination(self, test_client: TestClient, admin_user, family_record, db: Session):
-        from app.models import Person, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         _admin_login(test_client)
         # Create 5 people in the family
@@ -685,6 +685,7 @@ class TestAdminListPeople:
                 family_id=family_record.id,
                 given_name=f"Person {i}",
                 age=10,
+                role=PersonRole.son,
             )
             db.add(p)
             db.flush()
@@ -743,6 +744,7 @@ class TestAdminCreatePerson:
             json={
                 "family_id": family_record.id,
                 "given_name": "Diana",
+                "role": "daughter",
                 "age": 5,
                 "wishes": [
                     {"type": "practical", "description": "A coat"},
@@ -770,13 +772,13 @@ class TestAdminCreatePerson:
                     {"type": "practical", "description": "A coat", "size": "Small"},
                     {"type": "fun", "description": "A puzzle"},
                 ],
-                "title": "Ms.",
+                "role": "daughter",
                 "note": "Allergic to peanuts",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["title"] == "Ms."
+        assert body["role"] == "daughter"
         assert body["note"] == "Allergic to peanuts"
         assert len(body["wishes"]) == 2
         assert body["wishes"][0]["size"] == "Small"
@@ -788,6 +790,7 @@ class TestAdminCreatePerson:
             json={
                 "family_id": family_record.id,
                 "given_name": "Diana",
+                "role": "mother",
                 "age": 25,
                 "wishes": [
                     {"type": "adult", "description": "A laptop"},
@@ -808,6 +811,7 @@ class TestAdminCreatePerson:
             json={
                 "family_id": family_record.id,
                 "given_name": "Diana",
+                "role": "mother",
                 "age": 25,
                 "wishes": [
                     {"type": "practical", "description": "A coat"},
@@ -824,6 +828,7 @@ class TestAdminCreatePerson:
             json={
                 "family_id": 99999,
                 "given_name": "Diana",
+                "role": "daughter",
                 "age": 5,
                 "wishes": [
                     {"type": "practical", "description": "A coat"},
@@ -859,7 +864,7 @@ class TestAdminUpdatePerson:
                     {"type": "practical", "description": "A new coat"},
                     {"type": "fun", "description": "A board game"},
                 ],
-                "title": "Miss",
+                "role": "granddaughter",
                 "note": "Updated note",
             },
         )
@@ -867,7 +872,7 @@ class TestAdminUpdatePerson:
         body = resp.json()
         assert body["given_name"] == "Alicia"
         assert body["age"] == 9
-        assert body["title"] == "Miss"
+        assert body["role"] == "granddaughter"
         assert body["note"] == "Updated note"
         # Wishes should be updated
         assert len(body["wishes"]) == 2
@@ -919,35 +924,31 @@ class TestAdminUpdatePerson:
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
         """Sending null for a nullable field should leave it unchanged."""
         person = family_with_people["people"][0]
-        person.title = "Dr."
         person.note = "Important note"
         person._sa_instance_state.session.commit()
 
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/people/{person.id}",
-            json={"title": None},
+            json={"note": None},
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["title"] == "Dr."  # unchanged
         assert body["note"] == "Important note"  # unchanged
 
     def test_200_empty_string_clears_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
         """Sending '' for a nullable field should clear it to None."""
         person = family_with_people["people"][0]
-        person.title = "Dr."
         person.note = "Important note"
         person._sa_instance_state.session.commit()
 
         _admin_login(test_client)
         resp = test_client.patch(
             f"/api/admin/people/{person.id}",
-            json={"title": "", "note": ""},
+            json={"note": ""},
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["title"] is None  # cleared
         assert body["note"] is None  # cleared
 
     def test_404_not_found(self, test_client: TestClient, admin_user):

@@ -54,9 +54,15 @@ export function FamilyForm({
   const [form, setForm] = useState<FamilyFormState>(() => ({ ...defaultFamilyForm, ...initial }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
+  // Re-populate only when the *family* being edited changes, not on every new
+  // `initial` object identity (background refetches of the same detail).
+  const familyId = initial?.id;
+  const [loadedId, setLoadedId] = useState<number | undefined>(familyId);
   useEffect(() => {
+    if (familyId === loadedId) return;
+    setLoadedId(familyId);
     setForm({ ...defaultFamilyForm, ...initial });
-  }, [initial]);
+  }, [initial, familyId, loadedId]);
 
   const update = (key: keyof FamilyFormState, val: string | number | null) => setForm((prev) => ({ ...prev, [key]: val }));
 

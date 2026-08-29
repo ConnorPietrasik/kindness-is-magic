@@ -62,6 +62,7 @@ export type {
   PendingFamilySummary,
   PersonDetail,
   PersonPayload,
+  PersonRole,
   PersonWishItem,
   PublicFamilyListResponse,
   PublicFamilySummary,
@@ -92,4 +93,4 @@ export type {
   WishSummary,
   WishType,
 } from "./domain";
-export { getClaimStatus, WISH_TYPE } from "./domain";
+export { getClaimStatus, PERSON_ROLES, personRoleLabel, WISH_TYPE } from "./domain";

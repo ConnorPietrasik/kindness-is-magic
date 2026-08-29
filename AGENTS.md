@@ -22,10 +22,9 @@
 
 ## Planning
 
-- **Plans are contracts, not scripts.** Capture what makes the change *right* and what's expensive to rediscover: goal, scope boundaries (including what's explicitly out of scope), naming/behavior decisions, non-obvious traps, and stage gates. Omit what's easily verifiable during implementation — line numbers, exact code or string literals, predicted command output. Brittle detail biases the agent toward following the plan instead of the code, and a single stale detail can derail execution.
-- **Decisions are expressed as outcomes in the plan** (the chosen name, the chosen approach) — not restated in a separate "approved decisions" section.
-- **Break large changes into independently testable stages**, each with a validation gate before the next stage begins. Always do backend before frontend.
-- **Length is fine when every line earns its place.** A complex change with many traps needs a longer plan. Cut detail the code will answer anyway. A plan carries the results of blast-radius investigation: every *exception* to the change pattern — where a mechanical pattern match would do the wrong thing (out-of-scope matches that look identical, shared components, same name, different concept). Don't enumerate the sites that *should* change — `rg` finds them and doing them right is the default. Traps are where it isn't.
+- **A plan orders the work; it doesn't write it.** Capture goal, scope (including what's explicitly out of scope), decisions, traps, and stage gates as the *final state* — outcomes, not the Q&A that produced them; the implementing agent has no memory of this conversation. Omit what's easily verifiable during implementation — line numbers, exact code, predicted output; brittle detail derails more than it guides. Length tracks complexity — every line earns its place.
+- **The plan settles decisions; the code is truth for facts.** Don't re-litigate settled decisions, and don't audit the plan against the code either — you'll be reading the code you're editing anyway, and that's where a wrong plan shows itself. Stale facts: correct and note, move on. A *decision* the code disproves: stop and surface it — don't silently follow a wrong plan, and don't silently pick a different approach.
+- **Stage the work; map the exceptions.** Independently testable stages, each gated by validation before the next (backend before frontend). List every *exception* to the change pattern — where a mechanical match would do the wrong thing (out-of-scope look-alikes, shared components, same name different concept) — not the sites that should change; `rg` finds those.
 
 ## Project Structure
 

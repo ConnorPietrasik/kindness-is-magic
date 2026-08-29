@@ -71,21 +71,21 @@ describe("humanize", () => {
 
 describe("normalizePayload", () => {
   it("converts empty strings to null on nullable fields", () => {
-    const input = { family_name: "Smith", bio: "", address: "", title: "" };
+    const input = { family_name: "Smith", bio: "", address: "", note: "" };
     const result = normalizePayload(input);
     expect(result.bio).toBeNull();
-    expect(result.title).toBeNull();
+    expect(result.note).toBeNull();
     expect(result.family_name).toBe("Smith");
     // address is required (never nullable) — empty string stays as-is
     expect(result.address).toBe("");
   });
 
   it("leaves non-empty strings untouched", () => {
-    const input = { bio: "Hello", address: "123 Main", title: "Dr" };
+    const input = { bio: "Hello", address: "123 Main", note: "Dr" };
     const result = normalizePayload(input);
     expect(result.bio).toBe("Hello");
     expect(result.address).toBe("123 Main");
-    expect(result.title).toBe("Dr");
+    expect(result.note).toBe("Dr");
   });
 
   it("leaves null values as-is", () => {

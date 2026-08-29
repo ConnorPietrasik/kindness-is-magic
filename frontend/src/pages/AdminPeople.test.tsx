@@ -34,7 +34,7 @@ function makePerson(overrides: Partial<PersonDetail>): PersonDetail {
     family_id: 5,
     display_id: null,
     given_name: "Someone",
-    title: null,
+    role: "son",
     age: 0,
     note: null,
     created_at: "2025-01-01T00:00:00Z",
@@ -348,6 +348,7 @@ describe("AdminPeople", () => {
     });
 
     await user.selectOptions(screen.getByLabelText("Family") as HTMLSelectElement, "5");
+    await user.selectOptions(screen.getByLabelText("Role") as HTMLSelectElement, "daughter");
     await user.type(screen.getByLabelText("Given Name"), "Carol");
     await user.type(screen.getByLabelText("Age"), "10");
 
@@ -363,8 +364,8 @@ describe("AdminPeople", () => {
       expect(api.adminCreatePerson).toHaveBeenCalledWith(
         {
           given_name: "Carol",
+          role: "daughter",
           age: 10,
-          title: null,
           note: null,
           wishes: [
             { type: "practical", description: "Jumper", size: null },
@@ -400,6 +401,7 @@ describe("AdminPeople", () => {
     });
 
     await user.selectOptions(screen.getByLabelText("Family") as HTMLSelectElement, "5");
+    await user.selectOptions(screen.getByLabelText("Role") as HTMLSelectElement, "son");
     await user.type(screen.getByLabelText("Given Name"), "Dan");
     await user.type(screen.getByLabelText("Age"), "25");
 
@@ -413,8 +415,8 @@ describe("AdminPeople", () => {
       expect(api.adminCreatePerson).toHaveBeenCalledWith(
         {
           given_name: "Dan",
+          role: "son",
           age: 25,
-          title: null,
           note: null,
           wishes: [{ type: "adult", description: "Coffee", size: "M" }],
           family_id: 5,

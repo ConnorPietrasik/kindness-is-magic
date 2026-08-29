@@ -62,7 +62,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── Donor dashboard ────────────────────────────────────────────────────
 
   test("donor lands on the shared dashboard with welcome card and gift claim cap", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -91,7 +94,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── Header title link ──────────────────────────────────────────────────
 
   test("donor can return to the dashboard from the header title", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -119,7 +125,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── Browse families and view wish list ─────────────────────────────────
 
   test("donor browses families and views wish list", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword || !testData.familyId) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword || !testData.familyId) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -150,7 +159,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── Claim a family ─────────────────────────────────────────────────────
 
   test("donor claims a family with gifts commitment", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword || !testData.familyId) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword || !testData.familyId) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -194,7 +206,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── View claims list ───────────────────────────────────────────────────
 
   test("donor views claims list", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -223,7 +238,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── View claim detail and mark wish as purchased ───────────────────────
 
   test("donor views claim detail and marks wish as purchased", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -281,7 +299,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
   // ── Cancel claim ───────────────────────────────────────────────────────
 
   test("donor cancels a claim", async ({ browser }) => {
-    if (!testData.donorEmail || !testData.donorPassword) test.skip();
+    if (!testData.donorEmail || !testData.donorPassword) {
+      test.skip();
+      return;
+    }
 
     const context = await browser.newContext();
     const page = await context.newPage();

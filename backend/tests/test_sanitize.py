@@ -18,7 +18,7 @@ from app.schemas import (
     ReferrerUpdate,
     WishCreate,
 )
-from app.models import UserRole, WishType
+from app.models import PersonRole, UserRole, WishType
 from app.user_validation import sanitize_plain_text
 
 # ---------------------------------------------------------------------------
@@ -177,6 +177,7 @@ class TestPersonSchemasRejectHtml:
             PersonCreate(
                 family_id=1,
                 given_name=HTML_PAYLOAD,
+                role=PersonRole.daughter,
                 age=10,
                 wishes=[
                     WishCreate(type=WishType.practical, description="Shoes"),
@@ -189,6 +190,7 @@ class TestPersonSchemasRejectHtml:
             PersonCreate(
                 family_id=1,
                 given_name="Alice",
+                role=PersonRole.daughter,
                 age=10,
                 wishes=[
                     WishCreate(type=WishType.practical, description=HTML_PAYLOAD),
@@ -201,6 +203,7 @@ class TestPersonSchemasRejectHtml:
             PersonCreate(
                 family_id=1,
                 given_name="Alice",
+                role=PersonRole.daughter,
                 age=10,
                 wishes=[
                     WishCreate(type=WishType.practical, description="Shoes"),
@@ -209,17 +212,17 @@ class TestPersonSchemasRejectHtml:
                 note=HTML_PAYLOAD,
             )
 
-    def test_person_create_title(self):
+    def test_person_create_invalid_role(self):
         with pytest.raises(ValidationError):
             PersonCreate(
                 family_id=1,
                 given_name="Alice",
+                role="Ms.",  # not a valid PersonRole
                 age=10,
                 wishes=[
                     WishCreate(type=WishType.practical, description="Shoes"),
                     WishCreate(type=WishType.fun, description="Game"),
                 ],
-                title=HTML_PAYLOAD,
             )
 
     def test_person_update(self):
@@ -230,6 +233,7 @@ class TestPersonSchemasRejectHtml:
         with pytest.raises(ValidationError):
             PersonCreateInFamily(
                 given_name=HTML_PAYLOAD,
+                role=PersonRole.daughter,
                 age=10,
                 wishes=[
                     WishCreate(type=WishType.practical, description="Shoes"),
@@ -266,6 +270,7 @@ class TestValidInputPasses:
         p = PersonCreate(
             family_id=1,
             given_name="Alice",
+            role=PersonRole.daughter,
             age=10,
             wishes=[
                 WishCreate(type=WishType.practical, description="A backpack for school"),

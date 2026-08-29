@@ -121,6 +121,7 @@ test.describe("Admin Family Lifecycle — cascade delete", () => {
     await page.getByRole("button", { name: "+ Add Person" }).click();
     await page.getByLabel("Given Name").fill(personName);
     await page.getByLabel("Age").fill("5");
+    await page.getByLabel("Role").selectOption("son");
     await expect(page.getByLabel("Practical Wish")).toBeVisible({ timeout: 5_000 });
     await page.getByLabel("Practical Wish").fill("A coat");
     await page.getByLabel("Size").fill("M");

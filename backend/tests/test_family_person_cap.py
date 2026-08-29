@@ -39,13 +39,14 @@ def _child_wishes():
 
 def _seed_people(db: Session, family_id: int, count: int) -> None:
     """Create *count* Person rows for the given family."""
-    from app.models import Person, Wish, WishType
+    from app.models import Person, PersonRole, Wish, WishType
 
     for i in range(count):
         person = Person(
             family_id=family_id,
             given_name=f"Person {i}",
             age=8,
+            role=PersonRole.son,
         )
         db.add(person)
         db.flush()
@@ -71,7 +72,7 @@ class TestFamilyPersonCapFamilySelfService:
         _family_login(test_client)
         resp = test_client.post(
             "/api/family/people",
-            json={"given_name": "Tenth", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Tenth", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 201
         assert resp.json()["given_name"] == "Tenth"
@@ -83,7 +84,7 @@ class TestFamilyPersonCapFamilySelfService:
         _family_login(test_client)
         resp = test_client.post(
             "/api/family/people",
-            json={"given_name": "Eleventh", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Eleventh", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 400
         assert "limit" in resp.json()["detail"].lower()
@@ -102,7 +103,7 @@ class TestFamilyPersonCapFamilySelfService:
         _family_login(test_client)
         resp = test_client.post(
             "/api/family/people",
-            json={"given_name": "Replacement", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Replacement", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 201
         assert resp.json()["given_name"] == "Replacement"
@@ -125,7 +126,7 @@ class TestFamilyPersonCapReferrerSelfService:
         _tree_referrer_login(test_client)
         resp = test_client.post(
             f"/api/referrer/families/{fam.id}/people",
-            json={"given_name": "Tenth", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Tenth", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 201
         assert resp.json()["given_name"] == "Tenth"
@@ -139,7 +140,7 @@ class TestFamilyPersonCapReferrerSelfService:
         _tree_referrer_login(test_client)
         resp = test_client.post(
             f"/api/referrer/families/{fam.id}/people",
-            json={"given_name": "Eleventh", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Eleventh", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 400
         assert "limit" in resp.json()["detail"].lower()
@@ -159,7 +160,7 @@ class TestFamilyPersonCapReferrerSelfService:
         _tree_referrer_login(test_client)
         resp = test_client.post(
             f"/api/referrer/families/{fam.id}/people",
-            json={"given_name": "Replacement", "age": 5, "wishes": _child_wishes()},
+            json={"given_name": "Replacement", "role": "son", "age": 5, "wishes": _child_wishes()},
         )
         assert resp.status_code == 201
 
@@ -182,6 +183,7 @@ class TestFamilyPersonCapAdminBypass:
             json={
                 "family_id": family_record.id,
                 "given_name": "Admin Person",
+                "role": "son",
                 "age": 5,
                 "wishes": _child_wishes(),
             },
@@ -200,6 +202,7 @@ class TestFamilyPersonCapAdminBypass:
                 json={
                     "family_id": family_record.id,
                     "given_name": f"Admin Extra {i}",
+                    "role": "son",
                     "age": 5,
                     "wishes": _child_wishes(),
                 },

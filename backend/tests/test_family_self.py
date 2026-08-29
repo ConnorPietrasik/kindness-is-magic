@@ -242,6 +242,7 @@ class TestFamilyCreatePerson:
             "/api/family/people",
             json={
                 "given_name": "New Kid",
+                "role": "son",
                 "age": 4,
                 "wishes": [
                     {"type": "practical", "description": "A jacket"},
@@ -267,13 +268,13 @@ class TestFamilyCreatePerson:
                     {"type": "practical", "description": "A jacket", "size": "Small"},
                     {"type": "fun", "description": "A balloon"},
                 ],
-                "title": "Mr.",
+                "role": "son",
                 "note": "Loves balloons",
             },
         )
         assert resp.status_code == 201
         body = resp.json()
-        assert body["title"] == "Mr."
+        assert body["role"] == "son"
         assert body["note"] == "Loves balloons"
         assert len(body["wishes"]) == 2
 

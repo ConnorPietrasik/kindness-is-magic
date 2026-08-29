@@ -61,6 +61,7 @@ test.describe.serial("Admin Person Lifecycle", () => {
     /* Fill the person form */
     await page.getByLabel("Given Name").fill(TEST_PERSON);
     await page.getByLabel("Age", { exact: true }).fill("7");
+    await page.getByLabel("Role").selectOption("son");
     await page.getByLabel("Practical Wish").fill("A warm jacket");
     await page.getByLabel("Size").fill("0");
     await page.getByLabel("Fun Wish").fill("A puzzle");

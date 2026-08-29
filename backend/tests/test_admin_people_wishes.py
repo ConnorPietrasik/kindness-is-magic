@@ -18,6 +18,7 @@ from app.models import (
     Family,
     FamilyVerificationStatus,
     Person,
+    PersonRole,
     Referrer,
     ReferrerApprovalStatus,
     Wish,
@@ -64,7 +65,7 @@ def person_with_wishes(db: Session):
     db.commit()
     db.refresh(fam)
 
-    person = Person(family_id=fam.id, given_name="WishChild", age=10)
+    person = Person(family_id=fam.id, given_name="WishChild", age=10, role=PersonRole.son)
     db.add(person)
     db.flush()
 
@@ -104,7 +105,7 @@ def adult_person_with_wish(db: Session):
     db.commit()
     db.refresh(fam)
 
-    person = Person(family_id=fam.id, given_name="AdultPerson", age=20)
+    person = Person(family_id=fam.id, given_name="AdultPerson", age=20, role=PersonRole.son)
     db.add(person)
     db.flush()
 
@@ -142,7 +143,7 @@ def adult_person_no_wishes(db: Session):
     db.commit()
     db.refresh(fam)
 
-    person = Person(family_id=fam.id, given_name="AdultPerson2", age=25)
+    person = Person(family_id=fam.id, given_name="AdultPerson2", age=25, role=PersonRole.son)
     db.add(person)
     db.commit()
     db.refresh(person)
@@ -202,7 +203,7 @@ class TestListPersonWishes:
         db.commit()
         db.refresh(fam)
 
-        person = Person(family_id=fam.id, given_name="EmptyPerson", age=5)
+        person = Person(family_id=fam.id, given_name="EmptyPerson", age=5, role=PersonRole.son)
         db.add(person)
         db.commit()
         db.refresh(person)
@@ -276,7 +277,7 @@ class TestCreatePersonWish:
         db.commit()
         db.refresh(fam)
 
-        person = Person(family_id=fam.id, given_name="SizePerson", age=30)
+        person = Person(family_id=fam.id, given_name="SizePerson", age=30, role=PersonRole.son)
         db.add(person)
         db.commit()
         db.refresh(person)
@@ -452,7 +453,7 @@ class TestUpdatePersonWish:
         db.commit()
         db.refresh(fam)
 
-        other_person = Person(family_id=fam.id, given_name="OtherPerson", age=6)
+        other_person = Person(family_id=fam.id, given_name="OtherPerson", age=6, role=PersonRole.son)
         db.add(other_person)
         db.flush()
 
@@ -561,7 +562,7 @@ class TestDeletePersonWish:
         db.commit()
         db.refresh(fam)
 
-        other_person = Person(family_id=fam.id, given_name="OtherPerson2", age=6)
+        other_person = Person(family_id=fam.id, given_name="OtherPerson2", age=6, role=PersonRole.son)
         db.add(other_person)
         db.flush()
 
@@ -673,7 +674,7 @@ class TestRestorePersonWish:
         db.commit()
         db.refresh(fam)
 
-        other_person = Person(family_id=fam.id, given_name="OtherPerson3", age=6)
+        other_person = Person(family_id=fam.id, given_name="OtherPerson3", age=6, role=PersonRole.son)
         db.add(other_person)
         db.flush()
 

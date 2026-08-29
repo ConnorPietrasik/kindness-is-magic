@@ -307,6 +307,35 @@ export interface WishCreate {
   size?: string | null;
 }
 
+/** Literal person-role values in display order — drives the `PersonRole` type
+ *  and the role select options. Stored lowercase (mirrors backend).
+ */
+export const PERSON_ROLES = [
+  "son",
+  "daughter",
+  "grandson",
+  "granddaughter",
+  "mother",
+  "father",
+  "grandfather",
+  "grandmother",
+  "aunt",
+  "uncle",
+  "cousin",
+  "nephew",
+  "niece",
+  "cat",
+  "dog",
+] as const;
+
+/** Person's family role — mirrors backend PersonRole enum. */
+export type PersonRole = (typeof PERSON_ROLES)[number];
+
+/** Display label for a person role — capitalizes the stored value ("mother" → "Mother"). */
+export function personRoleLabel(role: PersonRole): string {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 /** Payload for creating or updating a person. `family_id` and `deleted_at` are admin-only.
 
     All fields are optional so the same type works for both create (all present) and
@@ -315,7 +344,7 @@ export interface WishCreate {
 export interface PersonPayload {
   family_id?: number;
   given_name?: string;
-  title?: string | null;
+  role?: PersonRole;
   age?: number;
   wishes?: WishCreate[];
   note?: string | null;
@@ -480,7 +509,7 @@ export interface PublicFamilyListResponse {
 /** Mirrors PersonWishItem on the backend wish-list response. */
 export interface PersonWishItem {
   given_name: string;
-  title: string | null;
+  role: PersonRole;
   age: number;
   note: string | null;
   wishes: WishSummary[];
@@ -505,7 +534,7 @@ export interface FamilyWishListResponse {
 export interface PackingSlipPersonItem {
   display_id: string;
   given_name: string;
-  title: string | null;
+  role: PersonRole;
   age: number;
   note: string | null;
   wishes: WishSummary[];
@@ -529,7 +558,7 @@ export interface PersonDetail {
   family_id: number;
   display_id: string | null;
   given_name: string;
-  title: string | null;
+  role: PersonRole;
   age: number;
   note: string | null;
   created_at: string;

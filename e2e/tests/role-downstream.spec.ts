@@ -75,6 +75,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
   // Create a person with wishes
   await createPersonViaApi(apiContext, family.familyId, {
     givenName: TEST_PERSON_NAME,
+    role: "son",
     age: 7,
     wish: "Warm winter coat",
     size: "7",
@@ -144,6 +145,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
 
   await createPersonViaApi(apiContext, family2.familyId, {
     givenName: TEST_PERSON2_NAME,
+    role: "daughter",
     age: 9,
     wish: "Early practical wish",
     funWish: "Early fun wish",
