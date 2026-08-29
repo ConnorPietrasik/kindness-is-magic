@@ -712,3 +712,136 @@ class TestRestorePersonWish:
             f"/api/admin/people/{person_with_wishes['person'].id}/wishes/{wish.id}/restore",
         )
         assert resp.status_code == 401
+
+
+# =========================================================================
+# Wish color — create/update person sync + single-wish PATCH
+# =========================================================================
+
+
+class TestWishColor:
+    def test_201_create_person_stores_wish_color(self, test_client: TestClient, admin_user, family_record):
+        """Person creation stores color on each wish via create_person_with_wishes."""
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/people",
+            json={
+                "family_id": family_record.id,
+                "given_name": "ColorKid",
+                "role": "daughter",
+                "age": 9,
+                "wishes": [
+                    {"type": "practical", "description": "A coat", "size": "S", "color": "Blue"},
+                    {"type": "fun", "description": "A doll", "color": "Red"},
+                ],
+            },
+        )
+        assert resp.status_code == 201
+        colors = {w["type"]: w["color"] for w in resp.json()["wishes"]}
+        assert colors == {"practical": "Blue", "fun": "Red"}
+
+    def test_201_create_person_color_zero_becomes_null(self, test_client: TestClient, admin_user, family_record):
+        """'0' color normalizes to NULL on creation (same as size)."""
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/people",
+            json={
+                "family_id": family_record.id,
+                "given_name": "ZeroColor",
+                "role": "son",
+                "age": 30,
+                "wishes": [{"type": "adult", "description": "A book", "color": "0"}],
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["wishes"][0]["color"] is None
+
+    def test_200_update_person_syncs_wish_color(self, test_client: TestClient, admin_user, person_with_wishes):
+        """Person update syncs color onto existing wishes in place."""
+        _admin_login(test_client)
+        person = person_with_wishes["person"]
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={
+                "wishes": [
+                    {"type": "practical", "description": "A backpack", "size": "Medium", "color": "Blue"},
+                    {"type": "fun", "description": "A doll", "color": "Red"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        colors = {w["type"]: w["color"] for w in resp.json()["wishes"]}
+        assert colors == {"practical": "Blue", "fun": "Red"}
+
+    def test_200_update_person_clears_wish_color(self, test_client: TestClient, admin_user, person_with_wishes):
+        """Sending ''/'0' in a wishes sync clears color to NULL (same as size)."""
+        _admin_login(test_client)
+        person = person_with_wishes["person"]
+        # Set color first so the clear below is observable
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={
+                "wishes": [
+                    {"type": "practical", "description": "A backpack", "size": "Medium", "color": "Blue"},
+                    {"type": "fun", "description": "A doll", "color": "Red"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+
+        resp = test_client.patch(
+            f"/api/admin/people/{person.id}",
+            json={
+                "wishes": [
+                    {"type": "practical", "description": "A backpack", "size": "Medium", "color": ""},
+                    {"type": "fun", "description": "A doll", "color": "0"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        colors = {w["type"]: w["color"] for w in resp.json()["wishes"]}
+        assert colors == {"practical": None, "fun": None}
+
+    def test_200_patch_single_wish_sets_color(self, test_client: TestClient, admin_user, person_with_wishes):
+        _admin_login(test_client)
+        wish = person_with_wishes["wishes"][0]
+        resp = test_client.patch(
+            f"/api/admin/people/{person_with_wishes['person'].id}/wishes/{wish.id}",
+            json={"color": "Blue"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["color"] == "Blue"
+
+    def test_200_patch_single_wish_clears_color(self, test_client: TestClient, admin_user, person_with_wishes):
+        """Sending '' clears color to NULL on the single-wish PATCH."""
+        _admin_login(test_client)
+        base = f"/api/admin/people/{person_with_wishes['person'].id}/wishes/{person_with_wishes['wishes'][0].id}"
+        resp = test_client.patch(base, json={"color": "Blue"})
+        assert resp.status_code == 200
+
+        resp = test_client.patch(base, json={"color": ""})
+        assert resp.status_code == 200
+        assert resp.json()["color"] is None
+
+    def test_200_patch_single_wish_clears_size(self, test_client: TestClient, admin_user, person_with_wishes):
+        """Sending '' clears size to NULL on the single-wish PATCH."""
+        _admin_login(test_client)
+        base = f"/api/admin/people/{person_with_wishes['person'].id}/wishes/{person_with_wishes['wishes'][0].id}"
+        resp = test_client.patch(base, json={"size": ""})
+        assert resp.status_code == 200
+        assert resp.json()["size"] is None
+
+    def test_200_type_change_with_empty_size(self, test_client: TestClient, admin_user, adult_person_with_wish):
+        """Re-sending the type alongside size '' must not break type validation.
+
+        '' arrives as the _CLEAR sentinel; the WishCreate validation must
+        treat it as None rather than choking on the sentinel object.
+        """
+        _admin_login(test_client)
+        base = f"/api/admin/people/{adult_person_with_wish['person'].id}/wishes/{adult_person_with_wish['wishes'][0].id}"
+        resp = test_client.patch(base, json={"size": "Large"})
+        assert resp.status_code == 200
+
+        resp = test_client.patch(base, json={"type": "adult", "size": ""})
+        assert resp.status_code == 200
+        assert resp.json()["size"] is None

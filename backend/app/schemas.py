@@ -677,12 +677,28 @@ class FamilyListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _normalize_size_or_color(v: str | None) -> str | None:
+    """Normalize an optional size/color tag: ``None``, ``""`` and ``"0"`` → ``None`` (N/A).
+
+    Shared by the per-field ``normalize_size`` / ``normalize_color``
+    validators on WishCreate / WishUpdate / AdminWishUpdate. The
+    partial-update schemas map ``""`` to the ``_CLEAR`` sentinel before
+    calling, so an explicitly-sent empty string clears the column.
+    """
+    if v is None or v == "" or v == "0":
+        return None
+    if isinstance(v, str):
+        return sanitize_plain_text(v)
+    return v
+
+
 class WishCreate(BaseModel):
     """Create a single wish for a person (person_id inferred from route)."""
 
     type: WishType
     description: str = Field(..., min_length=1, max_length=60)
     size: str | None = Field(None, max_length=20)
+    color: str | None = Field(None, max_length=20)
 
     @field_validator("description")
     @classmethod
@@ -693,17 +709,29 @@ class WishCreate(BaseModel):
     @classmethod
     def normalize_size(cls, v: str | None) -> str | None:
         """Map empty string or '0' to None (N/A size)."""
-        if v is None or v == "" or v == "0":
-            return None
-        return sanitize_plain_text(v)
+        return _normalize_size_or_color(v)
+
+    @field_validator("color")
+    @classmethod
+    def normalize_color(cls, v: str | None) -> str | None:
+        """Map empty string or '0' to None (N/A color)."""
+        return _normalize_size_or_color(v)
 
 
 class WishUpdate(BaseModel):
-    """Partial update for a wish."""
+    """Partial update for a wish.
+
+    Send ``""`` to clear size or color to NULL (the ``_CLEAR`` sentinel
+    is resolved by :func:`app.response_builders.partial_update`).
+    """
 
     type: WishType | None = None
     description: Optional[str] = Field(None, min_length=1, max_length=60)
-    size: Optional[str] = Field(None, max_length=20)
+    # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
+    # the 20-char limit is enforced in the validators (constraints can't apply
+    # to a union containing object).
+    size: str | None | object = Field(default=None)  # type: ignore[assignment]
+    color: str | None | object = Field(default=None)  # type: ignore[assignment]
 
     @field_validator("description")
     @classmethod
@@ -714,13 +742,23 @@ class WishUpdate(BaseModel):
 
     @field_validator("size", mode="before")
     @classmethod
-    def normalize_size(cls, v: str | None) -> str | None:
-        """Map empty string or '0' to None (N/A size)."""
-        if v is None or v == "" or v == "0":
-            return None
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    def normalize_size(cls, v):
+        """Map '0' to None (N/A size); '' clears to NULL (``_CLEAR`` sentinel)."""
+        if v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 20:
+            raise ValueError("size must be 20 characters or fewer")
+        return _normalize_size_or_color(v)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def normalize_color(cls, v):
+        """Map '0' to None (N/A color); '' clears to NULL (``_CLEAR`` sentinel)."""
+        if v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 20:
+            raise ValueError("color must be 20 characters or fewer")
+        return _normalize_size_or_color(v)
 
 
 class WishSummary(BaseModel):
@@ -730,6 +768,7 @@ class WishSummary(BaseModel):
     type: WishType
     description: str
     size: str | None = None
+    color: str | None = None
     assigned_to_id: int | None = None
     purchased_at: datetime | None = None
     purchased_where: str | None = None
@@ -750,14 +789,18 @@ class WishDetail(WishSummary):
 class AdminWishUpdate(BaseModel):
     """Admin-only partial update for a wish.
 
-    Includes definition fields (type, description, size) and
+    Includes definition fields (type, description, size, color) and
     purchase-tracking fields (assigned_to_id, purchased_at, purchased_where,
     received_at, purchaser_note).
     """
 
     type: WishType | None = None
     description: Optional[str] = Field(None, min_length=1, max_length=60)
-    size: Optional[str] = Field(None, max_length=20)
+    # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
+    # the 20-char limit is enforced in the validators (constraints can't apply
+    # to a union containing object).
+    size: str | None | object = Field(default=None)  # type: ignore[assignment]
+    color: str | None | object = Field(default=None)  # type: ignore[assignment]
     assigned_to_id: int | None | object = Field(default=None)  # type: ignore[assignment]
     purchased_at: datetime | None = None
     purchased_where: str | None = None
@@ -773,13 +816,23 @@ class AdminWishUpdate(BaseModel):
 
     @field_validator("size", mode="before")
     @classmethod
-    def normalize_size(cls, v: str | None) -> str | None:
-        """Map empty string or '0' to None (N/A size)."""
-        if v is None or v == "" or v == "0":
-            return None
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    def normalize_size(cls, v):
+        """Map '0' to None (N/A size); '' clears to NULL (``_CLEAR`` sentinel)."""
+        if v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 20:
+            raise ValueError("size must be 20 characters or fewer")
+        return _normalize_size_or_color(v)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def normalize_color(cls, v):
+        """Map '0' to None (N/A color); '' clears to NULL (``_CLEAR`` sentinel)."""
+        if v == "":
+            return _CLEAR
+        if isinstance(v, str) and len(v) > 20:
+            raise ValueError("color must be 20 characters or fewer")
+        return _normalize_size_or_color(v)
 
     @field_validator("assigned_to_id", mode="before")
     @classmethod
@@ -844,6 +897,7 @@ class WishListSummary(BaseModel):
     type: WishType
     description: str
     size: str | None = None
+    color: str | None = None
     person_id: int
     person_given_name: str
     family_id: int
@@ -880,6 +934,7 @@ class PurchaserWishSummary(BaseModel):
     type: WishType
     description: str
     size: str | None = None
+    color: str | None = None
     person_id: int
     person_given_name: str
     family_id: int

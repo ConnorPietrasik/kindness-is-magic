@@ -82,6 +82,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     await page.getByLabel("Role").selectOption("son");
     await page.getByLabel("Practical Wish").fill("Winter gloves");
     await page.getByLabel("Size").fill("0");
+    await page.getByLabel("Color").fill("0");
     await page.getByLabel("Fun Wish").fill("Sticker book");
 
     await page.getByRole("button", { name: "Create" }).click();
@@ -192,6 +193,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     await page.getByLabel("Role").selectOption("daughter");
     await page.getByLabel("Practical Wish").fill("Warm socks");
     await page.getByLabel("Size").fill("0");
+    await page.getByLabel("Color").fill("0");
     await page.getByLabel("Fun Wish").fill("Coloring book");
 
     await page.getByRole("button", { name: "Create" }).click();

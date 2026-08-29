@@ -10,6 +10,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { wishText } from "../components/WishCell";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
@@ -135,16 +136,12 @@ function WishTable({
               <Td>{person.age}</Td>
               {isAdult ? (
                 <Td colSpan={2} className="max-w-xs">
-                  {practicalOrAdult ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}` : "—"}
+                  {practicalOrAdult ? wishText(practicalOrAdult) : "—"}
                 </Td>
               ) : (
                 <>
-                  <Td className="max-w-xs">
-                    {practicalOrAdult
-                      ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}`
-                      : "—"}
-                  </Td>
-                  <Td className="max-w-xs">{fun ? `${fun.description}${fun.size ? ` (${fun.size})` : ""}` : "—"}</Td>
+                  <Td className="max-w-xs">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</Td>
+                  <Td className="max-w-xs">{fun ? wishText(fun) : "—"}</Td>
                 </>
               )}
               {hasNotes(people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}
@@ -209,10 +206,7 @@ function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary;
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
             <h3 className="mb-3 text-base font-semibold text-gray-900">Mark as purchased — {personName}</h3>
-            <p className="mb-4 text-sm text-gray-600">
-              {wish.description}
-              {wish.size ? ` (${wish.size})` : ""}
-            </p>
+            <p className="mb-4 text-sm text-gray-600">{wishText(wish)}</p>
 
             <div className="mb-3">
               <label htmlFor="purchased-where" className="mb-1 block text-sm font-medium text-gray-700">

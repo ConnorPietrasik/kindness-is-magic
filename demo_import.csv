@@ -31,94 +31,94 @@ Father Miguel Santos,The Dubois Family,Backpack and notebooks,Emmanuel Dubois,Ha
 Father Miguel Santos,The Nkosi Family,A fleece blanket,Nomsa Nkosi,South African family adjusting to city life,603 Sedgwick Avenue,718-555-0221
 
 # people
-family_name,given_name,age,wish,size,fun_wish,role,note
-The Williams Family,Emily,32,A black bathrobe,M,,mother,
-The Williams Family,James,34,An electric shaving kit,,,father,
-The Williams Family,Emma,6,A navy blue puffer coat,6,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
-The Williams Family,Liam,4,Red snow boots,11C,Toy truck set,son,
-The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,,Play-Doh set,son,Baby
-The Rodriguez Family,Luis,65,A reading light,,,grandfather,
-The Rodriguez Family,Rosa,63,A knitting craft kit,,,grandmother,
-The Rodriguez Family,Sofia,11,A pink canvas backpack,,LEGO Friends set,granddaughter,Loves science
-The Rodriguez Family,Mateo,8,Gray tennis shoes,3Y,LEGO City set,grandson,
-The Rodriguez Family,Valentina,3,Diapers size 4 and onesies,,Peppa Pig plush,granddaughter,Granddaughter of Luis
-The Thompson Family,Tasha,30,A hair dryer,,,mother,Single mom
-The Thompson Family,Jada,14,Period care kit and warm socks,M,Wireless earbuds,daughter,Teenager
-The Thompson Family,Malik,10,A blue backpack and pencil set,,Mario Kart Switch game,son,Has asthma
-The Thompson Family,Zuri,5,A pink coat and winter hat,4,Disney Princess dress-up set,daughter,Kindergarten
-The Kim Family,Hyun,38,A standing fan,,,father,
-The Kim Family,Ji-Yeon,36,A curling iron,,,mother,
-The Kim Family,Jae,16,A black laptop backpack,,Art supplies and sketchbook,son,Scholar
-The Kim Family,Mina,13,Notebooks and a scientific calculator,,Watercolor paint set,daughter,Loves to draw
-The Garcia Family,Carlos,35,A home tool kit,,,father,Works two jobs
-The Garcia Family,Lucas,9,A gray winter coat,10,Basketball,son,
-The Garcia Family,Isabella,7,A purple winter jacket and scarf,7,Fisher-Price tea set,daughter,
-The Garcia Family,Diego,3,Red rain boots and green dinosaur pajamas,7,Baby Shark bath toy set,son,
-The Nguyen Family,Tran,40,A portable charger with built-in cables,,,father,
-The Nguyen Family,Lan,37,A coffee maker,,,mother,
-The Nguyen Family,Hoa,15,A navy canvas backpack,,Harry Potter book box set,daughter,Top student
-The Nguyen Family,Tam,12,Black running shoes,5,Uno and Skip-Bo card game set,son,
-The Nguyen Family,Linh,6,A pink winter coat with matching mittens,6,1000-piece jigsaw puzzle,daughter,
-The Okafor Family,Chidinma,29,Warm socks and underwear set,M,,mother,
-The Okafor Family,Emeka,31,Brown tennis shoes,10,,father,
-The Okafor Family,Nkem,13,A beige oversized sweater,M,Jewelry making kit,daughter,Loves fashion
-The Okafor Family,Chigozie,11,A black backpack and pencil set,,Wooden chess set,son,
-The Okafor Family,Uche,5,A red knit beanie with gray mittens,,Thomas the Tank Engine wooden railway,son,
-The Lee Family,Jane,28,A sleeping bag,,,mother,
-The Lee Family,Ethan,8,A blue and red backpack,,Mario Kart Switch game,son,
-The Lee Family,Grace,4,A pink winter coat and pink snow boots,4,Magna Doodle drawing board,daughter,
-The Martinez Family,Rosa,33,Gray sweats,M,,mother,
-The Martinez Family,Miguel,35,A curling iron,,,father,
-The Martinez Family,Carmen,12,A black winter jacket,12,Wireless earbuds,daughter,
-The Martinez Family,Rafael,7,Blue tennis shoes,2,Basketball,son,
-The Martinez Family,Sofia,2,Diapers size 3 and onesies,,Toy kitchen set,daughter,Baby
-The Patel Family,Priya,28,Black pajamas,S,,mother,
-The Patel Family,Aanya,10,A navy blue coat,10,Jewelry making kit,daughter,
-The Patel Family,Arjun,5,Red sneakers,12C,LEGO City set,son,
-The Washington Family,Robert,62,A standing fan,,,grandfather,
-The Washington Family,Dorothy,60,A hair dryer,,,grandmother,
-The Washington Family,DeShon,9,Black tennis shoes,3,Remote control car,grandson,
-The Washington Family,Taylor,4,A green puffer coat,4,Large stuffed bear,granddaughter,
-The Brown Family,DeShawn,31,A home tool kit,,,father,
-The Brown Family,Keisha,29,A navy blue bathrobe,M,,mother,
-The Brown Family,Jalen,11,A blue and red backpack,,Nintendo Switch game,son,
-The Brown Family,Maya,7,A pink winter jacket,7,Fisher-Price tea set,daughter,
-The Brown Family,Trey,3,Yellow rain boots,4,Play-Doh set,son,
-The Torres Family,Elena,34,A coffee maker,,,mother,
-The Torres Family,Valentina,13,A purple winter coat,13,Catan board game,daughter,
-The Torres Family,Mateo,6,Gray tennis shoes,1,Dinosaur toy set,son,
-The Singh Family,Raj,40,A step-on garbage can,,,father,
-The Singh Family,Priya,38,A curling iron,,,mother,
-The Singh Family,Anya,14,A gray winter jacket,14,Makeup set,daughter,Teenager
-The Singh Family,Neel,9,A black backpack,,LEGO Star Wars set,son,
-The Singh Family,Bibek,3,Green snow boots and red pajamas,3C,Bubble machine,son,Baby
-The Jackson Family,Nicole,27,A hair dryer,,,mother,Single mom
-The Jackson Family,Amara,11,A pink coat,11,Makeup set,daughter,
-The Jackson Family,Isaiah,6,Black sneakers,1,Basketball,son,
-The Wilson Family,Evelyn,64,A reading light,,,grandmother,
-The Wilson Family,Henry,66,A pair of sweats,L,,grandfather,
-The Wilson Family,Chloe,10,A purple jacket,10,Stuffed animal,granddaughter,
-The Wilson Family,Noah,6,Blue sneakers,1,RC car,grandson,
-The Harris Family,Andre,33,A portable charger with built-in cables,,,father,
-The Harris Family,Tamika,30,A gray bathrobe,M,,mother,
-The Harris Family,Marcus,12,A navy backpack,,Nintendo Switch game,son,
-The Harris Family,Zara,8,A yellow winter coat,8,1000-piece puzzle,daughter,
-The Harris Family,Lilou,2,Diapers size 4 and dinosaur pajamas,,Toy truck set,daughter,Baby
-The Clark Family,Angela,26,A sleeping bag,,,mother,
-The Clark Family,Sophia,9,A pink coat,9,Large stuffed unicorn,daughter,
-The Clark Family,Liam,5,Black sneakers,1,Catan board game,son,
-The Rivera Family,Carlos,39,A home tool kit,,,father,
-The Rivera Family,Maria,36,Black pajamas,M,,mother,
-The Rivera Family,Diego,10,A gray winter coat,10,Basketball,son,
-The Rivera Family,Lucia,6,A pink coat,6,Stuffed animal,daughter,
-The Dubois Family,Emmanuel,42,A pair of sweats,L,,father,
-The Dubois Family,Marie,38,A hair dryer,,,mother,
-The Dubois Family,Jean,12,A navy backpack,,LEGO City set,son,
-The Dubois Family,Sophie,7,Black sneakers,2,Fisher-Price tea set,daughter,
-The Nkosi Family,Nomsa,35,Gray sweats,M,,mother,
-The Nkosi Family,Thabo,11,A green winter jacket,11,Basketball,son,
-The Nkosi Family,Amahle,8,A purple coat,8,Board game,daughter,
-The Nkosi Family,Naledi,3,Red snow boots,3C,Large stuffed bear,daughter,Baby
+family_name,given_name,age,wish,size,color,fun_wish,role,note
+The Williams Family,Emily,32,A black bathrobe,M,Black,,mother,
+The Williams Family,James,34,An electric shaving kit,,,,father,
+The Williams Family,Emma,6,A navy blue puffer coat,6,Navy,Barbie Dreamhouse doll,daughter,Allergic to tree nuts
+The Williams Family,Liam,4,Red snow boots,11C,Red,Toy truck set,son,
+The Williams Family,Oliver,2,Diapers size 5 and winter pajamas,,,Play-Doh set,son,Baby
+The Rodriguez Family,Luis,65,A reading light,,,,grandfather,
+The Rodriguez Family,Rosa,63,A knitting craft kit,,,,grandmother,
+The Rodriguez Family,Sofia,11,A pink canvas backpack,,,LEGO Friends set,granddaughter,Loves science
+The Rodriguez Family,Mateo,8,Gray tennis shoes,3Y,Gray,LEGO City set,grandson,
+The Rodriguez Family,Valentina,3,Diapers size 4 and onesies,,,Peppa Pig plush,granddaughter,Granddaughter of Luis
+The Thompson Family,Tasha,30,A hair dryer,,,,mother,Single mom
+The Thompson Family,Jada,14,Period care kit and warm socks,M,,Wireless earbuds,daughter,Teenager
+The Thompson Family,Malik,10,A blue backpack and pencil set,,,Mario Kart Switch game,son,Has asthma
+The Thompson Family,Zuri,5,A pink coat and winter hat,4,Pink,Disney Princess dress-up set,daughter,Kindergarten
+The Kim Family,Hyun,38,A standing fan,,,,father,
+The Kim Family,Ji-Yeon,36,A curling iron,,,,mother,
+The Kim Family,Jae,16,A black laptop backpack,,,Art supplies and sketchbook,son,Scholar
+The Kim Family,Mina,13,Notebooks and a scientific calculator,,,Watercolor paint set,daughter,Loves to draw
+The Garcia Family,Carlos,35,A home tool kit,,,,father,Works two jobs
+The Garcia Family,Lucas,9,A gray winter coat,10,Gray,Basketball,son,
+The Garcia Family,Isabella,7,A purple winter jacket and scarf,7,Purple,Fisher-Price tea set,daughter,
+The Garcia Family,Diego,3,Red rain boots and green dinosaur pajamas,7,Red,Baby Shark bath toy set,son,
+The Nguyen Family,Tran,40,A portable charger with built-in cables,,,,father,
+The Nguyen Family,Lan,37,A coffee maker,,,,mother,
+The Nguyen Family,Hoa,15,A navy canvas backpack,,,Harry Potter book box set,daughter,Top student
+The Nguyen Family,Tam,12,Black running shoes,5,Black,Uno and Skip-Bo card game set,son,
+The Nguyen Family,Linh,6,A pink winter coat with matching mittens,6,Pink,1000-piece jigsaw puzzle,daughter,
+The Okafor Family,Chidinma,29,Warm socks and underwear set,M,,,mother,
+The Okafor Family,Emeka,31,Brown tennis shoes,10,Brown,,father,
+The Okafor Family,Nkem,13,A beige oversized sweater,M,Beige,Jewelry making kit,daughter,Loves fashion
+The Okafor Family,Chigozie,11,A black backpack and pencil set,,,Wooden chess set,son,
+The Okafor Family,Uche,5,A red knit beanie with gray mittens,,,Thomas the Tank Engine wooden railway,son,
+The Lee Family,Jane,28,A sleeping bag,,,,mother,
+The Lee Family,Ethan,8,A blue and red backpack,,,Mario Kart Switch game,son,
+The Lee Family,Grace,4,A pink winter coat and pink snow boots,4,Pink,Magna Doodle drawing board,daughter,
+The Martinez Family,Rosa,33,Gray sweats,M,Gray,,mother,
+The Martinez Family,Miguel,35,A curling iron,,,,father,
+The Martinez Family,Carmen,12,A black winter jacket,12,Black,Wireless earbuds,daughter,
+The Martinez Family,Rafael,7,Blue tennis shoes,2,Blue,Basketball,son,
+The Martinez Family,Sofia,2,Diapers size 3 and onesies,,,Toy kitchen set,daughter,Baby
+The Patel Family,Priya,28,Black pajamas,S,Black,,mother,
+The Patel Family,Aanya,10,A navy blue coat,10,Navy,Jewelry making kit,daughter,
+The Patel Family,Arjun,5,Red sneakers,12C,Red,LEGO City set,son,
+The Washington Family,Robert,62,A standing fan,,,,grandfather,
+The Washington Family,Dorothy,60,A hair dryer,,,,grandmother,
+The Washington Family,DeShon,9,Black tennis shoes,3,Black,Remote control car,grandson,
+The Washington Family,Taylor,4,A green puffer coat,4,Green,Large stuffed bear,granddaughter,
+The Brown Family,DeShawn,31,A home tool kit,,,,father,
+The Brown Family,Keisha,29,A navy blue bathrobe,M,Navy,,mother,
+The Brown Family,Jalen,11,A blue and red backpack,,,Nintendo Switch game,son,
+The Brown Family,Maya,7,A pink winter jacket,7,Pink,Fisher-Price tea set,daughter,
+The Brown Family,Trey,3,Yellow rain boots,4,Yellow,Play-Doh set,son,
+The Torres Family,Elena,34,A coffee maker,,,,mother,
+The Torres Family,Valentina,13,A purple winter coat,13,Purple,Catan board game,daughter,
+The Torres Family,Mateo,6,Gray tennis shoes,1,Gray,Dinosaur toy set,son,
+The Singh Family,Raj,40,A step-on garbage can,,,,father,
+The Singh Family,Priya,38,A curling iron,,,,mother,
+The Singh Family,Anya,14,A gray winter jacket,14,Gray,Makeup set,daughter,Teenager
+The Singh Family,Neel,9,A black backpack,,,LEGO Star Wars set,son,
+The Singh Family,Bibek,3,Green snow boots and red pajamas,3C,Green,Bubble machine,son,Baby
+The Jackson Family,Nicole,27,A hair dryer,,,,mother,Single mom
+The Jackson Family,Amara,11,A pink coat,11,Pink,Makeup set,daughter,
+The Jackson Family,Isaiah,6,Black sneakers,1,Black,Basketball,son,
+The Wilson Family,Evelyn,64,A reading light,,,,grandmother,
+The Wilson Family,Henry,66,A pair of sweats,L,,,grandfather,
+The Wilson Family,Chloe,10,A purple jacket,10,Purple,Stuffed animal,granddaughter,
+The Wilson Family,Noah,6,Blue sneakers,1,Blue,RC car,grandson,
+The Harris Family,Andre,33,A portable charger with built-in cables,,,,father,
+The Harris Family,Tamika,30,A gray bathrobe,M,Gray,,mother,
+The Harris Family,Marcus,12,A navy backpack,,,Nintendo Switch game,son,
+The Harris Family,Zara,8,A yellow winter coat,8,Yellow,1000-piece puzzle,daughter,
+The Harris Family,Lilou,2,Diapers size 4 and dinosaur pajamas,,,Toy truck set,daughter,Baby
+The Clark Family,Angela,26,A sleeping bag,,,,mother,
+The Clark Family,Sophia,9,A pink coat,9,Pink,Large stuffed unicorn,daughter,
+The Clark Family,Liam,5,Black sneakers,1,Black,Catan board game,son,
+The Rivera Family,Carlos,39,A home tool kit,,,,father,
+The Rivera Family,Maria,36,Black pajamas,M,Black,,mother,
+The Rivera Family,Diego,10,A gray winter coat,10,Gray,Basketball,son,
+The Rivera Family,Lucia,6,A pink coat,6,Pink,Stuffed animal,daughter,
+The Dubois Family,Emmanuel,42,A pair of sweats,L,,,father,
+The Dubois Family,Marie,38,A hair dryer,,,,mother,
+The Dubois Family,Jean,12,A navy backpack,,,LEGO City set,son,
+The Dubois Family,Sophie,7,Black sneakers,2,Black,Fisher-Price tea set,daughter,
+The Nkosi Family,Nomsa,35,Gray sweats,M,Gray,,mother,
+The Nkosi Family,Thabo,11,A green winter jacket,11,Green,Basketball,son,
+The Nkosi Family,Amahle,8,A purple coat,8,Purple,Board game,daughter,
+The Nkosi Family,Naledi,3,Red snow boots,3C,Red,Large stuffed bear,daughter,Baby
 
 # users
 email,password,role,referrer_name_or_id,family_name_or_id,display_name

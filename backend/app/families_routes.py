@@ -305,7 +305,10 @@ async def _send_claim_confirmation(
             {
                 "given_name": p.given_name,
                 "age": p.age,
-                "wishes": [{"type": w.type.value, "description": w.description, "size": w.size} for w in wishes_by_person.get(p.id, [])],
+                "wishes": [
+                    {"type": w.type.value, "description": w.description, "size": w.size, "color": w.color}
+                    for w in wishes_by_person.get(p.id, [])
+                ],
             }
             for p in people
         ]

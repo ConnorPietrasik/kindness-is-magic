@@ -151,6 +151,7 @@ export default function PurchaserAssignedGifts() {
               <Th>Type</Th>
               <Th>Description</Th>
               <Th>Size</Th>
+              <Th>Color</Th>
               <Th>Purchased</Th>
               <Th>Actions</Th>
             </TableHead>
@@ -173,6 +174,7 @@ export default function PurchaserAssignedGifts() {
                     </Td>
                     <Td className="max-w-xs truncate">{w.description}</Td>
                     <Td>{w.size ?? "—"}</Td>
+                    <Td>{w.color ?? "—"}</Td>
                     <Td>
                       {w.purchased_at ? (
                         <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
@@ -206,7 +208,7 @@ export default function PurchaserAssignedGifts() {
                   </Tr>
                   {editingId === w.id && (
                     <Tr key={`${w.id}-edit`}>
-                      <Td colSpan={7} className="!py-3">
+                      <Td colSpan={8} className="!py-3">
                         <div className="rounded-xl bg-gray-50 p-4">
                           {detailLoading ? (
                             <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

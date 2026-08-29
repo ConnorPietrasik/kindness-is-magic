@@ -34,6 +34,16 @@ test.describe("CSV Import", () => {
     await expect(page.getByText("People", { exact: true })).toBeVisible();
     await expect(page.getByText("Users", { exact: true })).toBeVisible();
 
+    /* Verify the new color column was imported: filter the admin wishes list
+       to a seeded family and check a color value from the demo CSV. "Navy" is
+       Emma Williams' practical wish color — it only appears as a color cell
+       (her description uses lowercase "navy blue"). */
+    await page.goto("/admin/wishes");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+    const familySelect = page.locator("select").filter({ hasText: /All families/ });
+    await familySelect.selectOption({ label: "The Williams Family" });
+    await expect(page.getByRole("table")).toContainText("Navy", { timeout: 10_000 });
+
     await context.close();
   });
 
@@ -60,8 +70,8 @@ referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
 ${missingReferrer},${missingFamily},Wish,Contact,,,
 
 # people
-family_name,given_name,age,wish,size,fun_wish,role,note
-${missingFamily},Test Person,not_a_number,Bike,,Lego,son,
+family_name,given_name,age,wish,size,color,fun_wish,role,note
+${missingFamily},Test Person,not_a_number,Bike,,Red,Lego,son,
 `;
 
     await page.setInputFiles('input[type="file"]', {

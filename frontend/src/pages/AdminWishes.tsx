@@ -357,6 +357,7 @@ export default function AdminWishes() {
               {visibleColumns.includes("type") && <Th>Type</Th>}
               {visibleColumns.includes("description") && <Th>Description</Th>}
               {visibleColumns.includes("size") && <Th>Size</Th>}
+              {visibleColumns.includes("color") && <Th>Color</Th>}
               {visibleColumns.includes("assigned_to") && <Th>Assigned To</Th>}
               {visibleColumns.includes("purchased_at") && <Th>Purchased</Th>}
               {visibleColumns.includes("purchased_where") && <Th>Purchased Where</Th>}
@@ -398,6 +399,7 @@ export default function AdminWishes() {
                     )}
                     {visibleColumns.includes("description") && <Td className="max-w-xs truncate">{w.description}</Td>}
                     {visibleColumns.includes("size") && <Td>{w.size ?? "—"}</Td>}
+                    {visibleColumns.includes("color") && <Td>{w.color ?? "—"}</Td>}
                     {visibleColumns.includes("assigned_to") && <Td>{w.assigned_to_name ?? "—"}</Td>}
                     {visibleColumns.includes("purchased_at") && (
                       <Td>
@@ -559,6 +561,7 @@ interface WishFormState {
   type: WishType;
   description: string;
   size: string;
+  color: string;
   assigned_to_id: number | null;
   purchased_where: string;
   received_at: string;
@@ -570,6 +573,7 @@ function WishEditForm({ wish, users, onSave, onCancel, loading }: WishEditFormPr
     type: wish.type,
     description: wish.description,
     size: wish.size ?? "",
+    color: wish.color ?? "",
     assigned_to_id: wish.assigned_to_id,
     purchased_where: wish.purchased_where ?? "",
     received_at: wish.received_at ?? "",
@@ -581,6 +585,7 @@ function WishEditForm({ wish, users, onSave, onCancel, loading }: WishEditFormPr
       type: wish.type,
       description: wish.description,
       size: wish.size ?? "",
+      color: wish.color ?? "",
       assigned_to_id: wish.assigned_to_id,
       purchased_where: wish.purchased_where ?? "",
       received_at: wish.received_at ?? "",
@@ -624,6 +629,15 @@ function WishEditForm({ wish, users, onSave, onCancel, loading }: WishEditFormPr
             fieldProps={{
               value: form.size,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("size", e.target.value),
+              maxLength: 20,
+              autoComplete: "off",
+            }}
+          />
+          <FormField
+            label="Color"
+            fieldProps={{
+              value: form.color,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("color", e.target.value),
               maxLength: 20,
               autoComplete: "off",
             }}

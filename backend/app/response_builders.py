@@ -332,6 +332,7 @@ def build_person_detail(per: Person, db: Session) -> dict:
                 "type": w.type,
                 "description": w.description,
                 "size": w.size,
+                "color": w.color,
                 "assigned_to_id": w.assigned_to_id,
                 "purchased_at": w.purchased_at,
                 "purchased_where": w.purchased_where,
@@ -392,6 +393,7 @@ def sync_person_wishes(
         if existing:
             existing.description = wish_data.description
             existing.size = wish_data.size
+            existing.color = wish_data.color
         else:
             # Hard-delete any soft-deleted wish of this type first (partial unique index)
             old_deleted = (
@@ -412,6 +414,7 @@ def sync_person_wishes(
                     type=wish_data.type,
                     description=wish_data.description,
                     size=wish_data.size,
+                    color=wish_data.color,
                 )
             )
 
@@ -507,6 +510,7 @@ def create_person_with_wishes(
                 type=wish_data.type,
                 description=wish_data.description,
                 size=wish_data.size,
+                color=wish_data.color,
             )
         )
 
@@ -520,6 +524,7 @@ def build_wish_detail(wish: Wish, person: Person) -> dict:
         "type": wish.type,
         "description": wish.description,
         "size": wish.size,
+        "color": wish.color,
         "assigned_to_id": wish.assigned_to_id,
         "purchased_at": wish.purchased_at,
         "purchased_where": wish.purchased_where,
@@ -549,6 +554,7 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
         "type": wish.type,
         "description": wish.description,
         "size": wish.size,
+        "color": wish.color,
         "person_id": wish.person_id,
         "person_given_name": person.given_name,
         "family_id": person.family_id,

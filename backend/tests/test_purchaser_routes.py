@@ -145,6 +145,18 @@ class TestPurchaserListWishes:
             # Family is created at default lock level — reported for link gating
             assert w["wish_lock_level"] == WishLockLevel.family.value
 
+    def test_list_includes_color(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Purchaser wish summaries include the color field."""
+        practical = purchaser_wish_tree["wishes"][0]
+        practical.color = "Blue"
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        colors = {w["id"]: w["color"] for w in resp.json()["wishes"]}
+        assert colors[practical.id] == "Blue"
+        assert colors[purchaser_wish_tree["wishes"][1].id] is None
+
     def test_list_display_id_zero_for_unenumerated_family(self, logged_in_purchaser, purchaser_wish_tree, db):
         """A wish under a pending (unenumerated) family shows display_id '0'."""
         fam2 = Family(

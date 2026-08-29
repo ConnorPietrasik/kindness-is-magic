@@ -272,10 +272,21 @@ def build_referrer_rejected_email(referrer_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _format_wish_text(desc: str, size: str | None, color: str | None) -> str:
+    """Format a wish as ``Description (size, color)``.
+
+    Present parts are joined with ``", "`` inside the parentheses; the
+    parentheses are omitted when both size and color are empty.
+    """
+    parts = [p for p in (size, color) if p]
+    return f"{desc} ({', '.join(parts)})" if parts else desc
+
+
 def _build_wish_table_rows(people: list[dict]) -> str:
     """Build HTML table rows for people and their wishes.
 
-    Each person dict has: given_name, age, wishes (list of {type, description, size}).
+    Each person dict has: given_name, age, wishes (list of
+    {type, description, size, color}).
     Children (age < 18) get practical + fun columns.
     Adults (age >= 18) get a single 'Wish' column.
     """
@@ -288,27 +299,21 @@ def _build_wish_table_rows(people: list[dict]) -> str:
         if age >= 18:
             # Adult: single wish column
             adult_wish = wishes.get("adult", {})
-            desc = adult_wish.get("description", "")
-            size = adult_wish.get("size")
-            size_str = f" ({size})" if size else ""
+            adult_text = _format_wish_text(adult_wish.get("description", ""), adult_wish.get("size"), adult_wish.get("color"))
             rows += f"""<tr>
   <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{name} (age {age})</td>
-  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{desc}{size_str}</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{adult_text}</td>
 </tr>"""
         else:
             # Child: practical + fun columns
             practical = wishes.get("practical", {})
             fun = wishes.get("fun", {})
-            p_desc = practical.get("description", "")
-            p_size = practical.get("size")
-            p_size_str = f" ({p_size})" if p_size else ""
-            f_desc = fun.get("description", "")
-            f_size = fun.get("size")
-            f_size_str = f" ({f_size})" if f_size else ""
+            p_text = _format_wish_text(practical.get("description", ""), practical.get("size"), practical.get("color"))
+            f_text = _format_wish_text(fun.get("description", ""), fun.get("size"), fun.get("color"))
             rows += f"""<tr>
   <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{name} (age {age})</td>
-  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{p_desc}{p_size_str}</td>
-  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{f_desc}{f_size_str}</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{p_text}</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">{f_text}</td>
 </tr>"""
 
     return rows

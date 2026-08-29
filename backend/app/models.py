@@ -345,6 +345,7 @@ class Wish(Base):
     type: Mapped[WishType] = mapped_column(SAEnum(WishType, name="wish_type", create_constraint=True), nullable=False)
     description: Mapped[str] = mapped_column(String(60), nullable=False)
     size: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     assigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     purchased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purchased_where: Mapped[str | None] = mapped_column(String(200), nullable=True)

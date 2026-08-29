@@ -12,6 +12,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
+import { wishText } from "../components/WishCell";
 
 import { adminGetPackingSlips } from "../lib/api";
 import { adminPackingSlips } from "../lib/queryKeys";
@@ -202,10 +203,8 @@ function PersonRow({ person, hasFunCol }: PersonRowProps) {
       <td className="packing-slip-td whitespace-nowrap text-sm" style={{ textAlign: "center", padding: "8px 0" }}>
         {person.age}
       </td>
-      <td className="packing-slip-td">
-        {practicalOrAdult ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}` : "—"}
-      </td>
-      {hasFunCol && <td className="packing-slip-td">{fun ? `${fun.description}${fun.size ? ` (${fun.size})` : ""}` : "—"}</td>}
+      <td className="packing-slip-td">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</td>
+      {hasFunCol && <td className="packing-slip-td">{fun ? wishText(fun) : "—"}</td>}
     </tr>
   );
 }

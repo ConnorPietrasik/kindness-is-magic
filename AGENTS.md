@@ -18,6 +18,7 @@
 - When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
 - **No backward compatibility needed.** The app is not yet deployed. 
 - **Do not consider existing users.** The database is wiped regularly.
+- **No database downgrade.** The database is wiped regularly so that's a waste of time
 - If something is easily verifiable, **check it instead of wasting time thinking.**
 
 ## Planning

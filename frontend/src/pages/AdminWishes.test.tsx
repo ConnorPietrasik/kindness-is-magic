@@ -17,6 +17,7 @@ const mockWish1: WishListSummary = {
   type: "practical",
   description: "Winter jacket",
   size: "M",
+  color: "Red",
   person_id: 10,
   person_given_name: "Alice",
   family_id: 5,
@@ -33,6 +34,7 @@ const mockWish2: WishListSummary = {
   type: "fun",
   description: "LEGO set",
   size: null,
+  color: null,
   person_id: 11,
   person_given_name: "Bob",
   family_id: 5,
@@ -57,6 +59,7 @@ const mockWishDetail: WishDetail = {
   type: "practical",
   description: "Winter jacket",
   size: "M",
+  color: "Red",
   assigned_to_id: null,
   purchased_at: null,
   purchased_where: null,
@@ -124,6 +127,87 @@ describe("AdminWishes", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("Winter jacket")).toBeInTheDocument();
     expect(screen.getByText("LEGO set")).toBeInTheDocument();
+  });
+
+  it("renders the Color column with values and dash for null", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("columnheader", { name: "Color" })).toBeInTheDocument();
+    expect(screen.getByText("Red")).toBeInTheDocument();
+  });
+
+  it("edit form round-trips color", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
+    vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const editButtons = screen.getAllByText("Edit");
+    await user.click(editButtons[0]!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit Wish")).toBeInTheDocument();
+    });
+
+    // Color is pre-filled from the wish detail
+    const colorInput = screen.getByLabelText("Color");
+    expect(colorInput).toHaveValue("Red");
+
+    // Change color and save
+    await user.clear(colorInput);
+    await user.type(colorInput, "Blue");
+    await user.click(screen.getByText("Update"));
+
+    await waitFor(() => {
+      expect(api.adminUpdateWish).toHaveBeenCalledWith(1, expect.objectContaining({ color: "Blue" }));
+    });
+  });
+
+  it("clears color by sending empty string sentinel", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
+    vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const editButtons = screen.getAllByText("Edit");
+    await user.click(editButtons[0]!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit Wish")).toBeInTheDocument();
+    });
+
+    await user.clear(screen.getByLabelText("Color"));
+    await user.click(screen.getByText("Update"));
+
+    await waitFor(() => {
+      expect(api.adminUpdateWish).toHaveBeenCalled();
+    });
+    const callArgs = (api.adminUpdateWish as ReturnType<typeof vi.spyOn>).mock.calls[0];
+    expect(callArgs[1]).toHaveProperty("color", "");
   });
 
   it("shows empty state when no wishes found", async () => {
@@ -540,6 +624,7 @@ describe("AdminWishes", () => {
     expect(payload.description).toBeUndefined();
     expect(payload.type).toBeUndefined();
     expect(payload.size).toBeUndefined();
+    expect(payload.color).toBeUndefined();
   });
 
   it("mark-purchased dialog sends correct payload with optional fields", async () => {

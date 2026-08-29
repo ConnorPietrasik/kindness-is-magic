@@ -101,6 +101,7 @@ class TestCsvSample:
         assert "# families" in body["csv_template"]
         assert "# people" in body["csv_template"]
         assert "# users" in body["csv_template"]
+        assert "family_name,given_name,age,wish,size,color,fun_wish,role,note" in body["csv_template"]
 
     def test_401_unauthenticated(self, test_client: TestClient):
         resp = test_client.get("/api/admin/csv-sample")
@@ -232,6 +233,61 @@ class TestCsvImportFull:
         assert admin.role.value == "admin"
         assert admin.referrer_id is None
         assert admin.family_id is None
+
+
+# =========================================================================
+#  CSV import - wish color
+# =========================================================================
+
+
+class TestCsvImportColor:
+    def test_color_stored_on_primary_wishes_only(self, test_client: TestClient, admin_user, db: Session):
+        """Color is stored on adult/practical wishes, NULL on fun; empty/0 → NULL."""
+        from app.models import Person, Wish, WishType
+
+        csv_data = """# referrers
+name,family_limit,phone_number
+Color Ref,5,555-300-3001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Color Ref,Color Fam,A wish,Contact,,7 Color St,555-300-3002
+
+# people
+family_name,given_name,age,wish,size,color,fun_wish,role,note
+Color Fam,ColorAdult,30,Coat,L,Blue,,mother,
+Color Fam,ColorKid,8,Backpack,,Red,Doll set,daughter,
+Color Fam,ColorBaby,3,Bottles,0,,Blocks,mother,
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["people"]["created"] == 3
+
+        db.expire_all()
+
+        def _wishes(name: str) -> dict[str, Wish]:
+            person = db.query(Person).filter(Person.given_name == name).first()
+            wishes = db.query(Wish).filter(Wish.person_id == person.id, Wish.deleted_at.is_(None)).all()
+            return {w.type: w for w in wishes}
+
+        # Adult: color stored on the adult wish
+        adult = _wishes("ColorAdult")
+        assert adult[WishType.adult].size == "L"
+        assert adult[WishType.adult].color == "Blue"
+
+        # Child: color stored on practical, NULL on fun
+        kid = _wishes("ColorKid")
+        assert kid[WishType.practical].size is None
+        assert kid[WishType.practical].color == "Red"
+        assert kid[WishType.fun].size is None
+        assert kid[WishType.fun].color is None
+
+        # Child: empty color and '0' size → NULL
+        baby = _wishes("ColorBaby")
+        assert baby[WishType.practical].size is None
+        assert baby[WishType.practical].color is None
+        assert baby[WishType.fun].color is None
 
 
 # =========================================================================

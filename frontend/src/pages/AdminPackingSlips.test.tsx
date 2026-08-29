@@ -28,6 +28,7 @@ const mockFamily: PackingSlipItem = {
           type: "practical",
           description: "Winter jacket",
           size: "8-10",
+          color: "Blue",
           assigned_to_id: null,
           purchased_at: null,
           purchased_where: null,
@@ -40,6 +41,7 @@ const mockFamily: PackingSlipItem = {
           type: "fun",
           description: "LEGO set",
           size: null,
+          color: null,
           assigned_to_id: null,
           purchased_at: null,
           purchased_where: null,
@@ -61,6 +63,7 @@ const mockFamily: PackingSlipItem = {
           type: "adult",
           description: "Coffee gift card",
           size: null,
+          color: null,
           assigned_to_id: null,
           purchased_at: null,
           purchased_where: null,
@@ -119,8 +122,8 @@ describe("AdminPackingSlips", () => {
     expect(screen.getByText("8")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
 
-    // Wishes inline with sizes
-    expect(screen.getByText("Winter jacket (8-10)")).toBeInTheDocument();
+    // Wishes inline with size and color
+    expect(screen.getByText("Winter jacket (8-10, Blue)")).toBeInTheDocument();
     expect(screen.getByText("LEGO set")).toBeInTheDocument();
     expect(screen.getByText("Coffee gift card")).toBeInTheDocument();
   });
@@ -237,6 +240,7 @@ describe("AdminPackingSlips", () => {
               type: "adult",
               description: "Socks",
               size: "L",
+              color: null,
               assigned_to_id: null,
               purchased_at: null,
               purchased_where: null,

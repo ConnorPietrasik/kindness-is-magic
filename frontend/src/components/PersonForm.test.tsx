@@ -21,6 +21,7 @@ const mockChildPerson: PersonDetail = {
       type: "practical",
       description: "A backpack",
       size: "M",
+      color: "Blue",
       assigned_to_id: null,
       purchased_at: null,
       purchased_where: null,
@@ -33,6 +34,7 @@ const mockChildPerson: PersonDetail = {
       type: "fun",
       description: "A doll",
       size: null,
+      color: null,
       assigned_to_id: null,
       purchased_at: null,
       purchased_where: null,
@@ -59,6 +61,7 @@ const mockAdultPerson: PersonDetail = {
       type: "adult",
       description: "A coffee maker",
       size: null,
+      color: null,
       assigned_to_id: null,
       purchased_at: null,
       purchased_where: null,
@@ -173,6 +176,7 @@ describe("PersonForm", () => {
     expect(screen.queryByLabelText("Practical Wish")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Wish")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Color")).not.toBeInTheDocument();
   });
 
   it("renders Practical Wish and Fun Wish fields for children (age < 18)", () => {
@@ -181,6 +185,7 @@ describe("PersonForm", () => {
     expect(screen.getByLabelText("Practical Wish")).toBeInTheDocument();
     expect(screen.getByLabelText("Fun Wish")).toBeInTheDocument();
     expect(screen.getByLabelText("Size")).toBeInTheDocument();
+    expect(screen.getByLabelText("Color")).toBeInTheDocument();
   });
 
   it("renders single Wish field for adults (age >= 18)", () => {
@@ -189,6 +194,7 @@ describe("PersonForm", () => {
     expect(screen.getByLabelText("Wish")).toBeInTheDocument();
     expect(screen.queryByLabelText("Practical Wish")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Fun Wish")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Color")).toBeInTheDocument();
   });
 
   it("hides Fun Wish when age changes from child to adult", async () => {
@@ -226,6 +232,7 @@ describe("PersonForm", () => {
 
     expect(screen.getByLabelText("Practical Wish")).toHaveValue("A backpack");
     expect(screen.getByLabelText("Size")).toHaveValue("M");
+    expect(screen.getByLabelText("Color")).toHaveValue("Blue");
     expect(screen.getByLabelText("Fun Wish")).toHaveValue("A doll");
   });
 
@@ -248,6 +255,7 @@ describe("PersonForm", () => {
     await user.type(screen.getByLabelText("Given Name"), "Charlie");
     await user.type(screen.getByLabelText("Practical Wish"), "Bike");
     await user.type(screen.getByLabelText("Size"), "S");
+    await user.type(screen.getByLabelText("Color"), "Red");
     await user.type(screen.getByLabelText("Fun Wish"), "Lego set");
     await user.click(screen.getByText("Create"));
 
@@ -258,9 +266,54 @@ describe("PersonForm", () => {
         role: "son",
         age: 8,
         wishes: [
-          { type: "practical", description: "Bike", size: "S" },
-          { type: "fun", description: "Lego set", size: null },
+          { type: "practical", description: "Bike", size: "S", color: "Red" },
+          { type: "fun", description: "Lego set", size: null, color: null },
         ],
+      })
+    );
+  });
+
+  it('submits null color for N/A markers ("N/A", "0", empty) on the primary wish', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 8 }} onSubmit={onSubmit} onCancel={() => {}} />);
+
+    await user.selectOptions(screen.getByLabelText("Role"), "daughter");
+    await user.type(screen.getByLabelText("Given Name"), "Frank");
+    await user.type(screen.getByLabelText("Practical Wish"), "Bike");
+    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Color"), "N/A");
+    await user.type(screen.getByLabelText("Fun Wish"), "Lego set");
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wishes: [
+          { type: "practical", description: "Bike", size: null, color: null },
+          { type: "fun", description: "Lego set", size: null, color: null },
+        ],
+      })
+    );
+  });
+
+  it('submits null color for the quoted "0" marker on an adult wish', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(<PersonForm title="Add Person" isEdit={false} initial={{ age: 30 }} onSubmit={onSubmit} onCancel={() => {}} />);
+
+    await user.selectOptions(screen.getByLabelText("Role"), "father");
+    await user.type(screen.getByLabelText("Given Name"), "Grace");
+    await user.type(screen.getByLabelText("Wish"), "Headphones");
+    await user.type(screen.getByLabelText("Size"), "0");
+    // Quoted "0" is a frontend-only N/A marker (the backend only knows "")
+    await user.type(screen.getByLabelText("Color"), '"0"');
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wishes: [{ type: "adult", description: "Headphones", size: null, color: null }],
       })
     );
   });
@@ -275,6 +328,7 @@ describe("PersonForm", () => {
     await user.type(screen.getByLabelText("Given Name"), "Diana");
     await user.type(screen.getByLabelText("Wish"), "Headphones");
     await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Color"), "0");
     await user.click(screen.getByText("Create"));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -283,7 +337,7 @@ describe("PersonForm", () => {
         given_name: "Diana",
         role: "mother",
         age: 30,
-        wishes: [{ type: "adult", description: "Headphones", size: null }],
+        wishes: [{ type: "adult", description: "Headphones", size: null, color: null }],
       })
     );
   });
@@ -299,6 +353,7 @@ describe("PersonForm", () => {
     await user.type(screen.getByLabelText("Given Name"), "Eve");
     await user.type(screen.getByLabelText("Practical Wish"), "Book");
     await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Color"), "0");
     await user.type(screen.getByLabelText("Fun Wish"), "Puzzle");
     await user.click(screen.getByText("Create"));
 

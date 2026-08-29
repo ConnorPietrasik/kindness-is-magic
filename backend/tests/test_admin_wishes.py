@@ -158,6 +158,21 @@ class TestListWishes:
         assert data["page"] == 1
         assert data["page_size"] == 50
 
+    def test_list_includes_color(self, test_client, admin_user, wish_tree, db):
+        """List items include the color field (None when unset)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish_tree["wishes"][0].color = "Blue"
+        db.commit()
+
+        resp = test_client.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        colors = {w["id"]: w["color"] for w in resp.json()["wishes"]}
+        assert colors[wish_tree["wishes"][0].id] == "Blue"
+        assert colors[wish_tree["wishes"][1].id] is None
+
     def test_pagination(self, test_client, admin_user, wish_tree, second_family_with_wishes):
         """Pagination works correctly."""
         test_client.post(
@@ -400,6 +415,43 @@ class TestPatchWish:
         )
         assert resp.status_code == 200
         assert resp.json()["size"] == "Large"
+
+    def test_update_color(self, test_client, admin_user, wish_tree):
+        """Update color."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"color": "Blue"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["color"] == "Blue"
+
+    def test_update_color_empty_clears(self, test_client, admin_user, wish_tree):
+        """Sending '' clears color to NULL."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish_id = wish_tree["wishes"][0].id
+        resp = test_client.patch(f"/api/admin/wishes/{wish_id}", json={"color": "Blue"})
+        assert resp.status_code == 200
+
+        resp = test_client.patch(f"/api/admin/wishes/{wish_id}", json={"color": ""})
+        assert resp.status_code == 200
+        assert resp.json()["color"] is None
+
+    def test_update_size_empty_clears(self, test_client, admin_user, wish_tree):
+        """Sending '' clears size to NULL."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(f"/api/admin/wishes/{wish_tree['wishes'][0].id}", json={"size": ""})
+        assert resp.status_code == 200
+        assert resp.json()["size"] is None
 
     def test_change_type_valid(self, test_client, admin_user, wish_tree, db):
         """Change type to another valid type for person's age (after removing conflict)."""

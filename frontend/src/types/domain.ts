@@ -243,6 +243,7 @@ export interface WishSummary {
   type: WishType;
   description: string;
   size: string | null;
+  color: string | null;
   assigned_to_id: number | null;
   purchased_at: string | null;
   purchased_where: string | null;
@@ -257,6 +258,7 @@ export interface WishListSummary {
   type: WishType;
   description: string;
   size: string | null;
+  color: string | null;
   person_id: number;
   person_given_name: string;
   family_id: number;
@@ -286,6 +288,7 @@ export interface AdminWishUpdate {
   type?: WishType;
   description?: string;
   size?: string | null;
+  color?: string | null;
   assigned_to_id?: number | null;
   purchased_at?: string | null;
   purchased_where?: string | null;
@@ -305,6 +308,7 @@ export interface WishCreate {
   type: WishType;
   description: string;
   size?: string | null;
+  color?: string | null;
 }
 
 /** Literal person-role values in display order — drives the `PersonRole` type
@@ -591,6 +595,7 @@ export interface PurchaserWishSummary {
   type: WishType;
   description: string;
   size: string | null;
+  color: string | null;
   person_id: number;
   person_given_name: string;
   family_id: number;

@@ -64,6 +64,7 @@ test.describe.serial("Admin Person Lifecycle", () => {
     await page.getByLabel("Role").selectOption("son");
     await page.getByLabel("Practical Wish").fill("A warm jacket");
     await page.getByLabel("Size").fill("0");
+    await page.getByLabel("Color").fill("0");
     await page.getByLabel("Fun Wish").fill("A puzzle");
 
     await page.getByRole("button", { name: "Create" }).click();

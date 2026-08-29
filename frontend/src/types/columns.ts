@@ -58,6 +58,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "type", label: "Type", visible: true },
     { key: "description", label: "Description", visible: true },
     { key: "size", label: "Size", visible: true },
+    { key: "color", label: "Color", visible: true },
     { key: "assigned_to", label: "Assigned To", visible: true },
     { key: "purchased_at", label: "Purchased", visible: true },
     { key: "purchased_where", label: "Purchased Where", visible: false },

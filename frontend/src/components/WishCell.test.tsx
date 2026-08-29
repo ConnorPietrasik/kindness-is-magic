@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { WishSummary } from "../types";
-import { WishCellAdult, WishCellType } from "./WishCell";
+import { WishCellAdult, WishCellType, wishText } from "./WishCell";
 
 function makeWish(overrides: Partial<WishSummary> = {}): WishSummary {
   return {
@@ -9,6 +9,7 @@ function makeWish(overrides: Partial<WishSummary> = {}): WishSummary {
     type: "adult",
     description: "Sweater",
     size: "M",
+    color: null,
     assigned_to_id: null,
     purchased_at: null,
     purchased_where: null,
@@ -23,7 +24,30 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("wishText", () => {
+  it("joins size and color when both present", () => {
+    expect(wishText({ description: "Sweater", size: "M", color: "Blue" })).toBe("Sweater (M, Blue)");
+  });
+
+  it("shows size only when color is null", () => {
+    expect(wishText({ description: "Sweater", size: "M", color: null })).toBe("Sweater (M)");
+  });
+
+  it("shows color only when size is null", () => {
+    expect(wishText({ description: "Sweater", size: null, color: "Blue" })).toBe("Sweater (Blue)");
+  });
+
+  it("omits parentheses when both are null", () => {
+    expect(wishText({ description: "Gift Card", size: null, color: null })).toBe("Gift Card");
+  });
+});
+
 describe("WishCellAdult", () => {
+  it("renders the adult wish with size and color in parentheses", () => {
+    render(<WishCellAdult wishes={[makeWish({ type: "adult", description: "Sweater", size: "M", color: "Blue" })]} />);
+    expect(screen.getByText("Sweater (M, Blue)")).toBeInTheDocument();
+  });
+
   it("renders the adult wish with size in parentheses", () => {
     render(<WishCellAdult wishes={[makeWish({ type: "adult", description: "Sweater", size: "M" })]} />);
     expect(screen.getByText("Sweater (M)")).toBeInTheDocument();

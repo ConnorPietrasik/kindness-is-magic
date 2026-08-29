@@ -70,6 +70,31 @@ def test_wish_list_includes_optional_fields(db, test_client: TestClient, family_
     assert len(data["people"][0]["wishes"]) == 2
 
 
+def test_wish_list_includes_color(db, test_client: TestClient, family_record):
+    """Wishes in the public wish list include the color field."""
+    family_record.wish_lock_level = "admin"
+    person = Person(
+        family_id=family_record.id,
+        given_name="Colorful",
+        role=PersonRole.daughter,
+        age=6,
+    )
+    db.add(person)
+    db.flush()
+    w1 = Wish(person_id=person.id, type=WishType.practical, description="A coat", size="S", color="Blue")
+    w2 = Wish(person_id=person.id, type=WishType.fun, description="A teddy")
+    db.add_all([w1, w2])
+    db.commit()
+
+    resp = test_client.get(f"/api/families/{family_record.id}/wish-list")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["people"]) == 1
+    colors = {w["type"]: w["color"] for w in data["people"][0]["wishes"]}
+    assert colors["practical"] == "Blue"
+    assert colors["fun"] is None
+
+
 def test_wish_list_people_ordered_by_id(db, test_client: TestClient, family_record):
     """People are returned ordered by id (oldest first)."""
     from app.models import Wish, WishType

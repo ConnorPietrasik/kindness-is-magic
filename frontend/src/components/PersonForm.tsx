@@ -28,28 +28,39 @@ interface FormState {
   role: PersonRole | "";
   wish_description: string;
   wish_size: string;
+  wish_color: string;
   fun_wish_description: string;
   note: string;
   family_id: number;
 }
 
 /** Map existing wishes into the flat form fields. */
-function wishesToFormFields(wishes: WishSummary[]): Pick<FormState, "wish_description" | "wish_size" | "fun_wish_description"> {
+function wishesToFormFields(
+  wishes: WishSummary[]
+): Pick<FormState, "wish_description" | "wish_size" | "wish_color" | "fun_wish_description"> {
   const result: Partial<FormState> = {};
   for (const wish of wishes) {
     if (wish.deleted_at) continue;
     if (wish.type === "adult" || wish.type === "practical") {
       result.wish_description = wish.description;
       result.wish_size = wish.size ?? "";
+      result.wish_color = wish.color ?? "";
     } else if (wish.type === "fun") {
       result.fun_wish_description = wish.description;
     }
   }
-  return result as Pick<FormState, "wish_description" | "wish_size" | "fun_wish_description">;
+  return result as Pick<FormState, "wish_description" | "wish_size" | "wish_color" | "fun_wish_description">;
 }
 
 /** Normalize user-entered size: empty string, "0", '"0"', or "N/A" → null (not applicable). */
 function normalizeSize(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed === "0" || trimmed === '"0"' || trimmed === "'0'" || trimmed.toUpperCase() === "N/A") return null;
+  return value;
+}
+
+/** Normalize user-entered color: empty string, "0", '"0"', or "N/A" → null (not applicable). */
+function normalizeColor(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === "" || trimmed === "0" || trimmed === '"0"' || trimmed === "'0'" || trimmed.toUpperCase() === "N/A") return null;
   return value;
@@ -63,6 +74,7 @@ function buildWishes(form: Omit<FormState, "age"> & { age: number }): WishCreate
         type: WISH_TYPE.adult,
         description: form.wish_description,
         size: normalizeSize(form.wish_size),
+        color: normalizeColor(form.wish_color),
       },
     ];
   }
@@ -71,11 +83,13 @@ function buildWishes(form: Omit<FormState, "age"> & { age: number }): WishCreate
       type: WISH_TYPE.practical,
       description: form.wish_description,
       size: normalizeSize(form.wish_size),
+      color: normalizeColor(form.wish_color),
     },
     {
       type: WISH_TYPE.fun,
       description: form.fun_wish_description,
       size: null,
+      color: null,
     },
   ];
 }
@@ -267,9 +281,24 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                 fieldProps={{
                   value: form.wish_size,
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),
-                  required: true,
+                  /* Required on create (families must consciously mark "0" when N/A),
+                     optional on update — the N/A decision was already made. */
+                  required: !isEdit,
                   maxLength: 20,
                   placeholder: 'e.g. "Toddler 3T", "Girls M", "Mens M", "8", or "0" if it does not apply',
+                  autoComplete: "off",
+                }}
+              />
+
+              <FormField
+                label="Color"
+                fieldProps={{
+                  value: form.wish_color,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_color", e.target.value),
+                  /* Required on create, optional on update — same convention as Size. */
+                  required: !isEdit,
+                  maxLength: 20,
+                  placeholder: 'e.g. "Blue", or "0" if it does not apply',
                   autoComplete: "off",
                 }}
               />

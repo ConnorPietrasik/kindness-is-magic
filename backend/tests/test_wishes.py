@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from app.models import PersonRole, WishType
 from app.schemas import (
+    _CLEAR,
+    AdminWishUpdate,
     PersonCreate,
     PersonCreateInFamily,
     PersonUpdate,
@@ -53,6 +55,26 @@ class TestWishCreate:
         wish = WishCreate(type=WishType.adult, description="  A nice coat  ")
         assert wish.description == "A nice coat"
 
+    def test_valid_wish_with_color(self):
+        wish = WishCreate(type=WishType.practical, description="A winter coat", color="Blue")
+        assert wish.color == "Blue"
+
+    def test_color_zero_becomes_none(self):
+        wish = WishCreate(type=WishType.fun, description="A toy", color="0")
+        assert wish.color is None
+
+    def test_color_empty_string_becomes_none(self):
+        wish = WishCreate(type=WishType.fun, description="A toy", color="")
+        assert wish.color is None
+
+    def test_color_max_length(self):
+        with pytest.raises(ValidationError):
+            WishCreate(type=WishType.adult, description="A coat", color="x" * 21)
+
+    def test_color_sanitized(self):
+        wish = WishCreate(type=WishType.adult, description="A coat", color="  Blue  ")
+        assert wish.color == "Blue"
+
 
 # ---------------------------------------------------------------------------
 # WishUpdate schema tests
@@ -74,9 +96,51 @@ class TestWishUpdate:
         update = WishUpdate(size="0")
         assert update.size is None
 
-    def test_size_empty_becomes_none(self):
+    def test_size_empty_becomes_clear(self):
+        """'' maps to the _CLEAR sentinel so partial_update clears the column."""
         update = WishUpdate(size="")
-        assert update.size is None
+        assert update.size is _CLEAR
+
+    def test_partial_update_color(self):
+        update = WishUpdate(color="Blue")
+        assert update.color == "Blue"
+
+    def test_color_zero_becomes_none(self):
+        update = WishUpdate(color="0")
+        assert update.color is None
+
+    def test_color_empty_becomes_clear(self):
+        """'' maps to the _CLEAR sentinel so partial_update clears the column."""
+        update = WishUpdate(color="")
+        assert update.color is _CLEAR
+
+
+# ---------------------------------------------------------------------------
+# AdminWishUpdate schema tests
+# ---------------------------------------------------------------------------
+
+
+class TestAdminWishUpdate:
+    def test_partial_update_color(self):
+        update = AdminWishUpdate(color="Red")
+        assert update.color == "Red"
+
+    def test_color_zero_becomes_none(self):
+        update = AdminWishUpdate(color="0")
+        assert update.color is None
+
+    def test_color_empty_becomes_clear(self):
+        """'' maps to the _CLEAR sentinel so partial_update clears the column."""
+        update = AdminWishUpdate(color="")
+        assert update.color is _CLEAR
+
+    def test_color_max_length(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(color="x" * 21)
+
+    def test_size_max_length(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(size="x" * 21)
 
 
 # ---------------------------------------------------------------------------

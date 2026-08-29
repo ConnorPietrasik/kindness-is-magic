@@ -1,7 +1,7 @@
 /**
  * Wish cell components for person list tables.
  *
- * Renders wish descriptions with inline size (e.g. "Sweater (M)").
+ * Renders wish descriptions with inline size and color (e.g. "Sweater (M, Blue)").
  * Adults (age ≥ 18) get a single wish spanning Fun + Practical columns.
  * Children get separate columns per wish type.
  */
@@ -13,8 +13,13 @@ import { Td } from "./Table";
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-function wishText(wish: { description: string; size: string | null }): string {
-  return wish.description + (wish.size ? ` (${wish.size})` : "");
+/**
+ * Format a wish as "Description (size, color)" — present parts joined by ", ",
+ * parentheses omitted when both are empty (e.g. "Sweater (M, Blue)", "Sweater").
+ */
+export function wishText(wish: { description: string; size: string | null; color: string | null }): string {
+  const parts = [wish.size, wish.color].filter((p): p is string => p != null && p !== "");
+  return parts.length > 0 ? `${wish.description} (${parts.join(", ")})` : wish.description;
 }
 
 /* ------------------------------------------------------------------ */

@@ -16,6 +16,7 @@ import { Logo } from "../components/Logo";
 import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { wishText } from "../components/WishCell";
 import { useAuth } from "../context/AuthContext";
 import { getFamilyWishList } from "../lib/api";
 import { familyWishList } from "../lib/queryKeys";
@@ -156,18 +157,12 @@ export default function FamilyWishList() {
                     <Td>{person.age}</Td>
                     {isAdult ? (
                       <Td colSpan={2} className="max-w-xs">
-                        {practicalOrAdult
-                          ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}`
-                          : "—"}
+                        {practicalOrAdult ? wishText(practicalOrAdult) : "—"}
                       </Td>
                     ) : (
                       <>
-                        <Td className="max-w-xs">
-                          {practicalOrAdult
-                            ? `${practicalOrAdult.description}${practicalOrAdult.size ? ` (${practicalOrAdult.size})` : ""}`
-                            : "—"}
-                        </Td>
-                        <Td className="max-w-xs">{fun ? `${fun.description}${fun.size ? ` (${fun.size})` : ""}` : "—"}</Td>
+                        <Td className="max-w-xs">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</Td>
+                        <Td className="max-w-xs">{fun ? wishText(fun) : "—"}</Td>
                       </>
                     )}
                     {hasNotes(data.people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}

@@ -33,6 +33,7 @@ from app.response_builders import (
     sync_person_wishes,
 )
 from app.schemas import (
+    _CLEAR,
     PersonCreate,
     PersonDetail,
     PersonListResponse,
@@ -339,6 +340,7 @@ def create_person_wish(
         type=body.type,
         description=body.description,
         size=body.size,
+        color=body.color,
     )
     db.add(wish)
     db.commit()
@@ -366,7 +368,18 @@ def update_person_wish(
     # If type is being changed, validate against person age and check for conflicts
     if body.type is not None:
         try:
-            validate_wishes_for_age([WishCreate(type=body.type, description=body.description or wish.description, size=body.size)], per.age)
+            # '' size/color arrives as the _CLEAR sentinel — treat as None for type validation
+            validate_wishes_for_age(
+                [
+                    WishCreate(
+                        type=body.type,
+                        description=body.description or wish.description,
+                        size=None if body.size is _CLEAR else body.size,
+                        color=None if body.color is _CLEAR else body.color,
+                    )
+                ],
+                per.age,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         if body.type != wish.type:

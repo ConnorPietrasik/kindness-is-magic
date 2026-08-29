@@ -318,6 +318,40 @@ class TestClaimConfirmationEmailTemplate:
         # Lego set should not have empty parens
         assert "Lego set ()" not in html
 
+    def test_email_includes_color_after_size(self):
+        """Wish color appears in parentheses after size: 'Description (size, color)'."""
+        from app.mail import build_claim_confirmation_email
+
+        people = [
+            {
+                "given_name": "Child",
+                "age": 6,
+                "wishes": [
+                    {"type": "practical", "description": "Shoes", "size": "Size 24", "color": "Red"},
+                    {"type": "fun", "description": "Lego set", "size": None, "color": None},
+                ],
+            },
+            {
+                "given_name": "Bob",
+                "age": 25,
+                "wishes": [
+                    {"type": "adult", "description": "Winter jacket", "size": None, "color": "Navy"},
+                ],
+            },
+        ]
+        html = build_claim_confirmation_email(
+            donor_name="Jane",
+            family_display_id="1-1",
+            family_wish="Warm clothes",
+            family_bio=None,
+            people=people,
+            claim_detail_url="http://localhost/donor/claims/1",
+        )
+        assert "Shoes (Size 24, Red)" in html
+        assert "Winter jacket (Navy)" in html
+        # Lego set should not have empty parens
+        assert "Lego set ()" not in html
+
 
 # =========================================================================
 # Admin notification template tests
@@ -557,6 +591,33 @@ class TestClaimConfirmationEmailOnCreation:
         assert "A coat" in html
         assert "Medium" in html
         assert "A doll" in html
+
+    def test_email_contains_wish_color(self, test_client: TestClient, db: Session):
+        """Email body renders wish color after size in parentheses."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+        data["wishes"][0].color = "Blue"
+        db.commit()
+
+        sent_emails = []
+
+        async def _capture_send(to, subject, html_body, db=None, **kwargs):
+            sent_emails.append(html_body)
+            return {"sent": True, "reason": None}
+
+        with patch("app.families_routes.send_email", new=_capture_send):
+            resp = test_client.post(
+                f"/api/families/{fam.id}/claim",
+                json={"commitment_type": "gifts"},
+            )
+
+        assert resp.status_code == 201
+        assert len(sent_emails) == 1
+        html = sent_emails[0]
+        assert "A coat (Medium, Blue)" in html
+        # Fun wish has no size/color — no empty parens
+        assert "A doll ()" not in html
 
     def test_email_contains_adult_wish_data(self, test_client: TestClient, db: Session):
         """Email body correctly renders adult wish (single column)."""

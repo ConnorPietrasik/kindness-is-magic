@@ -8,6 +8,7 @@ export const defaultPersonForm = {
   role: "",
   wish_description: "",
   wish_size: "",
+  wish_color: "",
   fun_wish_description: "",
   note: "",
   family_id: 0,

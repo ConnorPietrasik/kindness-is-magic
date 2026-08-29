@@ -7,7 +7,7 @@ starting with ``#``.  Recognised section names (case-insensitive) are:
 
 - **referrers**  — name, family_limit, phone_number
 - **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number
-- **people**     — family_name, given_name, age, wish, size, fun_wish, role, note
+- **people**     — family_name, given_name, age, wish, size, color, fun_wish, role, note
 - **users**      — email, password, role, referrer_name_or_id, family_name_or_id
 
 Sections are processed in dependency order:
@@ -540,7 +540,7 @@ def _process_people(
             summary.people_errors += 1
             continue
 
-        # size (optional, empty → NULL)
+        # size (optional, empty/0 → NULL)
         size_raw = rec.get("size", "").strip()
         size: str | None = None
         if size_raw and size_raw != "0":
@@ -548,6 +548,15 @@ def _process_people(
                 size = sanitize_plain_text(size_raw)
             except ValueError:
                 size = None
+
+        # color (optional, empty/0 → NULL)
+        color_raw = rec.get("color", "").strip()
+        color: str | None = None
+        if color_raw and color_raw != "0":
+            try:
+                color = sanitize_plain_text(color_raw)
+            except ValueError:
+                color = None
 
         # fun_wish (required for children, error if present for adults)
         fun_wish_raw = rec.get("fun_wish", "").strip()
@@ -626,6 +635,7 @@ def _process_people(
                 type=WishType.adult,
                 description=wish_desc,
                 size=size,
+                color=color,
             )
             db.add(wish)
         else:
@@ -635,12 +645,14 @@ def _process_people(
                 type=WishType.practical,
                 description=wish_desc,
                 size=size,
+                color=color,
             )
             fun_wish_obj = Wish(
                 person_id=person.id,
                 type=WishType.fun,
                 description=fun_wish,
                 size=None,
+                color=None,
             )
             db.add_all([practical_wish, fun_wish_obj])
 

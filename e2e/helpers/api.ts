@@ -332,14 +332,20 @@ export async function createPersonViaApi(
     age: number;
     wish?: string;
     size?: string;
+    color?: string;
     funWish?: string;
     note?: string;
   },
 ): Promise<{ personId: number }> {
   /* Build wishes array from shorthand fields */
-  const wishes: Array<{ type: string; description: string; size?: string | null }> = [];
+  const wishes: Array<{ type: string; description: string; size?: string | null; color?: string | null }> = [];
   if (personData.wish) {
-    wishes.push({ type: "practical", description: personData.wish, size: personData.size ?? null });
+    wishes.push({
+      type: "practical",
+      description: personData.wish,
+      size: personData.size ?? null,
+      color: personData.color ?? null,
+    });
   }
   if (personData.funWish) {
     wishes.push({ type: "fun", description: personData.funWish });

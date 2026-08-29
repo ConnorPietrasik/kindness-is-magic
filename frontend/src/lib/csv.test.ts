@@ -266,8 +266,8 @@ describe("validateCsvForImport", () => {
   it("handles people section headers", () => {
     const sections = {
       people: {
-        headers: ["family_name", "given_name", "age", "wish", "size", "fun_wish", "role", "note"],
-        rows: [["Smiths", "Alice", "8", "Bike", "", "Lego", "", ""]],
+        headers: ["family_name", "given_name", "age", "wish", "size", "color", "fun_wish", "role", "note"],
+        rows: [["Smiths", "Alice", "8", "Bike", "", "Blue", "Lego", "", ""]],
       },
     };
     const result = validateCsvForImport(sections);
@@ -363,12 +363,16 @@ describe("EXPECTED_HEADERS", () => {
   });
 
   it("has correct people headers", () => {
-    expect(EXPECTED_HEADERS.people.length).toBe(8);
+    expect(EXPECTED_HEADERS.people.length).toBe(9);
     expect(EXPECTED_HEADERS.people).toContain("given_name");
     expect(EXPECTED_HEADERS.people).toContain("age");
     expect(EXPECTED_HEADERS.people).toContain("wish");
     expect(EXPECTED_HEADERS.people).toContain("size");
+    expect(EXPECTED_HEADERS.people).toContain("color");
     expect(EXPECTED_HEADERS.people).toContain("fun_wish");
+    // color sits between size and fun_wish
+    expect(EXPECTED_HEADERS.people.indexOf("color")).toBe(EXPECTED_HEADERS.people.indexOf("size") + 1);
+    expect(EXPECTED_HEADERS.people.indexOf("fun_wish")).toBe(EXPECTED_HEADERS.people.indexOf("color") + 1);
   });
 
   it("has correct users headers", () => {

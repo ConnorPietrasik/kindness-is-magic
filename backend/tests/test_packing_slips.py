@@ -321,6 +321,27 @@ class TestPackingSlipsResponseShape:
                     assert "type" in wish
                     assert "description" in wish
                     assert "size" in wish
+                    assert "color" in wish
+
+    def test_wish_summaries_include_color(self, test_client: TestClient, admin_user, packing_slip_families, db: Session):
+        """Wish summaries in packing slips carry the color value."""
+        from app.models import Wish, WishType
+
+        p1a = packing_slip_families["people"]["fam1"][0]
+        practical = db.query(Wish).filter(Wish.person_id == p1a.id, Wish.type == WishType.practical).first()
+        practical.color = "Blue"
+        db.commit()
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        slip = next(item for item in body if item["id"] == packing_slip_families["families"][0].id)
+        person = next(p for p in slip["people"] if p["given_name"] == p1a.given_name)
+        colors = {w["type"]: w["color"] for w in person["wishes"]}
+        assert colors["practical"] == "Blue"
+        assert colors["fun"] is None
 
     def test_display_ids_present(self, test_client: TestClient, admin_user, packing_slip_families):
         _admin_login(test_client)

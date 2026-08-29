@@ -18,6 +18,7 @@ function makeWish(overrides: Partial<WishSummary>): WishSummary {
     type: "practical",
     description: "A wish",
     size: null,
+    color: null,
     assigned_to_id: null,
     purchased_at: null,
     purchased_where: null,
@@ -353,9 +354,10 @@ describe("AdminPeople", () => {
     await user.type(screen.getByLabelText("Age"), "10");
 
     // Child (age < 18): separate practical + fun wish fields.
-    // Size is required even when not applicable — "0" normalizes to null.
+    // Size and color are required even when not applicable — "0" normalizes to null.
     await user.type(screen.getByLabelText("Practical Wish"), "Jumper");
     await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Color"), "0");
     await user.type(screen.getByLabelText("Fun Wish"), "Board game");
 
     await user.click(screen.getByRole("button", { name: "Create" }));
@@ -368,8 +370,8 @@ describe("AdminPeople", () => {
           age: 10,
           note: null,
           wishes: [
-            { type: "practical", description: "Jumper", size: null },
-            { type: "fun", description: "Board game", size: null },
+            { type: "practical", description: "Jumper", size: null, color: null },
+            { type: "fun", description: "Board game", size: null, color: null },
           ],
           family_id: 5,
         },
@@ -405,9 +407,10 @@ describe("AdminPeople", () => {
     await user.type(screen.getByLabelText("Given Name"), "Dan");
     await user.type(screen.getByLabelText("Age"), "25");
 
-    // Adult (age >= 18): single wish field + size
+    // Adult (age >= 18): single wish field + size + color
     await user.type(screen.getByLabelText("Wish"), "Coffee");
     await user.type(screen.getByLabelText("Size"), "M");
+    await user.type(screen.getByLabelText("Color"), "0");
 
     await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -418,7 +421,7 @@ describe("AdminPeople", () => {
           role: "son",
           age: 25,
           note: null,
-          wishes: [{ type: "adult", description: "Coffee", size: "M" }],
+          wishes: [{ type: "adult", description: "Coffee", size: "M", color: null }],
           family_id: 5,
         },
         expect.anything()
