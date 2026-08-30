@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -204,10 +204,10 @@ class TestReferrerGetFamily:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family
 
         # Create a family under another_referrer
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Ref Family",
             family_wish="Something else",
@@ -268,12 +268,13 @@ class TestReferrerCreateFamily:
         assert body["phone_number"] == "555-333-3333"
 
     def test_family_limit_enforced(self, test_client: TestClient, another_referrer, db: Session):
-        from app.models import Family, FamilyVerificationStatus, Referrer
+        from app.models import FamilyVerificationStatus, Referrer
 
         ref = another_referrer["referrer"]
         # Set limit to 1 and create 1 verified family
         db.query(Referrer).filter(Referrer.id == ref.id).update({"family_limit": 1}, synchronize_session=False)
-        existing = Family(
+        existing = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Limit Family",
             family_wish="A roof",
@@ -349,9 +350,9 @@ class TestReferrerUpdateFamily:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -400,9 +401,9 @@ class TestReferrerDeleteFamily:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -461,11 +462,11 @@ class TestReferrerListFamilyPeople:
         assert body["people"][0]["given_name"] == "Tree Person"
 
     def test_200_empty(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family
 
         _tree_referrer_login(test_client)
         ref = referrer_with_full_tree["referrer"]
-        empty_fam = Family(
+        empty_fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Empty Family",
             family_wish="Nothing",
@@ -487,9 +488,9 @@ class TestReferrerListFamilyPeople:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -567,9 +568,9 @@ class TestReferrerCreateFamilyPerson:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -655,11 +656,12 @@ class TestReferrerPendingFamilies:
         assert body == []
 
     def test_200_list_pending_only(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         # Create a pending family
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Pending Family",
             family_wish="A roof",
@@ -690,10 +692,11 @@ class TestReferrerPendingFamilies:
         assert all(f["family_name"] != "Tree Family" for f in body)
 
     def test_excludes_other_referrer_families(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         other_ref = another_referrer["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=other_ref.id,
             family_name="Other Pending",
             family_wish="A car",
@@ -722,10 +725,11 @@ class TestReferrerPendingFamilies:
 
 class TestReferrerVerifyFamily:
     def test_200_verify_pending(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="To Verify",
             family_wish="A roof",
@@ -745,10 +749,11 @@ class TestReferrerVerifyFamily:
         assert body["verification_status"] == "verified"
 
     def test_verify_increases_family_count(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Count Me",
             family_wish="A roof",
@@ -779,10 +784,11 @@ class TestReferrerVerifyFamily:
         assert resp.status_code == 400
 
     def test_400_cannot_verify_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        rejected = Family(
+        rejected = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Rejected Family",
             family_wish="A roof",
@@ -799,12 +805,13 @@ class TestReferrerVerifyFamily:
         assert resp.status_code == 400
 
     def test_400_limit_exceeded_on_verify(self, test_client: TestClient, another_referrer, db: Session):
-        from app.models import Family, FamilyVerificationStatus, Referrer
+        from app.models import FamilyVerificationStatus, Referrer
 
         ref = another_referrer["referrer"]
         db.query(Referrer).filter(Referrer.id == ref.id).update({"family_limit": 1}, synchronize_session=False)
         # Create 1 verified family (at limit)
-        verified = Family(
+        verified = make_family(
+            db,
             referrer_id=ref.id,
             family_name="At Limit",
             family_wish="A roof",
@@ -813,7 +820,8 @@ class TestReferrerVerifyFamily:
             verification_status=FamilyVerificationStatus.verified,
         )
         # Create 1 pending family
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Over Limit",
             family_wish="A car",
@@ -831,10 +839,11 @@ class TestReferrerVerifyFamily:
         assert "limit" in resp.json()["detail"].lower()
 
     def test_403_wrong_referrer(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Not Yours",
             family_wish="A roof",
@@ -851,10 +860,11 @@ class TestReferrerVerifyFamily:
         assert resp.status_code == 403
 
     def test_401_unauthenticated(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="No Auth",
             family_wish="A roof",
@@ -872,10 +882,11 @@ class TestReferrerVerifyFamily:
 
 class TestReferrerRejectFamily:
     def test_200_reject_pending(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="To Reject",
             family_wish="A roof",
@@ -899,11 +910,12 @@ class TestReferrerRejectFamily:
         from unittest.mock import patch
 
         from app.auth import get_password_hash
-        from app.models import EmailKind, Family, FamilyVerificationStatus, User, UserRole
+        from app.models import EmailKind, FamilyVerificationStatus, User, UserRole
 
         ref = referrer_with_full_tree["referrer"]
         ref_user = referrer_with_full_tree["user"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Reject Email Family",
             family_wish="A roof",
@@ -947,10 +959,11 @@ class TestReferrerRejectFamily:
         """No family user on the family → no email, reject still succeeds."""
         from unittest.mock import patch
 
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="No Contact",
             family_wish="A roof",
@@ -976,10 +989,11 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 400
 
     def test_400_cannot_reject_already_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        rejected = Family(
+        rejected = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Already Rejected",
             family_wish="A roof",
@@ -996,10 +1010,11 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 400
 
     def test_403_wrong_referrer(self, test_client: TestClient, referrer_with_full_tree, another_referrer, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Not Yours",
             family_wish="A roof",
@@ -1016,10 +1031,11 @@ class TestReferrerRejectFamily:
         assert resp.status_code == 403
 
     def test_401_unauthenticated(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="No Auth",
             family_wish="A roof",

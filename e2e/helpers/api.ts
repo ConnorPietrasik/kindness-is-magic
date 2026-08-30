@@ -188,7 +188,7 @@ export async function listUsersViaApi(
 export async function listWishesViaApi(
   request: APIRequestContext,
   opts?: { assignedToId?: number; purchased?: string; familyId?: number },
-): Promise<{ wishes: Array<{ id: number; assigned_to_id: number | null; purchased_at: string | null }>; total: number }> {
+): Promise<{ wishes: Array<{ id: number; type: string; assigned_to_id: number | null; purchased_at: string | null }>; total: number }> {
   const params = new URLSearchParams();
   if (opts?.assignedToId !== undefined) params.set("assigned_to_id", String(opts.assignedToId));
   if (opts?.purchased) params.set("purchased", opts.purchased);
@@ -197,7 +197,7 @@ export async function listWishesViaApi(
   if (!resp.ok()) {
     throw new Error(`listWishesViaApi failed: ${resp.status()}`);
   }
-  return resp.json() as Promise<{ wishes: Array<{ id: number; assigned_to_id: number | null; purchased_at: string | null }>; total: number }>;
+  return resp.json() as Promise<{ wishes: Array<{ id: number; type: string; assigned_to_id: number | null; purchased_at: string | null }>; total: number }>;
 }
 
 /**

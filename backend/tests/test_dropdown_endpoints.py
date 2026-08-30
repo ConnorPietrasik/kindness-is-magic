@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -247,11 +247,12 @@ class TestAdminReferrersDropdown:
 class TestAdminFamiliesDropdown:
     def test_200_returns_minimal_entries(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Returns all active families as {id, family_name} pairs."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         _admin_login(test_client)
         # Add a second family
-        f2 = Family(
+        f2 = make_family(
+            db,
             family_name="Second Family",
             family_wish="A bike",
             contact_name="Second Contact",
@@ -277,11 +278,12 @@ class TestAdminFamiliesDropdown:
 
     def test_200_ordered_by_id(self, test_client: TestClient, admin_user, db: Session):
         """Results are ordered by id ascending."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         _admin_login(test_client)
         for i in range(3):
-            f = Family(
+            f = make_family(
+                db,
                 family_name=f"Family {i}",
                 family_wish="Wish",
                 contact_name=f"Contact {i}",
@@ -299,10 +301,11 @@ class TestAdminFamiliesDropdown:
 
     def test_excludes_soft_deleted(self, test_client: TestClient, admin_user, family_record, db: Session):
         """Soft-deleted families do not appear in the dropdown."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         _admin_login(test_client)
-        deleted_fam = Family(
+        deleted_fam = make_family(
+            db,
             family_name="Deleted Family",
             family_wish="Wish",
             contact_name="Deleted Contact",

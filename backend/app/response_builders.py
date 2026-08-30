@@ -165,6 +165,16 @@ FAMILY_MAX_AGE = (
     select(func.max(Person.age)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
 )
 
+# The family wish is now a Wish row (type=family, family_id set, no person).
+# At most one active family wish exists per family (partial unique index), so
+# this scalar subquery is unambiguous.
+FAMILY_WISH = (
+    select(Wish.description)
+    .where(Wish.family_id == Family.id, Wish.type == WishType.family, Wish.deleted_at.is_(None))
+    .correlate(Family)
+    .scalar_subquery()
+)
+
 FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "family_name": Family.family_name,
     "id": Family.id,
@@ -454,6 +464,48 @@ def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, li
     return result
 
 
+def batch_load_family_wishes(db: Session, family_ids: list[int]) -> dict[int, str]:
+    """Load the active family wish description for a batch of family IDs.
+
+    Returns ``{family_id: description}`` (families without an active family
+    wish are omitted).
+    """
+    if not family_ids:
+        return {}
+    rows = (
+        db.query(Wish.family_id, Wish.description)
+        .filter(Wish.family_id.in_(family_ids), Wish.type == WishType.family, Wish.deleted_at.is_(None))
+        .all()
+    )
+    return {fid: desc for fid, desc in rows}
+
+
+def attach_family_wish(db: Session, fam: Family, description: str) -> Wish:
+    """Attach (or update) the family's single active ``family`` wish.
+
+    Every family is created with its family wish in the same transaction, and
+    at most one active family wish exists per family (partial unique index).
+    If an active wish already exists its description is updated in place
+    (preserving ID / purchase tracking); otherwise any soft-deleted remnant
+    is hard-deleted first and a new wish is created.
+
+    Does **not** commit — caller owns the transaction.
+    """
+    # Flush first so a just-added family has its ID for the lookups below.
+    db.flush()
+    wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.is_(None)).first()
+    if wish is None:
+        # Hard-delete any soft-deleted remnant first (partial unique index)
+        old_deleted = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.isnot(None)).first()
+        if old_deleted:
+            db.delete(old_deleted)
+        wish = Wish(family_id=fam.id, type=WishType.family, description=description)
+        db.add(wish)
+    else:
+        wish.description = description
+    return wish
+
+
 # ---------------------------------------------------------------------------
 # Validation helpers
 # ---------------------------------------------------------------------------
@@ -517,8 +569,12 @@ def create_person_with_wishes(
     return per
 
 
-def build_wish_detail(wish: Wish, person: Person) -> dict:
-    """Build a dict suitable for WishDetail, including person context."""
+def build_wish_detail(wish: Wish, person: Person | None) -> dict:
+    """Build a dict suitable for WishDetail, including person context.
+
+    *person* is ``None`` for family wishes (the wish is bound to a family,
+    not a person).
+    """
     return {
         "id": wish.id,
         "type": wish.type,
@@ -531,13 +587,16 @@ def build_wish_detail(wish: Wish, person: Person) -> dict:
         "received_at": wish.received_at,
         "purchaser_note": wish.purchaser_note,
         "person_id": wish.person_id,
-        "person_given_name": person.given_name,
-        "person_family_name": person.family.family_name if person.family else None,
+        "person_given_name": person.given_name if person is not None else None,
+        "person_family_name": person.family.family_name if person is not None and person.family else None,
     }
 
 
-def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int, User] | None = None) -> dict:
+def build_wish_list_item(wish: Wish, person: Person | None, *, assigned_users: dict[int, User] | None = None) -> dict:
     """Build a dict suitable for WishListSummary (flat admin list view).
+
+    *person* is ``None`` for family wishes, which resolve their family
+    directly from ``wish.family_id``.
 
     Pass *assigned_users* as a pre-loaded {user_id: User} map to avoid N+1
     queries.  If omitted the caller is responsible for populating the
@@ -556,8 +615,8 @@ def build_wish_list_item(wish: Wish, person: Person, *, assigned_users: dict[int
         "size": wish.size,
         "color": wish.color,
         "person_id": wish.person_id,
-        "person_given_name": person.given_name,
-        "family_id": person.family_id,
+        "person_given_name": person.given_name if person is not None else None,
+        "family_id": wish.family_id if person is None else person.family_id,
         "assigned_to_id": wish.assigned_to_id,
         "assigned_to_name": assigned_to_name,
         "purchased_at": wish.purchased_at,
@@ -578,6 +637,7 @@ def build_family_detail(
     include_claim: bool = True,
     claim_map: dict[int, FamilyClaim] | None = None,
     donor_map: dict[int, str] | None = None,
+    family_wish: str | None = None,
 ) -> dict:
     """Build a dict suitable for FamilyDetail, including person_count, display_id, and referrer_name.
 
@@ -591,7 +651,13 @@ def build_family_detail(
     Pass ``include_claim=False`` to skip claim lookups.
     Pass pre-loaded ``claim_map`` (family_id → FamilyClaim) and ``donor_map``
     (user_id → display_name) to avoid per-family claim queries.
+    Pass ``family_wish`` to skip the wish-row lookup (for callers that
+    already have the description, e.g. right after attaching it).
     """
+    if family_wish is None:
+        family_wish = (
+            db.query(Wish.description).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.is_(None)).scalar()
+        ) or ""
     if person_count is None:
         person_count = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).count()
 
@@ -655,7 +721,7 @@ def build_family_detail(
         "bio": fam.bio,
         "address": fam.address,
         "phone_number": fam.phone_number,
-        "family_wish": fam.family_wish,
+        "family_wish": family_wish,
         "contact_name": fam.contact_name,
         "verification_status": fam.verification_status,
         "pickup_window": fam.pickup_window,
@@ -686,6 +752,7 @@ class FamilyListContext:
     delivery_user_map: dict[int, str]
     claim_map: dict[int, FamilyClaim]
     donor_map: dict[int, str]
+    family_wish_map: dict[int, str]
 
 
 def load_family_list_context(
@@ -701,6 +768,8 @@ def load_family_list_context(
 
     Only runs queries for the maps that ``cols`` indicates the client needs
     (``cols=None`` loads all maps, for endpoints without a ``columns`` param).
+    ``person_count`` and ``family_wish`` are optional on FamilyDetail, so
+    skipping their lookups when not requested is safe.
     ``scope`` restricts display-ID numbering to a single referrer
     (``None`` = flat admin numbering).  ``include_claim`` loads claim and
     donor names (admin views); ``show_status_labels`` gives pending/rejected
@@ -709,10 +778,14 @@ def load_family_list_context(
     if cols is None:
         cols = ColumnRequest.parse(None)
 
+    family_ids = [f.id for f in families]
+
     count_map: dict[int, int] = {}
     if cols.needs("person_count"):
         counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
         count_map = {fid: cnt for fid, cnt in counts}
+
+    family_wish_map = batch_load_family_wishes(db, family_ids) if cols.needs("family_wish") else {}
 
     pos_map: dict[int, str] = {}
     if cols.needs("display_id"):
@@ -735,7 +808,6 @@ def load_family_list_context(
     claim_map: dict[int, FamilyClaim] = {}
     donor_map: dict[int, str] = {}
     if include_claim and cols.needs("claim_status", "claim_commitment_type", "claim_donor_name", "claim_id"):
-        family_ids = [f.id for f in families]
         if family_ids:
             claims = (
                 db.query(FamilyClaim)
@@ -758,6 +830,7 @@ def load_family_list_context(
         delivery_user_map=delivery_user_map,
         claim_map=claim_map,
         donor_map=donor_map,
+        family_wish_map=family_wish_map,
     )
 
 
@@ -776,7 +849,7 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
         "id": fam.id,
         "display_id": display_id if display_id is not None else ctx.pos_map.get(fam.id),
         "family_name": fam.family_name,
-        "family_wish": fam.family_wish,
+        "family_wish": ctx.family_wish_map.get(fam.id, ""),
         "contact_name": fam.contact_name,
         "referrer_id": fam.referrer_id,
         "referrer_name": ctx.referrer_map.get(fam.referrer_id) if fam.referrer_id else None,

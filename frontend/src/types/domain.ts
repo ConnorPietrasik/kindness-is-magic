@@ -140,7 +140,11 @@ export interface FamilySummary {
   has_notes: boolean;
 }
 
-/** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name). */
+/** Mirrors FamilyDetail (includes computed person_count, display_id, referrer_name).
+ *
+ * `family_wish` and `person_count` are omitted in column-filtered list
+ * responses when the client doesn't request them — always present in
+ * detail responses. */
 export interface FamilyDetail {
   id: number;
   referrer_id: number | null;
@@ -152,10 +156,10 @@ export interface FamilyDetail {
   bio: string | null;
   address: string;
   phone_number: string;
-  family_wish: string;
+  family_wish?: string;
   contact_name: string;
   deleted_at: string | null;
-  person_count: number;
+  person_count?: number;
   verification_status: FamilyVerificationStatus;
   pickup_window: string | null;
   wish_lock_level: WishLockLevel;
@@ -227,14 +231,15 @@ export interface FamilySelfPayload {
   contact_name?: string;
 }
 
-/** Wish type — mirrors backend WishType enum. */
-export type WishType = "adult" | "practical" | "fun";
+/** Wish type — mirrors backend WishType enum. `family` has no person. */
+export type WishType = "adult" | "practical" | "fun" | "family";
 
 /** Literal wish-type values — typed so `as WishType` casts are unnecessary. */
 export const WISH_TYPE = {
   adult: "adult" as const,
   practical: "practical" as const,
   fun: "fun" as const,
+  family: "family" as const,
 };
 
 /** Mirrors WishSummary — compact wish embedded in person responses. */
@@ -259,8 +264,10 @@ export interface WishListSummary {
   description: string;
   size: string | null;
   color: string | null;
-  person_id: number;
-  person_given_name: string;
+  /** Null for family wishes (no person). */
+  person_id: number | null;
+  /** Null for family wishes (no person). */
+  person_given_name: string | null;
   family_id: number;
   assigned_to_id: number | null;
   assigned_to_name: string | null;
@@ -296,9 +303,10 @@ export interface AdminWishUpdate {
   purchaser_note?: string | null;
 }
 
-/** Mirrors WishDetail — full wish with person context (returned by detail endpoint). */
+/** Mirrors WishDetail — full wish with person context (returned by detail endpoint).
+ *  Person fields are null for family wishes. */
 export interface WishDetail extends WishSummary {
-  person_id: number;
+  person_id: number | null;
   person_given_name: string | null;
   person_family_name: string | null;
 }
@@ -596,8 +604,10 @@ export interface PurchaserWishSummary {
   description: string;
   size: string | null;
   color: string | null;
-  person_id: number;
-  person_given_name: string;
+  /** Null for family wishes (no person). */
+  person_id: number | null;
+  /** Null for family wishes (no person). */
+  person_given_name: string | null;
   family_id: number;
   /** Presentational hierarchical position (e.g. "3-2-1"-style, family form "2-3"); "0" when not enumerated. */
   family_display_id: string;
@@ -678,6 +688,8 @@ export interface FamilyClaimDetail {
   fulfilled_at: string | null;
   donor_user_id: number;
   donor_display_name: string;
+  /** The family's family wish — part of the claim. Null if none exists. */
+  family_wish: WishSummary | null;
   people: PersonWishItem[];
 }
 

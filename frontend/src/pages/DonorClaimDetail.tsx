@@ -85,6 +85,19 @@ export default function DonorClaimDetail() {
           </div>
         </Card>
 
+        {/* Family wish — a claim covers the whole family, wish included */}
+        {data.family_wish && (
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
+              <p className="mt-1 text-sm text-violet-800">{data.family_wish.description}</p>
+            </div>
+            {data.commitment_type === "gifts" && canAct && (
+              <MarkPurchasedButton wish={data.family_wish} claimId={claimId} personName="Family" />
+            )}
+          </div>
+        )}
+
         {/* Wish list */}
         <h3 className="mb-3 text-base font-semibold text-gray-900">Family Members & Wishes</h3>
         {data.people.length === 0 ? (

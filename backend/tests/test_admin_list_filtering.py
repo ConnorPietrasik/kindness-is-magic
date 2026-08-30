@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,11 +42,12 @@ def _make_referrers(db: Session, names: list[str], statuses: list[str] | None = 
 
 def _make_families(db: Session, names: list[str], statuses: list[str] | None = None, lock_levels: list[str] | None = None):
     """Create multiple families with given names and optional statuses."""
-    from app.models import Family, FamilyVerificationStatus, WishLockLevel
+    from app.models import FamilyVerificationStatus, WishLockLevel
 
     families = []
     for i, name in enumerate(names):
-        f = Family(
+        f = make_family(
+            db,
             family_name=name,
             family_wish="A wish",
             contact_name=f"Contact {i}",
@@ -225,9 +226,10 @@ class TestFamiliesSearch:
         assert resp.json()["total"] == 1
 
     def test_search_by_wish(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             family_name="Alpha",
             family_wish="Bicycle for the kids",
             contact_name="C1",
@@ -235,7 +237,8 @@ class TestFamiliesSearch:
             verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             family_name="Beta",
             family_wish="Winter coats please",
             contact_name="C2",
@@ -255,14 +258,15 @@ class TestFamiliesSearch:
 
     def test_search_all_fields(self, test_client: TestClient, admin_user, db: Session):
         from app.models import Family
+        from app.response_builders import attach_family_wish
 
         _make_families(db, ["Smith Family", "Jones Family"])
-        # Also set distinct family_wish values
+        # Also set distinct family wish values (on the wish rows)
         for f in db.query(Family).all():
             if f.family_name == "Smith Family":
-                f.family_wish = "Toys and games"
+                attach_family_wish(db, f, "Toys and games")
             else:
-                f.family_wish = "School supplies"
+                attach_family_wish(db, f, "School supplies")
         db.commit()
         _admin_login(test_client)
 
@@ -287,9 +291,10 @@ class TestFamiliesSearch:
         assert resp.json()["total"] == 1
 
     def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             family_name="Smith Family",
             family_wish="Bicycle",
             contact_name="John Smith",
@@ -297,7 +302,8 @@ class TestFamiliesSearch:
             verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             family_name="Smith Family",
             family_wish="Coats",
             contact_name="Jane Doe",
@@ -305,7 +311,8 @@ class TestFamiliesSearch:
             verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.family,
         )
-        f3 = Family(
+        f3 = make_family(
+            db,
             family_name="Jones Family",
             family_wish="Bicycle",
             contact_name="Bob Jones",
@@ -811,10 +818,10 @@ class TestDeletedReferrersSort:
 
 class TestDeletedFamiliesSort:
     def test_deleted_sorted_by_deleted_at_desc(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
-        f1 = Family(family_name="First", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
-        f2 = Family(family_name="Second", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
+        f1 = make_family(db, family_name="First", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
+        f2 = make_family(db, family_name="Second", family_wish="W", contact_name="C", verification_status=FamilyVerificationStatus.verified)
         db.add_all([f1, f2])
         db.commit()
 

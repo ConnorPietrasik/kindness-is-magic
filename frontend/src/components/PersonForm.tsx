@@ -270,7 +270,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                   value: form.wish_description,
                   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("wish_description", e.target.value),
                   required: true,
-                  maxLength: 60,
+                  maxLength: 100,
                   rows: 2,
                   autoComplete: "off",
                 }}
@@ -312,7 +312,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
                     value: form.fun_wish_description,
                     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => update("fun_wish_description", e.target.value),
                     required: true,
-                    maxLength: 60,
+                    maxLength: 100,
                     rows: 2,
                     autoComplete: "off",
                   }}

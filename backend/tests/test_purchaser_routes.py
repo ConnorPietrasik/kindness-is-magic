@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Family,
     FamilyVerificationStatus,
     Person,
     PersonRole,
@@ -18,6 +17,7 @@ from app.models import (
     WishLockLevel,
     WishType,
 )
+from tests.conftest import make_family
 
 
 @pytest.fixture()
@@ -36,7 +36,8 @@ def purchaser_wish_tree(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Purchaser Family",
         family_wish="Warm clothes",
@@ -105,6 +106,15 @@ def second_purchaser(db: Session):
     return purchaser2
 
 
+def assign_family_wish(db: Session, tree) -> Wish:
+    """Assign the tree family's family wish row to the tree purchaser."""
+    w = db.query(Wish).filter(Wish.family_id == tree["family"].id, Wish.type == WishType.family).first()
+    assert w is not None
+    w.assigned_to_id = tree["purchaser"].id
+    db.commit()
+    return w
+
+
 @pytest.fixture()
 def logged_in_purchaser(test_client, purchaser_wish_tree):
     """Login as the purchaser and return the test_client."""
@@ -159,7 +169,8 @@ class TestPurchaserListWishes:
 
     def test_list_display_id_zero_for_unenumerated_family(self, logged_in_purchaser, purchaser_wish_tree, db):
         """A wish under a pending (unenumerated) family shows display_id '0'."""
-        fam2 = Family(
+        fam2 = make_family(
+            db,
             referrer_id=purchaser_wish_tree["referrer"].id,
             family_name="Pending Family",
             family_wish="Something",
@@ -201,6 +212,23 @@ class TestPurchaserListWishes:
         assert len(data["wishes"]) == 2
         for w in data["wishes"]:
             assert w["wish_lock_level"] == WishLockLevel.admin.value
+
+    def test_list_includes_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An assigned family wish appears with null person fields and family context."""
+        assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+
+        fam_item = [w for w in data["wishes"] if w["type"] == "family"][0]
+        assert fam_item["person_id"] is None
+        assert fam_item["person_given_name"] is None
+        assert fam_item["family_id"] == purchaser_wish_tree["family"].id
+        ref_id = purchaser_wish_tree["referrer"].id
+        assert fam_item["family_display_id"] == f"{ref_id}-1"
+        assert fam_item["wish_lock_level"] == WishLockLevel.family.value
 
     def test_list_excludes_unassigned_wishes(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Unassigned wishes are not shown to the purchaser."""
@@ -288,6 +316,18 @@ class TestPurchaserGetWish:
         assert data["id"] == wish.id
         assert data["person_given_name"] == "PurchaserChild"
 
+    def test_get_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Family wish detail has null person fields."""
+        w = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get(f"/api/purchaser/wishes/{w.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["type"] == "family"
+        assert data["person_id"] is None
+        assert data["person_given_name"] is None
+        assert data["person_family_name"] is None
+
     def test_get_unassigned_wish_returns_403(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Purchaser cannot get detail of a wish not assigned to them."""
         purchaser_wish_tree["wishes"][1].assigned_to_id = None
@@ -334,6 +374,21 @@ class TestPurchaserMarkPurchased:
         assert data["purchased_where"] == "Target"
         assert data["purchaser_note"] == "Got on sale"
         assert data["received_at"] is not None
+
+    def test_mark_purchased_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Purchaser can mark an assigned family wish purchased (no reassign)."""
+        w = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.post(
+            f"/api/purchaser/wishes/{w.id}/mark-purchased",
+            json={"purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is not None
+        assert data["purchased_where"] == "Target"
+        assert data["assigned_to_id"] == purchaser_wish_tree["purchaser"].id
+        assert data["person_id"] is None
 
     def test_mark_purchased_does_not_change_assigned_to_id(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Mark purchased does NOT change assigned_to_id (unlike admin endpoint)."""
@@ -401,6 +456,17 @@ class TestPurchaserUpdateWish:
         )
         assert resp.status_code == 200
         assert resp.json()["purchaser_note"] == "Updated note"
+
+    def test_update_family_wish_note(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Purchaser can update purchaser_note on an assigned family wish."""
+        w = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.patch(
+            f"/api/purchaser/wishes/{w.id}",
+            json={"purchaser_note": "Gift wrapped"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchaser_note"] == "Gift wrapped"
 
     def test_update_received_at(self, logged_in_purchaser, purchaser_wish_tree):
         """Purchaser can update received_at."""
@@ -520,7 +586,8 @@ class TestAdminMarkPurchasedSkipRedundantWrite:
         db.refresh(admin2)
 
         # Create a separate family/person so we don't hit the unique wish-type constraint
-        fam2 = Family(
+        fam2 = make_family(
+            db,
             referrer_id=purchaser_wish_tree["referrer"].id,
             family_name="Admin Mark Family",
             family_wish="Test wish",

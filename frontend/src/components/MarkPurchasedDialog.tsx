@@ -10,7 +10,8 @@ import { OptionalLabel } from "./OptionalLabel";
  * WishListSummary and PurchaserWishSummary).
  */
 export interface MarkPurchasedDialogWish {
-  person_given_name: string;
+  /** Null for family wishes (no person). */
+  person_given_name: string | null;
   purchased_where: string | null;
   purchaser_note: string | null;
   received_at: string | null;
@@ -51,7 +52,7 @@ export function MarkPurchasedDialog({ open, wish, onSubmit, onCancel, loading }:
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
         <p className="mb-4 text-sm font-semibold text-gray-700">
-          Mark wish for <strong>{wish?.person_given_name ?? "?"}</strong> as purchased
+          Mark wish for <strong>{wish ? (wish.person_given_name ?? "Family") : "?"}</strong> as purchased
         </p>
         <form
           onSubmit={(e) => {

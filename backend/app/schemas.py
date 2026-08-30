@@ -148,7 +148,7 @@ class FamilySelfRegister(BaseModel):
 
     code: str
     family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=400)
+    family_wish: str = Field(..., min_length=1, max_length=100)
     contact_name: str = Field(..., min_length=1, max_length=40)
     email: str = Field(..., min_length=1, max_length=120)
     password: str = Field(..., min_length=8)
@@ -438,7 +438,7 @@ class EmailListResponse(BaseModel):
 class FamilyCreate(BaseModel):
     referrer_id: int | None = None
     family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=400)
+    family_wish: str = Field(..., min_length=1, max_length=100)
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
     address: str = Field(..., min_length=1, max_length=200)
@@ -466,7 +466,7 @@ class FamilyCreate(BaseModel):
 
 class FamilyUpdate(BaseModel):
     family_name: Optional[str] = Field(None, min_length=1, max_length=40)
-    family_wish: Optional[str] = Field(None, min_length=1, max_length=400)
+    family_wish: Optional[str] = Field(None, min_length=1, max_length=100)
     contact_name: Optional[str] = Field(None, min_length=1, max_length=40)
     bio: Optional[str] = None
     address: Optional[str] = Field(None, min_length=1, max_length=200)
@@ -552,12 +552,14 @@ class FamilyDetail(BaseModel):
     bio: Optional[str] = None
     address: str
     phone_number: str
-    family_wish: str
+    # Optional: column-filtered list responses omit fields not requested
+    # (the lookups are skipped too). Always present in detail responses.
+    family_wish: str | None = None
     contact_name: str
     verification_status: FamilyVerificationStatus
     pickup_window: datetime | None = None
     deleted_at: datetime | None = None
-    person_count: int
+    person_count: int | None = None
     wish_lock_level: WishLockLevel
     wish_review_requested_at: datetime | None = None
     wish_rejection_reason: Optional[str] = None
@@ -696,7 +698,7 @@ class WishCreate(BaseModel):
     """Create a single wish for a person (person_id inferred from route)."""
 
     type: WishType
-    description: str = Field(..., min_length=1, max_length=60)
+    description: str = Field(..., min_length=1, max_length=100)
     size: str | None = Field(None, max_length=20)
     color: str | None = Field(None, max_length=20)
 
@@ -726,7 +728,7 @@ class WishUpdate(BaseModel):
     """
 
     type: WishType | None = None
-    description: Optional[str] = Field(None, min_length=1, max_length=60)
+    description: Optional[str] = Field(None, min_length=1, max_length=100)
     # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
     # the 20-char limit is enforced in the validators (constraints can't apply
     # to a union containing object).
@@ -779,9 +781,9 @@ class WishSummary(BaseModel):
 
 
 class WishDetail(WishSummary):
-    """Full wish with person info."""
+    """Full wish with person info (person fields are null for family wishes)."""
 
-    person_id: int
+    person_id: int | None = None
     person_given_name: str | None = None
     person_family_name: str | None = None
 
@@ -795,7 +797,7 @@ class AdminWishUpdate(BaseModel):
     """
 
     type: WishType | None = None
-    description: Optional[str] = Field(None, min_length=1, max_length=60)
+    description: Optional[str] = Field(None, min_length=1, max_length=100)
     # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
     # the 20-char limit is enforced in the validators (constraints can't apply
     # to a union containing object).
@@ -898,8 +900,8 @@ class WishListSummary(BaseModel):
     description: str
     size: str | None = None
     color: str | None = None
-    person_id: int
-    person_given_name: str
+    person_id: int | None = None
+    person_given_name: str | None = None
     family_id: int
     assigned_to_id: int | None = None
     assigned_to_name: str | None = None
@@ -935,8 +937,8 @@ class PurchaserWishSummary(BaseModel):
     description: str
     size: str | None = None
     color: str | None = None
-    person_id: int
-    person_given_name: str
+    person_id: int | None = None
+    person_given_name: str | None = None
     family_id: int
     family_display_id: str = "0"
     wish_lock_level: WishLockLevel | None = None
@@ -1280,7 +1282,7 @@ class FamilyCreateByReferrer(BaseModel):
     """Referrer creates a family — referrer_id is inferred from the session."""
 
     family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=400)
+    family_wish: str = Field(..., min_length=1, max_length=100)
     contact_name: str = Field(..., min_length=1, max_length=40)
     bio: Optional[str] = None
     address: str = Field(..., min_length=1, max_length=200)
@@ -1402,6 +1404,7 @@ class FamilyClaimDetail(BaseModel):
     fulfilled_at: datetime | None = None
     donor_user_id: int
     donor_display_name: str
+    family_wish: WishSummary | None = None
     people: list[PersonWishItem] = []
 
     model_config = {"from_attributes": True}

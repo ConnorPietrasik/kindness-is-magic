@@ -227,6 +227,29 @@ def test_client(db: Session) -> Generator[Any, Any, None]:
 
 
 # ---------------------------------------------------------------------------
+# Helper: family factory (family + family wish in one call)
+# ---------------------------------------------------------------------------
+
+
+def make_family(db: Session, family_wish: str, **kwargs):
+    """Create a Family row plus its family wish (a wish row) in one call.
+
+    Mirrors the app invariant: every family is created with its family wish
+    in the same transaction. Adds and flushes both rows; does **not** commit
+    (the test's session/transaction is owned by the test).
+
+    Returns the Family instance.
+    """
+    from app.models import Family, Wish, WishType
+
+    fam = Family(**kwargs)
+    db.add(fam)
+    db.flush()
+    db.add(Wish(family_id=fam.id, type=WishType.family, description=family_wish))
+    return fam
+
+
+# ---------------------------------------------------------------------------
 # Helper: create seed data for auth testing
 # ---------------------------------------------------------------------------
 
@@ -289,9 +312,10 @@ def referrer_user(db: Session, referrer_record):
 @pytest.fixture()
 def family_record(db: Session):
     """Create a Family row."""
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    f = Family(
+    f = make_family(
+        db,
         family_name="TestFamily",
         family_wish="World peace",
         contact_name="Contact Person",
@@ -341,9 +365,10 @@ def login_as(client: Any, email: str, password: str) -> dict:
 @pytest.fixture()
 def referrer_with_families(db: Session, referrer_record):
     """Create a Referrer with 1-2 Family rows."""
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    f1 = Family(
+    f1 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Smith Family",
         family_wish="A new roof",
@@ -351,7 +376,8 @@ def referrer_with_families(db: Session, referrer_record):
         phone_number="555-010-0101",
         verification_status=FamilyVerificationStatus.verified,
     )
-    f2 = Family(
+    f2 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Jones Family",
         family_wish="Warm clothes",
@@ -408,7 +434,7 @@ def referrer_with_full_tree(db: Session):
 
     Returns a dict with keys: referrer, family, person, user.
     """
-    from app.models import FamilyVerificationStatus, Family, Person, PersonRole, Referrer, ReferrerApprovalStatus, User, UserRole
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Referrer, ReferrerApprovalStatus, User, UserRole
     from app.auth import get_password_hash
 
     ref = Referrer(
@@ -422,7 +448,8 @@ def referrer_with_full_tree(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Tree Family",
         family_wish="A new home",
@@ -505,10 +532,11 @@ def another_family(db: Session, referrer_record):
 
     Returns a dict with keys: family, user.
     """
-    from app.models import Family, FamilyVerificationStatus, User, UserRole
+    from app.models import FamilyVerificationStatus, User, UserRole
     from app.auth import get_password_hash
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Another Family",
         family_wish="A computer",

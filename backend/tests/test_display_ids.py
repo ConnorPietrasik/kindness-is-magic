@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,10 +45,11 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_orphan_families_get_0_prefix(self, test_client: TestClient, admin_user, db: Session):
         """Orphan families (no referrer) get display_id 0-1, 0-2, ..."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         for i in range(3):
-            f = Family(
+            f = make_family(
+                db,
                 family_name=f"Orphan {i}",
                 family_wish="Wish",
                 contact_name="Contact",
@@ -69,10 +70,11 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_referrer_families_get_referrer_prefix(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Families with a referrer get display_id {referrer_id}-{n}."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         for i in range(3):
-            f = Family(
+            f = make_family(
+                db,
                 referrer_id=referrer_record.id,
                 family_name=f"Ref Family {i}",
                 family_wish="Wish",
@@ -95,10 +97,11 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_mixed_referrer_and_orphan(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Mixed orphan and referrer families are in separate enumeration groups."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         # Orphan first (lower id)
-        f1 = Family(
+        f1 = make_family(
+            db,
             family_name="Orphan First",
             family_wish="Wish",
             contact_name="Contact",
@@ -110,7 +113,8 @@ class TestAdminFamilyDisplayIdFlat:
         db.refresh(f1)
 
         # Referrer family (higher id)
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Ref Family",
             family_wish="Wish",
@@ -133,7 +137,7 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_multiple_referrers_independent_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Families from different referrers have independent counters (each starts at 1)."""
-        from app.models import Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus
+        from app.models import FamilyVerificationStatus, Referrer, ReferrerApprovalStatus
 
         # Create a second referrer
         ref2 = Referrer(
@@ -148,7 +152,8 @@ class TestAdminFamilyDisplayIdFlat:
         db.refresh(ref2)
 
         # One family per referrer
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Ref1 Family",
             family_wish="Wish",
@@ -156,7 +161,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=ref2.id,
             family_name="Ref2 Family",
             family_wish="Wish",
@@ -178,9 +184,10 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_pending_families_included_in_flat_view(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Flat admin view includes pending families (unlike referrer's view)."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified Family",
             family_wish="Wish",
@@ -188,7 +195,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Pending Family",
             family_wish="Wish",
@@ -211,9 +219,10 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_pending_does_not_disrupt_verified_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Pending families interleaved between verified ones don't shift verified numbering."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified First",
             family_wish="Wish",
@@ -221,7 +230,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Pending Middle",
             family_wish="Wish",
@@ -229,7 +239,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0001",
             verification_status=FamilyVerificationStatus.pending,
         )
-        f3 = Family(
+        f3 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified Second",
             family_wish="Wish",
@@ -256,9 +267,10 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_rejected_does_not_disrupt_verified_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Rejected families interleaved between verified ones don't shift verified numbering."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified First",
             family_wish="Wish",
@@ -266,7 +278,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Rejected Middle",
             family_wish="Wish",
@@ -274,7 +287,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0001",
             verification_status=FamilyVerificationStatus.rejected,
         )
-        f3 = Family(
+        f3 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified Second",
             family_wish="Wish",
@@ -301,9 +315,10 @@ class TestAdminFamilyDisplayIdFlat:
 
     def test_flat_verified_display_id_matches_scoped(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """Verified family display_id is consistent between flat and scoped views (minus prefix)."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="First",
             family_wish="Wish",
@@ -311,7 +326,8 @@ class TestAdminFamilyDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Second",
             family_wish="Wish",
@@ -359,11 +375,12 @@ class TestAdminFamilyDisplayIdScoped:
         Verified families keep their sequential numbering; pending families
         are interleaved but don't disrupt the numbering.
         """
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_families["referrer"]
         # Add a pending family between the two verified ones by ID
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Pending Family",
             family_wish="Wish",
@@ -391,10 +408,11 @@ class TestAdminFamilyDisplayIdScoped:
 
     def test_scoped_includes_rejected_with_label(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Scoped admin view includes rejected families with 'REJECTED' display_id."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_families["referrer"]
-        rejected = Family(
+        rejected = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Rejected Family",
             family_wish="Wish",
@@ -422,12 +440,13 @@ class TestAdminFamilyDisplayIdScoped:
 
     def test_scoped_verified_matches_referrer_view(self, test_client: TestClient, admin_user, referrer_with_families, db: Session):
         """Verified families in admin scoped view have same display_ids as referrer's view."""
-        from app.models import Family, FamilyVerificationStatus, User, UserRole
+        from app.models import FamilyVerificationStatus, User, UserRole
         from app.auth import get_password_hash
 
         ref = referrer_with_families["referrer"]
         # Add a pending family
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Pending Family",
             family_wish="Wish",
@@ -496,24 +515,27 @@ class TestAdminFamilyDisplayIdDeleted:
 
     def test_deleted_skipped_in_counter(self, test_client: TestClient, admin_user, db: Session):
         """Deleted families don't consume enumeration numbers in the main list."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         # Create 3 families
-        f1 = Family(
+        f1 = make_family(
+            db,
             family_name="First",
             family_wish="W",
             contact_name="C",
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             family_name="Second",
             family_wish="W",
             contact_name="C",
             phone_number="555-000-0001",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f3 = Family(
+        f3 = make_family(
+            db,
             family_name="Third",
             family_wish="W",
             contact_name="C",
@@ -568,10 +590,11 @@ class TestAdminFamilyDisplayIdPagination:
 
     def test_continuity_across_pages(self, test_client: TestClient, admin_user, db: Session):
         """Display IDs continue across page boundaries."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         for i in range(5):
-            f = Family(
+            f = make_family(
+                db,
                 family_name=f"Family {i}",
                 family_wish="Wish",
                 contact_name="Contact",
@@ -638,9 +661,10 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_referrer_family_people(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People in referrer families get {ref_id}-{fam_n}-{per_n}."""
-        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
+        from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Ref Family",
             family_wish="Wish",
@@ -674,10 +698,11 @@ class TestAdminPeopleDisplayIdFlat:
 
     def test_multiple_families_enumeration(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """People across multiple families get correct family and person enumeration."""
-        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
+        from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
         # Two families under same referrer
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Family A",
             family_wish="Wish",
@@ -685,7 +710,8 @@ class TestAdminPeopleDisplayIdFlat:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Family B",
             family_wish="Wish",
@@ -732,7 +758,8 @@ class TestAdminPeopleDisplayIdFlat:
         from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
         # Verified family (first by id)
-        f1 = Family(
+        f1 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified Family",
             family_wish="Wish",
@@ -741,7 +768,8 @@ class TestAdminPeopleDisplayIdFlat:
             verification_status=FamilyVerificationStatus.verified,
         )
         # Pending family (second by id)
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Pending Family",
             family_wish="Wish",
@@ -750,7 +778,8 @@ class TestAdminPeopleDisplayIdFlat:
             verification_status=FamilyVerificationStatus.pending,
         )
         # Another verified family (third by id)
-        f3 = Family(
+        f3 = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Verified Family 2",
             family_wish="Wish",
@@ -956,11 +985,12 @@ class TestReferrerFamilyDisplayId:
 
     def test_sequential_enumeration(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         """Families are numbered 1, 2, 3... by DB id order."""
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         ref = referrer_with_full_tree["referrer"]
         # Create additional families
-        f2 = Family(
+        f2 = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Second Family",
             family_wish="Wish",
@@ -968,7 +998,8 @@ class TestReferrerFamilyDisplayId:
             phone_number="555-000-0000",
             verification_status=FamilyVerificationStatus.verified,
         )
-        f3 = Family(
+        f3 = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Third Family",
             family_wish="Wish",
@@ -1082,12 +1113,13 @@ class TestComputePositionMapsBatching:
     """
 
     def test_batched_matches_per_family_scoped(self, referrer_record, db: Session):
-        from app.models import Family, FamilyVerificationStatus, Person, PersonRole
+        from app.models import FamilyVerificationStatus, Person, PersonRole
         from app.response_builders import compute_position_maps
 
         fams = []
         for i in range(3):
-            f = Family(
+            f = make_family(
+                db,
                 referrer_id=referrer_record.id,
                 family_name=f"Batch Fam {i}",
                 family_wish="Wish",

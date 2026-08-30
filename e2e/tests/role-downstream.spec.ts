@@ -110,9 +110,10 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
     testData.deliveryUserId = deliveryData.id;
   }
 
-  // Assign wishes to purchaser (scope to our family to avoid parallel-worker race conditions)
+  // Assign the person's wishes to purchaser (family wishes are separate rows now;
+  // scope to our family to avoid parallel-worker race conditions)
   const wishes = await listWishesViaApi(apiContext, { purchased: "false", familyId: family.familyId });
-  const wishIds = wishes.wishes.slice(0, 2).map((w) => w.id);
+  const wishIds = wishes.wishes.filter((w) => w.type !== "family").slice(0, 2).map((w) => w.id);
 
   if (!testData.purchaserUserId) {
     throw new Error("Purchaser user was not created — cannot assign wishes");
@@ -152,10 +153,11 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
   });
 
   const wishes2 = await listWishesViaApi(apiContext, { purchased: "false", familyId: family2.familyId });
-  if (wishes2.wishes.length === 0) {
-    throw new Error("No wishes found for second family — cannot test early-purchase link gating");
+  const earlyWishIds = wishes2.wishes.filter((w) => w.type !== "family").slice(0, 1).map((w) => w.id);
+  if (earlyWishIds.length === 0) {
+    throw new Error("No person wishes found for second family — cannot test early-purchase link gating");
   }
-  await batchAssignWishesViaApi(apiContext, wishes2.wishes.slice(0, 1).map((w) => w.id), testData.purchaserUserId);
+  await batchAssignWishesViaApi(apiContext, earlyWishIds, testData.purchaserUserId);
 
   // Approve the wish chain so family 1 is publicly visible
   await approveWishChain(apiContext, family.familyId, TEST_REFERRER_EMAIL, PASSWORD);

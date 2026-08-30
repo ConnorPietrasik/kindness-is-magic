@@ -42,6 +42,7 @@ from app.models import (
     default_display_name_from_email,
 )
 from app.permissions import require_admin
+from app.response_builders import attach_family_wish
 from app.schemas import (
     UserLogin,
     UserResponse,
@@ -602,7 +603,6 @@ async def register_family(
     family = Family(
         referrer_id=referrer.id,
         family_name=data.family_name,
-        family_wish=data.family_wish,
         contact_name=data.contact_name,
         bio=data.bio,
         address=data.address,
@@ -610,6 +610,8 @@ async def register_family(
         verification_status=FamilyVerificationStatus.pending,
     )
     db.add(family)
+    # Family wish is a wish row, created in the same transaction
+    attach_family_wish(db, family, data.family_wish)
     db.flush()  # Get family.id
 
     user = User(
@@ -653,7 +655,7 @@ async def register_family(
             id=family.id,
             display_id="PENDING",
             family_name=family.family_name,
-            family_wish=family.family_wish,
+            family_wish=data.family_wish,
             contact_name=family.contact_name,
             referrer_id=family.referrer_id,
             verification_status=family.verification_status,

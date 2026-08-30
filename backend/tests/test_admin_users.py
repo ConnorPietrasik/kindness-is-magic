@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -425,10 +425,11 @@ class TestAdminCreateUser:
         assert resp.status_code == 422
 
     def test_422_family_fk_soft_deleted(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyVerificationStatus
+        from app.models import FamilyVerificationStatus
 
         _admin_login(test_client)
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Deleted Fam",
             family_wish="Wish",
             contact_name="Contact",

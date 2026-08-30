@@ -16,6 +16,7 @@ from app.models import (
     Wish,
     WishType,
 )
+from tests.conftest import make_family
 
 
 class TestUser:
@@ -93,7 +94,8 @@ class TestReferrer:
 
 class TestFamily:
     def test_create_family(self, db: Session):
-        f = Family(
+        f = make_family(
+            db,
             family_name="The Smiths",
             family_wish="A new roof",
             contact_name="John Smith",
@@ -109,7 +111,8 @@ class TestFamily:
 
 class TestPerson:
     def _create_family(self, db: Session) -> Family:
-        family = Family(
+        family = make_family(
+            db,
             family_name="TestFamily",
             family_wish="Wish",
             contact_name="Contact",
@@ -176,7 +179,8 @@ class TestPerson:
 
 class TestWish:
     def _create_person(self, db: Session) -> Person:
-        family = Family(
+        family = make_family(
+            db,
             family_name="TestFamily",
             family_wish="Wish",
             contact_name="Contact",

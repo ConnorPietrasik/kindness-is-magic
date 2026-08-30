@@ -2,6 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -224,7 +225,6 @@ class Family(Base):
     bio: Mapped[str | None] = mapped_column(String(400), nullable=True)
     address: Mapped[str] = mapped_column(String(200), nullable=False, server_default="none")
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
-    family_wish: Mapped[str] = mapped_column(String(400), nullable=False)
     contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
     verification_status: Mapped[FamilyVerificationStatus] = mapped_column(
         SAEnum(FamilyVerificationStatus, name="family_verification_status", create_constraint=True),
@@ -250,6 +250,7 @@ class Family(Base):
 
     referrer: Mapped["Referrer | None"] = relationship("Referrer", back_populates="families")
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="family", cascade="all, delete-orphan")
+    family_wishes: Mapped[list["Wish"]] = relationship("Wish", back_populates="family", cascade="all, delete-orphan")
 
     # Delivery assignment — many families can share one delivery person
     delivery_user_id: Mapped[int | None] = mapped_column(
@@ -313,15 +314,17 @@ class Person(Base):
 
 
 class WishType(str, enum.Enum):
-    """Wish type determined by person age.
+    """Wish type determined by person age, plus the family-level wish.
 
     Adults (18+) get one ``adult`` wish.
     Children (under 18) get one ``practical`` and one ``fun`` wish.
+    Every family has one ``family`` wish, bound to the family (no person).
     """
 
     adult = "adult"
     practical = "practical"
     fun = "fun"
+    family = "family"
 
 
 class Wish(Base):
@@ -337,13 +340,25 @@ class Wish(Base):
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        # Partial unique index: at most one active family wish per family.
+        Index(
+            "uq_wish_family_type_active",
+            "family_id",
+            "type",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         Index("ix_wish_person_id_deleted_at", "person_id", "deleted_at"),
+        Index("ix_wish_family_id_deleted_at", "family_id", "deleted_at"),
+        # A wish belongs to exactly one owner: a person or a family.
+        CheckConstraint("((person_id IS NOT NULL) <> (family_id IS NOT NULL))", name="ck_wish_exactly_one_owner"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=False)
+    person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
+    family_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("family.id"), nullable=True)
     type: Mapped[WishType] = mapped_column(SAEnum(WishType, name="wish_type", create_constraint=True), nullable=False)
-    description: Mapped[str] = mapped_column(String(60), nullable=False)
+    description: Mapped[str] = mapped_column(String(100), nullable=False)
     size: Mapped[str | None] = mapped_column(String(20), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     assigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
@@ -354,7 +369,8 @@ class Wish(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    person: Mapped["Person"] = relationship("Person", back_populates="wishes")
+    person: Mapped["Person | None"] = relationship("Person", back_populates="wishes")
+    family: Mapped["Family | None"] = relationship("Family", back_populates="family_wishes")
     assigned_to: Mapped["User | None"] = relationship("User", foreign_keys=[assigned_to_id])
 
 

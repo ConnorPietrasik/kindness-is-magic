@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -40,10 +40,11 @@ class TestFamilyGetSelf:
 
     def test_404_missing_family_record(self, test_client: TestClient, db: Session):
         """Create a family user whose family_id points to a deleted/missing family."""
-        from app.models import Family, User, UserRole
+        from app.models import User, UserRole
         from app.auth import get_password_hash
 
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Temp Family",
             family_wish="Temporary",
             contact_name="Temp",
@@ -103,10 +104,11 @@ class TestFamilyUpdateSelf:
         assert body["family_wish"] == "World peace"  # unchanged
 
     def test_404_missing_family_record(self, test_client: TestClient, db: Session):
-        from app.models import Family, User, UserRole
+        from app.models import User, UserRole
         from app.auth import get_password_hash
 
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Temp Family",
             family_wish="Temporary",
             contact_name="Temp",

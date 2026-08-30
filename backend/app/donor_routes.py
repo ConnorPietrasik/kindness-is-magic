@@ -18,6 +18,7 @@ from app.models import (
     User,
     UserRole,
     Wish,
+    WishType,
 )
 from app.permissions import require_admin, require_claim_capable
 from app.response_builders import (
@@ -149,6 +150,9 @@ def get_claim(
     person_ids = [p.id for p in people]
     wishes_by_person = batch_load_person_wishes(db, person_ids)
 
+    # The family wish is part of the claim too — a claim covers the whole family
+    family_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.is_(None)).first()
+
     return FamilyClaimDetail(
         id=claim.id,
         family=build_family_info(fam, db),
@@ -158,6 +162,7 @@ def get_claim(
         fulfilled_at=claim.fulfilled_at,
         donor_user_id=claim.donor_user_id,
         donor_display_name=claim.donor_user.display_name,
+        family_wish=WishSummary.model_validate(family_wish) if family_wish is not None else None,
         people=[
             PersonWishItem(
                 given_name=p.given_name,
@@ -243,9 +248,15 @@ def mark_wish_purchased(
     wish = get_or_404(db, Wish, wish_id, "Wish not found")
     if wish.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
-    if person.family_id != claim.family_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
+    # A claim covers the whole family: person wishes resolve their family
+    # through the person; family wishes belong to the claimed family directly
+    if wish.person_id is None:
+        if wish.family_id != claim.family_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
+    else:
+        person = get_or_404(db, Person, wish.person_id, "Person not found")
+        if person.family_id != claim.family_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
 
     now = datetime.now(timezone.utc)
     wish.purchased_at = now

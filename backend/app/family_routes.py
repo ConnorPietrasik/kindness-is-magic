@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models import Family, Person, User, WishLockLevel
 from app.permissions import require_family
 from app.response_builders import (
+    attach_family_wish,
     batch_load_person_wishes,
     build_family_detail,
     build_person_detail,
@@ -72,7 +73,11 @@ def update_self(
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
     _check_family_edit_lock(fam)
 
-    partial_update(fam, body)
+    partial_update(fam, body, exclude={"family_wish"})
+
+    # The family wish lives on its wish row (same lock gate as the rest)
+    if body.family_wish is not None:
+        attach_family_wish(db, fam, body.family_wish)
 
     db.commit()
     db.refresh(fam)

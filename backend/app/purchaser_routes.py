@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Person, User, Wish
+from app.models import Family, Person, User, Wish
 from app.permissions import require_purchaser
 from app.response_builders import (
     build_wish_detail,
@@ -37,20 +37,33 @@ purchaser_router = APIRouter(
 )
 
 
-def _build_purchaser_wish_item(wish: Wish, person: Person, family_display_id: str) -> dict:
+def _wish_family(wish: Wish) -> Family | None:
+    """The family a wish belongs to.
+
+    Family wishes are bound to the family directly; person wishes
+    resolve it through the person.
+    """
+    if wish.person_id is not None:
+        return wish.person.family if wish.person else None
+    return wish.family
+
+
+def _build_purchaser_wish_item(wish: Wish, person: Person | None, family_display_id: str) -> dict:
     """Build a dict suitable for PurchaserWishSummary.
 
     Reuses ``build_wish_detail`` for the shared wish+person fields,
     then swaps ``person_family_name`` for ``family_id`` (no PII).
+    *person* is ``None`` for family wishes.
     Includes ``wish_lock_level`` so the frontend can gate the
     public wishlist link on admin lock (family is already loaded
     via joinedload — no extra query), and ``family_display_id``
     (pre-computed by the caller) for presentational display.
     """
     data = build_wish_detail(wish, person)
-    data["family_id"] = person.family_id
+    family = _wish_family(wish)
+    data["family_id"] = family.id if family is not None else wish.family_id
     data["family_display_id"] = family_display_id
-    data["wish_lock_level"] = person.family.wish_lock_level if person.family else None
+    data["wish_lock_level"] = family.wish_lock_level if family is not None else None
     del data["person_family_name"]
     return data
 
@@ -70,7 +83,7 @@ def list_wishes(
     """
     query = (
         db.query(Wish)
-        .options(joinedload(Wish.person).joinedload(Person.family))
+        .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
         .filter(
             Wish.deleted_at.is_(None),
             Wish.assigned_to_id == current_user.id,
@@ -91,10 +104,15 @@ def list_wishes(
     # same format the public wish-list page shows as its heading).
     # The family rows come from the joinedload above (no N+1); computing
     # positions issues a single ROW_NUMBER query for the page's referrers.
-    page_families = list({w.person.family.id: w.person.family for w in wishes if w.person.family}.values())
+    page_families = list({_wish_family(w).id: _wish_family(w) for w in wishes if _wish_family(w)}.values())
     display_id_map = compute_display_ids(db, "family", page_families, scope=None)
 
-    items = [PurchaserWishSummary(**_build_purchaser_wish_item(w, w.person, display_id_map.get(w.person.family_id, "0"))) for w in wishes]
+    items = [
+        PurchaserWishSummary(
+            **_build_purchaser_wish_item(w, w.person, display_id_map.get(_wish_family(w).id if _wish_family(w) else 0, "0"))
+        )
+        for w in wishes
+    ]
 
     logger.info("Purchaser %s listed wishes (page=%d, total=%d)", current_user.email, page, total)
 
@@ -122,7 +140,7 @@ def get_wish(
             detail="This wish is not assigned to you",
         )
 
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
     return WishDetail(**build_wish_detail(wish, person))
 
 
@@ -146,7 +164,7 @@ def mark_purchased(
             detail="This wish is not assigned to you",
         )
 
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
     now = datetime.now(timezone.utc)
 
@@ -198,7 +216,7 @@ def update_wish(
             detail="This wish is not assigned to you",
         )
 
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
     partial_update(wish, body)
     db.commit()

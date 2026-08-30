@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models import Family, FamilyVerificationStatus, Person, User
 from app.permissions import require_delivery
 from app.response_builders import (
+    batch_load_family_wishes,
     batch_load_person_wishes,
     compute_display_ids,
     compute_position_maps,
@@ -113,6 +114,9 @@ def get_packing_slips(
     # Compute family display IDs (flat view)
     fam_display_map = compute_display_ids(db, "family", families, scope=None)
 
+    # Batch-load family wish descriptions (wish rows)
+    family_wish_map = batch_load_family_wishes(db, [f.id for f in families])
+
     # Collect people across all families
     family_ids_set = [f.id for f in families]
     people = (
@@ -149,7 +153,7 @@ def get_packing_slips(
             PackingSlipItem(
                 id=fam.id,
                 display_id=fam_display_map.get(fam.id, "0"),
-                family_wish=fam.family_wish,
+                family_wish=family_wish_map.get(fam.id, ""),
                 people=[
                     PackingSlipPersonItem(
                         display_id=person_display_map.get(p.id, "0"),

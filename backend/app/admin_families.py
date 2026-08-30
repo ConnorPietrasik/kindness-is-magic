@@ -18,11 +18,15 @@ from app.models import (
     Referrer,
     User,
     UserRole,
+    Wish,
     WishLockLevel,
+    WishType,
 )
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
+    attach_family_wish,
+    batch_load_family_wishes,
     batch_load_person_wishes,
     build_family_detail,
     build_family_list_item,
@@ -34,6 +38,7 @@ from app.response_builders import (
     compute_position_maps,
     FAMILY_PERSON_COUNT,
     FAMILY_SORT_FIELDS,
+    FAMILY_WISH,
     get_active_or_404,
     get_or_404,
     load_family_list_context,
@@ -117,7 +122,7 @@ def list_families(
                 Family.family_name.ilike(pattern),
                 Family.contact_name.ilike(pattern),
                 Family.phone_number.ilike(pattern),
-                Family.family_wish.ilike(pattern),
+                FAMILY_WISH.ilike(pattern),
             )
         )
     if search_name is not None:
@@ -127,7 +132,7 @@ def list_families(
     if search_phone is not None:
         query = query.filter(Family.phone_number.ilike(f"%{search_phone}%"))
     if search_wish is not None:
-        query = query.filter(Family.family_wish.ilike(f"%{search_wish}%"))
+        query = query.filter(FAMILY_WISH.ilike(f"%{search_wish}%"))
 
     if verification_status is not None:
         query = query.filter(Family.verification_status == verification_status)
@@ -284,6 +289,9 @@ def get_packing_slips(
     # --- Compute family display IDs ----------------------------------------- #
     fam_display_map = compute_display_ids(db, "family", families, scope=None)
 
+    # --- Batch-load family wishes ------------------------------------------- #
+    family_wish_map = batch_load_family_wishes(db, [f.id for f in families])
+
     # --- Collect people across all families --------------------------------- #
     family_ids_set = [f.id for f in families]
     people = (
@@ -322,7 +330,7 @@ def get_packing_slips(
             PackingSlipItem(
                 id=fam.id,
                 display_id=fam_display_map.get(fam.id, "0"),
-                family_wish=fam.family_wish,
+                family_wish=family_wish_map.get(fam.id, ""),
                 people=[
                     PackingSlipPersonItem(
                         display_id=person_display_map.get(p.id, "0"),
@@ -363,7 +371,6 @@ def create_family(
     fam = Family(
         referrer_id=body.referrer_id,
         family_name=body.family_name,
-        family_wish=body.family_wish,
         contact_name=body.contact_name,
         bio=body.bio,
         address=body.address,
@@ -372,6 +379,8 @@ def create_family(
         verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
+    # Family wish is a wish row, created in the same transaction
+    attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s created family '%s' (id=%s)", _admin.email, fam.family_name, fam.id)
@@ -397,7 +406,9 @@ def update_family(
             raise HTTPException(status_code=422, detail="Delivery user is soft-deleted")
         if delivery_user.role != UserRole.delivery:
             raise HTTPException(status_code=422, detail="User is not a delivery person")
-    partial_update(fam, body)
+    partial_update(fam, body, exclude={"family_wish"})
+    if body.family_wish is not None:
+        attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s updated family (id=%s)", _admin.email, fam_id)
@@ -413,9 +424,10 @@ def restore_family(
     fam = get_or_404(db, Family, fam_id, "Family not found")
     if fam.deleted_at is None:
         raise HTTPException(status_code=400, detail="Family is not deleted")
-    # Restore the family and all its soft-deleted people
+    # Restore the family, all its soft-deleted people, and its family wish
     fam.deleted_at = None
     db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: None}, synchronize_session=False)
+    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: None}, synchronize_session=False)
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s restored family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
@@ -432,6 +444,8 @@ def delete_family(
     # Soft-delete all persons in the family first to avoid orphans.
     now = datetime.now(timezone.utc)
     db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
+    # Soft-delete the family wish (person wishes are left alone — pre-existing quirk)
+    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: now}, synchronize_session=False)
     fam.deleted_at = now
     db.commit()
     logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)

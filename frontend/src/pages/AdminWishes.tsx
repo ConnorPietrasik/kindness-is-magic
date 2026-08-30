@@ -298,6 +298,7 @@ export default function AdminWishes() {
             <option value="adult">Adult</option>
             <option value="practical">Practical</option>
             <option value="fun">Fun</option>
+            <option value="family">Family</option>
           </select>
 
           <select
@@ -375,14 +376,20 @@ export default function AdminWishes() {
                         checked={selectedIds.has(w.id)}
                         onChange={() => toggleSelect(w.id)}
                         className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
-                        aria-label={`Select wish for ${w.person_given_name}`}
+                        aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
                       />
                     </Td>
                     {visibleColumns.includes("person_given_name") && (
                       <Td>
-                        <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                          {w.person_given_name}
-                        </Link>
+                        {/* person_given_name is null only for family wishes — person_id is
+                            not in the column-filtered list response */}
+                        {w.person_given_name == null ? (
+                          <span className="font-medium">Family</span>
+                        ) : (
+                          <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                            {w.person_given_name}
+                          </Link>
+                        )}
                       </Td>
                     )}
                     {visibleColumns.includes("family_id") && (
@@ -620,7 +627,7 @@ function WishEditForm({ wish, users, onSave, onCancel, loading }: WishEditFormPr
               value: form.description,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("description", e.target.value),
               required: true,
-              maxLength: 60,
+              maxLength: 100,
               autoComplete: "off",
             }}
           />
@@ -787,6 +794,7 @@ const wishTypeColors: Record<WishType, string> = {
   adult: "bg-purple-100 text-purple-700",
   practical: "bg-blue-100 text-blue-700",
   fun: "bg-amber-100 text-amber-700",
+  family: "bg-teal-100 text-teal-700",
 };
 
 function WishTypeBadge({ type }: { type: WishType }) {

@@ -46,6 +46,23 @@ const mockWish2: WishListSummary = {
   purchaser_note: "Got a great deal",
 };
 
+const mockFamilyWish: WishListSummary = {
+  id: 3,
+  type: "family",
+  description: "A weekend at the beach",
+  size: null,
+  color: null,
+  person_id: null,
+  person_given_name: null,
+  family_id: 5,
+  assigned_to_id: null,
+  assigned_to_name: null,
+  purchased_at: null,
+  purchased_where: null,
+  received_at: null,
+  purchaser_note: null,
+};
+
 const mockWishListResponse: WishListResponse = {
   wishes: [mockWish1, mockWish2],
   total: 2,
@@ -127,6 +144,39 @@ describe("AdminWishes", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("Winter jacket")).toBeInTheDocument();
     expect(screen.getByText("LEGO set")).toBeInTheDocument();
+  });
+
+  it("renders Family for family wish rows (null person) and offers the Family filter option", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue({
+      wishes: [mockFamilyWish],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+    });
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("A weekend at the beach")).toBeInTheDocument();
+    });
+
+    // Person cell renders "Family" (family wishes have no person)
+    const row = screen.getByText("A weekend at the beach").closest("tr");
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent("Family");
+
+    // Type badge shows the family type
+    expect(screen.getByText("family")).toBeInTheDocument();
+
+    // Type filter offers a Family option
+    expect(screen.getByRole("option", { name: "Family" })).toBeInTheDocument();
+
+    // No null/undefined leaks in the row
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+    expect(screen.queryByText("null")).not.toBeInTheDocument();
   });
 
   it("renders the Color column with values and dash for null", async () => {

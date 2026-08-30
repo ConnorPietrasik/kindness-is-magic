@@ -1,7 +1,7 @@
 """Tests for admin family delivery assignment."""
 
 import pytest
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 
 @pytest.fixture()
@@ -43,9 +43,10 @@ def non_delivery_user(db):
 @pytest.fixture()
 def family_for_delivery(db, referrer_record):
     """Create a family with no delivery person assigned."""
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Delivery Test Family",
         family_wish="A blanket",

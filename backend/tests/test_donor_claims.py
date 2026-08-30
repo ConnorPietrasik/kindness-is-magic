@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,9 +44,10 @@ def _create_donor(client: TestClient) -> dict:
 
 def _create_claimed_family(db: Session) -> dict:
     """Create a verified, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-    fam = Family(
+    fam = make_family(
+        db,
         family_name="Claimed Family",
         family_wish="Warm clothes",
         contact_name="Claim Contact",
@@ -204,9 +205,10 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(5):
-            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+            from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-            fam = Family(
+            fam = make_family(
+                db,
                 family_name=f"Cap Family {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
@@ -233,7 +235,8 @@ class TestClaimCreation:
             assert resp.status_code == 201, f"Claim {i + 1} should succeed"
 
         # 6th should fail
-        fam6 = Family(
+        fam6 = make_family(
+            db,
             family_name="Cap Family 6",
             family_wish="A wish",
             contact_name="Contact 6",
@@ -263,9 +266,10 @@ class TestClaimCreation:
         _create_donor(test_client)
 
         for i in range(6):
-            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+            from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-            fam = Family(
+            fam = make_family(
+                db,
                 family_name=f"Cash Family {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
@@ -315,10 +319,11 @@ class TestClaimCreation:
     def test_claim_deleted_family(self, test_client: TestClient, db: Session):
         """Claim soft-deleted family → 404."""
         _create_donor(test_client)
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
         from datetime import datetime, timezone
 
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Deleted Family",
             family_wish="A wish",
             contact_name="Deleted Contact",
@@ -340,9 +345,10 @@ class TestClaimCreation:
     def test_claim_not_fully_approved_family(self, test_client: TestClient, db: Session):
         """Claim a family that hasn't been fully reviewed → 403."""
         _create_donor(test_client)
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Unapproved Family",
             family_wish="A wish",
             contact_name="Pending Contact",
@@ -405,7 +411,7 @@ class TestClaimCRUD:
         assert len(resp.json()) == 0
 
     def test_get_claim_detail(self, test_client: TestClient, db: Session):
-        """Get claim detail → returns wish list."""
+        """Get claim detail → returns family wish and person wish list."""
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
@@ -420,6 +426,10 @@ class TestClaimCRUD:
         assert resp.status_code == 200
         body = resp.json()
         assert body["id"] == claim_id
+        # The family wish is part of the claim
+        assert body["family_wish"] is not None
+        assert body["family_wish"]["type"] == "family"
+        assert body["family_wish"]["description"] == "Warm clothes"
         assert len(body["people"]) == 1
         assert body["people"][0]["given_name"] == "Child"
         assert len(body["people"][0]["wishes"]) == 2
@@ -569,9 +579,10 @@ class TestClaimCRUD:
         # Create 5 gift claims
         claim_ids = []
         for i in range(5):
-            from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+            from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-            fam = Family(
+            fam = make_family(
+                db,
                 family_name=f"Cap Test {i}",
                 family_wish="A wish",
                 contact_name=f"Contact {i}",
@@ -601,7 +612,8 @@ class TestClaimCRUD:
         assert test_client.get(f"/api/donor/claims/{claim_ids[0]}").status_code == 404
 
         # Now can claim a 6th family with gifts
-        fam6 = Family(
+        fam6 = make_family(
+            db,
             family_name="Cap Test 6",
             family_wish="A wish",
             contact_name="Contact 6",
@@ -716,9 +728,10 @@ class TestMarkPurchased:
         fam = data["family"]
 
         # Create another family with wishes
-        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+        from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             family_name="Other Family",
             family_wish="A wish",
             contact_name="Other Contact",
@@ -744,6 +757,69 @@ class TestMarkPurchased:
 
         resp = test_client.post(
             f"/api/donor/claims/{claim_id}/wishes/{other_wish.id}/mark-purchased",
+            json={"purchased_where": "Target"},
+        )
+        assert resp.status_code == 400
+
+    def test_mark_purchased_family_wish(self, test_client: TestClient, db: Session):
+        """Family wishes are part of the claim — can be marked purchased."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        from app.models import Wish, WishType
+
+        fam_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family).first()
+        assert fam_wish is not None
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        resp = test_client.post(
+            f"/api/donor/claims/{claim_id}/wishes/{fam_wish.id}/mark-purchased",
+            json={"purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["purchased_at"] is not None
+        assert body["purchased_where"] == "Target"
+        assert body["assigned_to_id"] is not None
+
+    def test_mark_purchased_family_wish_not_in_claim(self, test_client: TestClient, db: Session):
+        """Family wish of another family → 400."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        from app.models import FamilyVerificationStatus, Wish, WishLockLevel, WishType
+
+        other_fam = make_family(
+            db,
+            family_name="Other Family",
+            family_wish="A wish",
+            contact_name="Other Contact",
+            phone_number="555-000-0002",
+            verification_status=FamilyVerificationStatus.verified,
+            wish_lock_level=WishLockLevel.admin,
+        )
+        db.add(other_fam)
+        db.flush()
+        other_fam_wish = db.query(Wish).filter(Wish.family_id == other_fam.id, Wish.type == WishType.family).first()
+        assert other_fam_wish is not None
+        db.commit()
+        db.refresh(other_fam_wish)
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        resp = test_client.post(
+            f"/api/donor/claims/{claim_id}/wishes/{other_fam_wish.id}/mark-purchased",
             json={"purchased_where": "Target"},
         )
         assert resp.status_code == 400

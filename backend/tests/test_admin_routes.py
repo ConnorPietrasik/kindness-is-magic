@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -264,12 +264,12 @@ class TestAdminListFamilies:
         assert body["total_pages"] == 1
 
     def test_pagination(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family
 
         _admin_login(test_client)
         # Create 4 families
         for i in range(4):
-            f = Family(
+            f = make_family(
+                db,
                 family_name=f"Family {i}",
                 family_wish="Wish",
                 contact_name="Contact",
@@ -491,6 +491,28 @@ class TestAdminUpdateFamily:
         restored = db.query(Person).filter(Person.family_id == family.id).all()
         assert all(p.deleted_at is None for p in restored)
 
+    def test_200_restore_family_cascades_to_family_wish(self, test_client: TestClient, admin_user, family_record, db: Session):
+        """Restore brings the soft-deleted family wish row back to active."""
+        from app.models import Wish, WishType
+
+        fam = family_record
+        fam_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family).first()
+        assert fam_wish is not None
+        fam_wish_id = fam_wish.id
+
+        _admin_login(test_client)
+        # Delete via the API — soft-deletes the family, its people, and its family wish
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        db.expunge(fam_wish)
+        assert db.get(Wish, fam_wish_id).deleted_at is not None
+
+        resp = test_client.post(f"/api/admin/families/{fam.id}/restore")
+        assert resp.status_code == 200
+        assert resp.json()["deleted_at"] is None
+        assert db.get(Wish, fam_wish_id).deleted_at is None
+
     def test_400_restore_family_not_deleted(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/families/{family_record.id}/restore")
@@ -648,6 +670,22 @@ class TestAdminDeleteFamily:
             db.expunge(p)
             refreshed = db.get(Person, pid)
             assert refreshed.deleted_at is not None
+
+    def test_delete_soft_deletes_family_wish(self, test_client: TestClient, admin_user, family_record, db: Session):
+        """Deleting a family must soft-delete its family wish row."""
+        from app.models import Wish, WishType
+
+        fam_wish = db.query(Wish).filter(Wish.family_id == family_record.id, Wish.type == WishType.family).first()
+        assert fam_wish is not None
+        assert fam_wish.deleted_at is None
+        fam_wish_id = fam_wish.id
+
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/families/{family_record.id}")
+        assert resp.status_code == 204
+
+        db.expunge(fam_wish)
+        assert db.get(Wish, fam_wish_id).deleted_at is not None
 
 
 # =========================================================================

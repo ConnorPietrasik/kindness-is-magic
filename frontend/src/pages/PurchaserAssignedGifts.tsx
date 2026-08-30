@@ -159,7 +159,7 @@ export default function PurchaserAssignedGifts() {
               {wishes.map((w) => (
                 <React.Fragment key={w.id}>
                   <Tr>
-                    <Td>{w.person_given_name}</Td>
+                    <Td>{w.person_given_name ?? "Family"}</Td>
                     <Td>
                       {w.wish_lock_level === "admin" ? (
                         <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
@@ -297,7 +297,7 @@ function PurchaserEditForm({ wish, onSave, onCancel, loading }: PurchaserEditFor
 
   return (
     <Card className="mb-6 border border-gray-200">
-      <h3 className="mb-4 text-lg font-semibold text-violet-950">Edit — Gift for {wish.person_given_name}</h3>
+      <h3 className="mb-4 text-lg font-semibold text-violet-950">Edit — Gift for {wish.person_given_name ?? "Family"}</h3>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -341,6 +341,7 @@ const wishTypeColors: Record<WishType, string> = {
   adult: "bg-purple-100 text-purple-700",
   practical: "bg-blue-100 text-blue-700",
   fun: "bg-amber-100 text-amber-700",
+  family: "bg-teal-100 text-teal-700",
 };
 
 function WishTypeBadge({ type }: { type: WishType }) {

@@ -12,10 +12,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 from app.models import (
-    Family,
     FamilyVerificationStatus,
     Person,
     PersonRole,
@@ -53,7 +52,8 @@ def person_with_wishes(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Wish Family",
         family_wish="Warm clothes",
@@ -93,7 +93,8 @@ def adult_person_with_wish(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Adult Family",
         family_wish="Books",
@@ -131,7 +132,8 @@ def adult_person_no_wishes(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Adult2 Family",
         family_wish="Books",
@@ -191,7 +193,8 @@ class TestListPersonWishes:
         db.commit()
         db.refresh(ref)
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Empty Family",
             family_wish="Nothing",
@@ -265,7 +268,8 @@ class TestCreatePersonWish:
         db.commit()
         db.refresh(ref)
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Size Family",
             family_wish="Toys",
@@ -441,7 +445,8 @@ class TestUpdatePersonWish:
         db.commit()
         db.refresh(ref)
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Other Family",
             family_wish="Other wish",
@@ -550,7 +555,8 @@ class TestDeletePersonWish:
         db.commit()
         db.refresh(ref)
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Other Family 2",
             family_wish="Other wish",
@@ -662,7 +668,8 @@ class TestRestorePersonWish:
         db.commit()
         db.refresh(ref)
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=ref.id,
             family_name="Other Family 3",
             family_wish="Other wish",

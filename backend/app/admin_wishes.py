@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.database import get_db
 from app.models import Family, Person, User, Wish, WishType
@@ -64,18 +64,25 @@ def list_wishes(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishListResponse:
-    """List active wishes with person/family context and purchase tracking."""
-    # Base query: join Wish → Person → Family for filtering and context
+    """List active wishes with person/family context and purchase tracking.
+
+    Person wishes resolve their family through the person; family wishes
+    (``person_id`` null) are bound to the family directly, so both sources
+    are outer-joined and handled by the filters and search below.
+    """
+    # Base query: outer-join Wish → Person → Family for filtering and context
+    direct_family = aliased(Family)
     query = (
         db.query(Wish)
-        .join(Person, Wish.person_id == Person.id)
-        .join(Family, Person.family_id == Family.id)
+        .outerjoin(Person, Wish.person_id == Person.id)
+        .outerjoin(Family, Person.family_id == Family.id)
+        .outerjoin(direct_family, Wish.family_id == direct_family.id)
         .filter(Wish.deleted_at.is_(None))
     )
 
     # Filters
     if family_id is not None:
-        query = query.filter(Family.id == family_id)
+        query = query.filter(or_(Wish.family_id == family_id, Person.family_id == family_id))
     if person_id is not None:
         query = query.filter(Person.id == person_id)
     if assigned_to_id is not None:
@@ -96,6 +103,7 @@ def list_wishes(
                 Wish.description.ilike(pattern),
                 Person.given_name.ilike(pattern),
                 Family.family_name.ilike(pattern),
+                direct_family.family_name.ilike(pattern),
             )
         )
     if wish_type is not None:
@@ -116,6 +124,7 @@ def list_wishes(
             db.query(Wish)
             .options(
                 joinedload(Wish.person).joinedload(Person.family),
+                joinedload(Wish.family),
                 joinedload(Wish.assigned_to),
             )
             .filter(Wish.id.in_(wish_ids))
@@ -187,9 +196,9 @@ def get_wish(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishDetail:
-    """Get a single wish with person context."""
+    """Get a single wish with person context (null person for family wishes)."""
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
     return WishDetail(**build_wish_detail(wish, person))
 
 
@@ -202,10 +211,13 @@ def update_wish(
 ) -> WishDetail:
     """Partially update a wish (definition + purchase tracking fields)."""
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
     # Validate type change against person age
     if body.type is not None and body.type != wish.type:
+        if person is None:
+            # Type is fixed per owner — family wishes can't change type
+            raise HTTPException(status_code=400, detail="Family wish type cannot be changed")
         valid_types = _get_valid_wish_types_for_age(person.age)
         if body.type not in valid_types:
             raise HTTPException(
@@ -237,7 +249,7 @@ def mark_purchased(
 ) -> WishDetail:
     """Mark a wish as purchased. Sets purchased_at=now and assigned_to_id=admin."""
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-    person = get_or_404(db, Person, wish.person_id, "Person not found")
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
     now = datetime.now(timezone.utc)
 

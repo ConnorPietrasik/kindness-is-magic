@@ -1,7 +1,7 @@
 """Tests for delivery person self-service routes."""
 
 import pytest
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 
 @pytest.fixture()
@@ -25,9 +25,10 @@ def delivery_user(db):
 @pytest.fixture()
 def delivery_assigned_families(db, delivery_user, referrer_record):
     """Create families assigned to a delivery person."""
-    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishType
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishType
 
-    fam1 = Family(
+    fam1 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Delivery Family A",
         family_wish="Warm blankets",
@@ -37,7 +38,8 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
         verification_status=FamilyVerificationStatus.verified,
         delivery_user_id=delivery_user.id,
     )
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Delivery Family B",
         family_wish="New shoes",
@@ -48,7 +50,8 @@ def delivery_assigned_families(db, delivery_user, referrer_record):
         delivery_user_id=delivery_user.id,
     )
     # Family not assigned to this delivery person
-    fam3 = Family(
+    fam3 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Other Family",
         family_wish="A toy",

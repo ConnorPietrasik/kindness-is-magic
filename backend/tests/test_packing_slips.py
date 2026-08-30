@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,10 +38,11 @@ def packing_slip_families(db: Session, referrer_record):
     Family 2: wish_lock_level=admin (should appear in default query)
     Family 3: wish_lock_level=referrer (should NOT appear in default query)
     """
-    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
     # Family 1 — admin locked
-    fam1 = Family(
+    fam1 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Packing Family One",
         family_wish="Winter coats for everyone",
@@ -55,7 +56,8 @@ def packing_slip_families(db: Session, referrer_record):
     db.refresh(fam1)
 
     # Family 2 — admin locked
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Packing Family Two",
         family_wish="School supplies",
@@ -69,7 +71,8 @@ def packing_slip_families(db: Session, referrer_record):
     db.refresh(fam2)
 
     # Family 3 — referrer locked (should NOT appear in default)
-    fam3 = Family(
+    fam3 = make_family(
+        db,
         referrer_id=referrer_record.id,
         family_name="Packing Family Three",
         family_wish="Not ready yet",
@@ -188,9 +191,10 @@ class TestPackingSlipsDefaultFilter:
         assert fam1_id not in ids
 
     def test_excludes_pending_families(self, test_client: TestClient, admin_user, referrer_record, db: Session):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
-        pending_fam = Family(
+        pending_fam = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Pending Family",
             family_wish="Something",
@@ -236,10 +240,11 @@ class TestPackingSlipsFamilyIdsFilter:
         assert body[0]["id"] == fam1_id
 
     def test_404_deleted_family_in_filter(self, test_client: TestClient, admin_user, db: Session):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
         # Create and delete a family
-        fam = Family(
+        fam = make_family(
+            db,
             family_name="Deleted Family",
             family_wish="Something",
             contact_name="Contact",
@@ -262,10 +267,11 @@ class TestPackingSlipsFamilyIdsFilter:
         assert resp.status_code == 404
 
     def test_filters_to_approved_when_family_ids_given(self, test_client: TestClient, admin_user, db: Session, referrer_record):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
         # Create a pending family with admin lock
-        pending = Family(
+        pending = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Pending Filtered",
             family_wish="Something",
@@ -434,9 +440,10 @@ class TestPackingSlipsEdgeCases:
         assert resp.status_code == 400
 
     def test_family_with_no_people(self, test_client: TestClient, admin_user, db: Session, referrer_record):
-        from app.models import Family, FamilyVerificationStatus, WishLockLevel
+        from app.models import FamilyVerificationStatus, WishLockLevel
 
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Empty Family",
             family_wish="Nothing yet",
@@ -535,9 +542,10 @@ class TestPackingSlipsDisplayIds:
 
     def test_pending_family_does_not_shift_family_numbering(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         """A pending family by id doesn't consume a family position."""
-        from app.models import Family, FamilyVerificationStatus, Person, PersonRole, WishLockLevel
+        from app.models import FamilyVerificationStatus, Person, PersonRole, WishLockLevel
 
-        fam_a = Family(
+        fam_a = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Shift A",
             family_wish="Wish",
@@ -546,7 +554,8 @@ class TestPackingSlipsDisplayIds:
             verification_status=FamilyVerificationStatus.verified,
             wish_lock_level=WishLockLevel.admin,
         )
-        fam_b = Family(
+        fam_b = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Shift B (pending)",
             family_wish="Wish",
@@ -555,7 +564,8 @@ class TestPackingSlipsDisplayIds:
             verification_status=FamilyVerificationStatus.pending,
             wish_lock_level=WishLockLevel.admin,
         )
-        fam_c = Family(
+        fam_c = make_family(
+            db,
             referrer_id=referrer_record.id,
             family_name="Shift C",
             family_wish="Wish",

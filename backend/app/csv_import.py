@@ -51,6 +51,7 @@ from app.models import (
     WishType,
     default_display_name_from_email,
 )
+from app.response_builders import attach_family_wish
 from app.user_validation import (
     sanitize_plain_text,
     validate_email,
@@ -445,7 +446,6 @@ def _process_families(
         family = Family(
             referrer_id=referrer_id,
             family_name=family_name,
-            family_wish=family_wish,
             contact_name=contact_name,
             bio=bio,
             address=address,
@@ -453,6 +453,8 @@ def _process_families(
             verification_status=FamilyVerificationStatus.verified,
         )
         db.add(family)
+        # Family wish is a wish row, created in the same transaction
+        attach_family_wish(db, family, family_wish)
         db.flush()
         db.refresh(family)
         summary.rows.append(

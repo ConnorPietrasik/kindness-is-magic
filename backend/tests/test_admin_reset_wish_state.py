@@ -10,10 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 from app.models import (
-    Family,
     FamilyVerificationStatus,
     Referrer,
     ReferrerApprovalStatus,
@@ -48,7 +47,8 @@ def locked_family(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Reset Family",
         family_wish="Toys",
@@ -78,7 +78,8 @@ def referrer_locked_family_with_review(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Review Family",
         family_wish="Clothes",
@@ -110,7 +111,8 @@ def admin_locked_family(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="AdminLock Family",
         family_wish="Books",

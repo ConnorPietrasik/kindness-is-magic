@@ -102,9 +102,11 @@ class TestApplyColumnFilter:
         # Requested fields present
         assert "id" in result[0]
         assert "family_name" in result[0]
-        # Optional non-requested fields excluded
+        # Optional non-requested fields excluded (incl. the query-backed ones)
         assert "bio" not in result[0]
         assert "referrer_notes" not in result[0]
+        assert "family_wish" not in result[0]
+        assert "person_count" not in result[0]
         # Required fields always included
         assert "verification_status" in result[0]
         assert "contact_name" in result[0]
@@ -181,6 +183,30 @@ class TestAdminFamiliesColumns:
         assert "family_wish" in family
         assert "person_count" in family
         assert "bio" in family
+
+    def test_family_wish_optional_column(self, test_client: TestClient, admin_user, family_with_people):
+        """family_wish is an optional column — omitted from the response (and the
+        lookup skipped) when not requested, real value when requested."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families?columns=id,family_name")
+        assert resp.status_code == 200
+        assert "family_wish" not in resp.json()["families"][0]
+
+        resp = test_client.get("/api/admin/families?columns=id,family_name,family_wish")
+        assert resp.status_code == 200
+        assert resp.json()["families"][0]["family_wish"] == "World peace"
+
+    def test_person_count_optional_column(self, test_client: TestClient, admin_user, family_with_people):
+        """person_count is an optional column — omitted from the response (and the
+        lookup skipped) when not requested, real value when requested."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families?columns=id,family_name")
+        assert resp.status_code == 200
+        assert "person_count" not in resp.json()["families"][0]
+
+        resp = test_client.get("/api/admin/families?columns=id,family_name,person_count")
+        assert resp.status_code == 200
+        assert resp.json()["families"][0]["person_count"] == 2
 
     def test_pagination_meta_always_included(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)

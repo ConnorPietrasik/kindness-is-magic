@@ -146,7 +146,7 @@ export default function FamilySelfRegister() {
               value: form.family_wish,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
               required: true,
-              maxLength: 400,
+              maxLength: 100,
               placeholder: "What would make your family's year special?",
               autoComplete: "off",
             }}

@@ -6,7 +6,7 @@ These endpoints are used by both referrers and family users with ownership check
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,10 +74,11 @@ class TestPersonGetShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, PersonRole, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
         # Create a family and person under another_referrer
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -181,9 +182,10 @@ class TestPersonUpdateShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, PersonRole, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",
@@ -314,9 +316,10 @@ class TestPersonDeleteShared:
         another_referrer,
         db: Session,
     ):
-        from app.models import Family, Person, PersonRole, Wish, WishType
+        from app.models import Person, PersonRole, Wish, WishType
 
-        other_fam = Family(
+        other_fam = make_family(
+            db,
             referrer_id=another_referrer["referrer"].id,
             family_name="Other Family",
             family_wish="Something",

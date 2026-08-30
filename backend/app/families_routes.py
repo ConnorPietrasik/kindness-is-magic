@@ -37,6 +37,7 @@ from app.response_builders import (
     FAMILY_MAX_AGE,
     FAMILY_MIN_AGE,
     FAMILY_PERSON_COUNT,
+    batch_load_family_wishes,
     batch_load_person_wishes,
     build_family_info,
     build_sort_clause,
@@ -256,10 +257,13 @@ def get_family_wish_list(
         if current_user_id is not None and active_claim.donor_user_id == current_user_id:
             claimed_by_current_user = True
 
+    # Family wish is a wish row — single lookup for this family
+    family_wish = batch_load_family_wishes(db, [fam.id]).get(fam.id, "")
+
     return FamilyWishListResponse(
         display_id=display_id,
         bio=fam.bio,
-        family_wish=fam.family_wish,
+        family_wish=family_wish,
         people=[
             PersonWishItem(
                 given_name=p.given_name,
@@ -319,7 +323,7 @@ async def _send_claim_confirmation(
         body = build_claim_confirmation_email(
             donor_name=user.display_name,
             family_display_id=display_id,
-            family_wish=fam.family_wish,
+            family_wish=batch_load_family_wishes(db, [fam.id]).get(fam.id, ""),
             family_bio=fam.bio,
             people=people_data,
             claim_detail_url=claim_detail_url,

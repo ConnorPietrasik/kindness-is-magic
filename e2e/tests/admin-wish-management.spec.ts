@@ -25,8 +25,9 @@ test.describe("Admin Wish Management — read-only", () => {
 
     await page.goto("/admin/wishes");
     await expect(page.getByRole("heading", { name: "Manage Wishes" })).toBeVisible();
-    // Seeded data has many wishes — at least one should appear
-    await expect(page.getByRole("table")).toContainText("Emma", { timeout: 10_000 });
+    // Page 1 is family wishes (one per family, created before person wishes) —
+    // a seeded family name should appear
+    await expect(page.getByRole("table")).toContainText("The Williams Family", { timeout: 10_000 });
 
     await context.close();
   });
@@ -173,8 +174,9 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     // Wait for table to show our person's wishes
     await expect(page.getByRole("table")).toContainText(MUTATION_PERSON_NAME, { timeout: 10_000 });
 
-    // Click Edit on the first row (should be our isolated wish)
-    await page.getByRole("button", { name: "Edit" }).first().click();
+    // Click Edit on our person's row (the family wish is a separate row now)
+    const ourRow = page.getByRole("row").filter({ hasText: MUTATION_PERSON_NAME }).first();
+    await ourRow.getByRole("button", { name: "Edit" }).click();
     await expect(page.getByText("Edit Wish")).toBeVisible();
 
     // Clear and type new description

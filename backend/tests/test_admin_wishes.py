@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Family,
     FamilyVerificationStatus,
     Person,
     PersonRole,
@@ -17,6 +16,7 @@ from app.models import (
     Wish,
     WishType,
 )
+from tests.conftest import make_family
 
 
 @pytest.fixture()
@@ -35,7 +35,8 @@ def wish_tree(db: Session):
     db.commit()
     db.refresh(ref)
 
-    fam = Family(
+    fam = make_family(
+        db,
         referrer_id=ref.id,
         family_name="Wish Family",
         family_wish="Warm clothes",
@@ -85,7 +86,8 @@ def wish_tree(db: Session):
 @pytest.fixture()
 def second_family_with_wishes(db: Session, wish_tree):
     """Second family with wishes for filter tests."""
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         referrer_id=wish_tree["referrer"].id,
         family_name="Second Family",
         family_wish="Food",
@@ -114,6 +116,13 @@ def second_family_with_wishes(db: Session, wish_tree):
     db.refresh(w4)
 
     return {"family": fam2, "person": person2, "wishes": [w3, w4]}
+
+
+def family_wish(db: Session, tree) -> Wish:
+    """The tree family's family wish row (created by make_family)."""
+    w = db.query(Wish).filter(Wish.family_id == tree["family"].id, Wish.type == WishType.family).first()
+    assert w is not None
+    return w
 
 
 @pytest.fixture()
@@ -145,7 +154,7 @@ def logged_in_referrer(test_client, referrer_user):
 
 class TestListWishes:
     def test_default_list(self, test_client, admin_user, wish_tree):
-        """Default list returns all active wishes."""
+        """Default list returns all active wishes (person wishes + family wish)."""
         test_client.post(
             "/api/auth/login",
             json={"email": admin_user.email, "password": "AdminPass123!"},
@@ -153,10 +162,18 @@ class TestListWishes:
         resp = test_client.get("/api/admin/wishes")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 2
-        assert len(data["wishes"]) == 2
+        assert data["total"] == 3
+        assert len(data["wishes"]) == 3
         assert data["page"] == 1
         assert data["page_size"] == 50
+
+        # The family wish appears as a wish row with no person
+        fam_wish = [w for w in data["wishes"] if w["type"] == "family"]
+        assert len(fam_wish) == 1
+        assert fam_wish[0]["description"] == "Warm clothes"
+        assert fam_wish[0]["person_id"] is None
+        assert fam_wish[0]["person_given_name"] is None
+        assert fam_wish[0]["family_id"] == wish_tree["family"].id
 
     def test_list_includes_color(self, test_client, admin_user, wish_tree, db):
         """List items include the color field (None when unset)."""
@@ -182,9 +199,9 @@ class TestListWishes:
         resp = test_client.get("/api/admin/wishes?page=1&page_size=2")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 4
+        assert data["total"] == 6
         assert len(data["wishes"]) == 2
-        assert data["total_pages"] == 2
+        assert data["total_pages"] == 3
 
         resp2 = test_client.get("/api/admin/wishes?page=2&page_size=2")
         assert resp2.status_code == 200
@@ -200,7 +217,8 @@ class TestListWishes:
         resp = test_client.get(f"/api/admin/wishes?family_id={wish_tree['family'].id}")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 2
+        # 2 person wishes + the family wish (bound to the family directly)
+        assert data["total"] == 3
         for w in data["wishes"]:
             assert w["family_id"] == wish_tree["family"].id
 
@@ -248,8 +266,10 @@ class TestListWishes:
         resp = test_client.get("/api/admin/wishes?assigned_to_id=0")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 1
-        assert data["wishes"][0]["assigned_to_id"] is None
+        # The other person wish + the family wish are unassigned
+        assert data["total"] == 2
+        for w in data["wishes"]:
+            assert w["assigned_to_id"] is None
 
     def test_filter_by_purchased_true(self, test_client, admin_user, wish_tree, db):
         """Filter by purchased=true returns only purchased wishes."""
@@ -279,7 +299,8 @@ class TestListWishes:
         resp = test_client.get("/api/admin/wishes?purchased=false")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 1
+        # The other person wish + the family wish are unpurchased
+        assert data["total"] == 2
 
     def test_filter_by_purchased_all(self, test_client, admin_user, wish_tree, db):
         """Filter by purchased=all returns all wishes."""
@@ -294,7 +315,7 @@ class TestListWishes:
         resp = test_client.get("/api/admin/wishes?purchased=all")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] == 2
+        assert data["total"] == 3
 
     def test_filter_search(self, test_client, admin_user, wish_tree, second_family_with_wishes):
         """Search filters by wish description and person/family name."""
@@ -316,7 +337,8 @@ class TestListWishes:
         resp3 = test_client.get("/api/admin/wishes?search=Second+Family")
         assert resp3.status_code == 200
         data3 = resp3.json()
-        assert data3["total"] == 2
+        # 2 person wishes (family via person) + the family wish (family directly)
+        assert data3["total"] == 3
 
     def test_combined_filters(self, test_client, admin_user, wish_tree, second_family_with_wishes):
         """Multiple filters can be combined."""
@@ -382,6 +404,22 @@ class TestGetWish:
 
         resp = test_client.get(f"/api/admin/wishes/{wish_tree['wishes'][0].id}")
         assert resp.status_code == 404
+
+    def test_get_family_wish(self, test_client, admin_user, wish_tree, db):
+        """Family wish returns detail with null person fields."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        w = family_wish(db, wish_tree)
+        resp = test_client.get(f"/api/admin/wishes/{w.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["type"] == "family"
+        assert data["description"] == "Warm clothes"
+        assert data["person_id"] is None
+        assert data["person_given_name"] is None
+        assert data["person_family_name"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -485,6 +523,31 @@ class TestPatchWish:
             json={"type": "adult"},
         )
         assert resp.status_code == 400
+
+    def test_update_family_wish_description(self, test_client, admin_user, wish_tree, db):
+        """Family wish description is editable like any other wish."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        w = family_wish(db, wish_tree)
+        resp = test_client.patch(f"/api/admin/wishes/{w.id}", json={"description": "Updated family wish"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["description"] == "Updated family wish"
+        assert data["person_id"] is None
+
+    def test_change_type_on_family_wish_rejected(self, test_client, admin_user, wish_tree, db):
+        """Type is fixed per owner — a family wish cannot change type."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        w = family_wish(db, wish_tree)
+        resp = test_client.patch(f"/api/admin/wishes/{w.id}", json={"type": "fun"})
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Family wish type cannot be changed"
+        assert w.type == WishType.family
 
     def test_set_assigned_to_id(self, test_client, admin_user, wish_tree):
         """Set assigned_to_id to a valid user."""
@@ -609,6 +672,24 @@ class TestMarkPurchased:
         assert data["purchased_at"] is not None
         assert data["purchased_where"] == "Walmart"
         assert data["assigned_to_id"] == admin_user.id
+
+    def test_mark_purchased_family_wish(self, test_client, admin_user, wish_tree, db):
+        """Family wish can be marked purchased (person fields stay null)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        w = family_wish(db, wish_tree)
+        resp = test_client.post(
+            f"/api/admin/wishes/{w.id}/mark-purchased",
+            json={"purchased_where": "Walmart"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is not None
+        assert data["purchased_where"] == "Walmart"
+        assert data["assigned_to_id"] == admin_user.id
+        assert data["person_id"] is None
 
     def test_auto_reassign(self, test_client, admin_user, wish_tree, db):
         """Mark-purchased reassigns wish to calling admin even if assigned to someone else."""

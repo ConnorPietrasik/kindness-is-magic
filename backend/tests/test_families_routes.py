@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.models import Person, PersonRole, Wish, WishType
+from tests.conftest import make_family
 
 # ---------------------------------------------------------------------------
 # 200 — valid family, correct fields returned
@@ -24,7 +25,7 @@ def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, fa
     assert "display_id" in data
     assert data["display_id"] != "0"  # valid position assigned
     assert "family_name" not in data  # intentionally excluded for privacy
-    assert data["family_wish"] == family.family_wish
+    assert data["family_wish"] == "World peace"  # family wish wish row (family_record fixture)
     assert data["bio"] == family.bio
     assert len(data["people"]) == len(family_with_people["people"])
 
@@ -342,7 +343,7 @@ def test_list_families_includes_eligible(db, test_client: TestClient, family_rec
 
 def test_list_families_pagination(db, test_client: TestClient, referrer_with_families):
     """Pagination works correctly with multiple families."""
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
     families = referrer_with_families["families"]
     # Set all existing families as eligible
@@ -352,7 +353,8 @@ def test_list_families_pagination(db, test_client: TestClient, referrer_with_fam
 
     # Create more families to test pagination
     for i in range(5):
-        fam = Family(
+        fam = make_family(
+            db,
             referrer_id=referrer_with_families["referrer"].id,
             family_name=f"Paginated Family {i}",
             family_wish="Something",
@@ -400,9 +402,10 @@ def test_list_families_filter_min_person_count(db, test_client: TestClient, fami
     _make_person(db, family_record.id, "Alice", 8)
 
     # Create another family with 2 people
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Big Family",
         family_wish="Lots of stuff",
         contact_name="Big Contact",
@@ -431,9 +434,10 @@ def test_list_families_filter_max_person_count(db, test_client: TestClient, fami
     _make_person(db, family_record.id, "Alice", 8)
 
     # Create another family with 2 people
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Big Family",
         family_wish="Lots of stuff",
         contact_name="Big Contact",
@@ -460,10 +464,11 @@ def test_list_families_filter_person_count_range(db, test_client: TestClient, fa
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
     # Family with 2 people
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Med Family",
         family_wish="Stuff",
         contact_name="Med Contact",
@@ -478,7 +483,8 @@ def test_list_families_filter_person_count_range(db, test_client: TestClient, fa
     _make_person(db, fam2.id, "Carol", 10)
 
     # Family with 3 people
-    fam3 = Family(
+    fam3 = make_family(
+        db,
         family_name="Big Family",
         family_wish="More stuff",
         contact_name="Big Contact",
@@ -511,9 +517,10 @@ def test_list_families_filter_min_age(db, test_client: TestClient, family_record
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Young Family",
         family_wish="Stuff",
         contact_name="Young Contact",
@@ -539,9 +546,10 @@ def test_list_families_filter_max_age(db, test_client: TestClient, family_record
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Old Family",
         family_wish="Stuff",
         contact_name="Old Contact",
@@ -572,9 +580,10 @@ def test_list_families_sort_person_count(db, test_client: TestClient, family_rec
     family_record.wish_lock_level = "admin"
     _make_person(db, family_record.id, "Alice", 8)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Big Family",
         family_wish="Stuff",
         contact_name="Big Contact",
@@ -607,9 +616,10 @@ def test_list_families_sort_min_age(db, test_client: TestClient, family_record):
     _make_person(db, family_record.id, "Alice", 10)
     _make_person(db, family_record.id, "Bob", 14)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Young Family",
         family_wish="Stuff",
         contact_name="Young Contact",
@@ -643,9 +653,10 @@ def test_list_families_sort_max_age(db, test_client: TestClient, family_record):
     _make_person(db, family_record.id, "Alice", 8)
     _make_person(db, family_record.id, "Bob", 10)
 
-    from app.models import Family, FamilyVerificationStatus
+    from app.models import FamilyVerificationStatus
 
-    fam2 = Family(
+    fam2 = make_family(
+        db,
         family_name="Old Family",
         family_wish="Stuff",
         contact_name="Old Contact",

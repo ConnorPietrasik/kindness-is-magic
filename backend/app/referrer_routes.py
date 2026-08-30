@@ -22,10 +22,14 @@ from app.models import (
     ReferrerApprovalStatus,
     SentEmail,
     User,
+    Wish,
     WishLockLevel,
+    WishType,
 )
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
+    attach_family_wish,
+    batch_load_family_wishes,
     batch_load_person_wishes,
     build_family_detail,
     build_family_list_item,
@@ -166,7 +170,6 @@ def create_family(
     fam = Family(
         referrer_id=referrer_id,
         family_name=body.family_name,
-        family_wish=body.family_wish,
         contact_name=body.contact_name,
         bio=body.bio,
         address=body.address,
@@ -174,6 +177,8 @@ def create_family(
         verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)
+    # Family wish is a wish row, created in the same transaction
+    attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s created family '%s' (id=%s)", user.email, fam.family_name, fam.id)
@@ -192,7 +197,11 @@ def update_family(
     standard_data = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "referrer_notes"}
     if standard_data:
         _check_referrer_edit_lock(owner.family)
-        partial_update(owner.family, body, exclude={"referrer_notes"})
+        partial_update(owner.family, body, exclude={"referrer_notes", "family_wish"})
+
+    # The family wish lives on its wish row
+    if body.family_wish is not None:
+        attach_family_wish(db, owner.family, body.family_wish)
 
     # Apply notes separately (always allowed, even on locked families)
     notes_value = body.referrer_notes
@@ -216,6 +225,8 @@ def delete_family(
     # Soft-delete all persons in the family first to avoid orphans.
     now = datetime.now(timezone.utc)
     db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
+    # Soft-delete the family wish (person wishes are left alone — pre-existing quirk)
+    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: now}, synchronize_session=False)
     fam.deleted_at = now
     db.commit()
     logger.info("Referrer %s soft-deleted family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
@@ -247,12 +258,15 @@ def list_pending_families(
     counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
     count_map = {fid: cnt for fid, cnt in counts}
 
+    # Family wishes are wish rows — batch-load descriptions for the page
+    family_wish_map = batch_load_family_wishes(db, [f.id for f in families])
+
     return [
         PendingFamilySummary(
             id=f.id,
             display_id="PENDING",
             family_name=f.family_name,
-            family_wish=f.family_wish,
+            family_wish=family_wish_map.get(f.id, ""),
             contact_name=f.contact_name,
             verification_status=f.verification_status,
             pickup_window=f.pickup_window,

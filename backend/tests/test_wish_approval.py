@@ -4,7 +4,6 @@ import pytest
 from datetime import datetime, timezone
 
 from app.models import (
-    Family,
     FamilyVerificationStatus,
     Person,
     PersonRole,
@@ -15,6 +14,7 @@ from app.models import (
     Wish,
     WishType,
 )
+from tests.conftest import make_family
 from app.auth import get_password_hash
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,8 @@ def referrer_user(db, referrer):
 
 @pytest.fixture()
 def family(db, referrer):
-    f = Family(
+    f = make_family(
+        db,
         referrer_id=referrer.id,
         family_name="Test Family",
         family_wish="World peace",
@@ -117,7 +118,8 @@ def person_in_family(db, family):
 
 @pytest.fixture()
 def second_family(db, referrer):
-    f = Family(
+    f = make_family(
+        db,
         referrer_id=referrer.id,
         family_name="Second Family",
         family_wish="Warm clothes",
@@ -163,7 +165,8 @@ def another_referrer_user(db, another_referrer):
 
 @pytest.fixture()
 def family_for_another_referrer(db, another_referrer):
-    f = Family(
+    f = make_family(
+        db,
         referrer_id=another_referrer.id,
         family_name="Another Family",
         family_wish="A computer",

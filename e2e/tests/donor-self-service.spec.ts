@@ -270,6 +270,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByText("Family Members & Wishes")).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
 
+    // The family wish is part of the claim — shown above the members table
+    await expect(page.getByText("Family Wish", { exact: true })).toBeVisible();
+    await expect(page.getByText("A warm blanket for everyone")).toBeVisible();
+
     // For gifts claims, "Mark purchased" buttons should be visible
     const markPurchasedBtn = page.getByRole("button", { name: "Mark purchased" });
     const count = await markPurchasedBtn.count();

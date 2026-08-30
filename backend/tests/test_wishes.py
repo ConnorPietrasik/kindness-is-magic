@@ -41,7 +41,7 @@ class TestWishCreate:
 
     def test_description_max_length(self):
         with pytest.raises(ValidationError):
-            WishCreate(type=WishType.adult, description="x" * 61)
+            WishCreate(type=WishType.adult, description="x" * 101)
 
     def test_description_min_length(self):
         with pytest.raises(ValidationError):

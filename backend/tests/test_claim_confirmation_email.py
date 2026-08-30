@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from tests.conftest import login_as
+from tests.conftest import login_as, make_family
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,9 +38,10 @@ def _create_donor(client: TestClient) -> dict:
 
 def _create_claimed_family(db: Session) -> dict:
     """Create a verified, admin-locked family with people and wishes."""
-    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-    fam = Family(
+    fam = make_family(
+        db,
         family_name="Claimed Family",
         family_wish="Warm clothes",
         contact_name="Claim Contact",
@@ -75,9 +76,10 @@ def _create_claimed_family(db: Session) -> dict:
 
 def _create_family_with_adult(db: Session) -> dict:
     """Create a family with an adult person."""
-    from app.models import Family, FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
+    from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
 
-    fam = Family(
+    fam = make_family(
+        db,
         family_name="Adult Family",
         family_wish="Food",
         contact_name="Adult Contact",
@@ -110,9 +112,10 @@ def _create_family_with_adult(db: Session) -> dict:
 
 def _create_empty_family(db: Session) -> dict:
     """Create a verified family with no people."""
-    from app.models import Family, FamilyVerificationStatus, WishLockLevel
+    from app.models import FamilyVerificationStatus, WishLockLevel
 
-    fam = Family(
+    fam = make_family(
+        db,
         family_name="Empty Family",
         family_wish="Support",
         contact_name="Empty Contact",
