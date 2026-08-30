@@ -5,6 +5,7 @@ import {
   formatDateTime,
   formatEmailStatus,
   fromDatetimeLocalValue,
+  getLockLevelRowClass,
   getPendingClaimFamilyId,
   humanize,
   isFamilyLocked,
@@ -375,6 +376,25 @@ describe("pending claim family id", () => {
     setPendingClaimFamilyId(7);
     clearPendingClaimFamilyId();
     expect(getPendingClaimFamilyId()).toBeNull();
+  });
+});
+
+describe("getLockLevelRowClass", () => {
+  it("returns the green tint for admin-locked families", () => {
+    expect(getLockLevelRowClass({ deleted_at: null, wish_lock_level: "admin" })).toBe("bg-emerald-50");
+  });
+
+  it("returns the amber tint for referrer-locked families", () => {
+    expect(getLockLevelRowClass({ deleted_at: null, wish_lock_level: "referrer" })).toBe("bg-amber-50");
+  });
+
+  it("returns no class for family-level locks", () => {
+    expect(getLockLevelRowClass({ deleted_at: null, wish_lock_level: "family" })).toBe("");
+  });
+
+  it("returns no class for soft-deleted families regardless of lock level", () => {
+    expect(getLockLevelRowClass({ deleted_at: "2025-02-02T00:00:00Z", wish_lock_level: "admin" })).toBe("");
+    expect(getLockLevelRowClass({ deleted_at: "2025-02-02T00:00:00Z", wish_lock_level: "referrer" })).toBe("");
   });
 });
 

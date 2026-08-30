@@ -412,7 +412,7 @@ describe("AdminFamilies", () => {
     await user.click(screen.getByRole("button", { name: "Yes, fully approve" }));
 
     await waitFor(() => {
-      expect(api.adminApproveWishes).toHaveBeenCalledWith(1, expect.anything());
+      expect(api.adminApproveWishes).toHaveBeenCalledWith(1);
     });
     await waitFor(() => {
       expect(screen.getByText("Family fully approved and visible to donors")).toBeInTheDocument();
@@ -440,7 +440,7 @@ describe("AdminFamilies", () => {
     await user.click(screen.getByRole("button", { name: "Yes, reset" }));
 
     await waitFor(() => {
-      expect(api.adminResetWishState).toHaveBeenCalledWith(2, expect.anything());
+      expect(api.adminResetWishState).toHaveBeenCalledWith(2);
     });
     await waitFor(() => {
       expect(screen.getByText("Wish lock reset — family can now edit their wishes")).toBeInTheDocument();

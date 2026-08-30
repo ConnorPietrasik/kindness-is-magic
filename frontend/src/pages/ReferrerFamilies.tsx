@@ -29,14 +29,8 @@ import {
 } from "../lib/api";
 import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerFamily, referrerMe } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyPayload, WishLockLevel } from "../types";
-
-function getLockLevelRowClass(wishLockLevel: WishLockLevel): string {
-  if (wishLockLevel === "admin") return "bg-emerald-50";
-  if (wishLockLevel === "referrer") return "bg-amber-50";
-  return "";
-}
+import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
+import type { FamilyPayload } from "../types";
 
 export default function ReferrerFamilies() {
   // Referrer self-info (for family limit)
@@ -155,7 +149,7 @@ export default function ReferrerFamilies() {
               <TableBody>
                 {families.map((f) => (
                   <React.Fragment key={f.id}>
-                    <Tr className={getLockLevelRowClass(f.wish_lock_level)}>
+                    <Tr className={getLockLevelRowClass(f)}>
                       <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
                       <Td className="font-medium text-gray-900">
                         {f.family_name}

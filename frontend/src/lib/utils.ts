@@ -81,6 +81,20 @@ export function humanize(str: string | null | undefined): string {
 }
 
 /**
+ * getLockLevelRowClass — row highlight class for a family by wish lock level.
+ *
+ * Admin-locked rows get a green tint, referrer-locked rows an amber tint.
+ * Soft-deleted rows are never highlighted. Accepts any object with the two
+ * relevant fields (FamilyDetail, FamilySummary, …).
+ */
+export function getLockLevelRowClass(family: { deleted_at: string | null; wish_lock_level: string }): string {
+  if (family.deleted_at != null) return "";
+  if (family.wish_lock_level === "admin") return "bg-emerald-50";
+  if (family.wish_lock_level === "referrer") return "bg-amber-50";
+  return "";
+}
+
+/**
  * formatDateTime — format an ISO datetime string for display.
  *
  * Used in list/detail views to show timestamps in a readable format.

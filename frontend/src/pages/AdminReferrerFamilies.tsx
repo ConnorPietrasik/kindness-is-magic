@@ -6,18 +6,15 @@
  * tabs (active/deleted), pagination, restore confirmation, dialogs.
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ActionsDropdown } from "../components/ActionsDropdown";
-import { ApprovalBadge } from "../components/ApprovalBadge";
+import { useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
+import { FamilyTableRow } from "../components/FamilyTableRow";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import {
   HierarchicalManage,
@@ -28,19 +25,17 @@ import { InfoRow } from "../components/InfoRow";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
-import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { useTableWidth } from "../hooks/useTableWidth";
+import { useWishLockActions } from "../hooks/useWishLockActions";
 import {
-  adminApproveWishes,
   adminCreateFamily,
   adminDeleteFamily,
   adminGetFamily,
   adminGetReferrer,
   adminListDeletedFamilies,
   adminListReferrerFamilies,
-  adminResetWishState,
   adminRestoreFamily,
   adminUpdateFamily,
   adminUpdateReferrer,
@@ -49,33 +44,18 @@ import {
   adminDeletedFamilies,
   adminDeletedReferrerFamilies,
   adminFamilies,
-  adminPackingSlips,
   adminReferrerDetail,
   adminReferrerFamilies,
-  adminReviewQueue,
   adminWishes,
 } from "../lib/queryKeys";
-import { ROUTES, route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { ROUTES } from "../lib/routes";
+import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
 import type { AdminListParams, FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
-function getLockLevelRowClass(deletedAt: string | null, wishLockLevel: string): string {
-  if (deletedAt != null) return "";
-  if (wishLockLevel === "admin") return "bg-emerald-50";
-  if (wishLockLevel === "referrer") return "bg-amber-50";
-  return "";
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrerFamilies() {
-  const queryClient = useQueryClient();
-  const toast = useToast();
   const { id: refId } = useParams<{ id: string }>();
   const refIdNum = parseInt(refId!, 10);
   const refIdStr = String(refIdNum);
@@ -84,31 +64,9 @@ export default function AdminReferrerFamilies() {
   const familiesKey = adminReferrerFamilies(refIdStr);
   const deletedFamiliesKey = adminDeletedReferrerFamilies(refIdStr);
 
-  // Reset wish state mutation
-  const resetMut = useMutation({
-    mutationFn: adminResetWishState,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: familiesKey });
-      queryClient.invalidateQueries({ queryKey: adminFamilies });
-      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
-      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
-      queryClient.invalidateQueries({ queryKey: adminWishes });
-      toast.success("Wish lock reset — family can now edit their wishes");
-    },
-  });
-
-  // Fully approve mutation (skips review flow)
-  const fullyApproveMut = useMutation({
-    mutationFn: adminApproveWishes,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: familiesKey });
-      queryClient.invalidateQueries({ queryKey: adminFamilies });
-      queryClient.invalidateQueries({ queryKey: adminReviewQueue });
-      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
-      queryClient.invalidateQueries({ queryKey: adminWishes });
-      toast.success("Family fully approved and visible to donors");
-    },
-  });
+  // Wish-lock row actions (reset lock / fully approve) — also refreshes
+  // this referrer's scoped family list
+  const { resetMut, fullyApproveMut } = useWishLockActions({ extraInvalidationKeys: [familiesKey] });
 
   const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
 
@@ -158,12 +116,10 @@ export default function AdminReferrerFamilies() {
                 rows={rows as FamilyDetail[]}
                 callbacks={callbacks}
                 isDeletedView={ctx.isDeletedView}
-                referrerId={refIdNum}
                 visibleColumns={visibleColumns}
-                onResetWishState={(id) => resetMut.mutate(id)}
-                isResetting={resetMut.isPending}
+                onResetLock={(id) => resetMut.mutate(id)}
                 onFullyApprove={(id) => fullyApproveMut.mutate(id)}
-                isFullyApproving={fullyApproveMut.isPending}
+                isLockActionPending={resetMut.isPending || fullyApproveMut.isPending}
               />
             ),
             title: "Families",
@@ -271,22 +227,18 @@ function FamiliesTable({
   rows,
   callbacks,
   isDeletedView,
-  referrerId,
   visibleColumns,
-  onResetWishState,
-  isResetting,
+  onResetLock,
   onFullyApprove,
-  isFullyApproving,
+  isLockActionPending,
 }: {
   rows: FamilyDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
-  referrerId: number;
   visibleColumns: string[];
-  onResetWishState: (id: number) => void;
-  isResetting: boolean;
+  onResetLock: (id: number) => void;
   onFullyApprove: (id: number) => void;
-  isFullyApproving: boolean;
+  isLockActionPending: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -300,12 +252,15 @@ function FamiliesTable({
 
   return (
     <Table>
+      {/* Header columns follow the same order as FamilyTableRow (shared "adminFamilies" column registry). */}
       <TableHead>
         {visibleColumns.includes("display_id") && <Th>ID</Th>}
         {visibleColumns.includes("family_name") && <Th>Family Name</Th>}
         {visibleColumns.includes("family_wish") && <Th>Family Wish</Th>}
         {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
         {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
+        {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
+        {visibleColumns.includes("claim") && <Th>Claim</Th>}
         {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
         {visibleColumns.includes("person_count") && <Th>People</Th>}
         {visibleColumns.includes("verification_status") && <Th>Verification</Th>}
@@ -313,140 +268,27 @@ function FamiliesTable({
         {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
         {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
         {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
-        {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
         <Th>Actions</Th>
       </TableHead>
       <TableBody>
         {rows.map((f) => (
           <React.Fragment key={f.id}>
-            <Tr className={getLockLevelRowClass(f.deleted_at, f.wish_lock_level)}>
-              {visibleColumns.includes("display_id") && (
-                <Td className="whitespace-nowrap text-xs text-gray-400">
-                  <DisplayId displayId={f.display_id} familyId={f.id} referrerId={referrerId} />
-                </Td>
-              )}
-              {visibleColumns.includes("family_name") && (
-                <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-                  {f.family_name}
-                  {f.deleted_at == null && f.referrer_notes != null && (
-                    <span className="ml-1 text-xs" title="Has internal notes">
-                      📝
-                    </span>
-                  )}
-                  {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-                    <Link
-                      to={route.familyWishList(f.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Wish List"
-                      className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                      title="Wish List"
-                    >
-                      📄
-                    </Link>
-                  )}
-                </Td>
-              )}
-              {visibleColumns.includes("family_wish") && <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>}
-              {visibleColumns.includes("contact_name") && <Td>{f.contact_name}</Td>}
-              {visibleColumns.includes("referrer_id") && (
-                <Td>
-                  {f.referrer_id != null ? (
-                    <Link
-                      to={route.adminReferrerFamilies(f.referrer_id)}
-                      className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                    >
-                      {f.referrer_name || `ID ${f.referrer_id}`}
-                    </Link>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </Td>
-              )}
-              {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
-              {visibleColumns.includes("person_count") && <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>}
-              {visibleColumns.includes("verification_status") && (
-                <Td>
-                  <ApprovalBadge status={f.verification_status} />
-                </Td>
-              )}
-              {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}
-              {visibleColumns.includes("wish_lock_level") && (
-                <Td>
-                  <span className="text-xs capitalize">{f.wish_lock_level}</span>
-                </Td>
-              )}
-              {visibleColumns.includes("wish_review_requested_at") && (
-                <Td className="text-xs text-gray-500">
-                  {f.wish_review_requested_at ? new Date(f.wish_review_requested_at).toLocaleDateString() : "—"}
-                </Td>
-              )}
-              {visibleColumns.includes("wish_rejection_reason") && (
-                <Td className="max-w-xs text-xs text-gray-500 truncate">{f.wish_rejection_reason || "—"}</Td>
-              )}
-              {visibleColumns.includes("delivery") && (
-                <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
-              )}
-              <Td>
-                <div className="flex items-center gap-2">
-                  {!isDeletedView && f.deleted_at == null && (
-                    <Link
-                      to={`${route.adminFamilyPeople(f.id)}?from=referrer`}
-                      className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                    >
-                      Manage
-                    </Link>
-                  )}
-                  {!isDeletedView && f.deleted_at == null && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => (callbacks.isEditing(f.id) ? callbacks.cancelForm?.() : callbacks.onEdit(f.id))}
-                      >
-                        {callbacks.isEditing(f.id) ? "Done" : "Edit"}
-                      </Button>
-                      <ActionsDropdown
-                        items={[
-                          ...(f.wish_lock_level !== "family"
-                            ? [
-                                {
-                                  label: "Reset Lock",
-                                  variant: "secondary" as const,
-                                  onClick: () => onResetWishState(f.id),
-                                },
-                              ]
-                            : []),
-                          ...(f.wish_lock_level !== "admin"
-                            ? [
-                                {
-                                  label: "Fully Approve",
-                                  onClick: () => onFullyApprove(f.id),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: "Delete",
-                            variant: "danger" as const,
-                            onClick: () => callbacks.onDelete(f.id),
-                          },
-                        ]}
-                        disabled={callbacks.isDeleting || isResetting || isFullyApproving}
-                      />
-                    </>
-                  )}
-                  {isDeletedView && (
-                    <Button
-                      variant="secondary"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => callbacks.onRestore(f.id)}
-                      disabled={callbacks.isRestoring}
-                    >
-                      Restore
-                    </Button>
-                  )}
-                </div>
-              </Td>
+            <Tr className={getLockLevelRowClass(f)}>
+              <FamilyTableRow
+                family={f}
+                visibleColumns={visibleColumns}
+                isDeletedView={isDeletedView}
+                isEditing={callbacks.isEditing(f.id)}
+                fromReferrer
+                onEdit={(id) => (callbacks.isEditing(id) ? callbacks.cancelForm?.() : callbacks.onEdit(id))}
+                onDelete={callbacks.onDelete}
+                onRestore={callbacks.onRestore}
+                onResetLock={onResetLock}
+                onFullyApprove={onFullyApprove}
+                isDeleting={callbacks.isDeleting}
+                isRestoring={callbacks.isRestoring}
+                isLockActionPending={isLockActionPending}
+              />
             </Tr>
             {callbacks.editingId === f.id && (
               <Tr key={`${f.id}-edit`}>
