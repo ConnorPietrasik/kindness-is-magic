@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
+    apply_purchase_fields,
     build_sort_clause,
     column_filtered_page,
     build_wish_detail,
@@ -251,25 +252,13 @@ def mark_purchased(
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
-    now = datetime.now(timezone.utc)
-
-    # Always set purchased_at
-    wish.purchased_at = now
-
-    # purchased_where always overwrites (null sets to None)
-    wish.purchased_where = body.purchased_where
+    # purchased_at, purchased_where and purchaser_note (partial-update convention)
+    apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=body.purchased_where, purchaser_note=body.purchaser_note)
 
     # Assign to the calling admin
     wish.assigned_to_id = admin.id
 
-    # purchaser_note and received_at follow partial-update convention
-    # Check raw field values (validator may have coerced "" → _CLEAR)
-    if body.purchaser_note is _CLEAR:
-        wish.purchaser_note = None
-    elif body.purchaser_note is not None:
-        wish.purchaser_note = body.purchaser_note
-    # None means no-op
-
+    # received_at follows partial-update convention (None means no-op)
     if body.received_at is _CLEAR:
         wish.received_at = None
     elif body.received_at is not None:

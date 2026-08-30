@@ -1455,3 +1455,15 @@ class DonorWishPurchaseMark(BaseModel):
         if isinstance(v, str):
             return sanitize_plain_text(v)
         return v
+
+
+class DonorWishPurchaseResponse(BaseModel):
+    """Response for the donor mark-purchased endpoint."""
+
+    id: int
+    purchased_at: datetime | None
+    purchased_where: str | None
+    purchaser_note: str | None
+    assigned_to_id: int | None
+
+    model_config = {"from_attributes": True}

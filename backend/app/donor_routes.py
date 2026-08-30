@@ -22,15 +22,17 @@ from app.models import (
 )
 from app.permissions import require_admin, require_claim_capable
 from app.response_builders import (
+    apply_purchase_fields,
     batch_build_family_info,
     batch_load_person_wishes,
     build_family_info,
+    get_active_or_404,
     get_or_404,
     partial_update,
 )
 from app.schemas import (
-    _CLEAR,
     DonorWishPurchaseMark,
+    DonorWishPurchaseResponse,
     FamilyClaimDetail,
     FamilyClaimSummary,
     FamilyClaimUpdate,
@@ -50,9 +52,7 @@ def get_claim_or_403(db: Session, claim_id: int, user: User) -> FamilyClaim:
     Raises 404 if the claim does not exist or is soft-deleted, and 403
     unless the user is the claim's donor or an admin.
     """
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
+    claim = get_active_or_404(db, FamilyClaim, claim_id, "Claim not found")
     if user.role != UserRole.admin and claim.donor_user_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to access this claim")
     return claim
@@ -131,9 +131,7 @@ def get_claim(
     """Get claim detail with wish list. Owner or admin only."""
     claim = get_claim_or_403(db, claim_id, user)
 
-    fam = get_or_404(db, Family, claim.family_id, "Family not found")
-    if fam.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
+    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
 
     # Active people ordered by id
     people = (
@@ -195,7 +193,7 @@ def update_claim(
     db.commit()
     db.refresh(claim)
 
-    fam = get_or_404(db, Family, claim.family_id, "Family not found")
+    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
     return FamilyClaimSummary(
         id=claim.id,
         family=build_family_info(fam, db),
@@ -237,7 +235,7 @@ def mark_wish_purchased(
     data: DonorWishPurchaseMark,
     db: Session = Depends(get_db),
     user: User = Depends(require_claim_capable),
-) -> dict:
+) -> DonorWishPurchaseResponse:
     """Mark a wish as purchased. Sets purchased_at, purchased_where, purchaser_note, assigned_to_id.
 
     No received_at — that's set by delivery. Owner or admin only.
@@ -245,9 +243,7 @@ def mark_wish_purchased(
     claim = get_claim_or_403(db, claim_id, user)
 
     # Wish must exist and belong to the claimed family
-    wish = get_or_404(db, Wish, wish_id, "Wish not found")
-    if wish.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
+    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
     # A claim covers the whole family: person wishes resolve their family
     # through the person; family wishes belong to the claimed family directly
     if wish.person_id is None:
@@ -258,30 +254,14 @@ def mark_wish_purchased(
         if person.family_id != claim.family_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
 
-    now = datetime.now(timezone.utc)
-    wish.purchased_at = now
     wish.assigned_to_id = user.id
-
-    # purchased_where always overwrites (null sets to None)
-    wish.purchased_where = data.purchased_where
-
-    # purchaser_note follows partial-update convention
-    if data.purchaser_note is _CLEAR:
-        wish.purchaser_note = None
-    elif data.purchaser_note is not None:
-        wish.purchaser_note = data.purchaser_note
+    apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=data.purchased_where, purchaser_note=data.purchaser_note)
 
     db.commit()
     db.refresh(wish)
 
     logger.info("User %s marked wish %s as purchased on claim %s", user.id, wish_id, claim_id)
-    return {
-        "id": wish.id,
-        "purchased_at": wish.purchased_at,
-        "purchased_where": wish.purchased_where,
-        "purchaser_note": wish.purchaser_note,
-        "assigned_to_id": wish.assigned_to_id,
-    }
+    return DonorWishPurchaseResponse.model_validate(wish)
 
 
 # ---------------------------------------------------------------------------
@@ -296,9 +276,7 @@ def fulfill_claim(
     admin: User = Depends(require_admin),
 ) -> FamilyClaimSummary:
     """Mark a claim as fulfilled. Admin only."""
-    claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
-    if claim.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
+    claim = get_active_or_404(db, FamilyClaim, claim_id, "Claim not found")
 
     if claim.fulfilled_at is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Claim is already fulfilled")
@@ -309,7 +287,7 @@ def fulfill_claim(
 
     logger.info("Admin %s fulfilled claim %s", admin.id, claim_id)
 
-    fam = get_or_404(db, Family, claim.family_id, "Family not found")
+    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
     return FamilyClaimSummary(
         id=claim.id,
         family=build_family_info(fam, db),

@@ -1008,6 +1008,27 @@ def partial_update(obj, schema_model, *, exclude: set[str] | None = None):
             setattr(obj, field, value)
 
 
+def apply_purchase_fields(
+    wish: Wish,
+    *,
+    now: datetime,
+    purchased_where: str | None,
+    purchaser_note,
+) -> None:
+    """Apply the purchase fields shared by the mark-purchased flows.
+
+    Sets ``purchased_at`` to *now*, overwrites ``purchased_where`` (None
+    clears it), and applies ``purchaser_note`` with the partial-update
+    convention (None = no-op, ``_CLEAR`` = clear to NULL).
+    """
+    wish.purchased_at = now
+    wish.purchased_where = purchased_where
+    if purchaser_note is _CLEAR:
+        wish.purchaser_note = None
+    elif purchaser_note is not None:
+        wish.purchaser_note = purchaser_note
+
+
 # ---------------------------------------------------------------------------
 # Column filtering
 # ---------------------------------------------------------------------------
