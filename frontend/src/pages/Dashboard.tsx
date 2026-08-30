@@ -119,32 +119,17 @@ export default function Dashboard() {
 
         {/* Referrer pending verification alert */}
         {user?.role === "referrer" && pendingFamilies && pendingFamilies.length > 0 && (
-          <Link
-            to={ROUTES.REFERRER_FAMILY_INVITES}
-            className="mb-6 block rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100"
-          >
-            {pendingFamilies.length} family{pendingFamilies.length > 1 ? "ies" : ""} awaiting your verification →
-          </Link>
+          <QueueAlert count={pendingFamilies.length} label="awaiting your verification" to={ROUTES.REFERRER_FAMILY_INVITES} tone="amber" />
         )}
 
         {/* Referrer wish review queue alert */}
         {user?.role === "referrer" && referrerReviewQueueData && referrerReviewQueueData.length > 0 && (
-          <Link
-            to={ROUTES.REFERRER_WISH_REVIEW}
-            className="mb-6 block rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
-          >
-            {referrerReviewQueueData.length} family{referrerReviewQueueData.length > 1 ? "ies" : ""} awaiting your wish review →
-          </Link>
+          <QueueAlert count={referrerReviewQueueData.length} label="awaiting your wish review" to={ROUTES.REFERRER_WISH_REVIEW} />
         )}
 
         {/* Admin wish review queue alert */}
         {user?.role === "admin" && adminReviewQueueData && adminReviewQueueData.length > 0 && (
-          <Link
-            to={ROUTES.ADMIN_WISH_REVIEW}
-            className="mb-6 block rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
-          >
-            {adminReviewQueueData.length} family{adminReviewQueueData.length > 1 ? "ies" : ""} awaiting your wish approval →
-          </Link>
+          <QueueAlert count={adminReviewQueueData.length} label="awaiting your wish approval" to={ROUTES.ADMIN_WISH_REVIEW} />
         )}
 
         {/* Navigation cards */}
@@ -564,6 +549,34 @@ function ChangePasswordSection() {
       </form>
       <MutationErrors mutations={[changePasswordMut]} />
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* QueueAlert — "N families awaiting …" link card                       */
+/* ------------------------------------------------------------------ */
+
+interface QueueAlertProps {
+  count: number;
+  /** Message after the count, e.g. "awaiting your wish review". */
+  label: string;
+  to: string;
+  tone?: "amber" | "blue";
+}
+
+const queueAlertTones = {
+  amber: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
+  blue: "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100",
+} as const;
+
+function QueueAlert({ count, label, to, tone = "blue" }: QueueAlertProps) {
+  return (
+    <Link
+      to={to}
+      className={`mb-6 block rounded-xl border px-6 py-4 text-sm font-semibold shadow-sm transition-colors ${queueAlertTones[tone]}`}
+    >
+      {count} famil{count > 1 ? "ies" : "y"} {label} →
+    </Link>
   );
 }
 

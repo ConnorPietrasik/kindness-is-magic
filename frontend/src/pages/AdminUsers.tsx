@@ -7,7 +7,7 @@
  * Supports role filter and text search on both tabs.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
@@ -27,13 +27,12 @@ import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useFamiliesDropdown, useReferrersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreateUser,
   adminDeleteUser,
-  adminGetFamiliesDropdown,
-  adminGetReferrersDropdown,
   adminGetUser,
   adminListDeletedUsers,
   adminListUsers,
@@ -41,7 +40,7 @@ import {
   adminRestoreUser,
   adminUpdateUser,
 } from "../lib/api";
-import { adminDeletedUsers, adminFamiliesDropdown, adminReferrersDropdown, adminUsers } from "../lib/queryKeys";
+import { adminDeletedUsers, adminUsers } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type {
@@ -118,17 +117,9 @@ export default function AdminUsers() {
     entityName: "User",
   });
 
-  // Fetch referrers for dropdown (only active)
-  const { data: referrers } = useQuery({
-    queryKey: adminReferrersDropdown,
-    queryFn: () => adminGetReferrersDropdown(),
-  });
-
-  // Fetch families for dropdown (only active)
-  const { data: families } = useQuery({
-    queryKey: adminFamiliesDropdown,
-    queryFn: () => adminGetFamiliesDropdown(),
-  });
+  // Dropdown lookups (only active)
+  const { referrers } = useReferrersDropdown();
+  const { families } = useFamiliesDropdown();
 
   // Reset password mutation (special — not standard CRUD)
   const resetPasswordMut = useMutation({
@@ -270,8 +261,8 @@ export default function AdminUsers() {
               title="Add User"
               initial={defaultUserForm}
               isEdit={false}
-              referrers={referrers ?? []}
-              families={families ?? []}
+              referrers={referrers}
+              families={families}
               onCreate={handleCreateUser}
               onUpdate={handleUpdateUser}
               onCancel={cancelForm}
@@ -390,8 +381,8 @@ export default function AdminUsers() {
                                 title="Edit User"
                                 initial={detail}
                                 isEdit={true}
-                                referrers={referrers ?? []}
-                                families={families ?? []}
+                                referrers={referrers}
+                                families={families}
                                 onCreate={handleCreateUser}
                                 onUpdate={handleUpdateUser}
                                 onCancel={cancelForm}

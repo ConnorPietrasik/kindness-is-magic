@@ -163,14 +163,14 @@ export default function FamilyDashboard() {
           ) : (
             familyInfo && (
               <div className="space-y-0">
-                <InfoRow label="Family Name" value={familyInfo.family_name} />
-                <InfoRow label="Contact" value={familyInfo.contact_name} />
-                <InfoRow label="Family Wish" value={familyInfo.family_wish} />
-                <InfoRow label="Bio" value={familyInfo.bio} />
-                <InfoRow label="Address" value={familyInfo.address} />
-                <InfoRow label="Phone" value={familyInfo.phone_number} />
-                <InfoRow label="Pickup Window" value={formatDateTime(familyInfo.pickup_window)} />
-                <InfoRow label="People Count" value={familyInfo.person_count ?? 0} isLast />
+                <InfoRow label="Family Name" value={familyInfo.family_name} truncate />
+                <InfoRow label="Contact" value={familyInfo.contact_name} truncate />
+                <InfoRow label="Family Wish" value={familyInfo.family_wish} truncate />
+                <InfoRow label="Bio" value={familyInfo.bio} truncate />
+                <InfoRow label="Address" value={familyInfo.address} truncate />
+                <InfoRow label="Phone" value={familyInfo.phone_number} truncate />
+                <InfoRow label="Pickup Window" value={formatDateTime(familyInfo.pickup_window)} truncate />
+                <InfoRow label="People Count" value={familyInfo.person_count ?? 0} isLast truncate />
               </div>
             )
           )}

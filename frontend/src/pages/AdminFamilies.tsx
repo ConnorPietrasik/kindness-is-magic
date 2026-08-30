@@ -6,7 +6,6 @@
  * Separate "Deleted" tab calls the /deleted endpoint.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -26,6 +25,7 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
+import { useReferrersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { useWishLockActions } from "../hooks/useWishLockActions";
@@ -33,7 +33,6 @@ import {
   adminCreateFamily,
   adminDeleteFamily,
   adminGetFamily,
-  adminGetReferrersDropdown,
   adminListDeletedFamilies,
   adminListFamilies,
   adminRestoreFamily,
@@ -46,7 +45,6 @@ import {
   adminFamiliesDropdown,
   adminPackingSlips,
   adminPeople,
-  adminReferrersDropdown,
   adminWishes,
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
@@ -174,18 +172,7 @@ export default function AdminFamilies() {
   );
 
   // Referrers lookup (for dropdown + display)
-  const { data: referrers, isLoading: referrersLoading } = useQuery({
-    queryKey: adminReferrersDropdown,
-    queryFn: () => adminGetReferrersDropdown(),
-  });
-
-  const referrerMap = useMemo((): Record<number, string> => {
-    const map: Record<number, string> = {};
-    (referrers ?? []).forEach((r) => {
-      map[r.id] = r.name;
-    });
-    return map;
-  }, [referrers]);
+  const { referrerMap, referrersLoading } = useReferrersDropdown();
 
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();

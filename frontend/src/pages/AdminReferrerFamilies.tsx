@@ -209,9 +209,9 @@ function ReferrerCard(props: HierarchicalManageParentRenderProps<ReferrerDetail>
       ) : (
         data && (
           <div className="space-y-0">
-            <InfoRow label="Name" value={data.name} />
-            <InfoRow label="Phone" value={data.phone_number} />
-            <InfoRow label="Family Limit" value={`${data.family_count ?? 0} / ${data.family_limit}`} isLast />
+            <InfoRow label="Name" value={data.name} truncate />
+            <InfoRow label="Phone" value={data.phone_number} truncate />
+            <InfoRow label="Family Limit" value={`${data.family_count ?? 0} / ${data.family_limit}`} isLast truncate />
           </div>
         )
       )}

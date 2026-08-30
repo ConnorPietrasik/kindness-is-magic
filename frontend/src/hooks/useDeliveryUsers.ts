@@ -2,7 +2,8 @@
  * useDeliveryUsers — fetch all delivery-role users and expose them as a lookup map.
  *
  * Used by admin family pages to populate the "Delivery Person" selector.
- * React Query caches the result so concurrent usages share a single request.
+ * Thin wrapper around `useUsersDropdown("delivery")` keeping the established
+ * return shape.
  *
  * @example
  * ```tsx
@@ -11,10 +12,7 @@
  * ```
  */
 
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { adminGetUsersDropdown } from "../lib/api";
-import { adminUsersDropdown } from "../lib/queryKeys";
+import { useUsersDropdown } from "./useDropdowns";
 
 export function useDeliveryUsers(): {
   /** Map of delivery user id → display name (or email as fallback) */
@@ -22,18 +20,6 @@ export function useDeliveryUsers(): {
   /** True while the delivery users list is still loading */
   deliveryUsersLoading: boolean;
 } {
-  const { data, isLoading } = useQuery({
-    queryKey: adminUsersDropdown,
-    queryFn: () => adminGetUsersDropdown("delivery"),
-  });
-
-  const deliveryUserMap = useMemo((): Record<number, string> => {
-    const map: Record<number, string> = {};
-    (data ?? []).forEach((u) => {
-      map[u.id] = u.display_name;
-    });
-    return map;
-  }, [data]);
-
-  return { deliveryUserMap, deliveryUsersLoading: isLoading };
+  const { userMap, usersLoading } = useUsersDropdown("delivery");
+  return { deliveryUserMap: userMap, deliveryUsersLoading: usersLoading };
 }

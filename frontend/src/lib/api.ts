@@ -444,7 +444,7 @@ export function adminListSentEmails(params?: AdminEmailsListParams): Promise<Ema
 // ---------------------------------------------------------------------------
 // Admin — CSV Import
 // ---------------------------------------------------------------------------
-export function adminGetCsvSample(): Promise<string> {
+export function adminGetCsvSample(): Promise<{ csv_template: string }> {
   return apiGet("/api/admin/csv-sample");
 }
 

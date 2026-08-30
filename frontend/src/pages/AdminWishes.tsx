@@ -8,8 +8,8 @@
  * list, detail, update, mark-purchased, and batch-assign.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
@@ -27,18 +27,12 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useDebouncedState } from "../hooks/useDebouncedState";
+import { useFamiliesDropdown, useUsersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
-import {
-  adminBatchAssignWishes,
-  adminGetFamiliesDropdown,
-  adminGetUsersDropdown,
-  adminGetWish,
-  adminListWishes,
-  adminMarkPurchased,
-  adminUpdateWish,
-} from "../lib/api";
-import { adminFamiliesDropdown, adminPackingSlips, adminUsersDropdown, adminWishDetail, adminWishes } from "../lib/queryKeys";
+import { adminBatchAssignWishes, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
+import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type {
@@ -63,7 +57,6 @@ export default function AdminWishes() {
   const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
   const [sortField, setSortField] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
   const [batchAssignOpen, setBatchAssignOpen] = useState(false);
@@ -74,13 +67,7 @@ export default function AdminWishes() {
   const toast = useToast();
 
   // Debounce search so the list doesn't refetch on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      pagination.goToPage(1);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [searchQuery, pagination]);
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
   // Column visibility
   const { visibleColumns, apiColumns } = useColumnVisibility("adminWishes");
@@ -120,17 +107,10 @@ export default function AdminWishes() {
     entityName: "Wish",
   });
 
-  // Fetch families for dropdown
-  const { data: families } = useQuery({
-    queryKey: adminFamiliesDropdown,
-    queryFn: () => adminGetFamiliesDropdown(),
-  });
-
-  // Fetch users for dropdown (assigned-to / batch-assign) — admins + purchasers
-  const { data: users } = useQuery({
-    queryKey: adminUsersDropdown,
-    queryFn: () => adminGetUsersDropdown("admin,purchaser"),
-  });
+  // Dropdown lookups
+  const { families } = useFamiliesDropdown();
+  // Users for assigned-to / batch-assign — admins + purchasers
+  const { users } = useUsersDropdown("admin,purchaser");
 
   // Mark-purchased mutation
   const markPurchasedMut = useMutation({
@@ -247,7 +227,7 @@ export default function AdminWishes() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           >
             <option value="">All families</option>
-            {(families ?? []).map((f) => (
+            {families.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.family_name}
               </option>
@@ -264,7 +244,7 @@ export default function AdminWishes() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           >
             <option value="">All assignees</option>
-            {(users ?? []).map((u) => (
+            {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.display_name}
               </option>
@@ -368,7 +348,7 @@ export default function AdminWishes() {
             </TableHead>
             <TableBody>
               {wishes.map((w) => (
-                <>
+                <React.Fragment key={w.id}>
                   <Tr key={w.id}>
                     <Td>
                       <input
@@ -395,7 +375,7 @@ export default function AdminWishes() {
                     {visibleColumns.includes("family_id") && (
                       <Td>
                         <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                          {getFamilyName(families ?? [], w.family_id)}
+                          {getFamilyName(families, w.family_id)}
                         </Link>
                       </Td>
                     )}
@@ -484,7 +464,7 @@ export default function AdminWishes() {
                           ) : detail ? (
                             <WishEditForm
                               wish={detail}
-                              users={users ?? []}
+                              users={users}
                               onSave={handleUpdateWish}
                               onCancel={cancelForm}
                               loading={updateMut.isPending}
@@ -494,7 +474,7 @@ export default function AdminWishes() {
                       </Td>
                     </Tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
@@ -527,7 +507,7 @@ export default function AdminWishes() {
         <BatchAssignDialog
           open={batchAssignOpen}
           selectedCount={selectedIds.size}
-          users={users ?? []}
+          users={users}
           assignedToId={assignUserId}
           onAssignToChange={setAssignUserId}
           onSubmit={() => {

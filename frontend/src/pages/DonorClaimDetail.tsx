@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeaderBar } from "../components/HeaderBar";
+import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
@@ -471,15 +472,6 @@ function BackToClaims() {
     <Link to={ROUTES.DONOR_CLAIMS} className="text-sm text-white/80 transition-colors hover:text-white">
       ← My Claims
     </Link>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between border-b border-gray-100 px-1 py-2">
-      <span className="text-sm font-medium text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900">{value}</span>
-    </div>
   );
 }
 

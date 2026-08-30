@@ -6,7 +6,7 @@
  * Separate "Deleted" tab calls the /deleted endpoint.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
@@ -28,12 +28,12 @@ import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
+import { useFamiliesDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreatePerson,
   adminDeletePerson,
-  adminGetFamiliesDropdown,
   adminGetPerson,
   adminListDeletedPeople,
   adminListPeople,
@@ -41,7 +41,7 @@ import {
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
-import { adminDeletedPeople, adminFamilies, adminFamiliesDropdown, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
+import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminPeopleListParams, PersonPayload } from "../types";
@@ -187,18 +187,7 @@ export default function AdminPeople() {
   );
 
   // Families lookup (for dropdown + display)
-  const { data: families, isLoading: familiesLoading } = useQuery({
-    queryKey: adminFamiliesDropdown,
-    queryFn: () => adminGetFamiliesDropdown(),
-  });
-
-  const familyMap = useMemo((): Record<number, string> => {
-    const map: Record<number, string> = {};
-    (families ?? []).forEach((f) => {
-      map[f.id] = f.family_name;
-    });
-    return map;
-  }, [families]);
+  const { families, familyMap, familiesLoading } = useFamiliesDropdown();
 
   function handleCreate(formData: PersonPayload) {
     createMut?.mutate(formData);
@@ -244,7 +233,7 @@ export default function AdminPeople() {
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             >
               <option value="">All families</option>
-              {(families ?? []).map((f) => (
+              {families.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.family_name}
                 </option>

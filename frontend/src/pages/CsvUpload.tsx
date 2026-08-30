@@ -106,7 +106,7 @@ export default function CsvUpload() {
     setFetchingTemplate(true);
     adminGetCsvSample()
       .then((data) => {
-        setTemplate((data as unknown as { csv_template: string }).csv_template);
+        setTemplate(data.csv_template);
         setShowTemplate(true);
       })
       .catch(() => {

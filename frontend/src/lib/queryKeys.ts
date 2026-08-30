@@ -94,6 +94,8 @@ export const adminReferrersDropdown = ["adminReferrersDropdown"] as const;
 export const adminFamiliesDropdown = ["adminFamiliesDropdown"] as const;
 /** Users for dropdown selects */
 export const adminUsersDropdown = ["adminUsersDropdown"] as const;
+/** User dropdown, separated by role filter (e.g. "delivery" vs "admin,purchaser") so caches don't collide */
+export const adminUsersDropdownRoles = (roles: string) => [...adminUsersDropdown, roles] as const;
 
 // ---------------------------------------------------------------------------
 // Referrer — Self

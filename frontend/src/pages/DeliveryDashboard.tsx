@@ -44,7 +44,7 @@ export default function DeliveryDashboard() {
         <Card className="mb-6">
           <h2 className="text-lg font-semibold text-gray-900">Welcome, {user?.display_name ?? "Delivery Person"}!</h2>
           <p className="mt-1 text-sm text-gray-500">
-            You are assigned to <strong>{families?.length ?? 0}</strong> family{families?.length !== 1 ? "ies" : ""}.
+            You are assigned to <strong>{families?.length ?? 0}</strong> famil{families?.length !== 1 ? "ies" : "y"}.
           </p>
         </Card>
 

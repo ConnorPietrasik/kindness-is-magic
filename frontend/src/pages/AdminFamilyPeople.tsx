@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useMemo } from "react";
+import React from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
@@ -30,12 +30,12 @@ import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
+import { useReferrersDropdown } from "../hooks/useDropdowns";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreatePerson,
   adminDeletePerson,
   adminGetFamily,
-  adminGetReferrersDropdown,
   adminListDeletedPeople,
   adminListFamilyPeople,
   adminRestorePerson,
@@ -50,7 +50,6 @@ import {
   adminFamilyPeople,
   adminPackingSlips,
   adminReferrerFamilies,
-  adminReferrersDropdown,
   adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -71,18 +70,7 @@ export default function AdminFamilyPeople() {
   const familyKey = adminFamilyDetail(famIdStr);
 
   // Referrers lookup for the family edit form
-  const { data: referrers, isLoading: referrersLoading } = useQuery({
-    queryKey: adminReferrersDropdown,
-    queryFn: () => adminGetReferrersDropdown(),
-  });
-
-  const referrerMap = useMemo((): Record<number, string> => {
-    const map: Record<number, string> = {};
-    (referrers ?? []).forEach((r) => {
-      map[r.id] = r.name;
-    });
-    return map;
-  }, [referrers]);
+  const { referrerMap, referrersLoading } = useReferrersDropdown();
 
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
@@ -283,16 +271,17 @@ function FamilyCard(
       ) : (
         data && (
           <div className="space-y-0">
-            <InfoRow label="Family Name" value={data.family_name} />
-            <InfoRow label="Contact" value={data.contact_name} />
-            <InfoRow label="Family Wish" value={data.family_wish} />
-            <InfoRow label="Bio" value={data.bio} />
-            <InfoRow label="Address" value={data.address} />
-            <InfoRow label="Phone" value={data.phone_number} />
+            <InfoRow label="Family Name" value={data.family_name} truncate />
+            <InfoRow label="Contact" value={data.contact_name} truncate />
+            <InfoRow label="Family Wish" value={data.family_wish} truncate />
+            <InfoRow label="Bio" value={data.bio} truncate />
+            <InfoRow label="Address" value={data.address} truncate />
+            <InfoRow label="Phone" value={data.phone_number} truncate />
             <InfoRow
               label="Delivery Person"
               value={data.delivery_user_name || (data.delivery_user_id != null ? `ID ${data.delivery_user_id}` : null)}
               isLast
+              truncate
             />
           </div>
         )

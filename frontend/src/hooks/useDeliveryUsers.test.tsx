@@ -9,11 +9,14 @@ import { useDeliveryUsers } from "./useDeliveryUsers";
 // Mock the API module
 // ---------------------------------------------------------------------------
 vi.mock("../lib/api", () => ({
+  adminGetFamiliesDropdown: vi.fn(),
+  adminGetReferrersDropdown: vi.fn(),
   adminGetUsersDropdown: vi.fn(),
 }));
 
 vi.mock("../lib/queryKeys", () => ({
   adminUsersDropdown: ["adminUsersDropdown"],
+  adminUsersDropdownRoles: (roles: string) => ["adminUsersDropdown", roles],
 }));
 
 import { adminGetUsersDropdown } from "../lib/api";
@@ -23,10 +26,9 @@ const mockAdminGetUsersDropdown = adminGetUsersDropdown as Mock;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-let queryClient: QueryClient;
-
+// Each test gets a fresh QueryClient — no cross-test cache state to clear.
 function wrap() {
-  queryClient = new QueryClient({
+  const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
@@ -38,7 +40,6 @@ function wrap() {
 describe("useDeliveryUsers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    if (queryClient) queryClient.clear();
   });
 
   it("fetches delivery users on mount", async () => {

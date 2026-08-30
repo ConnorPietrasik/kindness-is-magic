@@ -230,12 +230,12 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
       ) : (
         data && (
           <div className="space-y-0">
-            <InfoRow label="Family Name" value={data.family_name} />
-            <InfoRow label="Contact" value={data.contact_name} />
-            <InfoRow label="Family Wish" value={data.family_wish} />
-            <InfoRow label="Bio" value={data.bio} />
-            <InfoRow label="Address" value={data.address} />
-            <InfoRow label="Phone" value={data.phone_number} isLast />
+            <InfoRow label="Family Name" value={data.family_name} truncate />
+            <InfoRow label="Contact" value={data.contact_name} truncate />
+            <InfoRow label="Family Wish" value={data.family_wish} truncate />
+            <InfoRow label="Bio" value={data.bio} truncate />
+            <InfoRow label="Address" value={data.address} truncate />
+            <InfoRow label="Phone" value={data.phone_number} isLast truncate />
           </div>
         )
       )}
