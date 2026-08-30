@@ -52,6 +52,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
+| `admin_emails.py` | Admin sent-email log (list/filter) |
 | `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
 | `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
 | `donor_routes.py` | Donor / claim-capable self-service (family claims — available to admin, referrer, purchaser, donor) |

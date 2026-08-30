@@ -450,6 +450,43 @@ def restore_person_wishes(db: Session, person_id: int) -> None:
     db.query(Wish).filter(Wish.person_id == person_id).update({Wish.deleted_at: None}, synchronize_session=False)
 
 
+def _family_person_ids(db: Session, family_id: int) -> list[int]:
+    """All person IDs in a family, whether soft-deleted or not."""
+    return [pid for (pid,) in db.query(Person.id).filter(Person.family_id == family_id).all()]
+
+
+def soft_delete_family_cascade(db: Session, family_id: int, now: datetime) -> None:
+    """Soft-delete all of a family's people, their wishes, and the family wish.
+
+    Does **not** commit — caller owns the transaction. The caller sets
+    ``deleted_at`` on the loaded Family object.
+    """
+    person_ids = _family_person_ids(db, family_id)
+    db.query(Person).filter(Person.family_id == family_id).update({Person.deleted_at: now}, synchronize_session=False)
+    if person_ids:
+        db.query(Wish).filter(Wish.person_id.in_(person_ids)).update({Wish.deleted_at: now}, synchronize_session=False)
+    db.query(Wish).filter(Wish.family_id == family_id, Wish.type == WishType.family).update(
+        {Wish.deleted_at: now}, synchronize_session=False
+    )
+
+
+def restore_family_cascade(db: Session, family_id: int) -> None:
+    """Restore a family's soft-deleted people, their wishes, and the family wish.
+
+    Coarse by design (same as the people restore): brings back everything
+    under the family, including rows deleted independently while the family
+    was active. Does **not** commit — caller owns the transaction. The
+    caller clears ``deleted_at`` on the loaded Family object.
+    """
+    person_ids = _family_person_ids(db, family_id)
+    db.query(Person).filter(Person.family_id == family_id).update({Person.deleted_at: None}, synchronize_session=False)
+    if person_ids:
+        db.query(Wish).filter(Wish.person_id.in_(person_ids)).update({Wish.deleted_at: None}, synchronize_session=False)
+    db.query(Wish).filter(Wish.family_id == family_id, Wish.type == WishType.family).update(
+        {Wish.deleted_at: None}, synchronize_session=False
+    )
+
+
 def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, list[Wish]]:
     """Load all active wishes for a batch of person IDs in a single query.
 

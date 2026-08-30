@@ -445,6 +445,24 @@ class TestReferrerDeleteFamily:
         refreshed = db.get(Person, pid)
         assert refreshed.deleted_at is not None
 
+    def test_delete_cascade_soft_deletes_person_wishes(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Deleting a family must soft-delete its people's wishes too."""
+        from app.models import Wish
+
+        family = referrer_with_full_tree["family"]
+        person = referrer_with_full_tree["person"]
+        person_wishes = db.query(Wish).filter(Wish.person_id == person.id, Wish.deleted_at.is_(None)).all()
+        assert len(person_wishes) >= 1
+        wids = [w.id for w in person_wishes]
+        for w in person_wishes:
+            db.expunge(w)
+
+        _tree_referrer_login(test_client)
+        resp = test_client.delete(f"/api/referrer/families/{family.id}")
+        assert resp.status_code == 204
+
+        assert all(db.get(Wish, wid).deleted_at is not None for wid in wids)
+
 
 # =========================================================================
 # Referrer — People within a family

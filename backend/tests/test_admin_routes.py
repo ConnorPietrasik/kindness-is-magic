@@ -513,6 +513,29 @@ class TestAdminUpdateFamily:
         assert resp.json()["deleted_at"] is None
         assert db.get(Wish, fam_wish_id).deleted_at is None
 
+    def test_200_restore_family_cascades_to_person_wishes(self, test_client: TestClient, admin_user, family_with_people, db: Session):
+        """Restore brings the people's soft-deleted wishes back to active."""
+        from app.models import Wish
+
+        family = family_with_people["family"]
+        people = family_with_people["people"]
+        person_wishes = db.query(Wish).filter(Wish.person_id.in_([p.id for p in people]), Wish.deleted_at.is_(None)).all()
+        assert len(person_wishes) >= 1
+        wids = [w.id for w in person_wishes]
+        for w in person_wishes:
+            db.expunge(w)
+
+        _admin_login(test_client)
+        # Delete via the API — soft-deletes the family and all its wishes
+        resp = test_client.delete(f"/api/admin/families/{family.id}")
+        assert resp.status_code == 204
+        assert all(db.get(Wish, wid).deleted_at is not None for wid in wids)
+
+        resp = test_client.post(f"/api/admin/families/{family.id}/restore")
+        assert resp.status_code == 200
+        assert resp.json()["deleted_at"] is None
+        assert all(db.get(Wish, wid).deleted_at is None for wid in wids)
+
     def test_400_restore_family_not_deleted(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/families/{family_record.id}/restore")
@@ -686,6 +709,24 @@ class TestAdminDeleteFamily:
 
         db.expunge(fam_wish)
         assert db.get(Wish, fam_wish_id).deleted_at is not None
+
+    def test_delete_cascade_soft_deletes_person_wishes(self, test_client: TestClient, admin_user, family_with_people, db: Session):
+        """Deleting a family must soft-delete its people's wishes too."""
+        from app.models import Wish
+
+        family = family_with_people["family"]
+        people = family_with_people["people"]
+        person_wishes = db.query(Wish).filter(Wish.person_id.in_([p.id for p in people]), Wish.deleted_at.is_(None)).all()
+        assert len(person_wishes) >= 1
+        wids = [w.id for w in person_wishes]
+        for w in person_wishes:
+            db.expunge(w)
+
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/families/{family.id}")
+        assert resp.status_code == 204
+
+        assert all(db.get(Wish, wid).deleted_at is not None for wid in wids)
 
 
 # =========================================================================

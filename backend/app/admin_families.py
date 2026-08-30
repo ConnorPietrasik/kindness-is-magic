@@ -18,9 +18,7 @@ from app.models import (
     Referrer,
     User,
     UserRole,
-    Wish,
     WishLockLevel,
-    WishType,
 )
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
@@ -43,6 +41,8 @@ from app.response_builders import (
     get_or_404,
     load_family_list_context,
     partial_update,
+    restore_family_cascade,
+    soft_delete_family_cascade,
 )
 from app.schemas import (
     AdminFamilyUpdate,
@@ -424,10 +424,9 @@ def restore_family(
     fam = get_or_404(db, Family, fam_id, "Family not found")
     if fam.deleted_at is None:
         raise HTTPException(status_code=400, detail="Family is not deleted")
-    # Restore the family, all its soft-deleted people, and its family wish
+    # Restore the family, all its soft-deleted people, and all its wishes
     fam.deleted_at = None
-    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: None}, synchronize_session=False)
-    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: None}, synchronize_session=False)
+    restore_family_cascade(db, fam_id)
     db.commit()
     db.refresh(fam)
     logger.info("Admin %s restored family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
@@ -441,11 +440,9 @@ def delete_family(
     _admin: User = Depends(require_admin),
 ) -> Response:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    # Soft-delete all persons in the family first to avoid orphans.
+    # Soft-delete the family's people and all its wishes to avoid orphans.
     now = datetime.now(timezone.utc)
-    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
-    # Soft-delete the family wish (person wishes are left alone — pre-existing quirk)
-    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: now}, synchronize_session=False)
+    soft_delete_family_cascade(db, fam_id, now)
     fam.deleted_at = now
     db.commit()
     logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)

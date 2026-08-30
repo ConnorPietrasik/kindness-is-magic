@@ -22,9 +22,7 @@ from app.models import (
     ReferrerApprovalStatus,
     SentEmail,
     User,
-    Wish,
     WishLockLevel,
-    WishType,
 )
 from app.permissions import FamilyOwner, require_family_owner, require_referrer
 from app.response_builders import (
@@ -43,6 +41,7 @@ from app.response_builders import (
     get_or_404,
     load_family_list_context,
     partial_update,
+    soft_delete_family_cascade,
 )
 from app.schemas import (
     _CLEAR,
@@ -222,11 +221,9 @@ def delete_family(
 ) -> Response:
     _check_referrer_edit_lock(owner.family)
     fam = owner.family
-    # Soft-delete all persons in the family first to avoid orphans.
+    # Soft-delete the family's people and all its wishes to avoid orphans.
     now = datetime.now(timezone.utc)
-    db.query(Person).filter(Person.family_id == fam_id).update({Person.deleted_at: now}, synchronize_session=False)
-    # Soft-delete the family wish (person wishes are left alone — pre-existing quirk)
-    db.query(Wish).filter(Wish.family_id == fam_id, Wish.type == WishType.family).update({Wish.deleted_at: now}, synchronize_session=False)
+    soft_delete_family_cascade(db, fam_id, now)
     fam.deleted_at = now
     db.commit()
     logger.info("Referrer %s soft-deleted family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
