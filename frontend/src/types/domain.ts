@@ -245,6 +245,8 @@ export const WISH_TYPE = {
 /** Mirrors WishSummary — compact wish embedded in person responses. */
 export interface WishSummary {
   id: number;
+  /** Presentational id: owner display_id + type suffix (e.g. "1-1-1A", "1-1-F"); null on public/donor views. */
+  display_id: string | null;
   type: WishType;
   description: string;
   size: string | null;
@@ -260,6 +262,8 @@ export interface WishSummary {
 /** Mirrors WishListSummary — wish with person/family/assignee context for admin list. */
 export interface WishListSummary {
   id: number;
+  /** Presentational id (flat form, e.g. "1-1-1A", "1-1-F"); null when column filtering omits it. */
+  display_id: string | null;
   type: WishType;
   description: string;
   size: string | null;
@@ -600,6 +604,8 @@ export interface DeliveryFamilySummary {
 /** Mirrors PurchaserWishSummary — wish with person/family context for purchaser views. */
 export interface PurchaserWishSummary {
   id: number;
+  /** Presentational id (flat form, e.g. "3-2-1A", "2-3-F"); null when not enumerated. */
+  display_id: string | null;
   type: WishType;
   description: string;
   size: string | null;

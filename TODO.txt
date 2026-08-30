@@ -1,4 +1,3 @@
-Add wish display_id: format is 1-1-1A/B/F where A/B are for practical / fun, adult gifts are just the person display_id, and F is for family wishes.
 Packing slip: move family wish down to be more clear make all the wish info black (for all wishes) so it’s easier to read
 Packing slips: more per print page, ideally with page breaks
 Change claim to sponsor wording for all public stuff (so they sponsor a family instead of claiming it)

@@ -146,6 +146,7 @@ export default function PurchaserAssignedGifts() {
         ) : (
           <Table>
             <TableHead>
+              <Th>ID</Th>
               <Th>Person</Th>
               <Th>Family</Th>
               <Th>Type</Th>
@@ -159,6 +160,7 @@ export default function PurchaserAssignedGifts() {
               {wishes.map((w) => (
                 <React.Fragment key={w.id}>
                   <Tr>
+                    <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
                     <Td>{w.person_given_name ?? "Family"}</Td>
                     <Td>
                       {w.wish_lock_level === "admin" ? (
@@ -208,7 +210,7 @@ export default function PurchaserAssignedGifts() {
                   </Tr>
                   {editingId === w.id && (
                     <Tr key={`${w.id}-edit`}>
-                      <Td colSpan={8} className="!py-3">
+                      <Td colSpan={9} className="!py-3">
                         <div className="rounded-xl bg-gray-50 p-4">
                           {detailLoading ? (
                             <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

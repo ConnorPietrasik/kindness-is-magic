@@ -767,6 +767,7 @@ class WishSummary(BaseModel):
     """Compact wish representation embedded in person responses."""
 
     id: int
+    display_id: str | None = None
     type: WishType
     description: str
     size: str | None = None
@@ -896,6 +897,7 @@ class WishListSummary(BaseModel):
     """Flat wish summary for the admin list view."""
 
     id: int
+    display_id: str | None = None
     type: WishType
     description: str
     size: str | None = None
@@ -933,6 +935,7 @@ class PurchaserWishSummary(BaseModel):
     """
 
     id: int
+    display_id: str | None = None
     type: WishType
     description: str
     size: str | None = None

@@ -20,6 +20,7 @@ from app.response_builders import (
     get_active_or_404,
     get_or_404,
     partial_update,
+    wish_display_id,
 )
 from app.schemas import (
     _CLEAR,
@@ -49,7 +50,7 @@ def _wish_family(wish: Wish) -> Family | None:
     return wish.family
 
 
-def _build_purchaser_wish_item(wish: Wish, person: Person | None, family_display_id: str) -> dict:
+def _build_purchaser_wish_item(wish: Wish, person: Person | None, family_display_id: str, display_id: str, db: Session) -> dict:
     """Build a dict suitable for PurchaserWishSummary.
 
     Reuses ``build_wish_detail`` for the shared wish+person fields,
@@ -57,10 +58,11 @@ def _build_purchaser_wish_item(wish: Wish, person: Person | None, family_display
     *person* is ``None`` for family wishes.
     Includes ``wish_lock_level`` so the frontend can gate the
     public wishlist link on admin lock (family is already loaded
-    via joinedload — no extra query), and ``family_display_id``
-    (pre-computed by the caller) for presentational display.
+    via joinedload — no extra query), ``family_display_id`` and
+    ``display_id`` (both pre-computed by the caller from batched
+    position maps) for presentational display.
     """
-    data = build_wish_detail(wish, person)
+    data = build_wish_detail(wish, person, db, display_id=display_id)
     family = _wish_family(wish)
     data["family_id"] = family.id if family is not None else wish.family_id
     data["family_display_id"] = family_display_id
@@ -108,9 +110,24 @@ def list_wishes(
     page_families = list({_wish_family(w).id: _wish_family(w) for w in wishes if _wish_family(w)}.values())
     display_id_map = compute_display_ids(db, "family", page_families, scope=None)
 
+    # Flat person display ids for person wishes (family wishes use the
+    # family map above).
+    page_persons = [w.person for w in wishes if w.person is not None]
+    person_display_map = compute_display_ids(db, "person", page_persons, scope=None) if page_persons else {}
+
+    def _wish_display_id(w: Wish) -> str:
+        if w.person_id is not None:
+            owner_display_id = person_display_map.get(w.person.id, "0") if w.person is not None else "0"
+        else:
+            fam = _wish_family(w)
+            owner_display_id = display_id_map.get(fam.id, "0") if fam is not None else "0"
+        return wish_display_id(owner_display_id, w.type)
+
     items = [
         PurchaserWishSummary(
-            **_build_purchaser_wish_item(w, w.person, display_id_map.get(_wish_family(w).id if _wish_family(w) else 0, "0"))
+            **_build_purchaser_wish_item(
+                w, w.person, display_id_map.get(_wish_family(w).id if _wish_family(w) else 0, "0"), _wish_display_id(w), db
+            )
         )
         for w in wishes
     ]
@@ -142,7 +159,7 @@ def get_wish(
         )
 
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))
 
 
 @purchaser_router.post("/wishes/{wish_id}/mark-purchased")
@@ -181,7 +198,7 @@ def mark_purchased(
     db.refresh(wish)
 
     logger.info("Purchaser %s marked wish (id=%d) as purchased", current_user.email, wish_id)
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))
 
 
 @purchaser_router.patch("/wishes/{wish_id}")
@@ -213,4 +230,4 @@ def update_wish(
     db.refresh(wish)
 
     logger.info("Purchaser %s updated wish (id=%d)", current_user.email, wish_id)
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))

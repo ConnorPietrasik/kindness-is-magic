@@ -13,7 +13,7 @@ const mockFamily: PackingSlipItem = {
   family_wish: "A weekend trip",
   people: [
     {
-      display_id: "2-1-1",
+      display_id: "1",
       given_name: "Alice",
       role: "daughter",
       note: null,
@@ -21,6 +21,7 @@ const mockFamily: PackingSlipItem = {
       wishes: [
         {
           id: 1,
+          display_id: "1A",
           type: "practical",
           description: "Coat",
           size: "S",
@@ -34,6 +35,7 @@ const mockFamily: PackingSlipItem = {
         },
         {
           id: 2,
+          display_id: "1B",
           type: "fun",
           description: "LEGO",
           size: null,
@@ -47,6 +49,7 @@ const mockFamily: PackingSlipItem = {
         },
         {
           id: 3,
+          display_id: "1B",
           type: "fun",
           description: "Deleted toy",
           size: null,
@@ -61,7 +64,7 @@ const mockFamily: PackingSlipItem = {
       ],
     },
     {
-      display_id: "2-1-2",
+      display_id: "2",
       given_name: "Bob",
       role: "son",
       note: null,
@@ -69,6 +72,7 @@ const mockFamily: PackingSlipItem = {
       wishes: [
         {
           id: 4,
+          display_id: "2X",
           type: "adult",
           description: "Jacket",
           size: null,
@@ -91,7 +95,7 @@ const mockFamilyNoFun: PackingSlipItem = {
   family_wish: "Groceries",
   people: [
     {
-      display_id: "2-2-1",
+      display_id: "1",
       given_name: "Carol",
       role: "mother",
       note: null,
@@ -99,6 +103,7 @@ const mockFamilyNoFun: PackingSlipItem = {
       wishes: [
         {
           id: 5,
+          display_id: "1A",
           type: "practical",
           description: "Rice",
           size: null,
@@ -159,6 +164,10 @@ describe("PackingSlipsView", () => {
     // Practical wish renders with size/color in parentheses
     expect(screen.getByText("Coat (S, Blue)")).toBeInTheDocument();
     expect(screen.getByText("Jacket")).toBeInTheDocument();
+    // Each wish carries its scoped display_id (person position + type letter)
+    expect(screen.getByText("1A")).toBeInTheDocument();
+    expect(screen.getByText("1B")).toBeInTheDocument();
+    expect(screen.getByText("2X")).toBeInTheDocument();
   });
 
   it("only shows the Fun column when at least one active fun wish exists", () => {

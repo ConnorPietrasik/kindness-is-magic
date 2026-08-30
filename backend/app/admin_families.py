@@ -30,6 +30,7 @@ from app.response_builders import (
     build_family_list_item,
     build_family_review_summary,
     build_sort_clause,
+    build_wish_summary,
     column_filtered_page,
     ColumnRequest,
     compute_display_ids,
@@ -54,7 +55,6 @@ from app.schemas import (
     FamilyReviewRequest,
     PackingSlipItem,
     PackingSlipPersonItem,
-    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -338,7 +338,7 @@ def get_packing_slips(
                         role=p.role,
                         age=p.age,
                         note=p.note,
-                        wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                        wishes=[build_wish_summary(w, person_display_map.get(p.id, "0")) for w in wishes_by_person.get(p.id, [])],
                     )
                     for p in fam_people
                 ],

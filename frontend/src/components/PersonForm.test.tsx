@@ -18,6 +18,7 @@ const mockChildPerson: PersonDetail = {
   wishes: [
     {
       id: 1,
+      display_id: "1A",
       type: "practical",
       description: "A backpack",
       size: "M",
@@ -31,6 +32,7 @@ const mockChildPerson: PersonDetail = {
     },
     {
       id: 2,
+      display_id: "1B",
       type: "fun",
       description: "A doll",
       size: null,
@@ -58,6 +60,7 @@ const mockAdultPerson: PersonDetail = {
   wishes: [
     {
       id: 3,
+      display_id: "2X",
       type: "adult",
       description: "A coffee maker",
       size: null,

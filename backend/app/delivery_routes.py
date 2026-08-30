@@ -15,13 +15,13 @@ from app.permissions import require_delivery
 from app.response_builders import (
     batch_load_family_wishes,
     batch_load_person_wishes,
+    build_wish_summary,
     compute_display_ids,
     compute_position_maps,
 )
 from app.schemas import (
     PackingSlipItem,
     PackingSlipPersonItem,
-    WishSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def get_packing_slips(
                         role=p.role,
                         age=p.age,
                         note=p.note,
-                        wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                        wishes=[build_wish_summary(w, person_display_map.get(p.id, "0")) for w in wishes_by_person.get(p.id, [])],
                     )
                     for p in fam_people
                 ],

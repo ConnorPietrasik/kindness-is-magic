@@ -10,7 +10,7 @@
  */
 
 import { formatApiError } from "../lib/utils";
-import type { PackingSlipItem } from "../types";
+import type { PackingSlipItem, WishSummary } from "../types";
 import { wishText } from "./WishCell";
 
 /* ------------------------------------------------------------------ */
@@ -179,8 +179,18 @@ function PersonRow({ person, hasFunCol }: PersonRowProps) {
       <td className="packing-slip-td packing-slip-td-narrow whitespace-nowrap font-mono text-sm font-bold">{person.display_id}</td>
       <td className="packing-slip-td font-medium">{person.given_name}</td>
       <td className="packing-slip-td packing-slip-td-narrow whitespace-nowrap text-sm">{person.age}</td>
-      <td className="packing-slip-td">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</td>
-      {hasFunCol && <td className="packing-slip-td">{fun ? wishText(fun) : "—"}</td>}
+      <td className="packing-slip-td">{practicalOrAdult ? <WishWithId wish={practicalOrAdult} /> : "—"}</td>
+      {hasFunCol && <td className="packing-slip-td">{fun ? <WishWithId wish={fun} /> : "—"}</td>}
     </tr>
+  );
+}
+
+/** Renders a wish with its compact mono display_id prefix (e.g. "1A Coat (S, Blue)"). */
+function WishWithId({ wish }: { wish: WishSummary }) {
+  return (
+    <span>
+      {wish.display_id != null && <span className="mr-1 font-mono text-xs">{wish.display_id}</span>}
+      {wishText(wish)}
+    </span>
   );
 }

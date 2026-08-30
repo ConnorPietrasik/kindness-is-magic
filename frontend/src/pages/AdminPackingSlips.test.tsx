@@ -17,7 +17,7 @@ const mockFamily: PackingSlipItem = {
   family_wish: "A magical holiday season",
   people: [
     {
-      display_id: "1-1",
+      display_id: "1",
       given_name: "Alex",
       role: "son",
       age: 8,
@@ -25,6 +25,7 @@ const mockFamily: PackingSlipItem = {
       wishes: [
         {
           id: 1,
+          display_id: "1A",
           type: "practical",
           description: "Winter jacket",
           size: "8-10",
@@ -38,6 +39,7 @@ const mockFamily: PackingSlipItem = {
         },
         {
           id: 2,
+          display_id: "1B",
           type: "fun",
           description: "LEGO set",
           size: null,
@@ -52,7 +54,7 @@ const mockFamily: PackingSlipItem = {
       ],
     },
     {
-      display_id: "1-2",
+      display_id: "2",
       given_name: "Sam",
       role: "mother",
       age: 42,
@@ -60,6 +62,7 @@ const mockFamily: PackingSlipItem = {
       wishes: [
         {
           id: 3,
+          display_id: "2X",
           type: "adult",
           description: "Coffee gift card",
           size: null,
@@ -229,7 +232,7 @@ describe("AdminPackingSlips", () => {
       family_wish: "Keep it simple",
       people: [
         {
-          display_id: "5-1",
+          display_id: "1",
           given_name: "Jordan",
           role: "father",
           age: 30,
@@ -237,6 +240,7 @@ describe("AdminPackingSlips", () => {
           wishes: [
             {
               id: 10,
+              display_id: "1X",
               type: "adult",
               description: "Socks",
               size: "L",

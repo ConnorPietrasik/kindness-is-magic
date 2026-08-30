@@ -13,6 +13,7 @@ Covers:
 
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -1157,3 +1158,309 @@ class TestComputePositionMapsBatching:
         for i, f in enumerate(fams):
             positions = sorted(per_pos_batch[p.id] for p in all_people if p.family_id == f.id)
             assert positions == list(range(1, i + 2))
+
+
+# =========================================================================
+# Wish display_id
+# =========================================================================
+
+
+@pytest.fixture()
+def wish_display_tree(db: Session):
+    """One referrer + one verified, admin-locked family with a child
+    (practical + fun wishes), an adult (adult wish), and the family wish.
+
+    Flat display ids: family ``{ref}-1``, child ``{ref}-1-1``,
+    adult ``{ref}-1-2``.  Scoped positions: child ``1``, adult ``2``.
+    """
+    from app.models import (
+        FamilyVerificationStatus,
+        Person,
+        PersonRole,
+        Referrer,
+        ReferrerApprovalStatus,
+        Wish,
+        WishLockLevel,
+        WishType,
+    )
+
+    ref = Referrer(
+        name="Wish Display Referrer",
+        family_limit=10,
+        phone_number="555-000-0001",
+        family_invite_code="KFI-WISH01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+
+    fam = make_family(
+        db,
+        referrer_id=ref.id,
+        family_name="Wish Display Family",
+        family_wish="A new sofa",
+        contact_name="Wish Contact",
+        phone_number="555-000-0002",
+        verification_status=FamilyVerificationStatus.verified,
+        wish_lock_level=WishLockLevel.admin,
+    )
+    db.add(fam)
+    db.commit()
+    db.refresh(fam)
+
+    child = Person(family_id=fam.id, given_name="WishChild", age=8, role=PersonRole.son)
+    db.add(child)
+    db.flush()
+    child_a = Wish(person_id=child.id, type=WishType.practical, description="A backpack")
+    child_b = Wish(person_id=child.id, type=WishType.fun, description="A doll")
+    db.add_all([child_a, child_b])
+
+    adult = Person(family_id=fam.id, given_name="WishAdult", age=25, role=PersonRole.mother)
+    db.add(adult)
+    db.flush()
+    adult_x = Wish(person_id=adult.id, type=WishType.adult, description="Groceries")
+    db.add(adult_x)
+
+    db.commit()
+    for obj in (child, adult, child_a, child_b, adult_x):
+        db.refresh(obj)
+
+    family_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family).first()
+
+    return {
+        "referrer": ref,
+        "family": fam,
+        "child": child,
+        "adult": adult,
+        "child_a": child_a,
+        "child_b": child_b,
+        "adult_x": adult_x,
+        "family_wish": family_wish,
+    }
+
+
+def _wishes_by_type(wishes: list[dict]) -> dict[str, dict]:
+    return {w["type"]: w for w in wishes}
+
+
+class TestAdminWishListDisplayId:
+    """Flat admin wish list: exact flat wish display ids."""
+
+    def test_flat_wish_display_ids(self, test_client: TestClient, admin_user, wish_display_tree):
+        """Person wishes get {ref}-{fam}-{per}{A/B/X}; the family wish gets {ref}-{fam}-F."""
+        _admin_login(test_client)
+        tree = wish_display_tree
+        resp = test_client.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["wishes"]) == 4
+        by_id = {w["id"]: w for w in body["wishes"]}
+        assert by_id[tree["child_a"].id]["display_id"] == f"{tree['referrer'].id}-1-1A"
+        assert by_id[tree["child_b"].id]["display_id"] == f"{tree['referrer'].id}-1-1B"
+        assert by_id[tree["adult_x"].id]["display_id"] == f"{tree['referrer'].id}-1-2X"
+        assert by_id[tree["family_wish"].id]["display_id"] == f"{tree['referrer'].id}-1-F"
+
+    def test_columns_filter_accepts_display_id(self, test_client: TestClient, admin_user, wish_display_tree):
+        """display_id is a valid column name for the admin wish list."""
+        _admin_login(test_client)
+        tree = wish_display_tree
+        resp = test_client.get("/api/admin/wishes?columns=id,display_id")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["wishes"]) == 4
+        ids = {w["display_id"] for w in body["wishes"]}
+        assert f"{tree['referrer'].id}-1-F" in ids
+        assert all("id" in w and "display_id" in w for w in body["wishes"])
+
+
+class TestPurchaserWishDisplayId:
+    """Purchaser wish list + detail: exact flat wish display ids."""
+
+    @pytest.fixture()
+    def tree_with_purchaser(self, db: Session, wish_display_tree):
+        """Assign 3 of the tree's wishes to a purchaser user."""
+        from app.auth import get_password_hash
+        from app.models import User, UserRole
+
+        purchaser = User(
+            email="wish_purchaser@test.com",
+            hashed_password=get_password_hash("WishPur1234!"),
+            role=UserRole.purchaser,
+            display_name=None,
+        )
+        db.add(purchaser)
+        db.commit()
+        db.refresh(purchaser)
+        for w in (wish_display_tree["child_a"], wish_display_tree["adult_x"], wish_display_tree["family_wish"]):
+            w.assigned_to_id = purchaser.id
+        db.commit()
+        return {**wish_display_tree, "purchaser": purchaser}
+
+    def test_list_flat_ids(self, test_client: TestClient, tree_with_purchaser):
+        login_as(test_client, "wish_purchaser@test.com", "WishPur1234!")
+        tree = tree_with_purchaser
+        resp = test_client.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        body = resp.json()
+        # Only the assigned wishes appear
+        assert len(body["wishes"]) == 3
+        by_id = {w["id"]: w for w in body["wishes"]}
+        assert by_id[tree["child_a"].id]["display_id"] == f"{tree['referrer'].id}-1-1A"
+        assert by_id[tree["adult_x"].id]["display_id"] == f"{tree['referrer'].id}-1-2X"
+        assert by_id[tree["family_wish"].id]["display_id"] == f"{tree['referrer'].id}-1-F"
+
+    def test_detail_flat_ids(self, test_client: TestClient, tree_with_purchaser):
+        login_as(test_client, "wish_purchaser@test.com", "WishPur1234!")
+        tree = tree_with_purchaser
+        # Person wish
+        resp = test_client.get(f"/api/purchaser/wishes/{tree['child_a'].id}")
+        assert resp.status_code == 200
+        assert resp.json()["display_id"] == f"{tree['referrer'].id}-1-1A"
+        # Family wish (owner is the family, not a person)
+        resp = test_client.get(f"/api/purchaser/wishes/{tree['family_wish'].id}")
+        assert resp.status_code == 200
+        assert resp.json()["display_id"] == f"{tree['referrer'].id}-1-F"
+
+
+class TestPersonNestedWishDisplayId:
+    """Person detail/list responses: nested wishes use {pos}{A/B/X}."""
+
+    @pytest.fixture()
+    def family_user(self, db: Session, wish_display_tree):
+        from app.auth import get_password_hash
+        from app.models import User, UserRole
+
+        user = User(
+            email="wish_family@test.com",
+            hashed_password=get_password_hash("WishFam1234!"),
+            role=UserRole.family,
+            family_id=wish_display_tree["family"].id,
+            display_name=None,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    def test_family_people_list_scoped(self, test_client: TestClient, wish_display_tree, family_user):
+        """Family self-service people list: nested wishes {pos}A/B/X."""
+        login_as(test_client, "wish_family@test.com", "WishFam1234!")
+        resp = test_client.get("/api/family/people")
+        assert resp.status_code == 200
+        body = resp.json()
+        by_name = {p["given_name"]: p for p in body["people"]}
+        child, adult = by_name["WishChild"], by_name["WishAdult"]
+        assert child["display_id"] == "1"
+        assert adult["display_id"] == "2"
+        assert _wishes_by_type(child["wishes"])["practical"]["display_id"] == "1A"
+        assert _wishes_by_type(child["wishes"])["fun"]["display_id"] == "1B"
+        assert _wishes_by_type(adult["wishes"])["adult"]["display_id"] == "2X"
+
+    def test_admin_person_detail_scoped(self, test_client: TestClient, admin_user, wish_display_tree):
+        """Admin person detail: nested wishes {pos}A/B/X (family-scoped person id)."""
+        _admin_login(test_client)
+        tree = wish_display_tree
+        resp = test_client.get(f"/api/admin/people/{tree['child'].id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["display_id"] == "1"
+        assert _wishes_by_type(body["wishes"])["practical"]["display_id"] == "1A"
+        assert _wishes_by_type(body["wishes"])["fun"]["display_id"] == "1B"
+
+    def test_admin_person_wish_list_scoped(self, test_client: TestClient, admin_user, wish_display_tree):
+        """Admin person wish list endpoint: same {pos}A/B/X ids as the person detail."""
+        _admin_login(test_client)
+        tree = wish_display_tree
+        resp = test_client.get(f"/api/admin/people/{tree['child'].id}/wishes")
+        assert resp.status_code == 200
+        wishes = _wishes_by_type(resp.json())
+        assert wishes["practical"]["display_id"] == "1A"
+        assert wishes["fun"]["display_id"] == "1B"
+
+
+class TestPackingSlipWishDisplayId:
+    """Packing slips (admin + delivery): person wishes {pos}A/B/X, flat family header."""
+
+    def test_admin_packing_slip(self, test_client: TestClient, admin_user, wish_display_tree):
+        _admin_login(test_client)
+        tree = wish_display_tree
+        resp = test_client.get("/api/admin/families/packing-slips")
+        assert resp.status_code == 200
+        slips = [s for s in resp.json() if s["id"] == tree["family"].id]
+        assert len(slips) == 1
+        slip = slips[0]
+        assert slip["display_id"] == f"{tree['referrer'].id}-1"
+        by_name = {p["given_name"]: p for p in slip["people"]}
+        assert _wishes_by_type(by_name["WishChild"]["wishes"])["practical"]["display_id"] == "1A"
+        assert _wishes_by_type(by_name["WishChild"]["wishes"])["fun"]["display_id"] == "1B"
+        assert _wishes_by_type(by_name["WishAdult"]["wishes"])["adult"]["display_id"] == "2X"
+
+    def test_delivery_packing_slip(self, test_client: TestClient, db: Session, wish_display_tree):
+        from app.auth import get_password_hash
+        from app.models import User, UserRole
+
+        delivery = User(
+            email="wish_delivery@test.com",
+            hashed_password=get_password_hash("WishDel1234!"),
+            role=UserRole.delivery,
+            display_name=None,
+        )
+        db.add(delivery)
+        db.commit()
+        db.refresh(delivery)
+        wish_display_tree["family"].delivery_user_id = delivery.id
+        db.commit()
+
+        login_as(test_client, "wish_delivery@test.com", "WishDel1234!")
+        resp = test_client.get("/api/delivery/packing-slips")
+        assert resp.status_code == 200
+        slips = [s for s in resp.json() if s["id"] == wish_display_tree["family"].id]
+        assert len(slips) == 1
+        slip = slips[0]
+        assert slip["display_id"] == f"{wish_display_tree['referrer'].id}-1"
+        by_name = {p["given_name"]: p for p in slip["people"]}
+        assert _wishes_by_type(by_name["WishChild"]["wishes"])["practical"]["display_id"] == "1A"
+        assert _wishes_by_type(by_name["WishChild"]["wishes"])["fun"]["display_id"] == "1B"
+        assert _wishes_by_type(by_name["WishAdult"]["wishes"])["adult"]["display_id"] == "2X"
+
+
+class TestWishDisplayIdNonStaffBoundary:
+    """Public family wish list + donor claim detail keep display_id null.
+
+    These two non-staff endpoints are out of scope for wish display ids —
+    this guards the boundary.
+    """
+
+    def test_public_wish_list_display_id_null(self, test_client: TestClient, wish_display_tree):
+        tree = wish_display_tree
+        resp = test_client.get(f"/api/families/{tree['family'].id}/wish-list")
+        assert resp.status_code == 200
+        body = resp.json()
+        # The family heading keeps its flat display id
+        assert body["display_id"] == f"{tree['referrer'].id}-1"
+        assert any(p["given_name"] == "WishChild" for p in body["people"])
+        for person in body["people"]:
+            for w in person["wishes"]:
+                assert w["display_id"] is None
+
+    def test_donor_claim_detail_display_id_null(self, test_client: TestClient, wish_display_tree):
+        tree = wish_display_tree
+        # Register a donor (auto-login) and claim the family
+        resp = test_client.post(
+            "/api/auth/register-donor",
+            json={"display_name": "Wish Donor", "email": "wish_donor@test.com", "password": "DonorPass1!"},
+        )
+        assert resp.status_code == 201
+        resp = test_client.post(f"/api/families/{tree['family'].id}/claim", json={"commitment_type": "gifts"})
+        assert resp.status_code == 201
+        claim_id = resp.json()["id"]
+
+        resp = test_client.get(f"/api/donor/claims/{claim_id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["family_wish"] is not None
+        assert body["family_wish"]["display_id"] is None
+        for person in body["people"]:
+            for w in person["wishes"]:
+                assert w["display_id"] is None

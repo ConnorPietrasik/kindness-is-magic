@@ -14,6 +14,7 @@ import AdminWishes from "./AdminWishes";
 
 const mockWish1: WishListSummary = {
   id: 1,
+  display_id: "2-1-1A",
   type: "practical",
   description: "Winter jacket",
   size: "M",
@@ -31,6 +32,7 @@ const mockWish1: WishListSummary = {
 
 const mockWish2: WishListSummary = {
   id: 2,
+  display_id: "2-1-2B",
   type: "fun",
   description: "LEGO set",
   size: null,
@@ -48,6 +50,7 @@ const mockWish2: WishListSummary = {
 
 const mockFamilyWish: WishListSummary = {
   id: 3,
+  display_id: "2-1-F",
   type: "family",
   description: "A weekend at the beach",
   size: null,
@@ -73,6 +76,7 @@ const mockWishListResponse: WishListResponse = {
 
 const mockWishDetail: WishDetail = {
   id: 1,
+  display_id: "2-1-1A",
   type: "practical",
   description: "Winter jacket",
   size: "M",
@@ -144,6 +148,11 @@ describe("AdminWishes", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("Winter jacket")).toBeInTheDocument();
     expect(screen.getByText("LEGO set")).toBeInTheDocument();
+
+    // ID column (visible by default) shows each wish's display_id
+    expect(screen.getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    expect(screen.getByText("2-1-1A")).toBeInTheDocument();
+    expect(screen.getByText("2-1-2B")).toBeInTheDocument();
   });
 
   it("renders Family for family wish rows (null person) and offers the Family filter option", async () => {
@@ -170,6 +179,9 @@ describe("AdminWishes", () => {
 
     // Type badge shows the family type
     expect(screen.getByText("family")).toBeInTheDocument();
+
+    // Family wish row shows its display_id
+    expect(screen.getByText("2-1-F")).toBeInTheDocument();
 
     // Type filter offers a Family option
     expect(screen.getByRole("option", { name: "Family" })).toBeInTheDocument();

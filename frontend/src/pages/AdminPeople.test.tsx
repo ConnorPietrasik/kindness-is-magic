@@ -15,6 +15,7 @@ import AdminPeople from "./AdminPeople";
 function makeWish(overrides: Partial<WishSummary>): WishSummary {
   return {
     id: 0,
+    display_id: null,
     type: "practical",
     description: "A wish",
     size: null,

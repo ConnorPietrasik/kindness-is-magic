@@ -28,6 +28,8 @@ test.describe("Admin Wish Management — read-only", () => {
     // Page 1 is family wishes (one per family, created before person wishes) —
     // a seeded family name should appear
     await expect(page.getByRole("table")).toContainText("The Williams Family", { timeout: 10_000 });
+    // The ID column (wish display_id) is visible by default
+    await expect(page.getByRole("columnheader", { name: "ID", exact: true })).toBeVisible();
 
     await context.close();
   });
@@ -104,6 +106,10 @@ const mutationData: {
   purchaserUserId?: number;
 } = {};
 
+// Description of the fun wish created in beforeAll — never modified by any
+// test, so it is a stable anchor for locating the wish row.
+const FUN_WISH_DESC = "Original fun wish";
+
 test.describe.serial("Admin Wish Management — mutations", () => {
   test.beforeAll(async ({ request: req }) => {
     const api = await loginViaApi(req);
@@ -145,6 +151,39 @@ test.describe.serial("Admin Wish Management — mutations", () => {
       await deleteReferrerViaApi(authed, mutationData.referrerId);
     }
     await authed.dispose();
+  });
+
+  test("ID column shows the created wish's display_id", async ({ browser }) => {
+    if (!mutationData.familyId || !mutationData.referrerId) test.skip();
+
+    // Expected display_id is derived from the scenario's structure, not from
+    // the API: the isolated referrer has exactly one (verified) family, and
+    // that family has exactly one person — positions are 1/1, so the fun
+    // wish's flat display id is `{referrerId}-1-1B` (fun → "B"). The UI is
+    // the only thing under test.
+    const expectedDisplayId = `${mutationData.referrerId}-1-1B`;
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/wishes");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    // Filter to our isolated family (family names carry the unique suffix)
+    const familySelect = page.locator("select").filter({ hasText: /All families/ });
+    const allOptions = await familySelect.locator("option").allTextContents();
+    const ourFamilyLabel = allOptions.find((label) => label.includes(MUTATION_SUFFIX));
+    if (!ourFamilyLabel) {
+      await context.close();
+      throw new Error("isolated family not found in the family filter");
+    }
+    await familySelect.selectOption({ label: ourFamilyLabel });
+
+    // The fun wish row's ID cell (2nd cell; 1st is the row checkbox) shows the expected display_id
+    const funRow = page.getByRole("row").filter({ hasText: FUN_WISH_DESC });
+    await expect(funRow.getByRole("cell").nth(1)).toHaveText(expectedDisplayId, { timeout: 10_000 });
+
+    await context.close();
   });
 
   test("edit wish description and save", async ({ browser }) => {

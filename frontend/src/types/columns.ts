@@ -53,6 +53,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "family_id", label: "Family ID", visible: false },
   ],
   adminWishes: [
+    { key: "display_id", label: "ID", visible: true },
     { key: "person_given_name", label: "Person", visible: true },
     { key: "family_id", label: "Family", visible: true },
     { key: "type", label: "Type", visible: true },

@@ -6,6 +6,7 @@ import { WishCellAdult, WishCellType, wishText } from "./WishCell";
 function makeWish(overrides: Partial<WishSummary> = {}): WishSummary {
   return {
     id: 1,
+    display_id: null,
     type: "adult",
     description: "Sweater",
     size: "M",

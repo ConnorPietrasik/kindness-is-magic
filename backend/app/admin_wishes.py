@@ -20,10 +20,12 @@ from app.response_builders import (
     build_wish_detail,
     build_wish_list_item,
     ColumnRequest,
+    compute_display_ids,
     get_active_or_404,
     get_or_404,
     WISH_SORT_FIELDS,
     partial_update,
+    wish_display_id,
 )
 from app.schemas import (
     _CLEAR,
@@ -142,7 +144,27 @@ def list_wishes(
         wishes_with_context = []
         assigned_users = {}
 
-    items = [WishListSummary(**build_wish_list_item(w, w.person, assigned_users=assigned_users)) for w in wishes_with_context]
+    # Batch-compute wish display ids (owner's flat display id + type suffix)
+    # from the joinedload query's objects — the ones items are built from.
+    # Family-wish rows (person_id null) come from the family map, not the
+    # person map.
+    wish_display_map: dict[int, str] = {}
+    if cols.needs("display_id"):
+        page_persons = [w.person for w in wishes_with_context if w.person is not None]
+        page_families = [w.family for w in wishes_with_context if w.person is None and w.family is not None]
+        person_map = compute_display_ids(db, "person", page_persons, scope=None) if page_persons else {}
+        family_map = compute_display_ids(db, "family", page_families, scope=None) if page_families else {}
+        for w in wishes_with_context:
+            if w.person_id is not None:
+                owner_display_id = person_map.get(w.person.id, "0") if w.person is not None else "0"
+            else:
+                owner_display_id = family_map.get(w.family.id, "0") if w.family is not None else "0"
+            wish_display_map[w.id] = wish_display_id(owner_display_id, w.type)
+
+    items = [
+        WishListSummary(**build_wish_list_item(w, w.person, display_id=wish_display_map.get(w.id), assigned_users=assigned_users))
+        for w in wishes_with_context
+    ]
 
     logger.info("Admin %s listed wishes (page=%d, total=%d)", admin.email, page, total)
 
@@ -200,7 +222,7 @@ def get_wish(
     """Get a single wish with person context (null person for family wishes)."""
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))
 
 
 @admin_wishes_router.patch("/{wish_id}")
@@ -238,7 +260,7 @@ def update_wish(
     db.refresh(wish)
 
     logger.info("Admin %s updated wish (id=%d)", admin.email, wish_id)
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))
 
 
 @admin_wishes_router.post("/{wish_id}/mark-purchased")
@@ -269,4 +291,4 @@ def mark_purchased(
     db.refresh(wish)
 
     logger.info("Admin %s marked wish (id=%d) as purchased", admin.email, wish_id)
-    return WishDetail(**build_wish_detail(wish, person))
+    return WishDetail(**build_wish_detail(wish, person, db))

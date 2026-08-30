@@ -20,6 +20,7 @@ from app.response_builders import (
     build_person_list_item,
     build_sort_clause,
     build_wish_detail,
+    build_wish_summary,
     column_filtered_page,
     ColumnRequest,
     compute_display_ids,
@@ -278,10 +279,12 @@ def list_person_wishes(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> list[WishSummary]:
-    """List all active wishes for a person."""
-    get_active_or_404(db, Person, per_id, "Person not found")
+    """List all active wishes for a person (display ids family-scoped, like the person detail)."""
+    per = get_active_or_404(db, Person, per_id, "Person not found")
     wishes = db.query(Wish).filter(Wish.person_id == per_id, Wish.deleted_at.is_(None)).all()
-    return [WishSummary.model_validate(w) for w in wishes]
+    display_id_map = compute_display_ids(db, "person", [per], scope=per.family_id)
+    display_id = display_id_map.get(per.id, "0")
+    return [build_wish_summary(w, display_id) for w in wishes]
 
 
 @people_admin_router.post("/{per_id}/wishes", status_code=201)
@@ -347,7 +350,7 @@ def create_person_wish(
     db.refresh(wish)
     logger.info("Admin %s created wish (id=%s) for person (id=%s)", _admin.email, wish.id, per_id)
 
-    return WishDetail(**build_wish_detail(wish, per))
+    return WishDetail(**build_wish_detail(wish, per, db))
 
 
 @people_admin_router.patch("/{per_id}/wishes/{wish_id}")
@@ -404,7 +407,7 @@ def update_person_wish(
     db.refresh(wish)
     logger.info("Admin %s updated wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
 
-    return WishDetail(**build_wish_detail(wish, per))
+    return WishDetail(**build_wish_detail(wish, per, db))
 
 
 @people_admin_router.delete("/{per_id}/wishes/{wish_id}", status_code=204)
@@ -465,4 +468,4 @@ def restore_person_wish(
     db.refresh(wish)
     logger.info("Admin %s restored wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
 
-    return WishDetail(**build_wish_detail(wish, per))
+    return WishDetail(**build_wish_detail(wish, per, db))

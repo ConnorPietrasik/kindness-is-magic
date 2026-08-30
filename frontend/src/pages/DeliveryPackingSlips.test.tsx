@@ -27,7 +27,7 @@ const mockFamily: PackingSlipItem = {
   family_wish: "A weekend trip",
   people: [
     {
-      display_id: "2-1-1",
+      display_id: "1",
       given_name: "Alice",
       role: "daughter",
       note: null,
@@ -35,6 +35,7 @@ const mockFamily: PackingSlipItem = {
       wishes: [
         {
           id: 1,
+          display_id: "1A",
           type: "practical",
           description: "Coat",
           size: "S",

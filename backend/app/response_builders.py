@@ -318,7 +318,8 @@ def build_referrer_detail(
 def build_person_detail(per: Person, db: Session) -> dict:
     """Build a dict suitable for PersonDetail, including eager-loaded wishes and display_id.
 
-    Only non-deleted wishes are included.
+    Only non-deleted wishes are included. Each nested wish's ``display_id``
+    is derived from this person's (family-scoped) display_id.
     """
     wishes = db.query(Wish).filter(Wish.person_id == per.id, Wish.deleted_at.is_(None)).all()
 
@@ -336,22 +337,7 @@ def build_person_detail(per: Person, db: Session) -> dict:
         "note": per.note,
         "created_at": per.created_at,
         "deleted_at": per.deleted_at,
-        "wishes": [
-            {
-                "id": w.id,
-                "type": w.type,
-                "description": w.description,
-                "size": w.size,
-                "color": w.color,
-                "assigned_to_id": w.assigned_to_id,
-                "purchased_at": w.purchased_at,
-                "purchased_where": w.purchased_where,
-                "received_at": w.received_at,
-                "purchaser_note": w.purchaser_note,
-                "deleted_at": w.deleted_at,
-            }
-            for w in wishes
-        ],
+        "wishes": [build_wish_summary(w, display_id) for w in wishes],
     }
 
 
@@ -360,8 +346,10 @@ def build_person_list_item(p: Person, *, display_id: str | None, wishes: list[Wi
 
     Pass the pre-computed ``display_id`` and the person's wishes
     (typically from :func:`batch_load_person_wishes`); use ``[]`` for the
-    soft-deleted list where wishes are not loaded.
+    soft-deleted list where wishes are not loaded. Each nested wish's
+    ``display_id`` is derived from the person's display_id.
     """
+    owner_display_id = display_id if display_id is not None else "0"
     return {
         "id": p.id,
         "display_id": display_id,
@@ -372,7 +360,7 @@ def build_person_list_item(p: Person, *, display_id: str | None, wishes: list[Wi
         "note": p.note,
         "created_at": p.created_at,
         "deleted_at": p.deleted_at,
-        "wishes": [WishSummary.model_validate(w) for w in wishes],
+        "wishes": [build_wish_summary(w, owner_display_id) for w in wishes],
     }
 
 
@@ -606,12 +594,39 @@ def create_person_with_wishes(
     return per
 
 
-def build_wish_detail(wish: Wish, person: Person | None) -> dict:
+def build_wish_summary(wish: Wish, owner_display_id: str) -> dict:
+    """Build a dict suitable for ``WishSummary`` with an explicit ``display_id``.
+
+    ``WishSummary.model_validate(wish)`` on a Wish ORM object silently
+    defaults ``display_id`` to None (missing attribute → field default);
+    that is correct for the public/donor routes, so internal builders that
+    know the owner's display id must set the field explicitly.
+    """
+    data = WishSummary.model_validate(wish).model_dump()
+    data["display_id"] = wish_display_id(owner_display_id, wish.type)
+    return data
+
+
+def build_wish_detail(wish: Wish, person: Person | None, db: Session, *, display_id: str | None = None) -> dict:
     """Build a dict suitable for WishDetail, including person context.
 
     *person* is ``None`` for family wishes (the wish is bound to a family,
     not a person).
+
+    ``display_id`` is the wish's presentational id in the flat view format:
+    the owner's flat display id (person wish → the person's, family wish →
+    the family's) plus the wish's type suffix (see
+    :func:`wish_display_id`).  Pass a pre-computed ``display_id`` (from a
+    batched position map) to skip the per-wish lookups.
     """
+    if display_id is None:
+        if person is not None:
+            owner_map = compute_display_ids(db, "person", [person], scope=None)
+            owner_display_id = owner_map.get(person.id, "0")
+        else:
+            owner_map = compute_display_ids(db, "family", [wish.family], scope=None)
+            owner_display_id = owner_map.get(wish.family_id, "0")
+        display_id = wish_display_id(owner_display_id, wish.type)
     return {
         "id": wish.id,
         "type": wish.type,
@@ -626,14 +641,25 @@ def build_wish_detail(wish: Wish, person: Person | None) -> dict:
         "person_id": wish.person_id,
         "person_given_name": person.given_name if person is not None else None,
         "person_family_name": person.family.family_name if person is not None and person.family else None,
+        "display_id": display_id,
     }
 
 
-def build_wish_list_item(wish: Wish, person: Person | None, *, assigned_users: dict[int, User] | None = None) -> dict:
+def build_wish_list_item(
+    wish: Wish,
+    person: Person | None,
+    *,
+    display_id: str | None = None,
+    assigned_users: dict[int, User] | None = None,
+) -> dict:
     """Build a dict suitable for WishListSummary (flat admin list view).
 
     *person* is ``None`` for family wishes, which resolve their family
     directly from ``wish.family_id``.
+
+    Pass *display_id* as the pre-computed wish display id (the owner's flat
+    display id + type suffix); it stays None when the caller did not
+    compute it (the ``display_id`` column was not requested).
 
     Pass *assigned_users* as a pre-loaded {user_id: User} map to avoid N+1
     queries.  If omitted the caller is responsible for populating the
@@ -647,6 +673,7 @@ def build_wish_list_item(wish: Wish, person: Person | None, *, assigned_users: d
 
     return {
         "id": wish.id,
+        "display_id": display_id,
         "type": wish.type,
         "description": wish.description,
         "size": wish.size,
@@ -1180,6 +1207,45 @@ def column_filtered_page(
 # ---------------------------------------------------------------------------
 # Display ID computation
 # ---------------------------------------------------------------------------
+
+# Suffix appended to the owner's display_id to form a wish display_id — a
+# pure function of wish type (no DB enumeration).
+_WISH_TYPE_SUFFIXES: dict[WishType, str] = {
+    WishType.practical: "A",
+    WishType.fun: "B",
+    WishType.adult: "X",
+    WishType.family: "-F",
+}
+
+
+def wish_display_id(owner_display_id: str, wish_type: WishType) -> str:
+    """Compute a wish's presentational ``display_id`` from its owner's.
+
+    ``display_id = {owner_display_id}{suffix}`` where the suffix is a pure
+    function of the wish's type:
+
+    +----------------+--------+
+    | Wish type      | Suffix |
+    +================+========+
+    | ``practical``  | ``A``  |
+    +----------------+--------+
+    | ``fun``        | ``B``  |
+    +----------------+--------+
+    | ``adult``      | ``X``  |
+    +----------------+--------+
+    | ``family``     | ``-F`` |
+    +----------------+--------+
+
+    Person wishes get a bare letter (e.g. ``1-1-1A``); family wishes get a
+    dash + ``F`` (e.g. ``1-1-F``) so they read as "the family's wish" and
+    cannot collide with person wishes.
+
+    *owner_display_id* should be in the view's existing format: flat views
+    pass the full owner id (person ``1-1-1``, family ``1-1``); scoped views
+    (where the person id is the bare within-family position) pass ``1``,
+    yielding ``1A`` / ``1-F`` accordingly.
+    """
+    return f"{owner_display_id}{_WISH_TYPE_SUFFIXES[wish_type]}"
 
 
 def compute_position_maps(

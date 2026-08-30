@@ -333,6 +333,7 @@ export default function AdminWishes() {
                   aria-label="Select all wishes on this page"
                 />
               </Th>
+              {visibleColumns.includes("display_id") && <Th>ID</Th>}
               {visibleColumns.includes("person_given_name") && <Th>Person</Th>}
               {visibleColumns.includes("family_id") && <Th>Family</Th>}
               {visibleColumns.includes("type") && <Th>Type</Th>}
@@ -359,6 +360,9 @@ export default function AdminWishes() {
                         aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
                       />
                     </Td>
+                    {visibleColumns.includes("display_id") && (
+                      <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
+                    )}
                     {visibleColumns.includes("person_given_name") && (
                       <Td>
                         {/* person_given_name is null only for family wishes — person_id is

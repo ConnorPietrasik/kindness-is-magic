@@ -51,6 +51,7 @@ const mockClaim: FamilyClaimDetail = {
   donor_display_name: "Alice Donor",
   family_wish: {
     id: 10,
+    display_id: null,
     type: "family",
     description: "Family outing",
     size: null,
@@ -71,6 +72,7 @@ const mockClaim: FamilyClaimDetail = {
       wishes: [
         {
           id: 11,
+          display_id: null,
           type: "practical",
           description: "Socks",
           size: "S",

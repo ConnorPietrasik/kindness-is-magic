@@ -24,6 +24,7 @@ const wishBase = {
 const adminLockedWish: PurchaserWishSummary = {
   ...wishBase,
   id: 1,
+  display_id: "2-1-1A",
   type: "practical",
   description: "Coat",
   size: "S",
@@ -37,6 +38,7 @@ const adminLockedWish: PurchaserWishSummary = {
 const familyLockedWish: PurchaserWishSummary = {
   ...wishBase,
   id: 2,
+  display_id: "2-2-F",
   type: "fun",
   description: "LEGO",
   size: null,
@@ -49,6 +51,7 @@ const familyLockedWish: PurchaserWishSummary = {
 
 const mockWishDetail: WishDetail = {
   id: 1,
+  display_id: "2-1-1A",
   type: "practical",
   description: "Coat",
   size: "S",
@@ -106,6 +109,27 @@ describe("PurchaserAssignedGifts", () => {
     expect(screen.getByText("2-1", { selector: "a" })).toHaveAttribute("href", "/families/5/wish-list");
     // Family-locked family has no public page — plain text, no link
     expect(screen.queryByText("2-2", { selector: "a" })).not.toBeInTheDocument();
+  });
+
+  it("shows the fixed ID column with each wish's display_id", async () => {
+    vi.spyOn(api, "purchaserListWishes").mockResolvedValue({
+      wishes: [adminLockedWish, familyLockedWish],
+      total: 2,
+      page: 1,
+      page_size: 50,
+      total_pages: 1,
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Coat")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    // Person wish → person display_id + type letter; family wish → family display_id + "-F"
+    expect(screen.getByText("2-1-1A")).toBeInTheDocument();
+    expect(screen.getByText("2-2-F")).toBeInTheDocument();
   });
 
   it("marks a wish as purchased through the dialog", async () => {
