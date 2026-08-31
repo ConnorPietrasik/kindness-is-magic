@@ -1,4 +1,4 @@
-Packing slip prints: more per print page, ideally with page breaks
+Add a fully approve button to the admin family&people page
 Change claim to sponsor wording for all public stuff (so they sponsor a family instead of claiming it)
 Admins need a way to see their assigned wishes (frontend assigned wishes tile like purchasers have)
 Filtering for purchaser view (for easier checkmark mark all)

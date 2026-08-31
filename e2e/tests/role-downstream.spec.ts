@@ -364,6 +364,29 @@ test.describe("Role Downstream", () => {
     await context.close();
   });
 
+  test("delivery packing slips print multiple families per page", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_DELIVERY_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/delivery/packing-slips");
+    await expect(page.locator(".packing-slip-card").first()).toBeVisible({ timeout: 10_000 });
+
+    // Under print media, cards must not force a page break after each
+    // family, and each family's slip stays unsplit (break-inside: avoid).
+    await page.emulateMedia({ media: "print" });
+    const card = page.locator(".packing-slip-card").first();
+    expect(await card.evaluate((el) => getComputedStyle(el).breakInside)).toBe("avoid");
+    expect(await card.evaluate((el) => getComputedStyle(el).breakAfter)).not.toBe("page");
+
+    await context.close();
+  });
+
   // ── Public wish list tests ─────────────────────────────────────────────
 
   test("guest can view a family wish list", async ({ browser }) => {

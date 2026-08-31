@@ -200,4 +200,16 @@ describe("PackingSlipsView", () => {
     renderView({ data: undefined });
     expect(screen.getByText(/Unable to load packing slips/)).toBeInTheDocument();
   });
+
+  it("print CSS packs families per page instead of forcing a page break per card", () => {
+    const { container } = renderView({ data: [mockFamily, mockFamilyNoFun] });
+    const styleEl = container.querySelector("style");
+    expect(styleEl).toBeTruthy();
+    const css = styleEl ? (styleEl.textContent ?? "") : "";
+    // Each family's slip stays unsplit across pages...
+    expect(css).toContain("break-inside: avoid");
+    // ...but cards no longer force a page break after each family
+    expect(css).not.toContain("break-after: page");
+    expect(css).not.toContain("page-break-after: always");
+  });
 });

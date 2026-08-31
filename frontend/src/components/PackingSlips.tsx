@@ -4,7 +4,8 @@
  * Used by both AdminPackingSlips (all fully-approved families, optional
  * family_ids filter) and DeliveryPackingSlips (families assigned to the
  * delivery person). Renders the error/empty states, the slip cards, and
- * the print styles (landscape, B&W, hide chrome, page breaks).
+ * the print styles (landscape, B&W, hide chrome, pack families per page
+ * without splitting a family's slip across pages).
  *
  * Only display_ids are shown — no family names, contact names, or bios.
  */
@@ -48,7 +49,7 @@ export function PackingSlipsView({ data, isError, error, emptyMessage }: Packing
         )}
       </main>
 
-      {/* Print styles — landscape, B&W, hide chrome, page breaks */}
+      {/* Print styles — landscape, B&W, hide chrome, pack families per page */}
       <style>{`
         /* Fixed-layout table — column widths set on <th>, text wraps */
         .packing-slip-table {
@@ -91,13 +92,37 @@ export function PackingSlipsView({ data, isError, error, emptyMessage }: Packing
           body { background: white !important; color: black !important; }
           header { display: none !important; }
           main { padding: 0 !important; max-width: none !important; }
+          /* Pack multiple families per page: never force a page break after
+             a card — keep each family's slip unsplit, so the browser moves
+             the whole card to the next page when it doesn't fit. (A card
+             taller than a full page will still split.) */
           .packing-slip-card {
-            page-break-after: always;
-            break-after: page;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            /* Tight print gap — screen spacing comes from space-y-8
+               (margin-block-end), which these physical longhands override */
+            margin-top: 12px !important;
+            margin-bottom: 0 !important;
           }
-          .packing-slip-card:last-child {
-            page-break-after: auto;
-            break-after: auto;
+          .packing-slip-card:first-child {
+            margin-top: 0 !important;
+          }
+          /* Tighter print density — smaller family ID, compact cells */
+          .packing-slip-family-id {
+            font-size: 18px !important;
+            line-height: 1.2;
+          }
+          .packing-slip-th {
+            padding: 3px 8px;
+          }
+          .packing-slip-td {
+            padding: 4px 8px;
+          }
+          /* Narrow ID/Age columns keep zero horizontal padding */
+          .packing-slip-th-narrow,
+          .packing-slip-td-narrow {
+            padding-left: 0;
+            padding-right: 0;
           }
           /* Force B&W — strip backgrounds, use black borders */
           * {
@@ -131,7 +156,7 @@ function PackingSlipCard({ family }: PackingSlipCardProps) {
     <div className="packing-slip-card">
       {/* Family display_id with the family wish on its own line below */}
       <div className="mb-1">
-        <h2 className="text-2xl font-bold text-gray-900">{family.display_id}</h2>
+        <h2 className="packing-slip-family-id text-2xl font-bold text-gray-900">{family.display_id}</h2>
         {family.family_wish && (
           <p className="text-sm text-black">
             <span className="font-semibold">Family Wish:</span> {family.family_wish}
