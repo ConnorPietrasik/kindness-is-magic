@@ -10,7 +10,7 @@
  */
 
 import { formatApiError } from "../lib/utils";
-import type { PackingSlipItem, WishSummary } from "../types";
+import type { PackingSlipItem } from "../types";
 import { wishText } from "./WishCell";
 
 /* ------------------------------------------------------------------ */
@@ -129,10 +129,14 @@ function PackingSlipCard({ family }: PackingSlipCardProps) {
 
   return (
     <div className="packing-slip-card">
-      {/* Compact header row */}
-      <div className="mb-1 flex items-baseline gap-3">
-        <h2 className="shrink-0 text-2xl font-bold text-gray-900">{family.display_id}</h2>
-        <span className="min-w-0 text-sm text-gray-600">{family.family_wish}</span>
+      {/* Family display_id with the family wish on its own line below */}
+      <div className="mb-1">
+        <h2 className="text-2xl font-bold text-gray-900">{family.display_id}</h2>
+        {family.family_wish && (
+          <p className="text-sm text-black">
+            <span className="font-semibold">Family Wish:</span> {family.family_wish}
+          </p>
+        )}
       </div>
 
       {/* People table — fixed layout so long text wraps instead of scrolling */}
@@ -179,18 +183,8 @@ function PersonRow({ person, hasFunCol }: PersonRowProps) {
       <td className="packing-slip-td packing-slip-td-narrow whitespace-nowrap font-mono text-sm font-bold">{person.display_id}</td>
       <td className="packing-slip-td font-medium">{person.given_name}</td>
       <td className="packing-slip-td packing-slip-td-narrow whitespace-nowrap text-sm">{person.age}</td>
-      <td className="packing-slip-td">{practicalOrAdult ? <WishWithId wish={practicalOrAdult} /> : "—"}</td>
-      {hasFunCol && <td className="packing-slip-td">{fun ? <WishWithId wish={fun} /> : "—"}</td>}
+      <td className="packing-slip-td">{practicalOrAdult ? <span className="text-black">{wishText(practicalOrAdult)}</span> : "—"}</td>
+      {hasFunCol && <td className="packing-slip-td">{fun ? <span className="text-black">{wishText(fun)}</span> : "—"}</td>}
     </tr>
-  );
-}
-
-/** Renders a wish with its compact mono display_id prefix (e.g. "1A Coat (S, Blue)"). */
-function WishWithId({ wish }: { wish: WishSummary }) {
-  return (
-    <span>
-      {wish.display_id != null && <span className="mr-1 font-mono text-xs">{wish.display_id}</span>}
-      {wishText(wish)}
-    </span>
   );
 }

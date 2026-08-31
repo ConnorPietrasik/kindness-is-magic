@@ -159,15 +159,20 @@ describe("PackingSlipsView", () => {
 
     expect(screen.getByText("2-1")).toBeInTheDocument();
     expect(screen.getByText("A weekend trip")).toBeInTheDocument();
+    // Family wish sits on its own line below the display_id header, in black, with a label
+    expect(screen.getByText("Family Wish:")).toBeInTheDocument();
+    const familyWish = screen.getByText("A weekend trip");
+    expect(familyWish.closest("h2")).toBeNull();
+    expect(familyWish).toHaveClass("text-black");
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Bob")).toBeInTheDocument();
-    // Practical wish renders with size/color in parentheses
-    expect(screen.getByText("Coat (S, Blue)")).toBeInTheDocument();
+    // Wish text is black for readability; practical wish renders with size/color in parentheses
+    expect(screen.getByText("Coat (S, Blue)")).toHaveClass("text-black");
     expect(screen.getByText("Jacket")).toBeInTheDocument();
-    // Each wish carries its scoped display_id (person position + type letter)
-    expect(screen.getByText("1A")).toBeInTheDocument();
-    expect(screen.getByText("1B")).toBeInTheDocument();
-    expect(screen.getByText("2X")).toBeInTheDocument();
+    // Wish display_ids (e.g. "1A") are not rendered — person row + column already identify them
+    expect(screen.queryByText("1A")).not.toBeInTheDocument();
+    expect(screen.queryByText("1B")).not.toBeInTheDocument();
+    expect(screen.queryByText("2X")).not.toBeInTheDocument();
   });
 
   it("only shows the Fun column when at least one active fun wish exists", () => {
