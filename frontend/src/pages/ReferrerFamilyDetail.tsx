@@ -46,7 +46,7 @@ import {
 } from "../lib/api";
 import { referrerFamilies, referrerFamilyDetail, referrerFamilyPeople, referrerReviewQueue } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { getWishSubmitAction, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -143,9 +143,10 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
   const rejectionReason = data?.wish_rejection_reason ?? null;
   const isLockedByAdmin = lockLevel === "admin";
 
-  // Determine action button
-  const showSubmitButton = lockLevel === "family"; // initial submission
-  const showResubmitButton = lockLevel === "referrer" && rejectionReason != null; // re-submit after admin rejection
+  // Determine action button (shared rules with the referrer families list)
+  const submitAction = getWishSubmitAction(data ?? undefined);
+  const showSubmitButton = submitAction === "submit"; // initial submission
+  const showResubmitButton = submitAction === "resubmit"; // re-submit after admin rejection
 
   return (
     <Card className="mb-6">
@@ -254,9 +255,14 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
         open={showSubmitConfirm}
         title="Submit wishes for admin review?"
         description={
-          showResubmitButton
-            ? "This will re-submit the wishes to the admin after the previous rejection."
-            : "This will lock the family wishes and submit them for admin approval. The admin will then review and either approve or reject."
+          <>
+            {showResubmitButton
+              ? "This will re-submit the wishes to the admin after the previous rejection."
+              : "This will lock the family wishes and submit them for admin approval. The admin will then review and either approve or reject."}{" "}
+            <span className="font-medium text-amber-700">
+              The family is locked out of editing, and only an admin can unlock — you cannot send it back to the family yourself.
+            </span>
+          </>
         }
         onConfirm={() => {
           setShowSubmitConfirm(false);

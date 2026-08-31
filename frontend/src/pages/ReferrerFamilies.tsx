@@ -6,8 +6,8 @@
  * Also shows a pending verification alert when there are pending families.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -17,6 +17,7 @@ import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import {
   createReferrerFamily,
@@ -25,12 +26,20 @@ import {
   getReferrerMe,
   listPendingFamilies,
   listReferrerFamilies,
+  referrerApproveWishes,
   updateReferrerFamily,
 } from "../lib/api";
-import { pendingFamilies as PENDING_FAMILIES_KEY, referrerFamilies, referrerFamily, referrerMe } from "../lib/queryKeys";
+import {
+  pendingFamilies as PENDING_FAMILIES_KEY,
+  referrerFamilies,
+  referrerFamily,
+  referrerFamilyDetail,
+  referrerMe,
+  referrerReviewQueue,
+} from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyPayload } from "../types";
+import { getLockLevelRowClass, getWishSubmitAction, normalizeUpdatePayload } from "../lib/utils";
+import type { FamilyDetail, FamilyPayload } from "../types";
 
 export default function ReferrerFamilies() {
   // Referrer self-info (for family limit)
@@ -71,6 +80,22 @@ export default function ReferrerFamilies() {
     deleteFn: deleteReferrerFamily,
     invalidationKeys: [referrerFamilies, referrerMe, referrerFamily],
     entityName: "Family",
+  });
+
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [submitTarget, setSubmitTarget] = useState<FamilyDetail | null>(null);
+
+  // Lock the family (wish lock → referrer) and submit it to the admin review
+  // queue — no family review request required (same action as the detail page).
+  const submitMut = useMutation({
+    mutationFn: referrerApproveWishes,
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: referrerFamilies });
+      queryClient.invalidateQueries({ queryKey: referrerFamilyDetail(String(id)) });
+      queryClient.invalidateQueries({ queryKey: referrerReviewQueue });
+      toast.success("Wishes submitted for admin review");
+    },
   });
 
   function handleCreateFam(formData: FamilyPayload) {
@@ -147,90 +172,130 @@ export default function ReferrerFamilies() {
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
-                {families.map((f) => (
-                  <React.Fragment key={f.id}>
-                    <Tr className={getLockLevelRowClass(f)}>
-                      <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
-                      <Td className="font-medium text-gray-900">
-                        {f.family_name}
-                        {f.referrer_notes != null && (
-                          <span className="ml-1 text-xs" title="Has internal notes">
-                            📝
-                          </span>
-                        )}
-                        {f.wish_lock_level === "admin" && (
-                          <Link
-                            to={route.familyWishList(f.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Wish List"
-                            className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                            title="Wish List"
-                          >
-                            📄
-                          </Link>
-                        )}
-                      </Td>
-                      <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
-                      <Td>{f.contact_name}</Td>
-                      <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
-                      <Td>
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={route.referrerFamilyDetail(f.id)}
-                            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                          >
-                            {" "}
-                            Manage
-                          </Link>
-                          <Button
-                            variant="secondary"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => (editingId === f.id ? cancelForm() : openEdit(f.id))}
-                          >
-                            {editingId === f.id ? "Done" : "Edit"}
-                          </Button>
-                          <Button
-                            variant="danger"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => confirmDelete(f.id)}
-                            disabled={deleteFamMut?.isPending}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </Td>
-                    </Tr>
-                    {editingId === f.id && (
-                      <Tr key={`${f.id}-edit`}>
-                        <Td colSpan={6} className="!py-3">
-                          <div className="rounded-xl bg-gray-50 p-4">
-                            {detailLoading ? (
-                              <div className="flex items-center justify-center gap-3 py-6 text-gray-400">
-                                <Spinner size="sm" />
-                                <span className="text-sm">Loading…</span>
-                              </div>
-                            ) : detail ? (
-                              <FamilyForm
-                                title="Edit Family"
-                                initial={detail}
-                                isEdit={true}
-                                showReferrerNotes
-                                onSubmit={handleUpdateFam}
-                                onCancel={cancelForm}
-                                loading={updateFamMut?.isPending}
-                              />
-                            ) : null}
+                {families.map((f) => {
+                  const submitAction = getWishSubmitAction(f);
+                  return (
+                    <React.Fragment key={f.id}>
+                      <Tr className={getLockLevelRowClass(f)}>
+                        <Td className="whitespace-nowrap text-xs text-gray-400">{f.display_id}</Td>
+                        <Td className="font-medium text-gray-900">
+                          {f.family_name}
+                          {f.referrer_notes != null && (
+                            <span className="ml-1 text-xs" title="Has internal notes">
+                              📝
+                            </span>
+                          )}
+                          {f.wish_lock_level === "admin" && (
+                            <Link
+                              to={route.familyWishList(f.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Wish List"
+                              className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+                              title="Wish List"
+                            >
+                              📄
+                            </Link>
+                          )}
+                        </Td>
+                        <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>
+                        <Td>{f.contact_name}</Td>
+                        <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>
+                        <Td>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={route.referrerFamilyDetail(f.id)}
+                              className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                            >
+                              {" "}
+                              Manage
+                            </Link>
+                            {submitAction != null && (
+                              <Button
+                                variant="success"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setSubmitTarget(f)}
+                                loading={submitMut.isPending}
+                              >
+                                {submitAction === "resubmit" ? "Re-submit" : "Submit"}
+                              </Button>
+                            )}
+                            <Button
+                              variant="secondary"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => (editingId === f.id ? cancelForm() : openEdit(f.id))}
+                            >
+                              {editingId === f.id ? "Done" : "Edit"}
+                            </Button>
+                            <Button
+                              variant="danger"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => confirmDelete(f.id)}
+                              disabled={deleteFamMut?.isPending}
+                            >
+                              Delete
+                            </Button>
                           </div>
                         </Td>
                       </Tr>
-                    )}
-                  </React.Fragment>
-                ))}
+                      {editingId === f.id && (
+                        <Tr key={`${f.id}-edit`}>
+                          <Td colSpan={6} className="!py-3">
+                            <div className="rounded-xl bg-gray-50 p-4">
+                              {detailLoading ? (
+                                <div className="flex items-center justify-center gap-3 py-6 text-gray-400">
+                                  <Spinner size="sm" />
+                                  <span className="text-sm">Loading…</span>
+                                </div>
+                              ) : detail ? (
+                                <FamilyForm
+                                  title="Edit Family"
+                                  initial={detail}
+                                  isEdit={true}
+                                  showReferrerNotes
+                                  onSubmit={handleUpdateFam}
+                                  onCancel={cancelForm}
+                                  loading={updateFamMut?.isPending}
+                                />
+                              ) : null}
+                            </div>
+                          </Td>
+                        </Tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </>
           )}
         </Table>
+
+        {/* ── Submit-for-admin-review confirmation ───────────── */}
+        <ConfirmDialog
+          open={submitTarget != null}
+          title="Submit wishes for admin review?"
+          description={
+            submitTarget ? (
+              <>
+                {getWishSubmitAction(submitTarget) === "resubmit"
+                  ? `This will re-submit the wishes for ${submitTarget.family_name} to the admin after the previous rejection.`
+                  : `This will lock the wishes for ${submitTarget.family_name} and submit them for admin approval. The admin will then review and either approve or reject.`}{" "}
+                <span className="font-medium text-amber-700">
+                  The family is locked out of editing, and only an admin can unlock — you cannot send it back to the family yourself.
+                </span>
+              </>
+            ) : undefined
+          }
+          onConfirm={() => {
+            if (submitTarget) submitMut.mutate(submitTarget.id);
+            setSubmitTarget(null);
+          }}
+          onCancel={() => setSubmitTarget(null)}
+          loading={submitMut.isPending}
+          confirmLabel="Yes, submit"
+          loadingLabel="Submitting…"
+          confirmVariant="success"
+        />
 
         {/* ── Delete confirmation ─────────────────────────────── */}
         <ConfirmDialog
@@ -251,7 +316,9 @@ export default function ReferrerFamilies() {
         />
 
         {/* ── Errors ──────────────────────────────────────────── */}
-        <MutationErrors mutations={[createFamMut, updateFamMut, deleteFamMut].filter((m): m is NonNullable<typeof m> => m != null)} />
+        <MutationErrors
+          mutations={[createFamMut, updateFamMut, deleteFamMut, submitMut].filter((m): m is NonNullable<typeof m> => m != null)}
+        />
       </main>
     </div>
   );

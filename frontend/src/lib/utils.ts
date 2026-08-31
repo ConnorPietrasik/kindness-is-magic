@@ -1,4 +1,4 @@
-import type { EmailStatus } from "../types";
+import type { EmailStatus, WishLockLevel } from "../types";
 
 /**
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
@@ -182,6 +182,32 @@ export interface FamilyLockFields {
 export function isFamilyLocked(family: FamilyLockFields | null | undefined): boolean {
   if (family == null) return false;
   return family.wish_lock_level !== "family" || family.wish_review_requested_at != null;
+}
+
+/**
+ * getWishSubmitAction — which "submit for admin review" action a referrer can
+ * take on a family. Single source of truth shared by the referrer families
+ * list and detail pages:
+ *
+ * - `"submit"` — family is at the family lock level (regardless of whether
+ *   the family itself requested review): locking submits it to the admin
+ *   review queue.
+ * - `"resubmit"` — admin rejected the wishes (referrer lock + rejection
+ *   reason): re-submits after the referrer fixes them.
+ * - `null` — no action (admin lock, or already awaiting admin review).
+ */
+export interface WishSubmitFields {
+  wish_lock_level: WishLockLevel;
+  wish_rejection_reason: string | null;
+}
+
+export type WishSubmitAction = "submit" | "resubmit" | null;
+
+export function getWishSubmitAction(family: WishSubmitFields | null | undefined): WishSubmitAction {
+  if (family == null) return null;
+  if (family.wish_lock_level === "family") return "submit";
+  if (family.wish_lock_level === "referrer" && family.wish_rejection_reason != null) return "resubmit";
+  return null;
 }
 
 /**

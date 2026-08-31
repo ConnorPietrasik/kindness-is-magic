@@ -51,6 +51,17 @@ const mockFamilyAdminLocked: FamilyDetail = {
   wish_lock_level: "admin",
 };
 
+const mockFamilyRejectedByAdmin: FamilyDetail = {
+  ...mockFamily,
+  wish_lock_level: "referrer",
+  wish_rejection_reason: "Please add more details",
+};
+
+const mockFamilyAwaitingAdmin: FamilyDetail = {
+  ...mockFamily,
+  wish_lock_level: "referrer",
+};
+
 function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
@@ -198,5 +209,81 @@ describe("ReferrerFamilyDetail — Internal Notes", () => {
     });
     // The "Visible only to you and admins" hint should be visible
     expect(screen.getByText("Visible only to you and admins")).toBeInTheDocument();
+  });
+});
+
+describe("ReferrerFamilyDetail — Submit for Admin Review", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "getReferrerFamily").mockClear();
+    vi.spyOn(api, "listReferrerFamilyPeople").mockClear();
+    vi.spyOn(api, "updateReferrerFamily").mockClear();
+    vi.spyOn(api, "referrerApproveWishes").mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("shows 'Submit for Admin Review' at family lock", async () => {
+    renderPage(mockFamily);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Submit for Admin Review" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Re-submit for Admin Review' after admin rejection", async () => {
+    renderPage(mockFamilyRejectedByAdmin);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Re-submit for Admin Review" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Submit for Admin Review" })).not.toBeInTheDocument();
+  });
+
+  it("shows no submit button while awaiting admin review", async () => {
+    renderPage(mockFamilyAwaitingAdmin);
+
+    await waitFor(() => {
+      expect(screen.getByText("Awaiting admin review:")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /submit for admin review/i })).not.toBeInTheDocument();
+  });
+
+  it("shows no submit button when admin-locked", async () => {
+    renderPage(mockFamilyAdminLocked);
+
+    await waitFor(() => {
+      expect(screen.getByText("Admin-approved:")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /submit for admin review/i })).not.toBeInTheDocument();
+  });
+
+  it("warns that only an admin can unlock, then calls referrerApproveWishes on confirm", async () => {
+    const user = userEvent.setup();
+    renderPage(mockFamily);
+
+    await user.click(await screen.findByRole("button", { name: "Submit for Admin Review" }));
+
+    // Warning must be visible in the confirm dialog
+    await expect(screen.getByText(/only an admin can unlock/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Yes, submit" }));
+
+    // React Query passes a mutation context as the second arg — only the id matters here
+    await waitFor(() => {
+      expect(api.referrerApproveWishes).toHaveBeenCalledWith(1, expect.anything());
+    });
+  });
+
+  it("does not call referrerApproveWishes when the dialog is cancelled", async () => {
+    const user = userEvent.setup();
+    renderPage(mockFamily);
+
+    await user.click(await screen.findByRole("button", { name: "Submit for Admin Review" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(api.referrerApproveWishes).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,6 @@
 Packing slip: move family wish down to be more clear make all the wish info black (for all wishes) so it’s easier to read
-Packing slips: more per print page, ideally with page breaks
+Packing slip prints: more per print page, ideally with page breaks
 Change claim to sponsor wording for all public stuff (so they sponsor a family instead of claiming it)
-Referrer can lock families without waiting for them to request it
 Admins need a way to see their assigned wishes (frontend assigned wishes tile like purchasers have)
 Filtering for purchaser view (for easier checkmark mark all)
 Checkmarks to batch mark things purchased at the same place in admin and purchaser assigned-wish views

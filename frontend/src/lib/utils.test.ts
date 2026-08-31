@@ -7,6 +7,7 @@ import {
   fromDatetimeLocalValue,
   getLockLevelRowClass,
   getPendingClaimFamilyId,
+  getWishSubmitAction,
   humanize,
   isFamilyLocked,
   normalizePayload,
@@ -422,5 +423,33 @@ describe("isFamilyLocked", () => {
 
   it("returns true when both locked and review requested", () => {
     expect(isFamilyLocked({ wish_lock_level: "admin", wish_review_requested_at: "2025-01-01T00:00:00Z" })).toBe(true);
+  });
+});
+
+describe("getWishSubmitAction", () => {
+  it("returns null for null/undefined input", () => {
+    expect(getWishSubmitAction(null)).toBeNull();
+    expect(getWishSubmitAction(undefined)).toBeNull();
+  });
+
+  it("returns submit at family lock with no rejection reason", () => {
+    expect(getWishSubmitAction({ wish_lock_level: "family", wish_rejection_reason: null })).toBe("submit");
+  });
+
+  it("returns submit at family lock even with a stale rejection reason", () => {
+    expect(getWishSubmitAction({ wish_lock_level: "family", wish_rejection_reason: "Needs more detail" })).toBe("submit");
+  });
+
+  it("returns resubmit at referrer lock with a rejection reason", () => {
+    expect(getWishSubmitAction({ wish_lock_level: "referrer", wish_rejection_reason: "Admin rejected" })).toBe("resubmit");
+  });
+
+  it("returns null at referrer lock awaiting admin review (no rejection reason)", () => {
+    expect(getWishSubmitAction({ wish_lock_level: "referrer", wish_rejection_reason: null })).toBeNull();
+  });
+
+  it("returns null at admin lock regardless of rejection reason", () => {
+    expect(getWishSubmitAction({ wish_lock_level: "admin", wish_rejection_reason: null })).toBeNull();
+    expect(getWishSubmitAction({ wish_lock_level: "admin", wish_rejection_reason: "stale" })).toBeNull();
   });
 });
