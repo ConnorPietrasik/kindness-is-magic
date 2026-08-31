@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
@@ -50,8 +51,9 @@ const mockPerson: PersonDetail = {
   wishes: [],
 };
 
-function renderPage() {
-  vi.spyOn(api, "adminGetFamily").mockResolvedValue(mockFamily);
+function renderPage(familyOverrides: Partial<FamilyDetail> = {}) {
+  const family = { ...mockFamily, ...familyOverrides };
+  vi.spyOn(api, "adminGetFamily").mockResolvedValue(family);
   vi.spyOn(api, "adminListFamilyPeople").mockResolvedValue({
     people: [mockPerson],
     total: 1,
@@ -101,5 +103,36 @@ describe("AdminFamilyPeople", () => {
     expect(screen.getByText("8")).toBeInTheDocument();
     // Note column is hidden by default (adminPeople column visibility)
     expect(screen.queryByText("Likes blue")).not.toBeInTheDocument();
+  });
+
+  it("shows the Fully Approve button for non-admin-locked families", async () => {
+    renderPage();
+
+    await screen.findAllByText("The Johnsons");
+    expect(screen.getByRole("button", { name: "Fully Approve" })).toBeInTheDocument();
+  });
+
+  it("hides Fully Approve and shows Wish List for admin-locked families", async () => {
+    renderPage({ wish_lock_level: "admin" });
+
+    await screen.findAllByText("The Johnsons");
+    expect(screen.queryByRole("button", { name: "Fully Approve" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Wish List" })).toBeInTheDocument();
+  });
+
+  it("fully approve flow confirms and calls API", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminApproveWishes").mockResolvedValue({ ...mockFamily, wish_lock_level: "admin" });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Fully Approve" }));
+    await user.click(await screen.findByRole("button", { name: "Yes, fully approve" }));
+
+    await waitFor(() => {
+      expect(api.adminApproveWishes).toHaveBeenCalledWith(mockFamily.id);
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Family fully approved and visible to donors")).toBeInTheDocument();
+    });
   });
 });

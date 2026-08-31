@@ -10,6 +10,7 @@
  */
 import { test, expect } from "@playwright/test";
 import type { Locator } from "@playwright/test";
+import { deleteFamilyViaApi, loginViaApi } from "../helpers/api";
 import { findRowInTable } from "../helpers/assertions";
 
 /** Open the kebab-menu dropdown and click a menu item by label. */
@@ -21,8 +22,17 @@ async function clickAction(row: Locator, actionLabel: string) {
 // ── Delete / Restore test ──────────────────────────────────────────────────
 
 const DELETE_RESTORE_FAMILY = `E2E DR ${Math.random().toString(36).slice(2, 8)}`;
+let drFamilyId: number | undefined;
 
-test.describe("Admin Family Lifecycle — delete/restore", () => {
+test.describe.serial("Admin Family Lifecycle — delete/restore", () => {
+  test.afterAll(async ({ request }) => {
+    if (drFamilyId) {
+      const authed = await loginViaApi(request);
+      await deleteFamilyViaApi(authed, drFamilyId);
+      await authed.dispose();
+    }
+  });
+
   test("admin deletes a family, sees it in Deleted tab, restores it back to Active", async ({ browser }) => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
@@ -45,6 +55,9 @@ test.describe("Admin Family Lifecycle — delete/restore", () => {
     /* Find the new family in the table (may need to paginate) */
     const familyRow = (await findRowInTable(page, DELETE_RESTORE_FAMILY, { maxPages: 20 }))!;
     expect(familyRow).not.toBeNull();
+    /* Capture DB id from data-id for afterAll cleanup */
+    const rawId = await familyRow.getAttribute("data-id");
+    if (rawId) drFamilyId = parseInt(rawId, 10);
 
     /* Delete the family via UI */
     await clickAction(familyRow, "Delete");
@@ -85,7 +98,18 @@ test.describe("Admin Family Lifecycle — delete/restore", () => {
 
 // ── Cascade-delete test ────────────────────────────────────────────────────
 
-test.describe("Admin Family Lifecycle — cascade delete", () => {
+let cascadeFamilyId: number | undefined;
+
+test.describe.serial("Admin Family Lifecycle — cascade delete", () => {
+  test.afterAll(async ({ request }) => {
+    // Deleting the family cascade-deletes its person (as the test verifies).
+    if (cascadeFamilyId) {
+      const authed = await loginViaApi(request);
+      await deleteFamilyViaApi(authed, cascadeFamilyId);
+      await authed.dispose();
+    }
+  });
+
   test("deleting a family cascade-deletes its people into the Deleted tab", async ({ browser }) => {
     const suffix = Math.random().toString(36).slice(2, 8);
     const familyName = `E2E Cascade Family ${suffix}`;
@@ -111,6 +135,9 @@ test.describe("Admin Family Lifecycle — cascade delete", () => {
     /* Find the new family (may need to paginate) */
     const familyRow = (await findRowInTable(page, familyName))!;
     expect(familyRow).not.toBeNull();
+    /* Capture DB id from data-id for afterAll cleanup */
+    const rawId = await familyRow.getAttribute("data-id");
+    if (rawId) cascadeFamilyId = parseInt(rawId, 10);
 
     /* Navigate to the family's people page and add a person */
     await familyRow.getByRole("link", { name: "Manage" }).click();
@@ -186,8 +213,19 @@ test.describe("Admin Family Lifecycle — display IDs", () => {
 // ── Fully-approve test (creates its own family via UI) ─────────────────────
 
 const FULLY_APPROVE_FAMILY = `E2E FA ${Math.random().toString(36).slice(2, 8)}`;
+let faFamilyId: number | undefined;
+let fapFamilyId: number | undefined;
 
-test.describe("Admin Family Lifecycle — fully approve", () => {
+test.describe.serial("Admin Family Lifecycle — fully approve", () => {
+  test.afterAll(async ({ request }) => {
+    if (faFamilyId || fapFamilyId) {
+      const authed = await loginViaApi(request);
+      if (faFamilyId) await deleteFamilyViaApi(authed, faFamilyId);
+      if (fapFamilyId) await deleteFamilyViaApi(authed, fapFamilyId);
+      await authed.dispose();
+    }
+  });
+
   test("admin fully approves a family at lock=family via UI", async ({ browser }) => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
@@ -209,6 +247,9 @@ test.describe("Admin Family Lifecycle — fully approve", () => {
     /* Find our test family row (may need to paginate) */
     const row = (await findRowInTable(page, FULLY_APPROVE_FAMILY))!;
     expect(row).not.toBeNull();
+    /* Capture DB id from data-id for afterAll cleanup */
+    const rawId = await row.getAttribute("data-id");
+    if (rawId) faFamilyId = parseInt(rawId, 10);
 
     /* Verify "Fully Approve" is in the kebab menu */
     await row.getByRole("button", { name: "More actions" }).click();
@@ -238,6 +279,54 @@ test.describe("Admin Family Lifecycle — fully approve", () => {
     /* "Reset Lock" should appear instead (lock !== family) */
     await expect(approvedRow.getByRole("menuitem", { name: "Reset Lock" })).toBeVisible();
     await page.keyboard.press("Escape");
+
+    await context.close();
+  });
+
+  test("admin fully approves a family from the Family & People page", async ({ browser }) => {
+    const familyName = `E2E FAP ${Math.random().toString(36).slice(2, 8)}`;
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    /* Create the family via UI */
+    await page.goto("/admin/families");
+    await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
+
+    await page.getByRole("button", { name: "+ Add Family" }).click();
+    await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
+    await page.getByLabel("Referrer").selectOption({ index: 1 });
+    await page.getByLabel("Family Name", { exact: true }).fill(familyName);
+    await page.getByLabel("Contact Name", { exact: true }).fill("FAP Contact");
+    await page.getByLabel("Family Wish", { exact: true }).fill("FAP wish");
+    await page.getByLabel("Address", { exact: true }).fill("none");
+    await page.getByLabel("Phone Number", { exact: true }).fill("5551234567");
+    await page.getByRole("button", { name: "Create" }).click();
+
+    /* Open the family's Family & People page via Manage */
+    const row = (await findRowInTable(page, familyName))!;
+    /* Capture DB id from data-id for afterAll cleanup */
+    const rawId = await row.getAttribute("data-id");
+    if (rawId) fapFamilyId = parseInt(rawId, 10);
+    await row.getByRole("link", { name: "Manage" }).click();
+    await expect(page.getByRole("heading", { name: "Family & People" })).toBeVisible();
+
+    /* Fully Approve button appears in the family card header */
+    const approveButton = page.getByRole("button", { name: "Fully Approve" });
+    await expect(approveButton).toBeVisible({ timeout: 10_000 });
+    await approveButton.click();
+
+    /* Confirm in the dialog */
+    await expect(page.getByText("Fully approve family")).toBeVisible();
+    await page.getByRole("button", { name: "Yes, fully approve" }).click();
+
+    /* Verify success toast */
+    await expect(page.getByText("Family fully approved and visible to donors")).toBeVisible({
+      timeout: 10_000,
+    });
+
+    /* After approval the button is gone and the Wish List link appears */
+    await expect(approveButton).toBeHidden();
+    await expect(page.getByRole("link", { name: "Wish List" })).toBeVisible();
 
     await context.close();
   });

@@ -6,12 +6,13 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DisplayId } from "../components/DisplayId";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
@@ -23,6 +24,7 @@ import {
 } from "../components/HierarchicalManage";
 import { InfoRow } from "../components/InfoRow";
 import { InternalNotesSection } from "../components/InternalNotesSection";
+import { MutationErrors } from "../components/MutationErrors";
 import { PersonForm } from "../components/PersonForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
@@ -32,6 +34,7 @@ import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { useReferrersDropdown } from "../hooks/useDropdowns";
 import { useTableWidth } from "../hooks/useTableWidth";
+import { useWishLockActions } from "../hooks/useWishLockActions";
 import {
   adminCreatePerson,
   adminDeletePerson,
@@ -198,6 +201,17 @@ function FamilyCard(
   const lockLevel = data?.wish_lock_level ?? "family";
   const familyKey = adminFamilyDetail(String(famId));
 
+  // Fully-approve action (skips referrer review, makes the family visible to donors)
+  const [approveConfirm, setApproveConfirm] = useState(false);
+  const referrerKey = data?.referrer_id != null && data.referrer_id > 0 ? adminReferrerFamilies(String(data.referrer_id)) : null;
+  const { fullyApproveMut } = useWishLockActions({
+    extraInvalidationKeys: [
+      adminFamilyPeople(String(famId)),
+      adminDeletedFamilyPeople(String(famId)),
+      ...(referrerKey ? [referrerKey] : []),
+    ],
+  });
+
   const saveNotesMut = useMutation({
     mutationFn: (payload: { referrer_notes: string | null }) => adminUpdateFamily(famId, payload),
     onSuccess: (updatedFamily) => {
@@ -248,6 +262,16 @@ function FamilyCard(
               Wish List
             </Link>
           )}
+          {data && lockLevel !== "admin" && (
+            <Button
+              variant="success"
+              className="h-8 px-3 text-xs"
+              onClick={() => setApproveConfirm(true)}
+              disabled={fullyApproveMut.isPending}
+            >
+              Fully Approve
+            </Button>
+          )}
           <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>
             {isEditing ? "Cancel" : "Edit"}
           </Button>
@@ -295,6 +319,27 @@ function FamilyCard(
           isSaving={saveNotesMut.isPending}
         />
       )}
+
+      <ConfirmDialog
+        open={approveConfirm}
+        title={
+          <>
+            Fully approve family <strong>{data?.family_name}</strong>?
+          </>
+        }
+        description="This will make the family's wishes visible to donors immediately, skipping referrer review."
+        onConfirm={() => {
+          setApproveConfirm(false);
+          fullyApproveMut.mutate(famId);
+        }}
+        onCancel={() => setApproveConfirm(false)}
+        loading={fullyApproveMut.isPending}
+        confirmLabel="Yes, fully approve"
+        loadingLabel="Approving…"
+        confirmVariant="primary"
+      />
+
+      <MutationErrors mutations={[fullyApproveMut]} />
     </Card>
   );
 }
