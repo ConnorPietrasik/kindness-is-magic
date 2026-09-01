@@ -1,4 +1,3 @@
-Admins need a way to see their assigned wishes (frontend assigned wishes tile like purchasers have)
 Filtering for purchaser view (for easier checkmark mark all)
 Checkmarks to batch mark things purchased at the same place in admin and purchaser assigned-wish views
 An easy method for purchasers to mark that they purchased something yesterday (or whatever date they choose)

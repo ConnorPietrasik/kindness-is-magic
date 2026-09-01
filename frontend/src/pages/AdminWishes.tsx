@@ -24,6 +24,7 @@ import { OptionalLabel } from "../components/OptionalLabel";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishTypeBadge } from "../components/WishTypeBadge";
 import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
@@ -143,15 +144,10 @@ export default function AdminWishes() {
   function handleUpdateWish(formData: WishFormState) {
     if (editingId == null || detail == null) return;
     const payload: Record<string, unknown> = normalizeUpdatePayload(formData, detail);
-    // Backend sentinels: 0 → NULL for FK, "" → NULL for optional strings
+    // Backend sentinels: 0 unassigns the FK; cleared optional strings pass
+    // through as "" (the clear sentinel).
     if ("assigned_to_id" in payload && payload.assigned_to_id === null) {
       payload.assigned_to_id = 0;
-    }
-    if ("received_at" in payload && payload.received_at === "") {
-      payload.received_at = ""; // explicit empty string = clear sentinel
-    }
-    if ("purchaser_note" in payload && payload.purchaser_note === "") {
-      payload.purchaser_note = ""; // explicit empty string = clear sentinel
     }
     updateMut.mutate({ id: editingId, data: payload as Partial<AdminWishUpdate> });
   }
@@ -768,21 +764,6 @@ function BatchAssignDialog({
       </div>
     </div>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* WishTypeBadge                                                       */
-/* ------------------------------------------------------------------ */
-
-const wishTypeColors: Record<WishType, string> = {
-  adult: "bg-purple-100 text-purple-700",
-  practical: "bg-blue-100 text-blue-700",
-  fun: "bg-amber-100 text-amber-700",
-  family: "bg-teal-100 text-teal-700",
-};
-
-function WishTypeBadge({ type }: { type: WishType }) {
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${wishTypeColors[type] ?? "bg-gray-100 text-gray-700"}`}>{type}</span>;
 }
 
 /* ------------------------------------------------------------------ */

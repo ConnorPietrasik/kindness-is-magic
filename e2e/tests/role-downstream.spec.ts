@@ -241,7 +241,7 @@ test.describe("Role Downstream", () => {
 
       // Fill purchased where and submit
       await page.getByLabel("Purchased Where").fill("E2E Test Store");
-      const dialog = page.locator(".fixed.inset-0.z-50").first();
+      const dialog = page.getByRole("dialog");
       await dialog.getByRole("button", { name: "Mark Purchased" }).click();
 
       // Success toast appears

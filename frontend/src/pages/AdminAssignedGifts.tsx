@@ -1,14 +1,15 @@
 /**
- * Purchaser — Assigned Gifts
+ * Admin — My Assigned Gifts
  *
- * Paginated list of wishes assigned to the current purchaser with:
+ * Paginated list of wishes assigned to the current admin (mirrors the
+ * purchaser view), with:
  *  - Filter: purchased / unpurchased / all
  *  - "Mark Purchased" dialog
  *  - Inline edit for purchaser note + received_at
- *  - Family display_id linked to the public wishlist page (only when the
- *    family is admin-locked — the public endpoint 404s otherwise)
  *
- * Purchasers cannot unassign wishes or edit wish definitions.
+ * Wishes are scoped to the current admin via the admin list endpoint's
+ * `assigned_to_id` filter. Full wish editing (definition fields,
+ * reassignment) lives on the Manage Wishes page.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,60 +26,73 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishTypeBadge } from "../components/WishTypeBadge";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useFamiliesDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { purchaserGetWish, purchaserListWishes, purchaserMarkPurchased, purchaserUpdateWish } from "../lib/api";
-import { purchaserWishDetail, purchaserWishes } from "../lib/queryKeys";
+import { adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
+import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
-import type { PurchaserWishListResponse, PurchaserWishUpdate, WishDetail, WishPurchaseMark } from "../types";
+import type { AdminWishesListParams, AdminWishUpdate, WishDetail, WishListResponse, WishPurchaseMark } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
-export default function PurchaserAssignedGifts() {
+export default function AdminAssignedGifts() {
+  const { user } = useAuth();
+  // Defer the data hooks until the user is known so the list query never
+  // fires unscoped (before `assigned_to_id` is available).
+  if (!user) return <PageSpinner />;
+  return <AdminAssignedGiftsList userId={user.id} />;
+}
+
+function AdminAssignedGiftsList({ userId }: { userId: number }) {
   const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
 
   const pagination = usePagination({ defaultPageSize: 50 });
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { familyMap } = useFamiliesDropdown();
 
-  // Build list params from filters
-  const listParams = useMemo(
+  // Build list params — always scoped to the current admin
+  const listParams = useMemo<AdminWishesListParams>(
     () => ({
       ...pagination.params,
+      assigned_to_id: userId,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
     }),
-    [pagination.params, purchasedFilter]
+    [pagination.params, userId, purchasedFilter]
   );
 
-  // CRUD manager — update only (no create/delete for purchasers)
+  // CRUD manager — list/detail/update only (no create/delete for wishes)
   const { listData, listLoading, detail, detailLoading, updateMut, editingId, openEdit, cancelForm } = useCrudManager<
-    PurchaserWishListResponse,
+    WishListResponse,
     WishDetail,
-    Partial<PurchaserWishUpdate>,
-    typeof listParams
+    Partial<AdminWishUpdate>,
+    AdminWishesListParams
   >({
-    rootKey: purchaserWishes,
-    listFn: purchaserListWishes,
+    rootKey: adminWishes,
+    listFn: adminListWishes,
     listParams,
-    detailFn: purchaserGetWish,
+    detailFn: adminGetWish,
     createFn: undefined,
-    updateFn: purchaserUpdateWish,
+    updateFn: adminUpdateWish,
     deleteFn: undefined,
-    invalidationKeys: [purchaserWishes],
+    invalidationKeys: [adminWishes, adminPackingSlips],
     entityName: "Wish",
   });
 
   // Mark-purchased mutation
   const markPurchasedMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: WishPurchaseMark }) => purchaserMarkPurchased(id, data),
+    mutationFn: ({ id, data }: { id: number; data: WishPurchaseMark }) => adminMarkPurchased(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: purchaserWishes });
+      queryClient.invalidateQueries({ queryKey: adminWishes });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       if (markPurchasedId != null) {
-        queryClient.invalidateQueries({ queryKey: purchaserWishDetail(markPurchasedId) });
+        queryClient.invalidateQueries({ queryKey: adminWishDetail(markPurchasedId) });
       }
       setMarkPurchasedId(null);
       toast.success("Wish marked as purchased");
@@ -86,7 +100,7 @@ export default function PurchaserAssignedGifts() {
   });
 
   // Update handler — build typed payload from form state
-  function handleUpdateWish(formData: PurchaserEditFormState) {
+  function handleUpdateWish(formData: AdminEditFormState) {
     if (editingId == null || detail == null) return;
     // Cleared fields keep "" — the backend's sentinel for clearing.
     const payload = normalizeUpdatePayload(formData, detail);
@@ -113,7 +127,7 @@ export default function PurchaserAssignedGifts() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-violet-950">Assigned Gifts</h2>
+          <h2 className="text-xl font-bold text-violet-950">My Assigned Gifts</h2>
         </div>
 
         {/* Filters */}
@@ -136,7 +150,7 @@ export default function PurchaserAssignedGifts() {
         {/* Table */}
         {wishes.length === 0 ? (
           <Card>
-            <p className="py-8 text-center text-gray-400">No wishes found.</p>
+            <p className="py-8 text-center text-gray-400">No wishes assigned to you.</p>
           </Card>
         ) : (
           <Table>
@@ -158,13 +172,9 @@ export default function PurchaserAssignedGifts() {
                     <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
                     <Td>{w.person_given_name ?? "Family"}</Td>
                     <Td>
-                      {w.wish_lock_level === "admin" ? (
-                        <Link to={route.familyWishList(w.family_id)} className="text-btn-start hover:underline">
-                          {w.family_display_id}
-                        </Link>
-                      ) : (
-                        <span>{w.family_display_id}</span>
-                      )}
+                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                        {familyMap[w.family_id] ?? `Family #${w.family_id}`}
+                      </Link>
                     </Td>
                     <Td>
                       <WishTypeBadge type={w.type} />
@@ -213,12 +223,7 @@ export default function PurchaserAssignedGifts() {
                               <span className="text-sm font-medium">Loading…</span>
                             </div>
                           ) : detail ? (
-                            <PurchaserEditForm
-                              wish={detail}
-                              onSave={handleUpdateWish}
-                              onCancel={cancelForm}
-                              loading={updateMut.isPending}
-                            />
+                            <AdminEditForm wish={detail} onSave={handleUpdateWish} onCancel={cancelForm} loading={updateMut.isPending} />
                           ) : null}
                         </div>
                       </Td>
@@ -261,24 +266,24 @@ export default function PurchaserAssignedGifts() {
 }
 
 /* ------------------------------------------------------------------ */
-/* PurchaserEditForm — inline edit for purchaser_note + received_at    */
+/* AdminEditForm — inline edit for purchaser_note + received_at        */
 /* ------------------------------------------------------------------ */
 
-interface PurchaserEditFormProps {
+interface AdminEditFormProps {
   wish: WishDetail;
-  onSave: (data: PurchaserEditFormState) => void;
+  onSave: (data: AdminEditFormState) => void;
   onCancel: () => void;
   loading: boolean;
 }
 
-/** Internal form state — only fields purchasers can edit. */
-interface PurchaserEditFormState {
+/** Internal form state — only the purchase-tracking fields this page edits. */
+interface AdminEditFormState {
   purchaser_note: string;
   received_at: string;
 }
 
-function PurchaserEditForm({ wish, onSave, onCancel, loading }: PurchaserEditFormProps) {
-  const [form, setForm] = useState<PurchaserEditFormState>(() => ({
+function AdminEditForm({ wish, onSave, onCancel, loading }: AdminEditFormProps) {
+  const [form, setForm] = useState<AdminEditFormState>(() => ({
     purchaser_note: wish.purchaser_note ?? "",
     received_at: wish.received_at ?? "",
   }));

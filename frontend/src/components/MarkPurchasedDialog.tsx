@@ -49,8 +49,8 @@ export function MarkPurchasedDialog({ open, wish, onSubmit, onCancel, loading }:
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" role="presentation">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true">
         <p className="mb-4 text-sm font-semibold text-gray-700">
           Mark wish for <strong>{wish ? (wish.person_given_name ?? "Family") : "?"}</strong> as purchased
         </p>

@@ -191,8 +191,8 @@ export const familyWishList = (id: number) => ["familyWishList", id] as const;
 
 /** Admin wishes list */
 export const adminWishes = ["adminWishes"] as const;
-/** Single admin wish detail (pass id at call site) */
-export const adminWishDetail = (id: number) => ["adminWishes", id] as const;
+/** Single admin wish detail — matches useCrudManager's inline detail key shape. */
+export const adminWishDetail = (id: number) => ["adminWishes", "detail", id] as const;
 
 // ---------------------------------------------------------------------------
 // Purchaser — Wishes
@@ -200,8 +200,8 @@ export const adminWishDetail = (id: number) => ["adminWishes", id] as const;
 
 /** Purchaser's assigned wishes list */
 export const purchaserWishes = ["purchaserWishes"] as const;
-/** Single purchaser wish detail (pass id at call site) */
-export const purchaserWishDetail = (id: number) => ["purchaserWishes", id] as const;
+/** Single purchaser wish detail — matches useCrudManager's inline detail key shape. */
+export const purchaserWishDetail = (id: number) => ["purchaserWishes", "detail", id] as const;
 
 // ---------------------------------------------------------------------------
 // Delivery — Families

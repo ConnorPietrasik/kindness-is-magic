@@ -157,6 +157,15 @@ describe("Dashboard", () => {
     expect(await screen.findByText(/2 families awaiting your wish approval/)).toBeInTheDocument();
   });
 
+  it("shows the assigned gifts tile for admins", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const tile = await screen.findByRole("link", { name: /My Assigned Gifts/ });
+    expect(tile).toHaveAttribute("href", "/admin/assigned-gifts");
+  });
+
   it("shows the gift-claim progress toward the cap for donors", async () => {
     vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveGiftClaim, { ...mockActiveGiftClaim, id: 2 }]);
 
