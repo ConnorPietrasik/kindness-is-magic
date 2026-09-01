@@ -54,7 +54,7 @@ def get_claim_or_403(db: Session, claim_id: int, user: User) -> FamilyClaim:
     """
     claim = get_active_or_404(db, FamilyClaim, claim_id, "Claim not found")
     if user.role != UserRole.admin and claim.donor_user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to access this claim")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to access this sponsorship")
     return claim
 
 
@@ -248,11 +248,11 @@ def mark_wish_purchased(
     # through the person; family wishes belong to the claimed family directly
     if wish.person_id is None:
         if wish.family_id != claim.family_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the sponsored family")
     else:
         person = get_or_404(db, Person, wish.person_id, "Person not found")
         if person.family_id != claim.family_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the claimed family")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the sponsored family")
 
     wish.assigned_to_id = user.id
     apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=data.purchased_where, purchaser_note=data.purchaser_note)
@@ -279,7 +279,7 @@ def fulfill_claim(
     claim = get_active_or_404(db, FamilyClaim, claim_id, "Claim not found")
 
     if claim.fulfilled_at is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Claim is already fulfilled")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sponsorship is already fulfilled")
 
     claim.fulfilled_at = datetime.now(timezone.utc)
     db.commit()

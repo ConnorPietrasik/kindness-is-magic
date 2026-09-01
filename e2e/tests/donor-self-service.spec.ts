@@ -85,7 +85,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByText("0 / 5")).toBeVisible();
 
     // Navigation cards should be present
-    await expect(page.getByText("My Claims", { exact: true })).toBeVisible();
+    await expect(page.getByText("My Sponsorships", { exact: true })).toBeVisible();
     await expect(page.getByText("Browse Families", { exact: true })).toBeVisible();
 
     await context.close();
@@ -110,7 +110,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.waitForURL(/\/dashboard/);
 
     // Go to a donor sub-page, then use the centred "Kindness is Magic" title to return home
-    await page.getByRole("link", { name: "My Claims" }).click();
+    await page.getByRole("link", { name: "My Sponsorships" }).click();
     await page.waitForURL(/\/donor\/claims/);
 
     await page.getByRole("link", { name: "Kindness is Magic" }).click();
@@ -150,8 +150,8 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.goto(`/families/${testData.familyId}/wish-list`);
     await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
 
-    // Wish list should show the "Claim this family" button for authenticated claim-capable users
-    await expect(page.getByRole("button", { name: "Claim this family" })).toBeVisible();
+    // Wish list should show the "Sponsor this family" button for authenticated claim-capable users
+    await expect(page.getByRole("button", { name: "Sponsor this family" })).toBeVisible();
 
     await context.close();
   });
@@ -180,10 +180,10 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByText("Family Members")).toBeVisible({ timeout: 10_000 });
 
     // Click "Claim this family" button
-    await page.getByRole("button", { name: "Claim this family" }).click();
+    await page.getByRole("button", { name: "Sponsor this family" }).click();
 
     // Claim modal should appear
-    await expect(page.getByRole("heading", { name: "Claim This Family" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Sponsor This Family" })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -191,11 +191,11 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByLabel("I'll purchase the items on their wish list")).toBeChecked();
 
     // Submit the claim
-    await page.getByRole("button", { name: "Claim Family" }).click();
+    await page.getByRole("button", { name: "Sponsor Family" }).click();
 
     // Should navigate to claim detail page
     await page.waitForURL(/\/donor\/claims\/\d+/);
-    await expect(page.getByText("Claim Details")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 
     // Verify claim details
     await expect(page.getByText("gifts", { exact: true })).toBeVisible();
@@ -222,8 +222,8 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list
-    await page.getByRole("link", { name: "My Claims" }).click();
-    await expect(page.getByRole("heading", { name: "My Claims" })).toBeVisible({
+    await page.getByRole("link", { name: "My Sponsorships" }).click();
+    await expect(page.getByRole("heading", { name: "My Sponsorships" })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -254,8 +254,8 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list, then to claim detail
-    await page.getByRole("link", { name: "My Claims" }).click();
-    await expect(page.getByRole("heading", { name: "My Claims" })).toBeVisible({
+    await page.getByRole("link", { name: "My Sponsorships" }).click();
+    await expect(page.getByRole("heading", { name: "My Sponsorships" })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -264,7 +264,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
 
     // Click "View" link on the claim row (styled as button but semantically a link)
     await page.getByRole("link", { name: "View" }).click();
-    await expect(page.getByText("Claim Details")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 
     // Should show the family members and their wishes
     await expect(page.getByText("Family Members & Wishes")).toBeVisible();
@@ -319,8 +319,8 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.waitForURL(/\/dashboard/);
 
     // Navigate to claims list
-    await page.getByRole("link", { name: "My Claims" }).click();
-    await expect(page.getByRole("heading", { name: "My Claims" })).toBeVisible({
+    await page.getByRole("link", { name: "My Sponsorships" }).click();
+    await expect(page.getByRole("heading", { name: "My Sponsorships" })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -329,13 +329,13 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
 
     // Navigate to claim detail ("View" is a Link styled as a button)
     await page.getByRole("link", { name: "View" }).click();
-    await expect(page.getByText("Claim Details")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 
     // Open the actions dropdown (kebab menu with aria-label="More actions")
     await page.getByRole("button", { name: "More actions" }).click();
 
     // Click "Cancel Claim"
-    await page.getByText("Cancel Claim").click();
+    await page.getByText("Cancel Sponsorship").click();
 
     // Confirmation dialog should appear
     await expect(page.getByRole("button", { name: "Yes, cancel" })).toBeVisible({
@@ -350,12 +350,12 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
 
     // Navigate to claims list to verify claim is gone
     await page.goto("/donor/claims");
-    await expect(page.getByRole("heading", { name: "My Claims" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "My Sponsorships" })).toBeVisible({
       timeout: 10_000,
     });
 
     // Should show empty state
-    await expect(page.getByText("You haven't claimed any families yet.")).toBeVisible();
+    await expect(page.getByText("You haven't sponsored any families yet.")).toBeVisible();
 
     await context.close();
   });

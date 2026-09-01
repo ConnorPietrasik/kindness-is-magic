@@ -33,7 +33,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   family_rejected: "Family Rejected",
   referrer_approved: "Referrer Approved",
   referrer_rejected: "Referrer Rejected",
-  claim_confirmation: "Claim Confirmation",
+  claim_confirmation: "Sponsorship Confirmation",
   admin_failure_notice: "Admin Failure Notice",
 };
 

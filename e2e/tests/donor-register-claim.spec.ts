@@ -94,8 +94,8 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
     await expect(page.getByText("Family Members")).toBeVisible({ timeout: 10_000 });
 
     // 2. "Claim this family" shows the guest sign-in / register modal
-    await page.getByRole("button", { name: "Claim this family" }).click();
-    await expect(page.getByRole("heading", { name: "Sign in to Claim" })).toBeVisible();
+    await page.getByRole("button", { name: "Sponsor this family" }).click();
+    await expect(page.getByRole("heading", { name: "Sign in to Sponsor" })).toBeVisible();
 
     // 3. "Sign in" in the dialog — remembers the family and goes to the login page
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -108,11 +108,11 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
 
     // 5. Lands back on the same family's wish list with the claim modal open
     await page.waitForURL(new RegExp(`/families/${testData.familyId}/wish-list`));
-    await expect(page.getByRole("heading", { name: "Claim This Family" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Sponsor This Family" })).toBeVisible({ timeout: 10_000 });
 
     // 6. Cancel — leave the family unclaimed for the registration test
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("heading", { name: "Claim This Family" })).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sponsor This Family" })).not.toBeVisible();
 
     await context.close();
   });
@@ -128,8 +128,8 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
     await expect(page.getByText("Family Members")).toBeVisible({ timeout: 10_000 });
 
     // 2. "Claim this family" shows the guest sign-in / register modal
-    await page.getByRole("button", { name: "Claim this family" }).click();
-    await expect(page.getByRole("heading", { name: "Sign in to Claim" })).toBeVisible();
+    await page.getByRole("button", { name: "Sponsor this family" }).click();
+    await expect(page.getByRole("heading", { name: "Sign in to Sponsor" })).toBeVisible();
 
     // 3. Register — stores the family and navigates to donor self-registration
     await page.getByRole("button", { name: "Register" }).click();
@@ -144,12 +144,12 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
 
     // 5. Lands back on the same family's wish list with the claim modal open
     await page.waitForURL(new RegExp(`/families/${testData.familyId}/wish-list`));
-    await expect(page.getByRole("heading", { name: "Claim This Family" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Sponsor This Family" })).toBeVisible({ timeout: 10_000 });
 
     // 6. Complete the claim (gifts is the default commitment)
-    await page.getByRole("button", { name: "Claim Family" }).click();
+    await page.getByRole("button", { name: "Sponsor Family" }).click();
     await page.waitForURL(/\/donor\/claims\/\d+/);
-    await expect(page.getByText("Claim Details")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 
     await context.close();
   });

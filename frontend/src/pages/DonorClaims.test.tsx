@@ -79,7 +79,7 @@ describe("DonorClaims", () => {
 
     wrap(<DonorClaims />);
 
-    expect(await screen.findByText("You haven't claimed any families yet.")).toBeInTheDocument();
+    expect(await screen.findByText("You haven't sponsored any families yet.")).toBeInTheDocument();
   });
 
   it("passes the fulfilled filter to the API when a status is selected", async () => {
@@ -92,13 +92,13 @@ describe("DonorClaims", () => {
       expect(screen.getByText("2-2")).toBeInTheDocument();
     });
 
-    await user.selectOptions(screen.getByLabelText("Claim status filter"), "fulfilled");
+    await user.selectOptions(screen.getByLabelText("Sponsorship status filter"), "fulfilled");
 
     await waitFor(() => {
       expect(listSpy).toHaveBeenLastCalledWith({ fulfilled: true });
     });
 
-    await user.selectOptions(screen.getByLabelText("Claim status filter"), "active");
+    await user.selectOptions(screen.getByLabelText("Sponsorship status filter"), "active");
 
     await waitFor(() => {
       expect(listSpy).toHaveBeenLastCalledWith({ fulfilled: false });
@@ -110,6 +110,6 @@ describe("DonorClaims", () => {
 
     wrap(<DonorClaims />);
 
-    expect(await screen.findByText("Unable to Load Claims")).toBeInTheDocument();
+    expect(await screen.findByText("Unable to Load Sponsorships")).toBeInTheDocument();
   });
 });

@@ -93,7 +93,7 @@ export default function Dashboard() {
         {/* Donor gift claim cap */}
         {user?.role === "donor" && (
           <Card className="mb-6">
-            <h3 className="mb-3 text-base font-semibold text-gray-900">Gift Claim Cap</h3>
+            <h3 className="mb-3 text-base font-semibold text-gray-900">Gift Sponsorship Cap</h3>
             <div className="flex items-center gap-4">
               <div className="flex-1 rounded-full bg-gray-200">
                 <div
@@ -106,7 +106,7 @@ export default function Dashboard() {
               </span>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              You can claim up to {GIFT_CLAIM_CAP} families for gifts. Cash claims are unlimited.
+              You can sponsor up to {GIFT_CLAIM_CAP} families for gifts. Cash sponsorships are unlimited.
             </p>
           </Card>
         )}
@@ -146,7 +146,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_WISHES} icon="🎁" label="Manage Wishes" desc="Assign & track gift purchases" />
               <NavCard to={ROUTES.ADMIN_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for volunteers" />
               <NavCard to={ROUTES.ADMIN_EMAILS} icon="📧" label="Sent Emails" desc="Full log of emails the app has sent" />
-              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and sponsor families" />
             </>
           )}
 
@@ -165,7 +165,7 @@ export default function Dashboard() {
           {user?.role === "purchaser" && (
             <>
               <NavCard to={ROUTES.PURCHASER_ASSIGNED_GIFTS} icon="🎁" label="Assigned Gifts" desc="View and manage your assigned gifts" />
-              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and claim families" />
+              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and sponsor families" />
             </>
           )}
 
@@ -178,7 +178,7 @@ export default function Dashboard() {
 
           {user?.role === "donor" && (
             <>
-              <NavCard to={ROUTES.DONOR_CLAIMS} icon="🎯" label="My Claims" desc="View and manage your claims" />
+              <NavCard to={ROUTES.DONOR_CLAIMS} icon="🎯" label="My Sponsorships" desc="View and manage your sponsorships" />
               <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🏠" label="Browse Families" desc="Find families needing gifts" />
             </>
           )}
@@ -245,7 +245,9 @@ function WelcomeCard() {
   return (
     <Card className="mb-6">
       <h2 className="mb-4 text-lg font-semibold text-gray-900">Welcome back!</h2>
-      {user?.role === "donor" && <p className="mb-4 text-sm text-gray-500">Browse families and claim them to help this holiday season.</p>}
+      {user?.role === "donor" && (
+        <p className="mb-4 text-sm text-gray-500">Browse families and sponsor them to help this holiday season.</p>
+      )}
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-btn-start to-btn-end text-lg font-bold text-white">
           {displayName[0]?.toUpperCase()}

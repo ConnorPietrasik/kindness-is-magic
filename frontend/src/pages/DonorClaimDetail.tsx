@@ -40,10 +40,10 @@ export default function DonorClaimDetail() {
         <HeaderBar title="Kindness is Magic" left={<BackToClaims />} />
         <PageError
           error={error}
-          heading="Unable to Load Claim"
-          fallback="This claim doesn't exist or you don't have access."
+          heading="Unable to Load Sponsorship"
+          fallback="This sponsorship doesn't exist or you don't have access."
           to={ROUTES.DONOR_CLAIMS}
-          linkLabel="← Back to my claims"
+          linkLabel="← Back to my sponsorships"
         />
       </div>
     );
@@ -75,7 +75,7 @@ export default function DonorClaimDetail() {
 
         {/* Claim info card */}
         <Card className="mb-6">
-          <h3 className="mb-3 text-base font-semibold text-gray-900">Claim Details</h3>
+          <h3 className="mb-3 text-base font-semibold text-gray-900">Sponsorship Details</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoRow label="Status" value={<StatusBadge status={getClaimStatus(data.fulfilled_at)} />} />
             <InfoRow label="Commitment" value={<CommitmentBadge type={data.commitment_type} />} />
@@ -299,7 +299,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
       queryClient.invalidateQueries({ queryKey: donorClaims });
       queryClient.invalidateQueries({ queryKey: donorClaim(claim.id) });
       queryClient.invalidateQueries({ queryKey: publicFamilies });
-      toast.success("Claim cancelled");
+      toast.success("Sponsorship cancelled");
     },
   });
 
@@ -308,7 +308,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: donorClaim(claim.id) });
       queryClient.invalidateQueries({ queryKey: donorClaims });
-      toast.success("Claim marked as fulfilled");
+      toast.success("Sponsorship marked as fulfilled");
     },
   });
 
@@ -318,7 +318,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
       queryClient.invalidateQueries({ queryKey: donorClaim(claim.id) });
       queryClient.invalidateQueries({ queryKey: donorClaims });
       setShowEditNotes(false);
-      toast.success("Claim updated");
+      toast.success("Sponsorship updated");
     },
   });
 
@@ -337,7 +337,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
                   },
                 },
                 {
-                  label: "Cancel Claim",
+                  label: "Cancel Sponsorship",
                   variant: "danger" as const,
                   onClick: () => setShowCancelConfirm(true),
                 },
@@ -350,7 +350,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
                   onClick: () => setShowFulfillConfirm(true),
                 },
                 {
-                  label: "Cancel Claim",
+                  label: "Cancel Sponsorship",
                   variant: "danger" as const,
                   onClick: () => setShowCancelConfirm(true),
                 },
@@ -363,8 +363,8 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
       {/* Cancel confirmation */}
       <ConfirmDialog
         open={showCancelConfirm}
-        title="Cancel this claim?"
-        description="The family will become available for others to claim."
+        title="Cancel this sponsorship?"
+        description="The family will become available for others to sponsor."
         onConfirm={() => {
           cancelMut.mutate();
           setShowCancelConfirm(false);
@@ -379,7 +379,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
       {/* Fulfill confirmation */}
       <ConfirmDialog
         open={showFulfillConfirm}
-        title="Mark claim as fulfilled?"
+        title="Mark sponsorship as fulfilled?"
         description="This indicates gifts/cash have been received by the organization."
         onConfirm={() => {
           fulfillMut.mutate();
@@ -396,7 +396,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
       {showEditNotes && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="mb-3 text-base font-semibold text-gray-900">Edit Claim Details</h3>
+            <h3 className="mb-3 text-base font-semibold text-gray-900">Edit Sponsorship Details</h3>
 
             <div className="mb-3">
               <label htmlFor="commitment-type" className="mb-1 block text-sm font-medium text-gray-700">
@@ -470,7 +470,7 @@ function hasNotes(people: { note: string | null }[]): boolean {
 function BackToClaims() {
   return (
     <Link to={ROUTES.DONOR_CLAIMS} className="text-sm text-white/80 transition-colors hover:text-white">
-      ← My Claims
+      ← My Sponsorships
     </Link>
   );
 }

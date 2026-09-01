@@ -116,7 +116,7 @@ describe("AdminEmails", () => {
 
     // Reset row
     const resetRow = screen.getByText("carol@example.com").closest("tr")!;
-    expect(resetRow).toHaveTextContent("Claim Confirmation");
+    expect(resetRow).toHaveTextContent("Sponsorship Confirmation");
     expect(resetRow).toHaveTextContent("Reset (not counted)");
     expect(resetRow).toHaveTextContent("Donor User");
   });

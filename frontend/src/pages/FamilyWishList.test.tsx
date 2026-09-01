@@ -155,8 +155,8 @@ describe("FamilyWishList claim modal auto-open", () => {
     wrap({ user: mockUser, state: { openClaim: true } });
 
     // Modal content for an authenticated claim-capable user
-    await screen.findByRole("heading", { name: "Claim This Family" });
-    expect(screen.getByRole("button", { name: "Claim Family" })).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Sponsor This Family" });
+    expect(screen.getByRole("button", { name: "Sponsor Family" })).toBeInTheDocument();
   });
 
   it("does not open the claim modal when logged out, even with openClaim state", async () => {
@@ -165,7 +165,7 @@ describe("FamilyWishList claim modal auto-open", () => {
     wrap({ state: { openClaim: true } });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Claim this family" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sponsor this family" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -176,7 +176,7 @@ describe("FamilyWishList claim modal auto-open", () => {
     wrap({ user: mockUser });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Claim this family" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sponsor this family" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -187,7 +187,7 @@ describe("FamilyWishList claim modal auto-open", () => {
 
     wrap({ user: mockUser, state: { openClaim: true } });
 
-    const modalHeading = await screen.findByRole("heading", { name: "Claim This Family" });
+    const modalHeading = await screen.findByRole("heading", { name: "Sponsor This Family" });
     expect(modalHeading).toBeInTheDocument();
     expect(screen.getByTestId("location-state")).toHaveTextContent('{"openClaim":true}');
 

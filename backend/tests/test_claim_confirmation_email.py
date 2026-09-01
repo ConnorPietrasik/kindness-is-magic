@@ -279,7 +279,7 @@ class TestClaimConfirmationEmailTemplate:
             people=[],
             claim_detail_url="http://example.com/donor/claims/42",
         )
-        assert "View Your Claim" in html
+        assert "View Your Sponsorship" in html
         assert "http://example.com/donor/claims/42" in html
 
     def test_email_includes_branding(self):
@@ -492,7 +492,7 @@ class TestClaimConfirmationEmailOnCreation:
         assert "email_error" not in body
         assert len(sent_emails) == 1
         assert sent_emails[0]["to"] == DONOR_EMAIL
-        assert "Claim Confirmation" in sent_emails[0]["subject"]
+        assert "Sponsorship Confirmation" in sent_emails[0]["subject"]
 
     def test_cash_claim_does_not_send_email(self, test_client: TestClient, db: Session):
         """Cash claim → no email sent."""

@@ -48,9 +48,9 @@ function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: num
   if (!user) {
     return (
       <>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900">Sign in to Claim</h3>
+        <h3 className="mb-2 text-lg font-semibold text-gray-900">Sign in to Sponsor</h3>
         <p className="mb-4 text-sm text-gray-600">
-          You need to be signed in to claim a family. Create a free donor account to get started.
+          You need to be signed in to sponsor a family. Create a free donor account to get started.
         </p>
         <div className="flex gap-3">
           <Link
@@ -109,7 +109,8 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
       navigate(route.donorClaimDetail(data.id));
       if (data.email_error) {
         toast.info(
-          "Claim created! However, we couldn't send your confirmation email. " + "Please contact us if you need a record of your claim."
+          "Sponsorship created! However, we couldn't send your confirmation email. " +
+            "Please contact us if you need a record of your sponsorship."
         );
       }
     },
@@ -117,7 +118,7 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
 
   return (
     <>
-      <h3 className="mb-2 text-lg font-semibold text-gray-900">Claim This Family</h3>
+      <h3 className="mb-2 text-lg font-semibold text-gray-900">Sponsor This Family</h3>
       <p className="mb-4 text-sm text-gray-600">How would you like to support this family?</p>
 
       <div className="mb-4 space-y-2">
@@ -154,7 +155,7 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
 
       <div className="flex gap-3">
         <Button className="flex-1" onClick={() => claimMut.mutate()} loading={claimMut.isPending}>
-          {claimMut.isPending ? "Claiming…" : "Claim Family"}
+          {claimMut.isPending ? "Sponsoring…" : "Sponsor Family"}
         </Button>
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel

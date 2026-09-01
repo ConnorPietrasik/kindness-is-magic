@@ -20,6 +20,7 @@
 - **Do not consider existing users.** The database is wiped regularly.
 - **No database downgrade.** The database is wiped regularly so that's a waste of time. No backfill either.
 - If something is easily verifiable, **check it instead of wasting time thinking.**
+- **Terminology:** a donor's commitment to a family is a "claim" in code but a "sponsorship" in user-facing text.
 
 ## Planning
 

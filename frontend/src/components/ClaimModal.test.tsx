@@ -55,7 +55,7 @@ describe("ClaimModal guest auth gate", () => {
     vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
     wrap();
 
-    expect(screen.getByRole("heading", { name: "Sign in to Claim" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in to Sponsor" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/login|");

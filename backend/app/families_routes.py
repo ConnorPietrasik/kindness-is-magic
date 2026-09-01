@@ -331,7 +331,7 @@ async def _send_claim_confirmation(
 
         result = await send_email(
             to=user.email,
-            subject=f"Claim Confirmation — Family {display_id}",
+            subject=f"Sponsorship Confirmation — Family {display_id}",
             html_body=body,
             db=db,
             kind=EmailKind.claim_confirmation,
@@ -362,7 +362,7 @@ async def _send_claim_confirmation(
                 error_summary=result.get("reason", "unknown"),
             )
             await send_admin_notification(
-                subject="Claim Confirmation Email Failed",
+                subject="Sponsorship Confirmation Email Failed",
                 body_html=admin_body,
                 db=db,
                 kind=EmailKind.admin_failure_notice,
@@ -384,7 +384,7 @@ async def _send_claim_confirmation(
                 error_summary="unexpected error",
             )
             await send_admin_notification(
-                subject="Claim Confirmation Email Failed",
+                subject="Sponsorship Confirmation Email Failed",
                 body_html=admin_body,
                 db=db,
                 kind=EmailKind.admin_failure_notice,
@@ -431,7 +431,7 @@ async def claim_family(
     if existing_claim:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This family is already claimed",
+            detail="This family is already sponsored",
         )
 
     # 3. Check gift-claim cap
@@ -449,7 +449,7 @@ async def claim_family(
         if current_gift_count >= GIFT_CLAIM_CAP:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Gift claim limit of {GIFT_CLAIM_CAP} reached",
+                detail=f"Gift sponsorship limit of {GIFT_CLAIM_CAP} reached",
             )
 
     # 4. Create the claim

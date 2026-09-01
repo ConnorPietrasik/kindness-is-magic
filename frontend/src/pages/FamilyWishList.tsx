@@ -180,10 +180,10 @@ export default function FamilyWishList() {
               // Already claimed — show status + link to detail
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-emerald-800 capitalize">{data.claim_status ?? "active"} Claim</span>
+                  <span className="text-sm font-semibold text-emerald-800 capitalize">{data.claim_status ?? "active"} Sponsorship</span>
                   {data.claim_id != null && (
                     <Link to={route.donorClaimDetail(data.claim_id)} className="text-sm font-medium text-emerald-700 hover:underline">
-                      View claim details →
+                      View sponsorship details →
                     </Link>
                   )}
                 </div>
@@ -191,8 +191,8 @@ export default function FamilyWishList() {
             ) : (
               // Claim-capable, not yet claimed
               <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="mb-3 text-sm text-gray-600">Would you like to claim this family and help fulfill their wishes?</p>
-                <Button onClick={() => setShowClaimModal(true)}>Claim this family</Button>
+                <p className="mb-3 text-sm text-gray-600">Would you like to sponsor this family and help fulfill their wishes?</p>
+                <Button onClick={() => setShowClaimModal(true)}>Sponsor this family</Button>
               </div>
             )
           ) : user ? // Authenticated but not claim-capable (family role) — no UI
@@ -200,9 +200,9 @@ export default function FamilyWishList() {
             // Not authenticated — show sign in / register prompt
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               <p className="mb-3 text-sm text-gray-600">
-                Sign in or create a free account to claim this family and help fulfill their wishes.
+                Sign in or create a free account to sponsor this family and help fulfill their wishes.
               </p>
-              <Button onClick={() => setShowClaimModal(true)}>Claim this family</Button>
+              <Button onClick={() => setShowClaimModal(true)}>Sponsor this family</Button>
             </div>
           )}
         </div>

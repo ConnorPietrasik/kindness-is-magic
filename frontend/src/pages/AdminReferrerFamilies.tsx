@@ -260,7 +260,7 @@ function FamiliesTable({
         {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
         {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
         {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
-        {visibleColumns.includes("claim") && <Th>Claim</Th>}
+        {visibleColumns.includes("claim") && <Th>Sponsorship</Th>}
         {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
         {visibleColumns.includes("person_count") && <Th>People</Th>}
         {visibleColumns.includes("verification_status") && <Th>Verification</Th>}

@@ -368,12 +368,12 @@ def build_claim_confirmation_email(
         table_html = """<p style="color:#666666;font-style:italic;">No family members have been added to this family yet. You can check back later or contact the organization for details.</p>"""
 
     return f"""<p>Hi <strong>{donor_name}</strong>,</p>
-<p>Thank you for claiming <strong>Family {family_display_id}</strong> on Kindness Is Magic ✨</p>
+<p>Thank you for sponsoring <strong>Family {family_display_id}</strong> on Kindness Is Magic ✨</p>
 {bio_line}
 <h2 style="font-size:16px;color:{_BRAND_COLOR};margin-top:20px;">Wish List</h2>
 {family_wish_html}
 {table_html}
-<p style="text-align:center;margin-top:24px;"><a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">View Your Claim</a></p>
+<p style="text-align:center;margin-top:24px;"><a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">View Your Sponsorship</a></p>
 <p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts.</p>"""
 
 
@@ -385,11 +385,11 @@ def build_admin_email_failure_notice(
 ) -> str:
     """Build the HTML body for an admin notification about a failed confirmation email."""
     base = APP_BASE_URL
-    return f"""<p>An error occurred while sending the claim confirmation email to a donor.</p>
+    return f"""<p>An error occurred while sending the sponsorship confirmation email to a donor.</p>
 <table style="width:100%;border-collapse:collapse;margin:16px 0;">
 <tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{donor_email}</td></tr>
 <tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Family</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{family_display_id}</td></tr>
-<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Claim ID</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{claim_id}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Sponsorship ID</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{claim_id}</td></tr>
 <tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{error_summary}</td></tr>
 </table>
 <p style="text-align:center;"><a href="{base}/admin" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Admin Dashboard</a></p>"""

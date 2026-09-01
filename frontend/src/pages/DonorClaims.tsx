@@ -39,7 +39,7 @@ export default function DonorClaims() {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar title="Kindness is Magic" />
-        <PageError error={error} heading="Unable to Load Claims" fallback="Something went wrong. Please try again later." />
+        <PageError error={error} heading="Unable to Load Sponsorships" fallback="Something went wrong. Please try again later." />
       </div>
     );
   }
@@ -50,10 +50,10 @@ export default function DonorClaims() {
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-violet-950">My Claims</h2>
+          <h2 className="text-xl font-bold text-violet-950">My Sponsorships</h2>
           <div className="flex items-center gap-3">
             <select
-              aria-label="Claim status filter"
+              aria-label="Sponsorship status filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -75,9 +75,9 @@ export default function DonorClaims() {
 
         {claims.length === 0 ? (
           <Card className="py-12 text-center">
-            <p className="text-gray-500">You haven't claimed any families yet.</p>
+            <p className="text-gray-500">You haven't sponsored any families yet.</p>
             <Link to={ROUTES.PUBLIC_FAMILIES} className="mt-3 inline-block text-sm font-medium text-btn-start hover:underline">
-              Browse families to claim →
+              Browse families to sponsor →
             </Link>
           </Card>
         ) : (

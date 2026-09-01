@@ -112,7 +112,7 @@ export default function Login() {
         </p>
         <p className="mt-2 text-center text-sm">
           <Link to={ROUTES.DONOR_SELF_REGISTER} className="text-btn-start hover:underline">
-            Register to claim a family
+            Register to sponsor a family
           </Link>
         </p>
         <p className="mt-4 text-center text-sm">

@@ -85,7 +85,7 @@ def require_claim_capable(current_user: User = Depends(_get_user_or_raise)) -> U
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to manage claims",
+            detail="You do not have permission to manage sponsorships",
         )
     return current_user
 

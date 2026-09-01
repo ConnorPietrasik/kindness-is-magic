@@ -130,7 +130,7 @@ describe("DonorClaimDetail", () => {
     });
 
     expect(screen.getByText("Board game fans")).toBeInTheDocument();
-    expect(screen.getByText("Claim Details")).toBeInTheDocument();
+    expect(screen.getByText("Sponsorship Details")).toBeInTheDocument();
     expect(screen.getByText("Please wrap gifts")).toBeInTheDocument();
     // Family wish + member wish
     expect(screen.getByText("Family outing")).toBeInTheDocument();
@@ -150,13 +150,13 @@ describe("DonorClaimDetail", () => {
     });
 
     await openActionsMenu(user);
-    await user.click(await screen.findByRole("menuitem", { name: "Cancel Claim" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Cancel Sponsorship" }));
     await user.click(await screen.findByRole("button", { name: "Yes, cancel" }));
 
     await waitFor(() => {
       expect(cancelSpy).toHaveBeenCalledWith(1);
     });
-    expect(await screen.findByText("Claim cancelled")).toBeInTheDocument();
+    expect(await screen.findByText("Sponsorship cancelled")).toBeInTheDocument();
   });
 
   it("offers Mark Fulfilled to admins instead of Edit Details", async () => {

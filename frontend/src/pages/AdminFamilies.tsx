@@ -365,7 +365,7 @@ export default function AdminFamilies() {
               )}
               {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
               {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
-              {visibleColumns.includes("claim") && <Th>Claim</Th>}
+              {visibleColumns.includes("claim") && <Th>Sponsorship</Th>}
               {visibleColumns.includes("phone_number") && (
                 <Th>
                   <div className="flex flex-col gap-1">

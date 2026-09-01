@@ -79,7 +79,7 @@ export default function DonorSelfRegister() {
       <div className="w-full max-w-md rounded-2xl bg-white px-8 py-10 shadow-lg">
         <Logo className="mx-auto mb-4 h-16 w-16" />
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Donor Registration</h1>
-        <p className="mb-6 text-center text-sm text-gray-500">Create an account to claim and support families</p>
+        <p className="mb-6 text-center text-sm text-gray-500">Create an account to sponsor families</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField

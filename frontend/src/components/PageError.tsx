@@ -4,7 +4,7 @@ import { formatApiError } from "../lib/utils";
 interface PageErrorProps {
   /** Query error from `useQuery` (may be `undefined` when `data` is missing without an error). */
   error: unknown;
-  /** Neutral heading, e.g. "Unable to Load Claim". */
+  /** Neutral heading, e.g. "Unable to Load Sponsorships". */
   heading: string;
   /** Message shown when the error has no extractable detail (network failures, etc.). */
   fallback: string;
