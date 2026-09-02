@@ -6,7 +6,8 @@
  * assigns them all to the seeded admin user (via API). The single-mark test
  * uses the practical wish; the batch test uses the fun wish + the second
  * person's wish, so the two never touch the same row. The UI is the path
- * under test: dashboard tile → scoped list → mark purchased → purchased filter.
+ * under test: dashboard tile → scoped list → mark purchased (with a custom
+ * purchase date) → purchased filter.
  */
 import { test, expect } from "@playwright/test";
 import {
@@ -26,6 +27,17 @@ const WISH_DESC = `Admin gifts e2e wish ${SUFFIX}`;
 const FUN_WISH_DESC = `Admin gifts e2e fun wish ${SUFFIX}`;
 const BATCH_WISH_DESC = `Admin batch e2e wish ${SUFFIX}`;
 const BATCH_FUN_WISH_DESC = `Admin batch e2e fun wish ${SUFFIX}`;
+
+// Custom purchase dates for the datetime-local picker (local-time input
+// values, as the browser's <input type="datetime-local"> expects)
+const SINGLE_MARK_DATE = "2026-02-25T09:30";
+const BATCH_MARK_DATE = "2026-03-10T14:45";
+
+// Same locale formatting as the UI's formatDateTime — computed here so the
+// assertion matches the rendered title regardless of the host locale.
+function formatPurchasedDate(inputValue: string): string {
+  return new Date(inputValue).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
 
 const state: {
   referrerId?: number;
@@ -115,16 +127,20 @@ test.describe.serial("Admin Assigned Gifts", () => {
     const ourRow = page.getByRole("row").filter({ hasText: WISH_DESC });
     await expect(ourRow).toBeVisible({ timeout: 10_000 });
 
-    // Mark it purchased through the dialog
+    // Mark it purchased through the dialog — with a custom purchase date
+    // (the picker defaults to now; fill overrides it)
     await ourRow.getByRole("button", { name: "Mark Purchased" }).click();
     await expect(page.getByText(/Mark wish for/)).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel("Purchased Where").fill("E2E Admin Store");
     const dialog = page.getByRole("dialog");
+    // exact — "Purchased" is a substring of "Purchased filter" / "Purchased Where"
+    await dialog.getByLabel("Purchased", { exact: true }).fill(SINGLE_MARK_DATE);
+    await dialog.getByLabel("Purchased Where").fill("E2E Admin Store");
     await dialog.getByRole("button", { name: "Mark Purchased" }).click();
 
-    // Success toast, then the row shows the purchased checkmark
+    // Success toast, then the row shows the purchased checkmark with the
+    // chosen date
     await expect(page.getByText("Wish marked as purchased")).toBeVisible({ timeout: 10_000 });
-    await expect(ourRow).toContainText("✓", { timeout: 10_000 });
+    await expect(ourRow.getByTitle(formatPurchasedDate(SINGLE_MARK_DATE))).toContainText("✓", { timeout: 10_000 });
 
     // Filter: still visible under "Purchased", gone under "Unpurchased"
     const statusSelect = page.getByLabel("Purchased filter");
@@ -155,20 +171,24 @@ test.describe.serial("Admin Assigned Gifts", () => {
     await funRow.getByRole("checkbox").check();
     await batchRow.getByRole("checkbox").check();
 
-    // Batch mark with a shared location
+    // Batch mark with a shared location and a shared custom date
     await page.getByRole("button", { name: "Mark Purchased (2)" }).click();
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel("Purchased Where").fill("E2E Batch Store");
-    await page.getByRole("dialog").getByRole("button", { name: "Mark Purchased" }).click();
+    const batchDialog = page.getByRole("dialog");
+    // exact — "Purchased" is a substring of "Purchased filter" / "Purchased Where"
+    await batchDialog.getByLabel("Purchased", { exact: true }).fill(BATCH_MARK_DATE);
+    await batchDialog.getByLabel("Purchased Where").fill("E2E Batch Store");
+    await batchDialog.getByRole("button", { name: "Mark Purchased" }).click();
 
     // Success toast
     await expect(page.getByText("2 wishes marked as purchased")).toBeVisible({ timeout: 10_000 });
 
-    // Status filter follows: both rows now show the purchased checkmark
+    // Status filter follows: both rows now show the purchased checkmark with
+    // the shared date
     const statusSelect = page.getByLabel("Purchased filter");
     await statusSelect.selectOption({ label: "Purchased" });
-    await expect(funRow).toContainText("✓", { timeout: 10_000 });
-    await expect(batchRow).toContainText("✓");
+    await expect(funRow.getByTitle(formatPurchasedDate(BATCH_MARK_DATE))).toContainText("✓", { timeout: 10_000 });
+    await expect(batchRow.getByTitle(formatPurchasedDate(BATCH_MARK_DATE))).toContainText("✓");
 
     // ...and both are gone under "Unpurchased"
     await statusSelect.selectOption({ label: "Unpurchased" });

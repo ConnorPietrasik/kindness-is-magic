@@ -770,12 +770,12 @@ export function purchaserGetWish(wishId: number): Promise<WishDetail> {
   return apiGet(`/api/purchaser/wishes/${wishId}`);
 }
 
-/** Mark a wish as purchased (sets purchased_at=now + optional fields). */
+/** Mark a wish as purchased (purchased_at defaults to now; "" clears). */
 export function purchaserMarkPurchased(wishId: number, payload: WishPurchaseMark): Promise<WishDetail> {
   return apiPost(`/api/purchaser/wishes/${wishId}/mark-purchased`, payload);
 }
 
-/** Batch-mark assigned wishes as purchased (sets purchased_at=now + optional fields, no note). */
+/** Batch-mark assigned wishes as purchased (purchased_at defaults to now; "" clears; no note). */
 export function purchaserBatchMarkPurchased(payload: WishBatchMarkPurchased): Promise<{ marked_count: number }> {
   return apiPost("/api/purchaser/wishes/batch-mark-purchased", payload);
 }

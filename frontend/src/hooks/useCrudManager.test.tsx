@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -495,5 +495,50 @@ describe("useCrudManager", () => {
 
     // Invalidation triggers at least one list refetch (call #2+)
     expect(fns.listFn.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /* ── Fetch-failure feedback ─────────────────────────────── */
+
+  it("toasts and reverts the edit row when the detail fetch fails", async () => {
+    const fns = makeFns();
+    fns.detailFn.mockRejectedValue(new Error("detail failed"));
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns, entityName: "Thing" }), { wrapper: wrap() });
+
+    act(() => {
+      result.current.openEdit(1);
+    });
+
+    // The failure is surfaced as a toast (error message) and the edit row reverts
+    await screen.findByText("detail failed");
+    expect(result.current.editingId).toBeNull();
+
+    // The poisoned cache entry is removed, so clicking Edit again fetches fresh
+    act(() => {
+      result.current.openEdit(1);
+    });
+    await waitFor(() => {
+      expect(fns.detailFn).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("toasts the server detail when the detail fetch fails with an API error", async () => {
+    const fns = makeFns();
+    fns.detailFn.mockRejectedValue({ response: { data: { detail: "Thing not found" } } });
+    const { result } = renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
+
+    act(() => {
+      result.current.openEdit(1);
+    });
+
+    await screen.findByText("Thing not found");
+    expect(result.current.editingId).toBeNull();
+  });
+
+  it("toasts when the list fetch fails", async () => {
+    const fns = makeFns();
+    fns.listFn.mockRejectedValue(new Error("list failed"));
+    renderHook(() => useCrudManager({ rootKey: ["test"], ...fns }), { wrapper: wrap() });
+
+    await screen.findByText("list failed");
   });
 });

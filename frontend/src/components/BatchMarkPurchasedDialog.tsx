@@ -1,4 +1,5 @@
 import { type ChangeEvent, useEffect, useState } from "react";
+import { nowIso } from "../lib/utils";
 import type { WishBatchMarkPurchased } from "../types";
 import { Button } from "./Button";
 import { DatePicker } from "./DatePicker";
@@ -16,17 +17,21 @@ interface BatchMarkPurchasedDialogProps {
  * Dialog for batch-marking selected wishes as purchased (e.g. things bought
  * at the same place).
  *
- * Clear semantics (backend contract):
+ * Field semantics (backend contract):
+ * - purchased_at: defaults to the current date/time; empty input submits
+ *   "", which clears the value (omitted/null means "now")
  * - purchased_where: empty input submits null, which clears the value
  * - received_at: "" is the backend sentinel for clearing
  * purchaser_note is not touched — notes are per-item (use the row's Edit form).
  */
 export function BatchMarkPurchasedDialog({ open, wishIds, onSubmit, onCancel, loading }: BatchMarkPurchasedDialogProps) {
+  const [purchasedAt, setPurchasedAt] = useState("");
   const [purchasedWhere, setPurchasedWhere] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
 
   useEffect(() => {
     if (open) {
+      setPurchasedAt(nowIso());
       setPurchasedWhere("");
       setReceivedAt("");
     }
@@ -49,6 +54,8 @@ export function BatchMarkPurchasedDialog({ open, wishIds, onSubmit, onCancel, lo
             e.preventDefault();
             onSubmit({
               wish_ids: wishIds,
+              // Empty input → "" (clears); a value overwrites
+              purchased_at: purchasedAt || "",
               // Empty input → null (clears); otherwise overwrites
               purchased_where: purchasedWhere || null,
               // "" is the backend sentinel for clearing
@@ -57,6 +64,8 @@ export function BatchMarkPurchasedDialog({ open, wishIds, onSubmit, onCancel, lo
           }}
           className="space-y-3"
         >
+          <DatePicker label="Purchased" value={purchasedAt} onChange={setPurchasedAt} />
+
           <FormField
             label="Purchased Where"
             fieldProps={{

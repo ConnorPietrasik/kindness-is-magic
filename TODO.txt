@@ -1,6 +1,4 @@
-Filtering for purchaser view (for easier checkmark mark all)
-Checkmarks to batch mark things purchased at the same place in admin and purchaser assigned-wish views
-An easy method for purchasers to mark that they purchased something yesterday (or whatever date they choose)
+Fix default wish sort order; should be grouped by family
 Delivery slips for the delivery people: where to drive + family name + phone number; Admins should see delivery slips too
 Hide CSV import - maybe make a nested view for rarely-used admin functions? It’s mostly used for demo and testing
 Move the password change thing into a more general “update user” area instead of being just kinda thrown onto the dashboard

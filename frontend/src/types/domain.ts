@@ -283,6 +283,8 @@ export interface WishListSummary {
 
 /** Payload for marking a wish as purchased. */
 export interface WishPurchaseMark {
+  /** Omitted or null → server defaults to the current time. "" clears. */
+  purchased_at?: string | null;
   purchased_where?: string | null;
   purchaser_note?: string | null;
   received_at?: string | null;
@@ -297,6 +299,8 @@ export interface WishBatchAssign {
 /** Payload for batch-marking wishes as purchased. No purchaser note — notes are per-item. */
 export interface WishBatchMarkPurchased {
   wish_ids: number[];
+  /** Omitted or null → server defaults to the current time. "" clears. */
+  purchased_at?: string | null;
   purchased_where?: string | null;
   received_at?: string | null;
 }

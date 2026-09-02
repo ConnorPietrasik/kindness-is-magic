@@ -376,6 +376,7 @@ describe("AdminWishes", () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
     vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
 
     wrap(<AdminWishes />);
@@ -408,6 +409,33 @@ describe("AdminWishes", () => {
     await waitFor(() => {
       expect(api.adminMarkPurchased).toHaveBeenCalledWith(1, expect.objectContaining({ purchased_where: "Amazon" }));
     });
+  });
+
+  it("mark-purchased dialog shows an error with retry when the detail fetch fails", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    vi.spyOn(api, "adminGetWish")
+      .mockRejectedValueOnce({ response: { data: { detail: "Wish not found" } } })
+      .mockResolvedValue(mockWishDetail);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const markPurchasedButtons = screen.getAllByText("Mark Purchased");
+    await user.click(markPurchasedButtons[0]!);
+
+    // The dialog stays open and shows the fetch failure instead of the form
+    await screen.findByText("Wish not found");
+    expect(screen.queryByLabelText("Purchased Where")).not.toBeInTheDocument();
+
+    // Retry re-fetches the detail and the form appears
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByLabelText("Purchased Where");
   });
 
   it("batch assign dialog opens with selected wishes", async () => {
@@ -695,6 +723,7 @@ describe("AdminWishes", () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
     vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
 
     wrap(<AdminWishes />);

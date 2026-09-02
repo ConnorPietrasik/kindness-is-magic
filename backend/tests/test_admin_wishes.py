@@ -629,6 +629,56 @@ class TestPatchWish:
         assert resp.status_code == 200
         assert resp.json()["purchased_at"] is not None
 
+    def test_clear_purchased_at(self, test_client, admin_user, wish_tree, db):
+        """'' clears purchased_at (partial-update sentinel convention); null is a no-op."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # null is a no-op (partial-update convention)
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish.id}",
+            json={"purchased_at": None},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] is not None
+
+        # '' clears to NULL
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish.id}",
+            json={"purchased_at": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] is None
+
+    def test_invalid_purchased_at_422(self, test_client, admin_user, wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"purchased_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
+    def test_invalid_received_at_422(self, test_client, admin_user, wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"received_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
     def test_set_purchased_where(self, test_client, admin_user, wish_tree):
         """Set purchased_where."""
         test_client.post(
@@ -708,6 +758,48 @@ class TestMarkPurchased:
         assert data["purchased_at"] is not None
         assert data["purchased_where"] == "Walmart"
         assert data["assigned_to_id"] == admin_user.id
+
+    def test_purchased_at_explicit(self, test_client, admin_user, wish_tree):
+        """An explicit purchased_at is used as-is."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        dt = "2026-02-14T09:30:00Z"
+        resp = test_client.post(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}/mark-purchased",
+            json={"purchased_where": "Walmart", "purchased_at": dt},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] == dt
+
+    def test_purchased_at_clear(self, test_client, admin_user, wish_tree, db):
+        """'' clears purchased_at (null/omitted default to now)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = test_client.post(
+            f"/api/admin/wishes/{wish.id}/mark-purchased",
+            json={"purchased_at": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] is None
+
+    def test_purchased_at_invalid_422(self, test_client, admin_user, wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.post(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}/mark-purchased",
+            json={"purchased_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
 
     def test_mark_purchased_family_wish(self, test_client, admin_user, wish_tree, db):
         """Family wish can be marked purchased (person fields stay null)."""
@@ -954,6 +1046,58 @@ class TestBatchMarkPurchased:
             assert fresh[w.id].purchased_where == "Walmart"
             assert fresh[w.id].received_at is not None
             assert fresh[w.id].assigned_to_id == admin_user.id
+
+    def test_batch_mark_purchased_at_explicit(self, test_client, admin_user, wish_tree, db):
+        """An explicit purchased_at is applied to every wish in the batch."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        dt = "2026-02-14T09:30:00Z"
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": dt},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_at.isoformat().replace("+00:00", "Z") == dt
+
+    def test_batch_mark_purchased_at_clear(self, test_client, admin_user, wish_tree, db):
+        """'' clears purchased_at on every wish in the batch."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        for w in wishes:
+            w.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": ""},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is None
+
+    def test_batch_mark_purchased_at_invalid_422(self, test_client, admin_user, wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
 
     def test_batch_mark_duplicate_ids_counted_once(self, test_client, admin_user, wish_tree, db):
         """Duplicate wish IDs are deduplicated — marked_count counts unique wishes."""

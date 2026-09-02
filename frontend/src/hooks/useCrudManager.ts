@@ -7,12 +7,15 @@
  *  - Optional detail query (fetch single item by id, for editing)
  *  - Create, update, delete mutations with automatic query invalidation
  *  - UI state: showForm, editingId, deleteConfirm
+ *  - Fetch-failure feedback: toasts list/detail fetch errors so a failure
+ *    never renders as a silent empty state or a vanished edit row
  */
 
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "../context/ToastContext";
+import { formatApiError } from "../lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,7 +97,13 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
 
   /* ── List query ─────────────────────────────────────────── */
   const listQueryKey = listParams != null ? [...rootKey, listParams] : rootKey;
-  const { data: listData, isLoading: listLoading } = useQuery({
+  const {
+    data: listData,
+    isLoading: listLoading,
+    isError: listIsError,
+    isFetching: listIsFetching,
+    error: listError,
+  } = useQuery({
     queryKey: listQueryKey,
     queryFn: () => listFn(listParams),
   });
@@ -112,6 +121,26 @@ export function useCrudManager<ListResponse, Item, Payload = unknown, ListParams
   });
   const detail: Item | null = detailQuery.data ?? null;
   const detailLoading = editingId != null && detailFn != null && detailQuery.isLoading;
+
+  /* ── Fetch-failure feedback ───────────────────────────────
+     A failed detail fetch would otherwise silently drop the edit row
+     back to the normal row, and a failed list fetch would render the
+     misleading "empty" state. Toast both (once retries are exhausted);
+     for the detail fetch also revert and drop the poisoned cache entry
+     so clicking Edit again performs a fresh fetch. */
+  useEffect(() => {
+    if (detailQuery.isError && !detailQuery.isFetching) {
+      toast.error(formatApiError(detailQuery.error, `Unable to load ${entityName ?? "record"}. Please try again.`));
+      queryClient.removeQueries({ queryKey: [...rootKey, "detail", editingId] });
+      setEditingId(null);
+    }
+  }, [detailQuery.isError, detailQuery.isFetching, detailQuery.error, editingId, entityName, queryClient, rootKey, toast]);
+
+  useEffect(() => {
+    if (listIsError && !listIsFetching) {
+      toast.error(formatApiError(listError, "Unable to load data. Please try again."));
+    }
+  }, [listIsError, listIsFetching, listError, toast]);
 
   /* ── Mutations (always created to satisfy Rules of Hooks) ── */
   const createMut = useMutation({

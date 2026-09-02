@@ -195,6 +195,17 @@ describe("HierarchicalManage", () => {
     expect(document.querySelector("svg.animate-spin")).toBeInTheDocument();
   });
 
+  it("shows an error message when the parent fetch fails", async () => {
+    const fns = makeApiFns();
+    fns.parentFetch.mockRejectedValue({ response: { data: { detail: "Family not found" } } });
+    render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
+
+    // The failure is visible instead of a blank parent card
+    await screen.findByText("Family not found");
+    expect(screen.queryByTestId("parent-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("children-table")).not.toBeInTheDocument();
+  });
+
   /* ── Parent rendering ──────────────────────────────────── */
 
   it("renders parent data via render callback", async () => {

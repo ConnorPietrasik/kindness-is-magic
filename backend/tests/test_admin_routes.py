@@ -645,6 +645,15 @@ class TestAdminUpdateFamily:
         body = resp.json()
         assert body["pickup_window"] is None
 
+    def test_422_invalid_pickup_window(self, test_client: TestClient, admin_user, family_record):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"pickup_window": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
     def test_200_pickup_window_in_list_response(self, test_client: TestClient, admin_user, family_record, db: Session):
         """pickup_window should appear in the list response."""
         family_record.pickup_window = datetime(2025, 10, 1, 9, 0, 0, tzinfo=timezone.utc)

@@ -459,6 +459,38 @@ class TestPurchaserMarkPurchased:
         assert data["purchaser_note"] == "Got on sale"
         assert data["received_at"] is not None
 
+    def test_mark_purchased_purchased_at_explicit(self, logged_in_purchaser, purchaser_wish_tree):
+        """An explicit purchased_at is used as-is."""
+        wish = purchaser_wish_tree["wishes"][0]
+        dt = "2026-02-14T09:30:00Z"
+        resp = logged_in_purchaser.post(
+            f"/api/purchaser/wishes/{wish.id}/mark-purchased",
+            json={"purchased_where": "Target", "purchased_at": dt},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] == dt
+
+    def test_mark_purchased_purchased_at_clear(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """'' clears purchased_at (null/omitted default to now)."""
+        wish = purchaser_wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = logged_in_purchaser.post(
+            f"/api/purchaser/wishes/{wish.id}/mark-purchased",
+            json={"purchased_at": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_at"] is None
+
+    def test_mark_purchased_purchased_at_invalid_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        wish = purchaser_wish_tree["wishes"][0]
+        resp = logged_in_purchaser.post(
+            f"/api/purchaser/wishes/{wish.id}/mark-purchased",
+            json={"purchased_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
     def test_mark_purchased_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Purchaser can mark an assigned family wish purchased (no reassign)."""
         w = assign_family_wish(db, purchaser_wish_tree)
@@ -550,6 +582,46 @@ class TestPurchaserBatchMarkPurchased:
             assert fresh[w.id].purchased_at is not None
             assert fresh[w.id].purchased_where == "Target"
             assert fresh[w.id].received_at is not None
+
+    def test_batch_mark_purchased_at_explicit(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An explicit purchased_at is applied to every wish in the batch."""
+        wishes = purchaser_wish_tree["wishes"]
+        dt = "2026-02-14T09:30:00Z"
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": dt},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_at.isoformat().replace("+00:00", "Z") == dt
+
+    def test_batch_mark_purchased_at_clear(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """'' clears purchased_at on every wish in the batch."""
+        wishes = purchaser_wish_tree["wishes"]
+        for w in wishes:
+            w.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": ""},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is None
+
+    def test_batch_mark_purchased_at_invalid_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        wishes = purchaser_wish_tree["wishes"]
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
 
     def test_batch_mark_duplicate_ids_counted_once(self, logged_in_purchaser, purchaser_wish_tree, db):
         """Duplicate wish IDs are deduplicated — marked_count counts unique wishes."""
@@ -756,6 +828,15 @@ class TestPurchaserUpdateWish:
         )
         assert resp.status_code == 200
         assert resp.json()["received_at"] is not None
+
+    def test_update_received_at_invalid_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        wish = purchaser_wish_tree["wishes"][0]
+        resp = logged_in_purchaser.patch(
+            f"/api/purchaser/wishes/{wish.id}",
+            json={"received_at": "not-a-date"},
+        )
+        assert resp.status_code == 422
 
     def test_cannot_update_wish_definition(self, logged_in_purchaser, purchaser_wish_tree):
         """Purchaser cannot update wish definition fields (type, description, size)."""

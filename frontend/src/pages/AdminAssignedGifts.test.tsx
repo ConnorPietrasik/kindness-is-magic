@@ -193,7 +193,7 @@ describe("AdminAssignedGifts", () => {
     await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
 
     await waitFor(() => {
-      expect(batchSpy).toHaveBeenCalledWith({ wish_ids: [1, 2], purchased_where: "Amazon", received_at: "" });
+      expect(batchSpy).toHaveBeenCalledWith(expect.objectContaining({ wish_ids: [1, 2], purchased_where: "Amazon", received_at: "" }));
     });
     // Success toast + selection cleared
     await waitFor(() => {

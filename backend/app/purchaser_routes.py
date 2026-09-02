@@ -204,8 +204,9 @@ def mark_purchased(
 ) -> WishDetail:
     """Mark a wish as purchased.
 
-    Sets ``purchased_at=now``, ``purchased_where``, ``purchaser_note``,
-    and ``received_at``.  Does **not** change ``assigned_to_id``.
+    Sets ``purchased_at`` (body value; omitted/null defaults to now,
+    ``''`` clears), ``purchased_where``, ``purchaser_note``, and
+    ``received_at``.  Does **not** change ``assigned_to_id``.
     """
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
 
@@ -217,8 +218,13 @@ def mark_purchased(
 
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
-    # purchased_at, purchased_where and purchaser_note (partial-update convention)
-    apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=body.purchased_where, purchaser_note=body.purchaser_note)
+    # purchased_at (omitted/null → now, '' → clear), purchased_where and purchaser_note (partial-update convention)
+    apply_purchase_fields(
+        wish,
+        purchased_at=body.purchased_at or datetime.now(timezone.utc),
+        purchased_where=body.purchased_where,
+        purchaser_note=body.purchaser_note,
+    )
 
     # received_at follows partial-update convention (None means no-op)
     if body.received_at is _CLEAR:
@@ -243,9 +249,10 @@ def batch_mark_purchased(
     """Batch-mark multiple assigned wishes as purchased.
 
     Mirrors the single mark-purchased semantics for every selected wish:
-    ``purchased_at=now``, ``purchased_where`` overwritten (None clears),
-    ``received_at`` per the partial-update sentinel convention.  Does
-    **not** touch ``purchaser_note`` or change ``assigned_to_id``.
+    ``purchased_at`` from the body (omitted/null defaults to now, ``''``
+    clears), ``purchased_where`` overwritten (None clears), ``received_at``
+    per the partial-update sentinel convention.  Does **not** touch
+    ``purchaser_note`` or change ``assigned_to_id``.
     Fail-fast on any missing/soft-deleted ID or any ID not assigned to
     the caller.
     """
@@ -263,11 +270,11 @@ def batch_mark_purchased(
         if wish.assigned_to_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Wish {wid} is not assigned to you")
 
-    now = datetime.now(timezone.utc)
+    purchased_at = body.purchased_at or datetime.now(timezone.utc)
     for wid in wish_ids:
         wish = wish_map[wid]
         # purchaser_note=None is a no-op — notes are per-item
-        apply_purchase_fields(wish, now=now, purchased_where=body.purchased_where, purchaser_note=None)
+        apply_purchase_fields(wish, purchased_at=purchased_at, purchased_where=body.purchased_where, purchaser_note=None)
 
         # received_at follows partial-update convention (None means no-op)
         if body.received_at is _CLEAR:

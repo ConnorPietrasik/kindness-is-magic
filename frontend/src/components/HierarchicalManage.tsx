@@ -30,6 +30,7 @@ import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { formatApiError } from "../lib/utils";
 import type { PaginationParams } from "../types";
 import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
@@ -286,7 +287,12 @@ export function HierarchicalManage<
   const isReadonly = (isDeletedView && deletedTab ? (deletedTab.readonly ?? false) : false) || (childConfig.isReadonly ?? false);
 
   /* ── Parent query ──────────────────────────────────────── */
-  const { data: parentData, isLoading: parentLoading } = useQuery({
+  const {
+    data: parentData,
+    isLoading: parentLoading,
+    isError: parentIsError,
+    error: parentError,
+  } = useQuery({
     queryKey: parent.queryKey as string[],
     queryFn: () => parent.fetchFn(parent.id),
   });
@@ -405,6 +411,16 @@ export function HierarchicalManage<
   /* ── Loading gate ──────────────────────────────────────── */
   if (parentLoading || crud.listLoading) {
     return <PageSpinner />;
+  }
+
+  // A failed parent fetch would otherwise render a blank parent card with
+  // no indication of why
+  if (parentIsError || !parentData) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white py-12 text-center shadow-sm">
+        <p className="text-gray-500">{formatApiError(parentError, `Unable to load ${parent.entityName ?? "data"}. Please try again.`)}</p>
+      </div>
+    );
   }
 
   /* ── Render ────────────────────────────────────────────── */

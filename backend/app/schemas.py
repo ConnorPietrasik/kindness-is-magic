@@ -108,6 +108,30 @@ _CLEAR = object()
 """Sentinel: field was sent as empty string — clear to NULL."""
 
 
+def _validate_nullable_datetime(v):
+    """Before-validator for ``datetime | None | object`` partial-update fields.
+
+    Maps ``''`` to the ``_CLEAR`` sentinel and parses any other string into
+    a ``datetime``; anything that can't be a valid datetime is rejected.
+    The ``object`` union member would otherwise carry any value through
+    validation untouched (a valid string stays a string all the way to the
+    DB), so bad input would surface as a 500 when Postgres tries to cast
+    it — with this guard it 422s here instead.
+    """
+    if v is None:
+        return v
+    if isinstance(v, str):
+        if v == "":
+            return _CLEAR
+        try:
+            return datetime.fromisoformat(v)
+        except ValueError:
+            raise ValueError("must be an ISO 8601 datetime (e.g. 2026-02-14T09:30:00Z)") from None
+    if isinstance(v, datetime):
+        return v
+    raise ValueError("must be an ISO 8601 datetime (e.g. 2026-02-14T09:30:00Z)")
+
+
 class UpdateProfile(BaseModel):
     """Update the authenticated user's profile."""
 
@@ -476,9 +500,7 @@ class FamilyUpdate(BaseModel):
     @field_validator("pickup_window", mode="before")
     @classmethod
     def _pickup_window_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        return v
+        return _validate_nullable_datetime(v)
 
     @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
     @classmethod
@@ -805,10 +827,15 @@ class AdminWishUpdate(BaseModel):
     size: str | None | object = Field(default=None)  # type: ignore[assignment]
     color: str | None | object = Field(default=None)  # type: ignore[assignment]
     assigned_to_id: int | None | object = Field(default=None)  # type: ignore[assignment]
-    purchased_at: datetime | None = None
+    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
     purchased_where: str | None = None
     received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
     purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_at", mode="before")
+    @classmethod
+    def _purchased_at_validate(cls, v):
+        return _validate_nullable_datetime(v)
 
     @field_validator("description")
     @classmethod
@@ -854,9 +881,7 @@ class AdminWishUpdate(BaseModel):
     @field_validator("received_at", mode="before")
     @classmethod
     def _received_at_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        return v
+        return _validate_nullable_datetime(v)
 
     @field_validator("purchaser_note", mode="before")
     @classmethod
@@ -869,11 +894,21 @@ class AdminWishUpdate(BaseModel):
 
 
 class WishPurchaseMark(BaseModel):
-    """Body for the mark-purchased endpoint."""
+    """Body for the mark-purchased endpoint.
 
+    ``purchased_at`` is optional — omitted (or null) defaults to the
+    server's current time; ``''`` clears it to NULL.
+    """
+
+    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
     purchased_where: str | None = None
     purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
     received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_at", mode="before")
+    @classmethod
+    def _purchased_at_validate(cls, v):
+        return _validate_nullable_datetime(v)
 
     @field_validator("purchased_where")
     @classmethod
@@ -894,9 +929,7 @@ class WishPurchaseMark(BaseModel):
     @field_validator("received_at", mode="before")
     @classmethod
     def _received_at_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        return v
+        return _validate_nullable_datetime(v)
 
 
 class WishBatchAssign(BaseModel):
@@ -913,15 +946,21 @@ class WishBatchMarkPurchased(BaseModel):
     """Batch-mark multiple wishes as purchased.
 
     Semantics mirror the single mark-purchased endpoints: ``purchased_at``
-    is set to now, ``purchased_where`` is overwritten (``None`` clears),
-    and ``received_at`` follows the partial-update sentinel convention
-    (``""`` clears, omitted is a no-op).  ``purchaser_note`` is not
-    touched — notes are per-item.
+    is taken from the body (omitted/null defaults to now, ``''`` clears),
+    ``purchased_where`` is overwritten (``None`` clears), and ``received_at``
+    follows the partial-update sentinel convention (``""`` clears, omitted
+    is a no-op).  ``purchaser_note`` is not touched — notes are per-item.
     """
 
     wish_ids: list[int] = Field(..., min_length=1)
+    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
     purchased_where: str | None = None
     received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_at", mode="before")
+    @classmethod
+    def _purchased_at_validate(cls, v):
+        return _validate_nullable_datetime(v)
 
     @field_validator("purchased_where")
     @classmethod
@@ -933,9 +972,7 @@ class WishBatchMarkPurchased(BaseModel):
     @field_validator("received_at", mode="before")
     @classmethod
     def _received_at_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        return v
+        return _validate_nullable_datetime(v)
 
 
 class WishListSummary(BaseModel):
@@ -1019,9 +1056,7 @@ class PurchaserWishUpdate(BaseModel):
     @field_validator("received_at", mode="before")
     @classmethod
     def _received_at_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        return v
+        return _validate_nullable_datetime(v)
 
 
 class PurchaserWishListResponse(BaseModel):

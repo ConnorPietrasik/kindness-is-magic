@@ -168,6 +168,18 @@ export function fromDatetimeLocalValue(value: string): string {
 }
 
 /**
+ * nowIso — the current date/time as an ISO 8601 UTC string
+ * (``YYYY-MM-DDTHH:MM:SSZ``).
+ *
+ * Same shape as `fromDatetimeLocalValue` output (no milliseconds), so the
+ * value round-trips through a `datetime-local` input without a spurious
+ * diff.
+ */
+export function nowIso(): string {
+  return `${new Date().toISOString().slice(0, -5)}Z`;
+}
+
+/**
  * isFamilyLocked — determine whether a family's wishes are locked for editing.
  *
  * A family is locked when:

@@ -224,10 +224,10 @@ def batch_mark_purchased(
     """Batch-mark multiple wishes as purchased. Fail-fast on any invalid ID.
 
     Mirrors the single mark-purchased semantics for every selected wish:
-    ``purchased_at=now``, ``purchased_where`` overwritten (None clears),
-    ``received_at`` per the partial-update sentinel convention, and
-    ``assigned_to_id`` set to the calling admin.  ``purchaser_note`` is
-    not touched.
+    ``purchased_at`` from the body (omitted/null defaults to now, ``''``
+    clears), ``purchased_where`` overwritten (None clears), ``received_at``
+    per the partial-update sentinel convention, and ``assigned_to_id`` set
+    to the calling admin.  ``purchaser_note`` is not touched.
     """
     # Deduplicate so repeated IDs don't inflate the count
     seen: set[int] = set()
@@ -244,11 +244,11 @@ def batch_mark_purchased(
             raise HTTPException(status_code=400, detail=f"Wish {wid} is deleted")
 
     # All valid — mark each wish
-    now = datetime.now(timezone.utc)
+    purchased_at = body.purchased_at or datetime.now(timezone.utc)
     for wid in wish_ids:
         wish = wish_map[wid]
         # purchaser_note=None is a no-op — notes are per-item
-        apply_purchase_fields(wish, now=now, purchased_where=body.purchased_where, purchaser_note=None)
+        apply_purchase_fields(wish, purchased_at=purchased_at, purchased_where=body.purchased_where, purchaser_note=None)
 
         # Assign to the calling admin
         wish.assigned_to_id = admin.id
@@ -322,12 +322,17 @@ def mark_purchased(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishDetail:
-    """Mark a wish as purchased. Sets purchased_at=now and assigned_to_id=admin."""
+    """Mark a wish as purchased. Sets purchased_at (body value; omitted/null defaults to now, ``''`` clears) and assigned_to_id=admin."""
     wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
-    # purchased_at, purchased_where and purchaser_note (partial-update convention)
-    apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=body.purchased_where, purchaser_note=body.purchaser_note)
+    # purchased_at (omitted/null → now, '' → clear), purchased_where and purchaser_note (partial-update convention)
+    apply_purchase_fields(
+        wish,
+        purchased_at=body.purchased_at or datetime.now(timezone.utc),
+        purchased_where=body.purchased_where,
+        purchaser_note=body.purchaser_note,
+    )
 
     # Assign to the calling admin
     wish.assigned_to_id = admin.id

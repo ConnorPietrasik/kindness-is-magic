@@ -255,7 +255,9 @@ def mark_wish_purchased(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the sponsored family")
 
     wish.assigned_to_id = user.id
-    apply_purchase_fields(wish, now=datetime.now(timezone.utc), purchased_where=data.purchased_where, purchaser_note=data.purchaser_note)
+    apply_purchase_fields(
+        wish, purchased_at=datetime.now(timezone.utc), purchased_where=data.purchased_where, purchaser_note=data.purchaser_note
+    )
 
     db.commit()
     db.refresh(wish)

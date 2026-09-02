@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearPendingClaimFamilyId,
   formatApiError,
@@ -12,6 +12,7 @@ import {
   isFamilyLocked,
   normalizePayload,
   normalizeUpdatePayload,
+  nowIso,
   setPendingClaimFamilyId,
   toDatetimeLocalValue,
 } from "./utils";
@@ -249,6 +250,17 @@ describe("toDatetimeLocalValue / fromDatetimeLocalValue", () => {
     const result = fromDatetimeLocalValue("2025-03-20T10:00");
     expect(result).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     expect(result).not.toContain(".");
+  });
+});
+
+describe("nowIso", () => {
+  it("returns the current time as a no-milliseconds UTC ISO string", () => {
+    vi.useFakeTimers().setSystemTime(new Date("2026-03-01T12:00:00Z"));
+    try {
+      expect(nowIso()).toBe("2026-03-01T12:00:00Z");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

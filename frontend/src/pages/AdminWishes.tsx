@@ -8,7 +8,7 @@
  * list, detail, update, mark-purchased, and batch-assign.
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
@@ -112,6 +112,15 @@ export default function AdminWishes() {
   const { families } = useFamiliesDropdown();
   // Users for assigned-to / batch-assign — admins + purchasers
   const { users } = useUsersDropdown("admin,purchaser");
+
+  // Mark-purchased dialog prefills from the full wish detail — the list
+  // response is column-filtered, so hidden columns (e.g. purchaser_note)
+  // would be missing from the row.
+  const markWishQuery = useQuery({
+    queryKey: adminWishDetail(markPurchasedId ?? 0),
+    queryFn: () => adminGetWish(markPurchasedId ?? 0),
+    enabled: markPurchasedId != null,
+  });
 
   // Mark-purchased mutation
   const markPurchasedMut = useMutation({
@@ -490,10 +499,13 @@ export default function AdminWishes() {
           onPageSizeChange={pagination.setPageSize}
         />
 
-        {/* Mark-purchased dialog */}
+        {/* Mark-purchased dialog — opens immediately; shows a spinner while
+            the detail loads and an error (with retry) if the fetch fails */}
         <MarkPurchasedDialog
           open={markPurchasedId !== null}
-          wish={wishes.find((w) => w.id === markPurchasedId) ?? null}
+          wish={markWishQuery.data ?? null}
+          error={markWishQuery.isError && !markWishQuery.isFetching ? markWishQuery.error : undefined}
+          onRetry={() => markWishQuery.refetch()}
           onSubmit={(data) => {
             if (markPurchasedId != null) {
               markPurchasedMut.mutate({ id: markPurchasedId, data });
