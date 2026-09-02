@@ -58,7 +58,7 @@ test.describe("CSV Import", () => {
        but every row is bad data — the errors must come from the server.
        Names are suffixed so a pre-existing record can't change which error fires.
        Nothing is created, so no cleanup is needed. */
-    const suffix = Math.random().toString(36).slice(2, 6);
+    const suffix = Math.random().toString(36).slice(2, 8);
     const missingReferrer = `No Ref ${suffix}`;
     const missingFamily = `No Fam ${suffix}`;
     const malformedCsv = `# referrers

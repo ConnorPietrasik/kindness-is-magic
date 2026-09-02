@@ -22,7 +22,7 @@ import {
 } from "../helpers/api";
 import { getAdminEmail } from "../helpers/env";
 
-const SUFFIX = Math.random().toString(36).slice(2, 6);
+const SUFFIX = Math.random().toString(36).slice(2, 8);
 const WISH_DESC = `Admin gifts e2e wish ${SUFFIX}`;
 const FUN_WISH_DESC = `Admin gifts e2e fun wish ${SUFFIX}`;
 const BATCH_WISH_DESC = `Admin batch e2e wish ${SUFFIX}`;

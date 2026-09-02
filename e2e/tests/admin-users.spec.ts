@@ -6,7 +6,7 @@
 import { test, expect } from "@playwright/test";
 import { loginViaApi } from "../helpers/api";
 
-const SUFFIX = Math.random().toString(36).slice(2, 6);
+const SUFFIX = Math.random().toString(36).slice(2, 8);
 const TEST_EMAIL = `e2etestuser${SUFFIX}@example.com`;
 
 let createdUserId: number | undefined;

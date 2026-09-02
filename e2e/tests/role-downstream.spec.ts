@@ -27,7 +27,7 @@ import {
 } from "../helpers/api";
 import { getAdminEmail, getAdminPassword } from "../helpers/env";
 
-const SUFFIX = Math.random().toString(36).slice(2, 6);
+const SUFFIX = Math.random().toString(36).slice(2, 8);
 const TEST_REFERRER_NAME = `E2E Downstream Ref ${SUFFIX}`;
 const TEST_REFERRER_EMAIL = `e2e-ds-ref-${SUFFIX}@example.com`;
 const TEST_FAMILY_NAME = `E2E Downstream Family ${SUFFIX}`;

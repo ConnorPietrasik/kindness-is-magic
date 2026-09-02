@@ -9,7 +9,7 @@ import type { Locator } from "@playwright/test";
 import { deleteReferrerViaApi, loginViaApi } from "../helpers/api";
 import { findRowInTable } from "../helpers/assertions";
 
-const TEST_REFERRER = `Test E2E Org ${Math.random().toString(36).slice(2, 6)}`;
+const TEST_REFERRER = `Test E2E Org ${Math.random().toString(36).slice(2, 8)}`;
 let referrerId: number | undefined;
 
 test.describe("Admin Referrers", () => {

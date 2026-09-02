@@ -15,7 +15,7 @@ async function clickAction(row: Locator, actionLabel: string) {
   await row.getByRole("menuitem", { name: actionLabel }).click();
 }
 
-const TEST_PERSON = `E2E Test ${Math.random().toString(36).slice(2, 6)}`;
+const TEST_PERSON = `E2E Test ${Math.random().toString(36).slice(2, 8)}`;
 let familyId: number | undefined;
 let personId: number | undefined;
 

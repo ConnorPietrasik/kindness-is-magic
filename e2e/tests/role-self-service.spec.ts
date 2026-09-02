@@ -16,8 +16,8 @@ import {
   loginViaApi,
 } from "../helpers/api";
 
-const TEST_FAMILY_CHILD = `Family Test ${Math.random().toString(36).slice(2, 6)}`;
-const TEST_REFERRER_CHILD = `Referrer Test ${Math.random().toString(36).slice(2, 6)}`;
+const TEST_FAMILY_CHILD = `Family Test ${Math.random().toString(36).slice(2, 8)}`;
+const TEST_REFERRER_CHILD = `Referrer Test ${Math.random().toString(36).slice(2, 8)}`;
 
 const familyTestData: { personId?: number } = {};
 const referrerTestData: { personId?: number } = {};
