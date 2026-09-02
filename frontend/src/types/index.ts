@@ -85,6 +85,7 @@ export type {
   UserPasswordReset,
   UserRole,
   WishBatchAssign,
+  WishBatchMarkPurchased,
   WishCreate,
   WishDetail,
   WishListSummary,

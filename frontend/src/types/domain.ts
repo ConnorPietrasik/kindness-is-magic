@@ -294,6 +294,13 @@ export interface WishBatchAssign {
   assigned_to_id: number;
 }
 
+/** Payload for batch-marking wishes as purchased. No purchaser note — notes are per-item. */
+export interface WishBatchMarkPurchased {
+  wish_ids: number[];
+  purchased_where?: string | null;
+  received_at?: string | null;
+}
+
 /** Admin-only wish update schema (includes purchase-tracking fields). */
 export interface AdminWishUpdate {
   type?: WishType;

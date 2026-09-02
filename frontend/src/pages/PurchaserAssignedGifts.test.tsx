@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -156,6 +156,115 @@ describe("PurchaserAssignedGifts", () => {
 
     await waitFor(() => {
       expect(markSpy).toHaveBeenCalledWith(1, expect.objectContaining({ purchased_where: "Amazon" }));
+    });
+  });
+
+  it("refetches with the wish type filter when changed", async () => {
+    const user = userEvent.setup();
+    const listSpy = vi.spyOn(api, "purchaserListWishes").mockResolvedValue({
+      wishes: [adminLockedWish],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      total_pages: 1,
+    });
+
+    renderPage();
+
+    await screen.findByText("Coat");
+    await user.selectOptions(screen.getByLabelText("Wish type filter"), "family");
+
+    await waitFor(() => {
+      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ wish_type: "family" }));
+    });
+  });
+
+  it("refetches with the debounced search query", async () => {
+    const user = userEvent.setup();
+    // Auto-advance time so debounce fires quickly without freezing waitFor/userEvent
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      const listSpy = vi.spyOn(api, "purchaserListWishes").mockResolvedValue({
+        wishes: [adminLockedWish],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        total_pages: 1,
+      });
+
+      renderPage();
+
+      await screen.findByText("Coat");
+      await user.type(screen.getByPlaceholderText("Search wishes…"), "coat");
+
+      await waitFor(() => {
+        expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ search: "coat" }));
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("batch marks selected wishes through the dialog", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "purchaserListWishes").mockResolvedValue({
+      wishes: [adminLockedWish, familyLockedWish],
+      total: 2,
+      page: 1,
+      page_size: 50,
+      total_pages: 1,
+    });
+    const batchSpy = vi.spyOn(api, "purchaserBatchMarkPurchased").mockResolvedValue({ marked_count: 2 });
+
+    renderPage();
+
+    // Select both rows, then open the batch dialog from the header button
+    await user.click(await screen.findByLabelText("Select all wishes on this page"));
+    await user.click(await screen.findByRole("button", { name: "Mark Purchased (2)" }));
+
+    await user.type(await screen.findByLabelText("Purchased Where"), "Amazon");
+    const dialog = within(screen.getByRole("dialog"));
+    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+
+    await waitFor(() => {
+      expect(batchSpy).toHaveBeenCalledWith({ wish_ids: [1, 2], purchased_where: "Amazon", received_at: "" });
+    });
+    // Success toast + selection cleared
+    await waitFor(() => {
+      expect(screen.getByText("2 wishes marked as purchased")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark Purchased (0)" })).toBeDisabled();
+    });
+  });
+
+  it("clears checkbox selection when the purchased filter changes", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "purchaserListWishes")
+      .mockResolvedValueOnce({
+        wishes: [adminLockedWish, familyLockedWish],
+        total: 2,
+        page: 1,
+        page_size: 50,
+        total_pages: 1,
+      })
+      // Faithful to the API: under "Purchased" only purchased wishes come back
+      .mockResolvedValueOnce({
+        wishes: [{ ...adminLockedWish, purchased_at: "2025-06-01T12:00:00Z" }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        total_pages: 1,
+      });
+
+    renderPage();
+
+    await screen.findByText("Coat");
+    await user.click(screen.getByLabelText("Select all wishes on this page"));
+    expect(screen.getByRole("button", { name: "Mark Purchased (2)" })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Purchased filter"), "true");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark Purchased (0)" })).toBeInTheDocument();
     });
   });
 

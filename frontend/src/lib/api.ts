@@ -67,6 +67,7 @@ import type {
   UserListResponse,
   UserPasswordReset,
   WishBatchAssign,
+  WishBatchMarkPurchased,
   WishDetail,
   WishListResponse,
   WishPurchaseMark,
@@ -523,6 +524,10 @@ export function adminBatchAssignWishes(payload: WishBatchAssign): Promise<{ assi
   return apiPost("/api/admin/wishes/batch-assign", payload);
 }
 
+export function adminBatchMarkPurchased(payload: WishBatchMarkPurchased): Promise<{ marked_count: number }> {
+  return apiPost("/api/admin/wishes/batch-mark-purchased", payload);
+}
+
 // ---------------------------------------------------------------------------
 // Referrer — Self
 // ---------------------------------------------------------------------------
@@ -751,6 +756,8 @@ export function deletePerson(id: number): Promise<void> {
 
 export interface PurchaserWishesListParams extends PaginationParams {
   purchased?: string;
+  search?: string;
+  wish_type?: string;
 }
 
 /** List wishes assigned to the current purchaser. */
@@ -766,6 +773,11 @@ export function purchaserGetWish(wishId: number): Promise<WishDetail> {
 /** Mark a wish as purchased (sets purchased_at=now + optional fields). */
 export function purchaserMarkPurchased(wishId: number, payload: WishPurchaseMark): Promise<WishDetail> {
   return apiPost(`/api/purchaser/wishes/${wishId}/mark-purchased`, payload);
+}
+
+/** Batch-mark assigned wishes as purchased (sets purchased_at=now + optional fields, no note). */
+export function purchaserBatchMarkPurchased(payload: WishBatchMarkPurchased): Promise<{ marked_count: number }> {
+  return apiPost("/api/purchaser/wishes/batch-mark-purchased", payload);
 }
 
 /** Partial update of purchaser_note and/or received_at on an assigned wish. */

@@ -3,8 +3,11 @@
  *
  * Paginated list of wishes assigned to the current admin (mirrors the
  * purchaser view), with:
- *  - Filter: purchased / unpurchased / all
- *  - "Mark Purchased" dialog
+ *  - Filters: purchased / unpurchased / all, wish type, debounced search
+ *    (description or person given name)
+ *  - Checkbox selection + batch "Mark Purchased" dialog (things bought at
+ *    the same place)
+ *  - Single "Mark Purchased" dialog
  *  - Inline edit for purchaser note + received_at
  *
  * Wishes are scoped to the current admin via the admin list endpoint's
@@ -13,8 +16,9 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { BatchMarkPurchasedDialog } from "../components/BatchMarkPurchasedDialog";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DatePicker } from "../components/DatePicker";
@@ -29,13 +33,24 @@ import { WishTypeBadge } from "../components/WishTypeBadge";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useFamiliesDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
+import { adminBatchMarkPurchased, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
 import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
-import type { AdminWishesListParams, AdminWishUpdate, WishDetail, WishListResponse, WishPurchaseMark } from "../types";
+import type {
+  AdminWishesListParams,
+  AdminWishUpdate,
+  WishBatchMarkPurchased,
+  WishDetail,
+  WishListResponse,
+  WishPurchaseMark,
+} from "../types";
+
+/** Data columns in the table (checkbox + Actions are implicit) — drives the inline edit row's colSpan. */
+const DATA_COLUMNS = ["ID", "Person", "Family", "Type", "Description", "Size", "Color", "Purchased"];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -50,6 +65,10 @@ export default function AdminAssignedGifts() {
 
 function AdminAssignedGiftsList({ userId }: { userId: number }) {
   const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
+  const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchMarkOpen, setBatchMarkOpen] = useState(false);
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
 
   const pagination = usePagination({ defaultPageSize: 50 });
@@ -57,14 +76,19 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
   const toast = useToast();
   const { familyMap } = useFamiliesDropdown();
 
+  // Debounce search so the list doesn't refetch on every keystroke
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+
   // Build list params — always scoped to the current admin
   const listParams = useMemo<AdminWishesListParams>(
     () => ({
       ...pagination.params,
       assigned_to_id: userId,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
+      search: debouncedSearch || undefined,
+      wish_type: wishTypeFilter || undefined,
     }),
-    [pagination.params, userId, purchasedFilter]
+    [pagination.params, userId, purchasedFilter, debouncedSearch, wishTypeFilter]
   );
 
   // CRUD manager — list/detail/update only (no create/delete for wishes)
@@ -99,6 +123,18 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
     },
   });
 
+  // Batch mark-purchased mutation
+  const batchMarkMut = useMutation({
+    mutationFn: (payload: WishBatchMarkPurchased) => adminBatchMarkPurchased(payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: adminWishes });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      setSelectedIds(new Set());
+      setBatchMarkOpen(false);
+      toast.success(`${data.marked_count} wish${data.marked_count > 1 ? "es" : ""} marked as purchased`);
+    },
+  });
+
   // Update handler — build typed payload from form state
   function handleUpdateWish(formData: AdminEditFormState) {
     if (editingId == null || detail == null) return;
@@ -108,6 +144,36 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
   }
 
   const wishes = listData?.wishes ?? [];
+
+  // Checkbox selection helpers
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allSelected = wishes.every((w) => prev.has(w.id));
+      if (allSelected) {
+        return new Set<number>();
+      }
+      return new Set(wishes.map((w) => w.id));
+    });
+  }, [wishes]);
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  // Reset selection on page/filter change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: listParams drives re-fetch; selection must reset when it changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [listParams]);
+
   const pageInfo = useMemo(
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
@@ -128,6 +194,9 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">My Assigned Gifts</h2>
+          <Button onClick={() => setBatchMarkOpen(true)} disabled={selectedIds.size === 0 || batchMarkMut.isPending}>
+            Mark Purchased ({selectedIds.size})
+          </Button>
         </div>
 
         {/* Filters */}
@@ -145,6 +214,34 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
             <option value="false">Unpurchased</option>
             <option value="true">Purchased</option>
           </select>
+
+          <select
+            aria-label="Wish type filter"
+            value={wishTypeFilter}
+            onChange={(e) => {
+              setWishTypeFilter(e.target.value);
+              resetPage();
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          >
+            <option value="">All types</option>
+            <option value="adult">Adult</option>
+            <option value="practical">Practical</option>
+            <option value="fun">Fun</option>
+            <option value="family">Family</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="Search wishes…"
+            aria-label="Search wishes"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+            }}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+            autoComplete="off"
+          />
         </div>
 
         {/* Table */}
@@ -155,6 +252,15 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
         ) : (
           <Table>
             <TableHead>
+              <Th>
+                <input
+                  type="checkbox"
+                  checked={wishes.length > 0 && wishes.every((w) => selectedIds.has(w.id))}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
+                  aria-label="Select all wishes on this page"
+                />
+              </Th>
               <Th>ID</Th>
               <Th>Person</Th>
               <Th>Family</Th>
@@ -169,6 +275,15 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
               {wishes.map((w) => (
                 <React.Fragment key={w.id}>
                   <Tr>
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(w.id)}
+                        onChange={() => toggleSelect(w.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
+                        aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
+                      />
+                    </Td>
                     <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
                     <Td>{w.person_given_name ?? "Family"}</Td>
                     <Td>
@@ -215,7 +330,7 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
                   </Tr>
                   {editingId === w.id && (
                     <Tr key={`${w.id}-edit`}>
-                      <Td colSpan={9} className="!py-3">
+                      <Td colSpan={DATA_COLUMNS.length + 2} className="!py-3">
                         <div className="rounded-xl bg-gray-50 p-4">
                           {detailLoading ? (
                             <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
@@ -258,8 +373,17 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
           loading={markPurchasedMut.isPending}
         />
 
+        {/* Batch mark-purchased dialog */}
+        <BatchMarkPurchasedDialog
+          open={batchMarkOpen}
+          wishIds={Array.from(selectedIds)}
+          onSubmit={(data) => batchMarkMut.mutate(data)}
+          onCancel={() => setBatchMarkOpen(false)}
+          loading={batchMarkMut.isPending}
+        />
+
         {/* Errors */}
-        <MutationErrors mutations={[updateMut, markPurchasedMut]} />
+        <MutationErrors mutations={[updateMut, markPurchasedMut, batchMarkMut]} />
       </main>
     </div>
   );

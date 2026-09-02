@@ -231,8 +231,9 @@ test.describe("Role Downstream", () => {
     await statusSelect.selectOption({ label: "Unpurchased" });
     await expect(page.getByRole("table")).toBeVisible();
 
-    // Click Mark Purchased on the first unpurchased wish
-    const markBtn = page.getByRole("button", { name: "Mark Purchased" });
+    // Click Mark Purchased on the first unpurchased wish (exact — the header
+    // batch button's name starts with the same text)
+    const markBtn = page.getByRole("button", { name: "Mark Purchased", exact: true });
     if (await markBtn.count() > 0) {
       await markBtn.first().click();
 
@@ -247,6 +248,53 @@ test.describe("Role Downstream", () => {
       // Success toast appears
       await expect(page.getByText("Wish marked as purchased")).toBeVisible({ timeout: 10_000 });
     }
+
+    await context.close();
+  });
+
+  test("purchaser batch marks selected wishes as purchased", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_PURCHASER_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/purchaser/assigned-gifts");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    // Select the fun wish and the early family's practical wish — distinct
+    // from the wish the single-mark test may consume, so the tests stay
+    // independent under fullyParallel
+    const funRow = page.getByRole("row").filter({ hasText: "LEGO set" });
+    const earlyRow = page.getByRole("row").filter({ hasText: "Early practical wish" });
+    await expect(funRow).toBeVisible({ timeout: 10_000 });
+    await expect(earlyRow).toBeVisible();
+
+    await funRow.getByRole("checkbox").check();
+    await earlyRow.getByRole("checkbox").check();
+
+    // Batch mark with a shared location
+    await page.getByRole("button", { name: "Mark Purchased (2)" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByLabel("Purchased Where").fill("E2E Batch Store");
+    await page.getByRole("dialog").getByRole("button", { name: "Mark Purchased" }).click();
+
+    // Success toast
+    await expect(page.getByText("2 wishes marked as purchased")).toBeVisible({ timeout: 10_000 });
+
+    // Status filter follows: both rows now show the purchased checkmark
+    const statusSelect = page.getByLabel("Purchased filter");
+    await statusSelect.selectOption({ label: "Purchased" });
+    await expect(funRow).toContainText("✓", { timeout: 10_000 });
+    await expect(earlyRow).toContainText("✓");
+
+    // ...and both are gone under "Unpurchased"
+    await statusSelect.selectOption({ label: "Unpurchased" });
+    await expect(funRow).toBeHidden({ timeout: 10_000 });
+    await expect(earlyRow).toBeHidden();
 
     await context.close();
   });
