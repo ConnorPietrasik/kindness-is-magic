@@ -62,6 +62,33 @@ class TestColumnRequest:
 
 
 # ---------------------------------------------------------------------------
+# Unit tests — escape_like
+# ---------------------------------------------------------------------------
+
+
+class TestEscapeLike:
+    def test_escapes_percent(self):
+        from app.response_builders import escape_like
+
+        assert escape_like("50%") == "50\\%"
+
+    def test_escapes_underscore(self):
+        from app.response_builders import escape_like
+
+        assert escape_like("a_b") == "a\\_b"
+
+    def test_escapes_backslash(self):
+        from app.response_builders import escape_like
+
+        assert escape_like("a\\b") == "a\\\\b"
+
+    def test_plain_text_unchanged(self):
+        from app.response_builders import escape_like
+
+        assert escape_like("backpack") == "backpack"
+
+
+# ---------------------------------------------------------------------------
 # Unit tests — apply_column_filter
 # ---------------------------------------------------------------------------
 

@@ -300,6 +300,90 @@ class TestPurchaserListWishes:
         assert data["total"] == 0
         assert data["wishes"] == []
 
+    def test_filter_search_description(self, logged_in_purchaser, purchaser_wish_tree):
+        """search matches wish description (case-insensitive)."""
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=backpack")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == purchaser_wish_tree["wishes"][0].id
+
+    def test_filter_search_person_given_name_case_insensitive(self, logged_in_purchaser, purchaser_wish_tree):
+        """search matches the person's given name, case-insensitively."""
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=PURCHAS")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert {w["id"] for w in data["wishes"]} == {w.id for w in purchaser_wish_tree["wishes"]}
+
+    def test_filter_search_does_not_match_family_name(self, logged_in_purchaser, purchaser_wish_tree):
+        """Family names are never matched (purchaser responses exclude family PII)."""
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=Purchaser%20Family")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+    def test_filter_search_ignores_family_wish_rows(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Person-name search does not pull in family wish rows (null person)."""
+        fam_wish = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=PurchaserChild")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert fam_wish.id not in {w["id"] for w in data["wishes"]}
+
+    def test_filter_search_coexists_with_purchased(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """search combines with the purchased filter."""
+        purchaser_wish_tree["wishes"][0].purchased_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=backpack&purchased=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == purchaser_wish_tree["wishes"][0].id
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=backpack&purchased=false")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+    def test_filter_wish_type(self, logged_in_purchaser, purchaser_wish_tree):
+        """wish_type filters to the matching type."""
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?wish_type=fun")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == purchaser_wish_tree["wishes"][1].id
+
+    def test_filter_wish_type_family(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An assigned family wish is returned by wish_type=family."""
+        fam_wish = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?wish_type=family")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == fam_wish.id
+
+    def test_filter_wish_type_invalid_422(self, logged_in_purchaser):
+        """An invalid wish_type value is rejected with 422, not a 500 from the DB."""
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?wish_type=banana")
+        assert resp.status_code == 422
+
+    def test_filter_search_wildcards_match_literally(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """LIKE wildcards typed by the user match literally, not as pattern syntax."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].description = "Save 50% today"
+        wishes[1].description = "Save 50 dollars"
+        db.commit()
+
+        # "50%" must not degenerate into a "contains 50" pattern
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?search=50%25")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[0].id
+
 
 # ---------------------------------------------------------------------------
 # Get endpoint tests
@@ -439,6 +523,200 @@ class TestPurchaserMarkPurchased:
         )
         assert resp.status_code == 200
         assert resp.json()["purchaser_note"] == "Existing note"
+
+
+# ---------------------------------------------------------------------------
+# Batch mark-purchased endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserBatchMarkPurchased:
+    def test_batch_mark_success(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Batch mark sets purchase fields on all selected wishes."""
+        wishes = purchaser_wish_tree["wishes"]
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={
+                "wish_ids": [w.id for w in wishes],
+                "purchased_where": "Target",
+                "received_at": "2026-02-15T10:00:00Z",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_where == "Target"
+            assert fresh[w.id].received_at is not None
+
+    def test_batch_mark_duplicate_ids_counted_once(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Duplicate wish IDs are deduplicated — marked_count counts unique wishes."""
+        wishes = purchaser_wish_tree["wishes"]
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [wishes[0].id, wishes[0].id, wishes[1].id], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = db.query(Wish).filter(Wish.id == wishes[0].id).first()
+        assert fresh.purchased_where == "Target"
+
+    def test_batch_mark_does_not_change_assigned_to_id(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Purchaser batch mark does not change assigned_to_id."""
+        wishes = purchaser_wish_tree["wishes"]
+        original = {w.id: w.assigned_to_id for w in wishes}
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Walmart"},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].assigned_to_id == original[w.id] == purchaser_wish_tree["purchaser"].id
+
+    def test_batch_mark_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An assigned family wish can be batch marked (no person required)."""
+        fam_wish = assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [fam_wish.id], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 1}
+
+        fresh = db.query(Wish).filter(Wish.id == fam_wish.id).first()
+        assert fresh.purchased_at is not None
+        assert fresh.purchased_where == "Target"
+        assert fresh.assigned_to_id == purchaser_wish_tree["purchaser"].id
+
+    def test_batch_mark_null_purchased_where_clears(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """purchased_where=null clears any existing value."""
+        wishes = purchaser_wish_tree["wishes"]
+        for w in wishes:
+            w.purchased_where = "Old store"
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": None},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_where is None
+
+    def test_batch_mark_received_at_clear(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """received_at='' clears any existing value (partial-update sentinel)."""
+        wishes = purchaser_wish_tree["wishes"]
+        existing = datetime(2026, 1, 10, 8, 0, 0, tzinfo=timezone.utc)
+        for w in wishes:
+            w.received_at = existing
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "received_at": ""},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].received_at is None
+
+    def test_batch_mark_received_at_omit_preserves(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Omitting received_at keeps the existing value."""
+        wishes = purchaser_wish_tree["wishes"]
+        existing = datetime(2026, 1, 10, 8, 0, 0, tzinfo=timezone.utc)
+        for w in wishes:
+            w.received_at = existing
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].received_at == existing
+
+    def test_batch_mark_does_not_touch_purchaser_note(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Batch mark leaves per-item purchaser notes untouched."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].purchaser_note = "Note one"
+        wishes[1].purchaser_note = "Note two"
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        assert fresh[wishes[0].id].purchaser_note == "Note one"
+        assert fresh[wishes[1].id].purchaser_note == "Note two"
+
+    def test_batch_mark_empty_wish_ids_422(self, logged_in_purchaser):
+        """Empty wish_ids list is rejected."""
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 422
+
+    def test_batch_mark_nonexistent_wish_404_fail_fast(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Missing wish ID → 404 and nothing is mutated."""
+        wish = purchaser_wish_tree["wishes"][0]
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [wish.id, 99999], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 404
+
+        fresh = db.query(Wish).filter(Wish.id == wish.id).first()
+        assert fresh.purchased_at is None
+        assert fresh.purchased_where is None
+
+    def test_batch_mark_soft_deleted_wish_404_fail_fast(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Soft-deleted wish ID → 404 and nothing is mutated."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[1].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 404
+
+        fresh = db.query(Wish).filter(Wish.id == wishes[0].id).first()
+        assert fresh.purchased_at is None
+
+    def test_batch_mark_other_purchasers_wish_403_fail_fast(self, logged_in_purchaser, purchaser_wish_tree, second_purchaser, db):
+        """A wish assigned to another purchaser → 403 and nothing is mutated."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[1].assigned_to_id = second_purchaser.id
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 403
+
+        fresh = db.query(Wish).filter(Wish.id == wishes[0].id).first()
+        assert fresh.purchased_at is None
 
 
 # ---------------------------------------------------------------------------

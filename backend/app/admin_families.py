@@ -38,6 +38,7 @@ from app.response_builders import (
     FAMILY_PERSON_COUNT,
     FAMILY_SORT_FIELDS,
     FAMILY_WISH,
+    escape_like,
     get_active_or_404,
     get_or_404,
     load_family_list_context,
@@ -87,7 +88,7 @@ def list_families(
     search_contact: str | None = Query(None),
     search_phone: str | None = Query(None),
     search_wish: str | None = Query(None),
-    verification_status: str | None = Query(None),
+    verification_status: FamilyVerificationStatus | None = Query(None),
     wish_lock_level: WishLockLevel | None = Query(None),
     min_person_count: int | None = Query(None, ge=0),
     max_person_count: int | None = Query(None, ge=0),
@@ -116,23 +117,23 @@ def list_families(
     # Multi-field search: each active filter is ANDed together.
     # `search` uses OR across all fields; targeted params search single fields.
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             sql_or(
-                Family.family_name.ilike(pattern),
-                Family.contact_name.ilike(pattern),
-                Family.phone_number.ilike(pattern),
-                FAMILY_WISH.ilike(pattern),
+                Family.family_name.ilike(pattern, escape="\\"),
+                Family.contact_name.ilike(pattern, escape="\\"),
+                Family.phone_number.ilike(pattern, escape="\\"),
+                FAMILY_WISH.ilike(pattern, escape="\\"),
             )
         )
     if search_name is not None:
-        query = query.filter(Family.family_name.ilike(f"%{search_name}%"))
+        query = query.filter(Family.family_name.ilike(f"%{escape_like(search_name)}%", escape="\\"))
     if search_contact is not None:
-        query = query.filter(Family.contact_name.ilike(f"%{search_contact}%"))
+        query = query.filter(Family.contact_name.ilike(f"%{escape_like(search_contact)}%", escape="\\"))
     if search_phone is not None:
-        query = query.filter(Family.phone_number.ilike(f"%{search_phone}%"))
+        query = query.filter(Family.phone_number.ilike(f"%{escape_like(search_phone)}%", escape="\\"))
     if search_wish is not None:
-        query = query.filter(FAMILY_WISH.ilike(f"%{search_wish}%"))
+        query = query.filter(FAMILY_WISH.ilike(f"%{escape_like(search_wish)}%", escape="\\"))
 
     if verification_status is not None:
         query = query.filter(Family.verification_status == verification_status)

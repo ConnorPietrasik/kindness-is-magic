@@ -176,6 +176,18 @@ class TestAdminEmailsList:
         assert body["total"] == 1
         assert body["emails"][0]["recipient_email"] == "c@example.com"
 
+    def test_invalid_kind_422(self, test_client: TestClient, admin_user):
+        """An invalid kind value is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails", params={"kind": "bogus"})
+        assert resp.status_code == 422
+
+    def test_invalid_status_422(self, test_client: TestClient, admin_user):
+        """An invalid status value is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails", params={"status": "bogus"})
+        assert resp.status_code == 422
+
     def test_filters_combine(self, test_client: TestClient, admin_user, db: Session):
         actor = _make_user(db, "actor_ref@test.com", "referrer", "Actor Ref")
         _seed(db, actor, "a@x.org", "family_invite", status="sent")

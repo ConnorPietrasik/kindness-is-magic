@@ -637,3 +637,36 @@ csv_fam@test.com,Password123!,family,,Fam Csv
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_fam@test.com").first()
         assert user.display_name == "Csv_fam"
+
+    def test_user_display_name_rejects_html(self, test_client: TestClient, admin_user):
+        """HTML in a CSV display_name errors the row instead of storing the payload."""
+        csv_data = """# users
+email,password,role,referrer_name_or_id,family_name_or_id,display_name
+csv_html@test.com,Password123!,admin,,,<script>alert('xss')</script>
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["users"]["created"] == 0
+        assert body["summary"]["users"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "user" and r["action"] == "error"]
+        assert len(error_rows) == 1
+        assert "display_name" in error_rows[0]["message"]
+
+    def test_user_display_name_normalizes_whitespace(self, test_client: TestClient, admin_user, db: Session):
+        """A CSV display_name has whitespace collapsed on import."""
+        from app.models import User
+
+        csv_data = """# users
+email,password,role,referrer_name_or_id,family_name_or_id,display_name
+csv_ws@test.com,Password123!,admin,,,  Ws\tName  
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["users"]["created"] == 1
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == "csv_ws@test.com").first()
+        assert user.display_name == "Ws Name"

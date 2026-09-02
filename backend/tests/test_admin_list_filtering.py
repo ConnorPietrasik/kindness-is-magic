@@ -139,6 +139,12 @@ class TestReferrersApprovalStatus:
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
+    def test_filter_invalid_422(self, test_client: TestClient, admin_user):
+        """An invalid approval_status value is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/referrers", params={"approval_status": "bogus"})
+        assert resp.status_code == 422
+
 
 class TestReferrersSort:
     def test_sort_name_asc(self, test_client: TestClient, admin_user, db: Session):
@@ -256,6 +262,17 @@ class TestFamiliesSearch:
         assert body["total"] == 1
         assert body["families"][0]["family_name"] == "Alpha"
 
+    def test_search_wildcards_match_literally(self, test_client: TestClient, admin_user, db: Session):
+        """LIKE wildcards in targeted search input match literally, not as pattern syntax."""
+        _make_families(db, ["Smith 50% Family", "Smith 50 Family"])
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/families", params={"search_name": "50%"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["families"][0]["family_name"] == "Smith 50% Family"
+
     def test_search_all_fields(self, test_client: TestClient, admin_user, db: Session):
         from app.models import Family
         from app.response_builders import attach_family_wish
@@ -351,6 +368,12 @@ class TestFamiliesVerificationStatus:
         resp = test_client.get("/api/admin/families", params={"verification_status": "pending"})
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
+
+    def test_filter_invalid_422(self, test_client: TestClient, admin_user):
+        """An invalid verification_status value is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/families", params={"verification_status": "bogus"})
+        assert resp.status_code == 422
 
 
 class TestFamiliesWishLockLevel:

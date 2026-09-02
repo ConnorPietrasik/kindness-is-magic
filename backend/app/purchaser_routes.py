@@ -8,15 +8,17 @@ import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Family, Person, User, Wish
+from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_purchaser
 from app.response_builders import (
     apply_purchase_fields,
     build_wish_detail,
     compute_display_ids,
+    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -27,6 +29,7 @@ from app.schemas import (
     PurchaserWishListResponse,
     PurchaserWishSummary,
     PurchaserWishUpdate,
+    WishBatchMarkPurchased,
     WishDetail,
     WishPurchaseMark,
 )
@@ -76,17 +79,24 @@ def list_wishes(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     purchased: str | None = Query(None),
+    search: str | None = Query(None),
+    wish_type: WishType | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_purchaser),
 ) -> PurchaserWishListResponse:
     """List wishes assigned to the current purchaser.
 
     Supports ``purchased`` filter: ``true`` (purchased only), ``false``
-    (unpurchased only), ``all`` (no filter).
+    (unpurchased only), ``all`` (no filter); ``search`` — case-insensitive
+    match on wish description or person given name (family names are
+    excluded: purchaser responses carry no family PII); and ``wish_type``
+    (same values the admin endpoint accepts).
     """
+    # Phase 1: filter query.  The explicit Person outer-join is needed for
+    # the given-name search.
     query = (
         db.query(Wish)
-        .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
+        .outerjoin(Person, Wish.person_id == Person.id)
         .filter(
             Wish.deleted_at.is_(None),
             Wish.assigned_to_id == current_user.id,
@@ -99,9 +109,32 @@ def list_wishes(
         elif purchased.lower() == "false":
             query = query.filter(Wish.purchased_at.is_(None))
         # "all" means no filter
+    if search is not None:
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(
+            or_(
+                Wish.description.ilike(pattern, escape="\\"),
+                Person.given_name.ilike(pattern, escape="\\"),
+            )
+        )
+    if wish_type is not None:
+        query = query.filter(Wish.type == wish_type)
 
     total = query.count()
-    wishes = query.order_by(Wish.id).offset((page - 1) * page_size).limit(page_size).all()
+    wish_ids = [w.id for w in query.order_by(Wish.id).offset((page - 1) * page_size).limit(page_size).all()]
+
+    # Phase 2: re-query the page's wish IDs with joinedload to build items —
+    # a join and an eagerload on the same relationship don't mix, which is
+    # why the admin list uses this two-phase pattern.
+    wishes = (
+        db.query(Wish)
+        .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
+        .filter(Wish.id.in_(wish_ids))
+        .order_by(Wish.id)
+        .all()
+        if wish_ids
+        else []
+    )
 
     # Display IDs for the families on this page (unscoped flat format —
     # same format the public wish-list page shows as its heading).
@@ -199,6 +232,53 @@ def mark_purchased(
 
     logger.info("Purchaser %s marked wish (id=%d) as purchased", current_user.email, wish_id)
     return WishDetail(**build_wish_detail(wish, person, db))
+
+
+@purchaser_router.post("/wishes/batch-mark-purchased")
+def batch_mark_purchased(
+    body: WishBatchMarkPurchased,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_purchaser),
+) -> dict:
+    """Batch-mark multiple assigned wishes as purchased.
+
+    Mirrors the single mark-purchased semantics for every selected wish:
+    ``purchased_at=now``, ``purchased_where`` overwritten (None clears),
+    ``received_at`` per the partial-update sentinel convention.  Does
+    **not** touch ``purchaser_note`` or change ``assigned_to_id``.
+    Fail-fast on any missing/soft-deleted ID or any ID not assigned to
+    the caller.
+    """
+    # Deduplicate so repeated IDs don't inflate the count
+    seen: set[int] = set()
+    wish_ids = [wid for wid in body.wish_ids if not (wid in seen or seen.add(wid))]
+
+    wishes = db.query(Wish).filter(Wish.id.in_(wish_ids)).all()
+    wish_map = {w.id: w for w in wishes}
+
+    for wid in wish_ids:
+        wish = wish_map.get(wid)
+        if wish is None or wish.deleted_at is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Wish {wid} not found")
+        if wish.assigned_to_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Wish {wid} is not assigned to you")
+
+    now = datetime.now(timezone.utc)
+    for wid in wish_ids:
+        wish = wish_map[wid]
+        # purchaser_note=None is a no-op — notes are per-item
+        apply_purchase_fields(wish, now=now, purchased_where=body.purchased_where, purchaser_note=None)
+
+        # received_at follows partial-update convention (None means no-op)
+        if body.received_at is _CLEAR:
+            wish.received_at = None
+        elif body.received_at is not None:
+            wish.received_at = body.received_at
+
+    db.commit()
+
+    logger.info("Purchaser %s batch-marked %d wishes as purchased", current_user.email, len(wish_ids))
+    return {"marked_count": len(wish_ids)}
 
 
 @purchaser_router.patch("/wishes/{wish_id}")

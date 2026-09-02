@@ -20,6 +20,7 @@ from app.response_builders import (
     build_sort_clause,
     column_filtered_page,
     ColumnRequest,
+    escape_like,
     get_active_or_404,
     get_or_404,
     REFERRER_SORT_FIELDS,
@@ -57,7 +58,7 @@ def list_referrers(
     page_size: int = Query(50, ge=1, le=200),
     columns: str | None = Query(None),
     search: str | None = Query(None),
-    approval_status: str | None = Query(None),
+    approval_status: ReferrerApprovalStatus | None = Query(None),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -66,8 +67,8 @@ def list_referrers(
     query = db.query(Referrer).filter(Referrer.deleted_at.is_(None))
 
     if search is not None:
-        pattern = f"%{search}%"
-        query = query.filter(Referrer.name.ilike(pattern))
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(Referrer.name.ilike(pattern, escape="\\"))
 
     if approval_status is not None:
         query = query.filter(Referrer.approval_status == approval_status)

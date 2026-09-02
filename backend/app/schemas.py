@@ -844,6 +844,13 @@ class AdminWishUpdate(BaseModel):
             return _CLEAR
         return v
 
+    @field_validator("purchased_where")
+    @classmethod
+    def _purchased_where_validate(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
     @field_validator("received_at", mode="before")
     @classmethod
     def _received_at_validate(cls, v):
@@ -856,6 +863,8 @@ class AdminWishUpdate(BaseModel):
     def _purchaser_note_validate(cls, v):
         if isinstance(v, str) and v == "":
             return _CLEAR
+        if isinstance(v, str):
+            return sanitize_plain_text(v)
         return v
 
 
@@ -865,6 +874,13 @@ class WishPurchaseMark(BaseModel):
     purchased_where: str | None = None
     purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
     received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_where")
+    @classmethod
+    def _purchased_where_validate(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
     @field_validator("purchaser_note", mode="before")
     @classmethod
@@ -891,6 +907,35 @@ class WishBatchAssign(BaseModel):
 
     wish_ids: list[int] = Field(..., min_length=1)
     assigned_to_id: int
+
+
+class WishBatchMarkPurchased(BaseModel):
+    """Batch-mark multiple wishes as purchased.
+
+    Semantics mirror the single mark-purchased endpoints: ``purchased_at``
+    is set to now, ``purchased_where`` is overwritten (``None`` clears),
+    and ``received_at`` follows the partial-update sentinel convention
+    (``""`` clears, omitted is a no-op).  ``purchaser_note`` is not
+    touched — notes are per-item.
+    """
+
+    wish_ids: list[int] = Field(..., min_length=1)
+    purchased_where: str | None = None
+    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_where")
+    @classmethod
+    def _purchased_where_validate(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
+    @field_validator("received_at", mode="before")
+    @classmethod
+    def _received_at_validate(cls, v):
+        if isinstance(v, str) and v == "":
+            return _CLEAR
+        return v
 
 
 class WishListSummary(BaseModel):
@@ -1449,6 +1494,13 @@ class DonorWishPurchaseMark(BaseModel):
 
     purchased_where: str | None = None
     purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("purchased_where")
+    @classmethod
+    def _purchased_where_validate(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
 
     @field_validator("purchaser_note", mode="before")
     @classmethod

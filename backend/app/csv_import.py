@@ -777,7 +777,15 @@ def _process_users(
 
         # Resolve display_name: CSV value takes precedence, then role-based default,
         # then email local-part as final fallback.
-        display_name: str | None = rec.get("display_name", "").strip() or None
+        display_name: str | None = None
+        display_name_raw = rec.get("display_name", "").strip()
+        if display_name_raw:
+            try:
+                display_name = sanitize_plain_text(display_name_raw)
+            except ValueError as exc:
+                summary.rows.append(RowResult(row_num, "user", "error", f"display_name: {exc}"))
+                summary.users_errors += 1
+                continue
         if display_name is None:
             if role == UserRole.referrer and referrer_id:
                 ref = db.query(Referrer).filter(Referrer.id == referrer_id).first()

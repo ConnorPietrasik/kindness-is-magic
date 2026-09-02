@@ -340,6 +340,42 @@ class TestListWishes:
         # 2 person wishes (family via person) + the family wish (family directly)
         assert data3["total"] == 3
 
+    def test_filter_search_wildcards_match_literally(self, test_client, admin_user, wish_tree, second_family_with_wishes, db):
+        """LIKE wildcards typed by the user match literally, not as pattern syntax."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"] + second_family_with_wishes["wishes"]
+        wishes[0].description = "Get 50% off"
+        wishes[1].description = "Get 50 off"
+        wishes[2].description = "a_b toy"
+        wishes[3].description = "aXb toy"
+        db.commit()
+
+        # "50%" must not degenerate into a "contains 50" pattern
+        resp = test_client.get("/api/admin/wishes?search=50%25")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[0].id
+
+        # "_" must not match any single character
+        resp = test_client.get("/api/admin/wishes?search=a_b")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[2].id
+
+    def test_filter_wish_type_invalid_422(self, test_client, admin_user):
+        """An invalid wish_type value is rejected with 422, not a 500 from the DB."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.get("/api/admin/wishes?wish_type=banana")
+        assert resp.status_code == 422
+
     def test_combined_filters(self, test_client, admin_user, wish_tree, second_family_with_wishes):
         """Multiple filters can be combined."""
         test_client.post(
@@ -889,6 +925,241 @@ class TestBatchAssign:
 
 
 # ---------------------------------------------------------------------------
+# Batch mark-purchased endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchMarkPurchased:
+    def test_batch_mark_success_multiple(self, test_client, admin_user, wish_tree, second_family_with_wishes, db):
+        """Batch mark sets purchase fields on all selected wishes."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"] + second_family_with_wishes["wishes"]
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={
+                "wish_ids": [w.id for w in wishes],
+                "purchased_where": "Walmart",
+                "received_at": "2026-02-15T10:00:00Z",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 4}
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_where == "Walmart"
+            assert fresh[w.id].received_at is not None
+            assert fresh[w.id].assigned_to_id == admin_user.id
+
+    def test_batch_mark_duplicate_ids_counted_once(self, test_client, admin_user, wish_tree, db):
+        """Duplicate wish IDs are deduplicated — marked_count counts unique wishes."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [wishes[0].id, wishes[0].id, wishes[1].id], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = db.query(Wish).filter(Wish.id == wishes[0].id).first()
+        assert fresh.purchased_where == "Target"
+
+    def test_batch_mark_family_wish(self, test_client, admin_user, wish_tree, db):
+        """A family wish can be batch marked (person fields stay null)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        w = family_wish(db, wish_tree)
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 1}
+
+        fresh = db.query(Wish).filter(Wish.id == w.id).first()
+        assert fresh.purchased_at is not None
+        assert fresh.purchased_where == "Target"
+        assert fresh.assigned_to_id == admin_user.id
+
+    def test_batch_mark_reassigns_to_admin(self, test_client, admin_user, wish_tree, db):
+        """Batch mark assigns each wish to the calling admin, even if assigned elsewhere."""
+        from app.auth import get_password_hash
+
+        other_user = User(
+            email="other_batch_mark@test.com",
+            hashed_password=get_password_hash("OtherPass123!"),
+            role=UserRole.admin,
+            display_name=None,
+        )
+        db.add(other_user)
+        db.commit()
+        db.refresh(other_user)
+
+        wish = wish_tree["wishes"][0]
+        wish.assigned_to_id = other_user.id
+        db.commit()
+
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [wish.id], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 1}
+
+        fresh = db.query(Wish).filter(Wish.id == wish.id).first()
+        assert fresh.assigned_to_id == admin_user.id
+
+    def test_batch_mark_null_purchased_where_clears(self, test_client, admin_user, wish_tree, db):
+        """purchased_where=null clears any existing value."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        for w in wishes:
+            w.purchased_where = "Old store"
+        db.commit()
+
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": None},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_at is not None
+            assert fresh[w.id].purchased_where is None
+
+    def test_batch_mark_received_at_clear(self, test_client, admin_user, wish_tree, db):
+        """received_at='' clears any existing value (partial-update sentinel)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        existing = datetime(2026, 1, 10, 8, 0, 0, tzinfo=timezone.utc)
+        for w in wishes:
+            w.received_at = existing
+        db.commit()
+
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "received_at": ""},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].received_at is None
+
+    def test_batch_mark_received_at_omit_preserves(self, test_client, admin_user, wish_tree, db):
+        """Omitting received_at keeps the existing value."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        existing = datetime(2026, 1, 10, 8, 0, 0, tzinfo=timezone.utc)
+        for w in wishes:
+            w.received_at = existing
+        db.commit()
+
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].received_at == existing
+
+    def test_batch_mark_does_not_touch_purchaser_note(self, test_client, admin_user, wish_tree, db):
+        """Batch mark leaves per-item purchaser notes untouched."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        wishes[0].purchaser_note = "Note one"
+        wishes[1].purchaser_note = "Note two"
+        db.commit()
+
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 200
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        assert fresh[wishes[0].id].purchaser_note == "Note one"
+        assert fresh[wishes[1].id].purchaser_note == "Note two"
+
+    def test_batch_mark_empty_wish_ids_422(self, test_client, admin_user):
+        """Empty wish_ids list is rejected."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 422
+
+    def test_batch_mark_fail_fast_invalid_wish_id(self, test_client, admin_user, wish_tree, db):
+        """Missing wish ID → 400 and nothing is mutated."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [wish.id, 99999], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 400
+
+        fresh = db.query(Wish).filter(Wish.id == wish.id).first()
+        assert fresh.purchased_at is None
+
+    def test_batch_mark_fail_fast_soft_deleted(self, test_client, admin_user, wish_tree, db):
+        """Soft-deleted wish ID → 400 and nothing is mutated."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        wishes[1].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = test_client.post(
+            "/api/admin/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": "Target"},
+        )
+        assert resp.status_code == 400
+
+        fresh = db.query(Wish).filter(Wish.id == wishes[0].id).first()
+        assert fresh.purchased_at is None
+
+
+# ---------------------------------------------------------------------------
 # Authorization tests
 # ---------------------------------------------------------------------------
 
@@ -937,4 +1208,13 @@ class TestAuthorization:
             json={"email": referrer_user.email, "password": "RefPass1234!"},
         )
         resp = test_client.post("/api/admin/wishes/batch-assign", json={"wish_ids": [1], "assigned_to_id": 1})
+        assert resp.status_code == 403
+
+    def test_non_admin_batch_mark_purchased(self, test_client, referrer_user):
+        """Non-admin gets 403 on batch-mark-purchased."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": referrer_user.email, "password": "RefPass1234!"},
+        )
+        resp = test_client.post("/api/admin/wishes/batch-mark-purchased", json={"wish_ids": [1], "purchased_where": "Target"})
         assert resp.status_code == 403

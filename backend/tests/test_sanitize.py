@@ -7,6 +7,8 @@ from app.schemas import (
     AdminReferrerUpdate,
     AdminUserCreate,
     AdminUserUpdate,
+    AdminWishUpdate,
+    DonorWishPurchaseMark,
     FamilyCreate,
     FamilyCreateByReferrer,
     FamilyUpdate,
@@ -16,7 +18,9 @@ from app.schemas import (
     ReferrerCreate,
     ReferrerSelfRegister,
     ReferrerUpdate,
+    WishBatchMarkPurchased,
     WishCreate,
+    WishPurchaseMark,
 )
 from app.models import PersonRole, UserRole, WishType
 from app.user_validation import sanitize_plain_text
@@ -380,3 +384,47 @@ class TestPhoneNumberValidation:
     def test_family_update_rejects_too_few_digits(self):
         with pytest.raises(ValidationError, match="10 digits"):
             FamilyUpdate(phone_number="555-1234")
+
+
+class TestWishPurchaseMarkSchemas:
+    def test_purchase_mark_rejects_html_in_purchased_where(self):
+        with pytest.raises(ValidationError):
+            WishPurchaseMark(purchased_where=HTML_PAYLOAD)
+
+    def test_purchase_mark_normalizes_whitespace_in_purchased_where(self):
+        m = WishPurchaseMark(purchased_where="  Walmart\nSupercenter  ")
+        assert m.purchased_where == "Walmart Supercenter"
+
+    def test_batch_purchase_mark_rejects_html_in_purchased_where(self):
+        with pytest.raises(ValidationError):
+            WishBatchMarkPurchased(wish_ids=[1], purchased_where=HTML_PAYLOAD)
+
+    def test_batch_purchase_mark_normalizes_whitespace_in_purchased_where(self):
+        m = WishBatchMarkPurchased(wish_ids=[1], purchased_where="  Kmart\n ")
+        assert m.purchased_where == "Kmart"
+
+    def test_donor_purchase_mark_rejects_html_in_purchased_where(self):
+        with pytest.raises(ValidationError):
+            DonorWishPurchaseMark(purchased_where=HTML_PAYLOAD)
+
+    def test_donor_purchase_mark_normalizes_whitespace_in_purchased_where(self):
+        m = DonorWishPurchaseMark(purchased_where="  Kmart\n ")
+        assert m.purchased_where == "Kmart"
+
+
+class TestAdminWishUpdateSchemas:
+    def test_rejects_html_in_purchased_where(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchased_where=HTML_PAYLOAD)
+
+    def test_normalizes_whitespace_in_purchased_where(self):
+        u = AdminWishUpdate(purchased_where="  Walmart\nSupercenter  ")
+        assert u.purchased_where == "Walmart Supercenter"
+
+    def test_rejects_html_in_purchaser_note(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchaser_note=HTML_PAYLOAD)
+
+    def test_normalizes_whitespace_in_purchaser_note(self):
+        u = AdminWishUpdate(purchaser_note="  Note\none  ")
+        assert u.purchaser_note == "Note one"

@@ -26,6 +26,7 @@ from app.response_builders import (
     compute_display_ids,
     create_person_with_wishes,
     PERSON_SORT_FIELDS,
+    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -99,23 +100,23 @@ def list_people(
     # `search` uses OR across all fields (including wish.description via join).
     # Targeted params search single fields.
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             sql_or(
-                Person.given_name.ilike(pattern),
-                Person.role.cast(String).ilike(pattern),
-                Person.note.ilike(pattern),
-                Wish.description.ilike(pattern),
+                Person.given_name.ilike(pattern, escape="\\"),
+                Person.role.cast(String).ilike(pattern, escape="\\"),
+                Person.note.ilike(pattern, escape="\\"),
+                Wish.description.ilike(pattern, escape="\\"),
             )
         )
     if search_name is not None:
-        query = query.filter(Person.given_name.ilike(f"%{search_name}%"))
+        query = query.filter(Person.given_name.ilike(f"%{escape_like(search_name)}%", escape="\\"))
     if search_role is not None:
-        query = query.filter(Person.role.cast(String).ilike(f"%{search_role}%"))
+        query = query.filter(Person.role.cast(String).ilike(f"%{escape_like(search_role)}%", escape="\\"))
     if search_note is not None:
-        query = query.filter(Person.note.ilike(f"%{search_note}%"))
+        query = query.filter(Person.note.ilike(f"%{escape_like(search_note)}%", escape="\\"))
     if search_wish is not None:
-        query = query.filter(Wish.description.ilike(f"%{search_wish}%"))
+        query = query.filter(Wish.description.ilike(f"%{escape_like(search_wish)}%", escape="\\"))
     if min_age is not None:
         query = query.filter(Person.age >= min_age)
     if max_age is not None:

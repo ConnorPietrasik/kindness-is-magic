@@ -148,6 +148,24 @@ def build_sort_clause(
 
 
 # ---------------------------------------------------------------------------
+# Search-pattern helper
+# ---------------------------------------------------------------------------
+
+
+def escape_like(value: str) -> str:
+    """Escape LIKE/ILIKE wildcards so user search input matches literally.
+
+    Without escaping, a ``%`` or ``_`` typed by the user acts as pattern
+    syntax (a search for ``50%`` behaves like ``50``).  Pair the result
+    with the ``escape="\\"` kwarg on the ilike/like call::
+
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(Wish.description.ilike(pattern, escape="\\"))
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+# ---------------------------------------------------------------------------
 # Sort-field registries (module-level so they aren't rebuilt per request)
 # ---------------------------------------------------------------------------
 

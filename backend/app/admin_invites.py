@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
-from app.response_builders import build_sort_clause, column_filtered_page, ColumnRequest, INVITE_SORT_FIELDS
+from app.response_builders import build_sort_clause, column_filtered_page, ColumnRequest, INVITE_SORT_FIELDS, escape_like
 from app.schemas import InviteListResponse, ReferrerInviteSummary
 
 logger = logging.getLogger(__name__)
@@ -100,11 +100,11 @@ def list_invites(
             query = query.filter(ReferrerInviteToken.expires_at >= now)
 
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             sql_or(
-                ReferrerInviteToken.code.ilike(pattern),
-                ReferrerInviteToken.locked_email.ilike(pattern),
+                ReferrerInviteToken.code.ilike(pattern, escape="\\"),
+                ReferrerInviteToken.locked_email.ilike(pattern, escape="\\"),
             )
         )
 

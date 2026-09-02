@@ -21,6 +21,7 @@ from app.response_builders import (
     build_wish_list_item,
     ColumnRequest,
     compute_display_ids,
+    escape_like,
     get_active_or_404,
     get_or_404,
     WISH_SORT_FIELDS,
@@ -31,6 +32,7 @@ from app.schemas import (
     _CLEAR,
     AdminWishUpdate,
     WishBatchAssign,
+    WishBatchMarkPurchased,
     WishDetail,
     WishListResponse,
     WishListSummary,
@@ -61,7 +63,7 @@ def list_wishes(
     assigned_to_id: int | None = Query(None),
     purchased: str | None = Query(None),
     search: str | None = Query(None),
-    wish_type: str | None = Query(None),
+    wish_type: WishType | None = Query(None),
     columns: str | None = Query(None),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
@@ -100,13 +102,13 @@ def list_wishes(
             query = query.filter(Wish.purchased_at.is_(None))
         # "all" means no filter
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             or_(
-                Wish.description.ilike(pattern),
-                Person.given_name.ilike(pattern),
-                Family.family_name.ilike(pattern),
-                direct_family.family_name.ilike(pattern),
+                Wish.description.ilike(pattern, escape="\\"),
+                Person.given_name.ilike(pattern, escape="\\"),
+                Family.family_name.ilike(pattern, escape="\\"),
+                direct_family.family_name.ilike(pattern, escape="\\"),
             )
         )
     if wish_type is not None:
@@ -211,6 +213,56 @@ def batch_assign(
         "(unassigned)" if is_unassign else body.assigned_to_id,
     )
     return {"assigned_count": count}
+
+
+@admin_wishes_router.post("/batch-mark-purchased")
+def batch_mark_purchased(
+    body: WishBatchMarkPurchased,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> dict:
+    """Batch-mark multiple wishes as purchased. Fail-fast on any invalid ID.
+
+    Mirrors the single mark-purchased semantics for every selected wish:
+    ``purchased_at=now``, ``purchased_where`` overwritten (None clears),
+    ``received_at`` per the partial-update sentinel convention, and
+    ``assigned_to_id`` set to the calling admin.  ``purchaser_note`` is
+    not touched.
+    """
+    # Deduplicate so repeated IDs don't inflate the count
+    seen: set[int] = set()
+    wish_ids = [wid for wid in body.wish_ids if not (wid in seen or seen.add(wid))]
+
+    # Fail-fast: check all wish IDs exist and are not deleted
+    wishes = db.query(Wish).filter(Wish.id.in_(wish_ids)).all()
+    wish_map = {w.id: w for w in wishes}
+
+    for wid in wish_ids:
+        if wid not in wish_map:
+            raise HTTPException(status_code=400, detail=f"Wish {wid} not found")
+        if wish_map[wid].deleted_at is not None:
+            raise HTTPException(status_code=400, detail=f"Wish {wid} is deleted")
+
+    # All valid — mark each wish
+    now = datetime.now(timezone.utc)
+    for wid in wish_ids:
+        wish = wish_map[wid]
+        # purchaser_note=None is a no-op — notes are per-item
+        apply_purchase_fields(wish, now=now, purchased_where=body.purchased_where, purchaser_note=None)
+
+        # Assign to the calling admin
+        wish.assigned_to_id = admin.id
+
+        # received_at follows partial-update convention (None means no-op)
+        if body.received_at is _CLEAR:
+            wish.received_at = None
+        elif body.received_at is not None:
+            wish.received_at = body.received_at
+
+    db.commit()
+
+    logger.info("Admin %s batch-marked %d wishes as purchased", admin.email, len(wish_ids))
+    return {"marked_count": len(wish_ids)}
 
 
 @admin_wishes_router.get("/{wish_id}")

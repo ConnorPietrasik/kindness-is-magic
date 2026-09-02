@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import SentEmail, User
+from app.models import EmailKind, EmailStatus, SentEmail, User
 from app.permissions import require_admin
-from app.response_builders import EMAIL_SORT_FIELDS, ColumnRequest, build_sort_clause, column_filtered_page
+from app.response_builders import EMAIL_SORT_FIELDS, ColumnRequest, build_sort_clause, column_filtered_page, escape_like
 from app.schemas import EmailListResponse, SentEmailSummary
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ def list_sent_emails(
     page_size: int = Query(50, ge=1, le=200),
     columns: str | None = Query(None),
     search: str | None = Query(None),
-    kind: str | None = Query(None),
-    status: str | None = Query(None),
+    kind: EmailKind | None = Query(None),
+    status: EmailStatus | None = Query(None),
     sort: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -38,8 +38,8 @@ def list_sent_emails(
     query = db.query(SentEmail)
 
     if search is not None:
-        pattern = f"%{search}%"
-        query = query.filter(SentEmail.recipient_email.ilike(pattern))
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(SentEmail.recipient_email.ilike(pattern, escape="\\"))
 
     if kind is not None:
         query = query.filter(SentEmail.kind == kind)

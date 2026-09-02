@@ -21,6 +21,7 @@ from app.response_builders import (
     build_user_detail,
     column_filtered_page,
     ColumnRequest,
+    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -184,11 +185,11 @@ def list_users(
     query = db.query(User).filter(User.deleted_at.is_(None))
     query = _apply_role_filter(query, role, roles)
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             or_(
-                User.email.ilike(pattern),
-                User.display_name.ilike(pattern),
+                User.email.ilike(pattern, escape="\\"),
+                User.display_name.ilike(pattern, escape="\\"),
             )
         )
     total = query.count()
@@ -233,11 +234,11 @@ def list_deleted_users(
     if role is not None:
         query = query.filter(User.role == role)
     if search is not None:
-        pattern = f"%{search}%"
+        pattern = f"%{escape_like(search)}%"
         query = query.filter(
             or_(
-                User.email.ilike(pattern),
-                User.display_name.ilike(pattern),
+                User.email.ilike(pattern, escape="\\"),
+                User.display_name.ilike(pattern, escape="\\"),
             )
         )
     total = query.count()
