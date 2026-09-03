@@ -87,8 +87,8 @@ export default function Dashboard() {
       <HeaderBar title="Kindness is Magic" right={<LogoutButton onClick={handleLogout} />} />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        {/* Welcome card with inline display name edit */}
-        <WelcomeCard />
+        {/* Profile card — inline display name edit + password change */}
+        <ProfileCard />
 
         {/* Donor gift claim cap */}
         {user?.role === "donor" && (
@@ -184,18 +184,15 @@ export default function Dashboard() {
             </>
           )}
         </div>
-
-        {/* Change password */}
-        <ChangePasswordSection />
       </main>
     </div>
   );
 }
 
 /**
- * WelcomeCard — greeting card with inline display name edit.
+ * ProfileCard — profile section with inline display name edit and password change.
  */
-function WelcomeCard() {
+function ProfileCard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -292,6 +289,10 @@ function WelcomeCard() {
             {user?.family_id && <span>Family ID: {user.family_id}</span>}
           </div>
         </div>
+      </div>
+      {/* Password change */}
+      <div className="mt-4 border-t border-gray-100 pt-3">
+        <PasswordRow />
       </div>
       <MutationErrors mutations={[updateProfileMut]} />
     </Card>
@@ -480,21 +481,33 @@ function NavCard({ to, icon, label, desc }: NavCardProps) {
 }
 
 /**
- * ChangePasswordSection — form to change the user's password.
+ * PasswordRow — "Change password" button that expands into the password change form.
  */
-function ChangePasswordSection() {
+function PasswordRow() {
   const toast = useToast();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [editing, setEditing] = useState(false);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
 
+  const resetFields = () => {
+    setOldPass("");
+    setNewPass("");
+    setConfirmPass("");
+  };
+
   const changePasswordMut = useMutation({
     mutationFn: () => changePasswordRequest(oldPass, newPass),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Password updated successfully!");
-      setOldPass("");
-      setNewPass("");
-      setConfirmPass("");
+      resetFields();
+      setEditing(false);
+      // A password change invalidates all refresh tokens, so sign this session
+      // out explicitly instead of stranding it until the next refresh failure.
+      await logout();
+      navigate(ROUTES.LOGIN, { replace: true });
     },
   });
 
@@ -509,49 +522,64 @@ function ChangePasswordSection() {
     changePasswordMut.mutate();
   };
 
+  const handleCancel = () => {
+    resetFields();
+    setEditing(false);
+  };
+
   return (
-    <Card>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Change Password</h2>
-      <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
-        <FormField
-          label="Current password"
-          type="password"
-          fieldProps={{
-            value: oldPass,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value),
-            required: true,
-            autoComplete: "current-password",
-          }}
-        />
-        <FormField
-          label="New password"
-          type="password"
-          fieldProps={{
-            value: newPass,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewPass(e.target.value),
-            required: true,
-            minLength: 8,
-            placeholder: "Min 8 characters",
-            autoComplete: "new-password",
-          }}
-        />
-        <FormField
-          label="Confirm new password"
-          type="password"
-          fieldProps={{
-            value: confirmPass,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmPass(e.target.value),
-            required: true,
-            autoComplete: "new-password",
-            minLength: 8,
-          }}
-        />
-        <Button type="submit" loading={changePasswordMut.isPending}>
-          {changePasswordMut.isPending ? "Updating…" : "Update Password"}
+    <div>
+      {editing ? (
+        <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
+          <FormField
+            label="Current password"
+            type="password"
+            fieldProps={{
+              value: oldPass,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOldPass(e.target.value),
+              required: true,
+              autoComplete: "current-password",
+            }}
+          />
+          <FormField
+            label="New password"
+            type="password"
+            fieldProps={{
+              value: newPass,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewPass(e.target.value),
+              required: true,
+              minLength: 8,
+              placeholder: "Min 8 characters",
+              autoComplete: "new-password",
+            }}
+          />
+          <FormField
+            label="Confirm new password"
+            type="password"
+            fieldProps={{
+              value: confirmPass,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmPass(e.target.value),
+              required: true,
+              autoComplete: "new-password",
+              minLength: 8,
+            }}
+          />
+          <div className="flex gap-3">
+            <Button type="submit" loading={changePasswordMut.isPending}>
+              {changePasswordMut.isPending ? "Updating…" : "Update password"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleCancel}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setEditing(true)}>
+          Change password
         </Button>
-      </form>
+      )}
       <MutationErrors mutations={[changePasswordMut]} />
-    </Card>
+    </div>
   );
 }
 

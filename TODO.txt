@@ -1,6 +1,5 @@
 Delivery slips for the delivery people: where to drive + family name + phone number; Admins should see delivery slips too
 Hide CSV import - maybe make a nested view for rarely-used admin functions? It’s mostly used for demo and testing
-Move the password change thing into a more general “update user” area instead of being just kinda thrown onto the dashboard
 Admin page with everything, kinda like a spreadsheet
 Add deadlines: family info, donor bringing gifts, others? - admin set
 Donor reminder emails before deadline

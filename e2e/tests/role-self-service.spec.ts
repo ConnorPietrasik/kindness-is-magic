@@ -1,8 +1,8 @@
 /**
- * Role Self-Service — family dashboard + people CRUD, referrer dashboard + people CRUD, display name.
+ * Role Self-Service — family dashboard + people CRUD, referrer dashboard + people CRUD, display name, password change.
  *
  * Family/referrer CRUD tests use CSV-seeded accounts and their data.
- * Display name test uses an isolated referrer so parallel workers don't collide.
+ * Display name and password change tests each use an isolated referrer so parallel workers don't collide.
  *
  * Person records created by tests are cleaned up in afterAll.
  */
@@ -341,5 +341,101 @@ test.describe("Role Self-Service — display name", () => {
     });
 
     await context.close();
+  });
+});
+
+// ── Password change test (isolated referrer — separate from the display name
+// account so a changed password can't break that block on re-runs) ──────────
+
+const PASSWORD_SUFFIX = Math.random().toString(36).slice(2, 8);
+const PASSWORD_ORIGINAL = "Password123!";
+const PASSWORD_NEW = `NewPass${PASSWORD_SUFFIX}!`;
+
+const passwordData: {
+  referrerId?: number;
+  userId?: number;
+  email?: string;
+} = {};
+
+test.describe("Role Self-Service — password change", () => {
+  test.beforeAll(async ({ request: req }) => {
+    const api = await loginViaApi(req);
+    const referrer = await createReferrerWithUserAndCredentials(api, {
+      name: `E2E Password Referrer ${PASSWORD_SUFFIX}`,
+      familyLimit: 5,
+      phoneNumber: "555-000-9998",
+      email: `e2e-password-${PASSWORD_SUFFIX}@example.com`,
+      password: PASSWORD_ORIGINAL,
+    });
+    passwordData.referrerId = referrer.referrerId;
+    passwordData.userId = referrer.userId;
+    passwordData.email = referrer.email;
+    await api.dispose();
+  });
+
+  test.afterAll(async ({ request: req }) => {
+    const authed = await loginViaApi(req);
+    if (passwordData.userId) {
+      await deleteUserViaApi(authed, passwordData.userId);
+    }
+    if (passwordData.referrerId) {
+      await deleteReferrerViaApi(authed, passwordData.referrerId);
+    }
+    await authed.dispose();
+  });
+
+  test("referrer changes password from the dashboard profile card", async ({ browser }) => {
+    if (!passwordData.email) {
+      test.skip();
+      return;
+    }
+
+    /* Log in with the original password */
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(passwordData.email);
+    await page.getByLabel("Password").fill(PASSWORD_ORIGINAL);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/);
+    await expect(page.getByRole("heading", { name: "Welcome back!" })).toBeVisible({ timeout: 10_000 });
+
+    /* Expand the password change form in the profile card */
+    await page.getByRole("button", { name: "Change password" }).click();
+    await page.getByLabel("Current password").fill(PASSWORD_ORIGINAL);
+    /* exact: true — "New password" is a substring of "Confirm new password" */
+    await page.getByLabel("New password", { exact: true }).fill(PASSWORD_NEW);
+    await page.getByLabel("Confirm new password", { exact: true }).fill(PASSWORD_NEW);
+    await page.getByRole("button", { name: "Update password" }).click();
+
+    /* Success toast. A password change invalidates all refresh tokens, so the
+       session is then signed out and redirected to /login. (The form-collapse
+       on success is covered by the Dashboard vitest; here the dashboard
+       unmounts to /login almost immediately, so don't assert on it.) */
+    await expect(page.getByText("Password updated successfully!")).toBeVisible({ timeout: 10_000 });
+    await page.waitForURL("/login", { timeout: 10_000 });
+    await context.close();
+
+    /* Old password is rejected */
+    const oldCtx = await browser.newContext();
+    const oldPage = await oldCtx.newPage();
+    await oldPage.goto("/login");
+    await oldPage.getByLabel("Email").fill(passwordData.email);
+    await oldPage.getByLabel("Password").fill(PASSWORD_ORIGINAL);
+    await oldPage.getByRole("button", { name: "Sign in" }).click();
+    await expect(oldPage.getByText("Incorrect email or password")).toBeVisible({ timeout: 10_000 });
+    await oldCtx.close();
+
+    /* New password is accepted */
+    const newCtx = await browser.newContext();
+    const newPage = await newCtx.newPage();
+    await newPage.goto("/login");
+    await newPage.getByLabel("Email").fill(passwordData.email);
+    await newPage.getByLabel("Password").fill(PASSWORD_NEW);
+    await newPage.getByRole("button", { name: "Sign in" }).click();
+    await newPage.waitForURL(/\/dashboard/);
+    await expect(newPage.getByRole("heading", { name: "Welcome back!" })).toBeVisible({ timeout: 10_000 });
+    await newCtx.close();
   });
 });

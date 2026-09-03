@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
@@ -172,5 +173,93 @@ describe("Dashboard", () => {
     renderDashboard(donorUser);
 
     expect(await screen.findByText("2 / 5")).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Profile card — display name edit + password change
+/* ------------------------------------------------------------------ */
+
+describe("Dashboard — profile card", () => {
+  const user = userEvent.setup();
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the password form collapsed until 'Change password' is clicked", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const changeButton = await screen.findByRole("button", { name: "Change password" });
+    expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
+
+    await user.click(changeButton);
+
+    expect(screen.getByLabelText("Current password")).toBeInTheDocument();
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
+  });
+
+  it("changes the password and collapses the form on success", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "changePasswordRequest").mockResolvedValue({});
+    vi.spyOn(api, "logoutRequest").mockResolvedValue(undefined);
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Change password" }));
+    await user.type(screen.getByLabelText("Current password"), "oldpass1");
+    await user.type(screen.getByLabelText("New password"), "newpass123");
+    await user.type(screen.getByLabelText("Confirm new password"), "newpass123");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+
+    await waitFor(() => {
+      expect(api.changePasswordRequest).toHaveBeenCalledWith("oldpass1", "newpass123");
+    });
+
+    expect(await screen.findByText("Password updated successfully!")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
+
+    // Refresh tokens are invalidated on change, so the session is signed out explicitly.
+    await waitFor(() => {
+      expect(api.logoutRequest).toHaveBeenCalled();
+    });
+  });
+
+  it("blocks the password change when new and confirm passwords differ", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    const changePasswordSpy = vi.spyOn(api, "changePasswordRequest");
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Change password" }));
+    await user.type(screen.getByLabelText("Current password"), "oldpass1");
+    await user.type(screen.getByLabelText("New password"), "newpass123");
+    await user.type(screen.getByLabelText("Confirm new password"), "different123");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByText("New passwords do not match.")).toBeInTheDocument();
+    expect(changePasswordSpy).not.toHaveBeenCalled();
+  });
+
+  it("saves the display name via the inline edit", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "updateMyProfile").mockResolvedValue({ ...adminUser, display_name: "New Admin Name" });
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByTitle("Edit display name"));
+    const input = screen.getByLabelText("Display name");
+    await user.clear(input);
+    await user.type(input, "New Admin Name");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      // Second arg is React Query's mutation context (mutationFn is passed directly).
+      expect(api.updateMyProfile).toHaveBeenCalledWith("New Admin Name", expect.anything());
+    });
   });
 });
