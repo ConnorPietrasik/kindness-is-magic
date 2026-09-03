@@ -106,6 +106,96 @@ def second_purchaser(db: Session):
     return purchaser2
 
 
+@pytest.fixture()
+def purchaser_sort_tree(db: Session):
+    """Two families under one referrer, every wish assigned to one purchaser.
+
+    ``fam1`` has the lower family id, but person wishes are inserted
+    interleaved across families so plain wish-id order differs from the
+    grouped default.
+    """
+    from app.auth import get_password_hash
+
+    ref = Referrer(
+        name="Purchaser Sort Referrer",
+        family_limit=10,
+        phone_number="555-4000-0001",
+        family_invite_code="KFI-PSORT1",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    purchaser = User(
+        email="purchaser_sort@test.com",
+        hashed_password=get_password_hash("PurchSort123!"),
+        role=UserRole.purchaser,
+        display_name=None,
+    )
+    db.add_all([ref, purchaser])
+    db.flush()
+
+    def new_family(name, phone):
+        fam = make_family(
+            db,
+            family_wish=f"{name} family wish",
+            referrer_id=ref.id,
+            family_name=name,
+            contact_name=f"{name} Contact",
+            phone_number=phone,
+            verification_status=FamilyVerificationStatus.verified,
+        )
+        db.flush()
+        return fam
+
+    fam1 = new_family("PSort First Family", "555-4000-0002")
+    fam2 = new_family("PSort Second Family", "555-4000-0003")
+
+    def new_person(family, name):
+        p = Person(family_id=family.id, given_name=name, age=10, role=PersonRole.son)
+        db.add(p)
+        db.flush()
+        return p
+
+    p1a, p1b = new_person(fam1, "PSort First A"), new_person(fam1, "PSort First B")
+    p2a, p2b = new_person(fam2, "PSort Second A"), new_person(fam2, "PSort Second B")
+
+    def new_wish(person, wtype, label):
+        w = Wish(person_id=person.id, type=wtype, description=f"PSort {label}")
+        db.add(w)
+        db.flush()
+        return w
+
+    # Interleaved inserts so wish ids alternate across families
+    person_wishes = {
+        "p1a_practical": new_wish(p1a, WishType.practical, "First A practical"),
+        "p2a_practical": new_wish(p2a, WishType.practical, "Second A practical"),
+        "p1a_fun": new_wish(p1a, WishType.fun, "First A fun"),
+        "p2a_fun": new_wish(p2a, WishType.fun, "Second A fun"),
+        "p1b_practical": new_wish(p1b, WishType.practical, "First B practical"),
+        "p2b_practical": new_wish(p2b, WishType.practical, "Second B practical"),
+        "p1b_fun": new_wish(p1b, WishType.fun, "First B fun"),
+        "p2b_fun": new_wish(p2b, WishType.fun, "Second B fun"),
+    }
+
+    family_wishes = {}
+    for label, family in (("fam1", fam1), ("fam2", fam2)):
+        w = db.query(Wish).filter(Wish.family_id == family.id, Wish.type == WishType.family).first()
+        assert w is not None
+        family_wishes[label] = w
+
+    # Assign every wish to the purchaser
+    for w in [*person_wishes.values(), *family_wishes.values()]:
+        w.assigned_to_id = purchaser.id
+    db.commit()
+
+    return {
+        "referrer": ref,
+        "purchaser": purchaser,
+        "fam1": fam1,
+        "fam2": fam2,
+        "family_wishes": family_wishes,
+        "wishes": person_wishes,
+    }
+
+
 def assign_family_wish(db: Session, tree) -> Wish:
     """Assign the tree family's family wish row to the tree purchaser."""
     w = db.query(Wish).filter(Wish.family_id == tree["family"].id, Wish.type == WishType.family).first()
@@ -383,6 +473,35 @@ class TestPurchaserListWishes:
         data = resp.json()
         assert data["total"] == 1
         assert data["wishes"][0]["id"] == wishes[0].id
+
+    def test_default_order_groups_by_family(self, test_client, purchaser_sort_tree):
+        """Assigned wishes from two families come back grouped by family."""
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": purchaser_sort_tree["purchaser"].email, "password": "PurchSort123!"},
+        )
+        assert resp.status_code == 200
+
+        resp = test_client.get("/api/purchaser/wishes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 10
+
+        fw = purchaser_sort_tree["family_wishes"]
+        w = purchaser_sort_tree["wishes"]
+        expected = [
+            fw["fam1"].id,
+            w["p1a_practical"].id,
+            w["p1a_fun"].id,
+            w["p1b_practical"].id,
+            w["p1b_fun"].id,
+            fw["fam2"].id,
+            w["p2a_practical"].id,
+            w["p2a_fun"].id,
+            w["p2b_practical"].id,
+            w["p2b_fun"].id,
+        ]
+        assert [item["id"] for item in data["wishes"]] == expected
 
 
 # ---------------------------------------------------------------------------

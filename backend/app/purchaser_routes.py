@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.database import get_db
 from app.models import Family, Person, User, Wish, WishType
@@ -23,6 +23,7 @@ from app.response_builders import (
     get_or_404,
     partial_update,
     wish_display_id,
+    wish_grouped_order,
 )
 from app.schemas import (
     _CLEAR,
@@ -86,6 +87,10 @@ def list_wishes(
 ) -> PurchaserWishListResponse:
     """List wishes assigned to the current purchaser.
 
+    Default order matches the admin wish list: grouped by owner family
+    (referrer, family, person) with the family wish first in each family
+    block, then wish type (practical, fun, adult) and wish id.
+
     Supports ``purchased`` filter: ``true`` (purchased only), ``false``
     (unpurchased only), ``all`` (no filter); ``search`` — case-insensitive
     match on wish description or person given name (family names are
@@ -93,10 +98,14 @@ def list_wishes(
     (same values the admin endpoint accepts).
     """
     # Phase 1: filter query.  The explicit Person outer-join is needed for
-    # the given-name search.
+    # the given-name search; the family joins serve the grouped default
+    # order (owner family = the person's family or the wish's own family).
+    direct_family = aliased(Family)
     query = (
         db.query(Wish)
         .outerjoin(Person, Wish.person_id == Person.id)
+        .outerjoin(Family, Person.family_id == Family.id)
+        .outerjoin(direct_family, Wish.family_id == direct_family.id)
         .filter(
             Wish.deleted_at.is_(None),
             Wish.assigned_to_id == current_user.id,
@@ -121,11 +130,13 @@ def list_wishes(
         query = query.filter(Wish.type == wish_type)
 
     total = query.count()
-    wish_ids = [w.id for w in query.order_by(Wish.id).offset((page - 1) * page_size).limit(page_size).all()]
+    order_by = wish_grouped_order(direct_family)
+    wish_ids = [w.id for w in query.order_by(*order_by).offset((page - 1) * page_size).limit(page_size).all()]
 
     # Phase 2: re-query the page's wish IDs with joinedload to build items —
     # a join and an eagerload on the same relationship don't mix, which is
-    # why the admin list uses this two-phase pattern.
+    # why the admin list uses this two-phase pattern. The re-query is
+    # join-free, so the grouped page order is restored in Python.
     wishes = (
         db.query(Wish)
         .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
@@ -135,6 +146,8 @@ def list_wishes(
         if wish_ids
         else []
     )
+    position = {wid: i for i, wid in enumerate(wish_ids)}
+    wishes.sort(key=lambda w: position[w.id])
 
     # Display IDs for the families on this page (unscoped flat format —
     # same format the public wish-list page shows as its heading).

@@ -295,7 +295,7 @@ export default function AdminWishes() {
             }}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           >
-            <option value="">Default sort</option>
+            <option value="">Default (by family)</option>
             <option value="id">ID ↑</option>
             <option value="-id">ID ↓</option>
             <option value="description">Description ↑</option>

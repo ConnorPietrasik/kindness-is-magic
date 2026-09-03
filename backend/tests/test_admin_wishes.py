@@ -118,6 +118,138 @@ def second_family_with_wishes(db: Session, wish_tree):
     return {"family": fam2, "person": person2, "wishes": [w3, w4]}
 
 
+@pytest.fixture()
+def sort_tree(db: Session):
+    """Three families under two referrers with interleaved wish ids.
+
+    ``fam_c`` (under ``ref2``) is created first so it has the lowest
+    family id, while the referrer group must still sort it last. Person
+    wishes are inserted interleaved across families so plain wish-id
+    order differs from the grouped default.
+    """
+    ref1 = Referrer(
+        name="Sort Ref 1",
+        family_limit=10,
+        phone_number="555-3000-0001",
+        family_invite_code="KFI-SORT01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    ref2 = Referrer(
+        name="Sort Ref 2",
+        family_limit=10,
+        phone_number="555-3000-0002",
+        family_invite_code="KFI-SORT02",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    db.add_all([ref1, ref2])
+    db.flush()
+
+    def new_family(name, referrer_id, phone):
+        fam = make_family(
+            db,
+            family_wish=f"{name} family wish",
+            referrer_id=referrer_id,
+            family_name=name,
+            contact_name=f"{name} Contact",
+            phone_number=phone,
+            verification_status=FamilyVerificationStatus.verified,
+        )
+        db.flush()
+        return fam
+
+    fam_c = new_family("Sort Family C", ref2.id, "555-3000-0003")
+    fam_a = new_family("Sort Family A", ref1.id, "555-3000-0004")
+    fam_b = new_family("Sort Family B", ref1.id, "555-3000-0005")
+
+    def new_person(family, name):
+        p = Person(family_id=family.id, given_name=name, age=10, role=PersonRole.son)
+        db.add(p)
+        db.flush()
+        return p
+
+    a1, a2 = new_person(fam_a, "Sort A One"), new_person(fam_a, "Sort A Two")
+    c1, c2 = new_person(fam_c, "Sort C One"), new_person(fam_c, "Sort C Two")
+    b1, b2 = new_person(fam_b, "Sort B One"), new_person(fam_b, "Sort B Two")
+
+    def new_wish(person, wtype, label):
+        w = Wish(person_id=person.id, type=wtype, description=f"Sort {label}")
+        db.add(w)
+        db.flush()
+        return w
+
+    # Interleaved inserts so wish ids alternate across families
+    wishes = {
+        "a1_practical": new_wish(a1, WishType.practical, "A1 practical"),
+        "c1_practical": new_wish(c1, WishType.practical, "C1 practical"),
+        "b1_practical": new_wish(b1, WishType.practical, "B1 practical"),
+        "a1_fun": new_wish(a1, WishType.fun, "A1 fun"),
+        "c1_fun": new_wish(c1, WishType.fun, "C1 fun"),
+        "b1_fun": new_wish(b1, WishType.fun, "B1 fun"),
+        "a2_practical": new_wish(a2, WishType.practical, "A2 practical"),
+        "c2_practical": new_wish(c2, WishType.practical, "C2 practical"),
+        "b2_practical": new_wish(b2, WishType.practical, "B2 practical"),
+        "a2_fun": new_wish(a2, WishType.fun, "A2 fun"),
+        "c2_fun": new_wish(c2, WishType.fun, "C2 fun"),
+        "b2_fun": new_wish(b2, WishType.fun, "B2 fun"),
+    }
+
+    family_wishes = {}
+    for label, family in (("a", fam_a), ("b", fam_b), ("c", fam_c)):
+        w = db.query(Wish).filter(Wish.family_id == family.id, Wish.type == WishType.family).first()
+        assert w is not None
+        family_wishes[label] = w
+
+    return {
+        "ref1": ref1,
+        "ref2": ref2,
+        "fam_a": fam_a,
+        "fam_b": fam_b,
+        "fam_c": fam_c,
+        "family_wishes": family_wishes,
+        "wishes": wishes,
+    }
+
+
+@pytest.fixture()
+def unassigned_tree(db: Session):
+    """One assigned and one unassigned family, each with only its family wish.
+
+    The unassigned family is created last so it has the higher family id,
+    while the grouped order must still place it first.
+    """
+    ref = Referrer(
+        name="Unassigned Sort Referrer",
+        family_limit=10,
+        phone_number="555-5000-0001",
+        family_invite_code="KFI-UNAS01",
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    db.add(ref)
+    db.flush()
+
+    assigned = make_family(
+        db,
+        family_wish="Unassigned Sort: assigned family wish",
+        referrer_id=ref.id,
+        family_name="Unassigned Sort Assigned",
+        contact_name="Unassigned Sort Assigned Contact",
+        phone_number="555-5000-0002",
+        verification_status=FamilyVerificationStatus.verified,
+    )
+    db.flush()
+    unassigned = make_family(
+        db,
+        family_wish="Unassigned Sort: unassigned family wish",
+        family_name="Unassigned Sort Unassigned",
+        contact_name="Unassigned Sort Unassigned Contact",
+        phone_number="555-5000-0003",
+        verification_status=FamilyVerificationStatus.verified,
+    )
+    db.flush()
+
+    return {"assigned": assigned, "unassigned": unassigned}
+
+
 def family_wish(db: Session, tree) -> Wish:
     """The tree family's family wish row (created by make_family)."""
     w = db.query(Wish).filter(Wish.family_id == tree["family"].id, Wish.type == WishType.family).first()
@@ -399,6 +531,133 @@ class TestListWishes:
         assert data["total"] == 0
         assert data["wishes"] == []
         assert data["total_pages"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Default (grouped) order tests
+# ---------------------------------------------------------------------------
+
+
+def expected_sort_order(tree):
+    """The canonical grouped default order for the sort_tree fixture."""
+    fw = tree["family_wishes"]
+    w = tree["wishes"]
+    return [
+        fw["a"].id,
+        w["a1_practical"].id,
+        w["a1_fun"].id,
+        w["a2_practical"].id,
+        w["a2_fun"].id,
+        fw["b"].id,
+        w["b1_practical"].id,
+        w["b1_fun"].id,
+        w["b2_practical"].id,
+        w["b2_fun"].id,
+        fw["c"].id,
+        w["c1_practical"].id,
+        w["c1_fun"].id,
+        w["c2_practical"].id,
+        w["c2_fun"].id,
+    ]
+
+
+class TestDefaultOrder:
+    """The grouped default order (referrer → family → person, family wish first)."""
+
+    def test_default_groups_by_family(self, logged_in_admin, sort_tree):
+        """Each family's wishes form a contiguous block; blocks follow referrer, family id."""
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        items = resp.json()["wishes"]
+        assert len(items) == 15
+
+        fam_ids = [item["family_id"] for item in items]
+        # Collapse consecutive runs — one run per family, in referrer/family order
+        runs = [fam_ids[0]]
+        for fam_id in fam_ids[1:]:
+            if fam_id != runs[-1]:
+                runs.append(fam_id)
+        assert runs == [sort_tree["fam_a"].id, sort_tree["fam_b"].id, sort_tree["fam_c"].id]
+        for fam in (sort_tree["fam_a"], sort_tree["fam_b"], sort_tree["fam_c"]):
+            assert fam_ids.count(fam.id) == 5
+
+    def test_default_order_within_family(self, logged_in_admin, sort_tree):
+        """Family wish first, then persons in order, practical before fun."""
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        ids = [item["id"] for item in resp.json()["wishes"]]
+        assert ids == expected_sort_order(sort_tree)
+
+    def test_default_referrer_group_dominates_family_id(self, logged_in_admin, sort_tree):
+        """The lowest family id belongs to ref2's family and sorts after ref1's families."""
+        assert sort_tree["fam_c"].id < sort_tree["fam_a"].id
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        ids = [item["id"] for item in resp.json()["wishes"]]
+        assert ids.index(sort_tree["family_wishes"]["c"].id) > ids.index(sort_tree["wishes"]["b2_fun"].id)
+
+    def test_explicit_sort_still_applies(self, logged_in_admin, wish_tree):
+        """An explicit sort= still orders by that field."""
+        resp = logged_in_admin.get("/api/admin/wishes?sort=description")
+        assert resp.status_code == 200
+        descs = [w["description"] for w in resp.json()["wishes"]]
+        assert descs == sorted(descs)
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-description")
+        assert resp.status_code == 200
+        assert [w["description"] for w in resp.json()["wishes"]] == sorted(descs, reverse=True)
+
+    def test_unknown_or_empty_sort_falls_back_to_default(self, logged_in_admin, wish_tree):
+        """Unknown or empty sort values fall back to the grouped default (family wish first)."""
+        for sort_param in ("bogus", ""):
+            resp = logged_in_admin.get(f"/api/admin/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            items = resp.json()["wishes"]
+            by_type = {w["type"]: w for w in items}
+            assert [w["id"] for w in items] == [by_type["family"]["id"], by_type["practical"]["id"], by_type["fun"]["id"]]
+
+    def test_default_order_across_pages(self, logged_in_admin, sort_tree):
+        """The grouped order continues correctly across pages."""
+        full = logged_in_admin.get("/api/admin/wishes")
+        assert full.status_code == 200
+        full_ids = [w["id"] for w in full.json()["wishes"]]
+
+        paged_ids = []
+        for page in (1, 2, 3):
+            resp = logged_in_admin.get(f"/api/admin/wishes?page={page}&page_size=5")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["total"] == 15
+            assert data["total_pages"] == 3
+            assert len(data["wishes"]) == 5
+            paged_ids.extend(w["id"] for w in data["wishes"])
+
+        assert paged_ids == full_ids
+        assert paged_ids == expected_sort_order(sort_tree)
+
+    def test_type_order_practical_fun_adult(self, logged_in_admin, wish_tree, db):
+        """A person's wishes order by type: practical, fun, adult.
+
+        An adult wish on a child violates the age-based type rules, but is
+        inserted directly at the DB level to exercise the sort key itself.
+        """
+        adult = Wish(person_id=wish_tree["person"].id, type=WishType.adult, description="A board game night")
+        db.add(adult)
+        db.commit()
+
+        fam_wish = db.query(Wish).filter(Wish.family_id == wish_tree["family"].id, Wish.type == WishType.family).first()
+        resp = logged_in_admin.get(f"/api/admin/wishes?family_id={wish_tree['family'].id}")
+        assert resp.status_code == 200
+        ids = [w["id"] for w in resp.json()["wishes"]]
+        assert ids == [fam_wish.id, wish_tree["wishes"][0].id, wish_tree["wishes"][1].id, adult.id]
+
+    def test_unassigned_families_sort_first(self, logged_in_admin, unassigned_tree):
+        """Families without a referrer sort ahead of assigned ones, before family id."""
+        assert unassigned_tree["unassigned"].id > unassigned_tree["assigned"].id
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        fam_ids = [w["family_id"] for w in resp.json()["wishes"]]
+        assert fam_ids == [unassigned_tree["unassigned"].id, unassigned_tree["assigned"].id]
 
 
 # ---------------------------------------------------------------------------

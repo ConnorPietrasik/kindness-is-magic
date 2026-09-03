@@ -15,7 +15,6 @@ from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
-    build_sort_clause,
     column_filtered_page,
     build_wish_detail,
     build_wish_list_item,
@@ -27,6 +26,7 @@ from app.response_builders import (
     WISH_SORT_FIELDS,
     partial_update,
     wish_display_id,
+    wish_grouped_order,
 )
 from app.schemas import (
     _CLEAR,
@@ -74,6 +74,14 @@ def list_wishes(
     Person wishes resolve their family through the person; family wishes
     (``person_id`` null) are bound to the family directly, so both sources
     are outer-joined and handled by the filters and search below.
+
+    Default order groups each family's wishes together — owner family's
+    referrer (unassigned families first), owner family, person — with the
+    family wish first in each family block, then wish type in display order
+    (practical, fun, adult) and wish id. An explicit ``sort`` naming a
+    ``WISH_SORT_FIELDS`` column (``-`` prefix for descending) orders by that
+    single column instead; unknown or empty values fall back to the grouped
+    default.
     """
     # Base query: outer-join Wish → Person → Family for filtering and context
     direct_family = aliased(Family)
@@ -116,12 +124,21 @@ def list_wishes(
 
     total = query.count()
 
-    sort_clause = build_sort_clause(sort, WISH_SORT_FIELDS, Wish.id.asc())
-    wishes = query.order_by(sort_clause, Wish.id).offset((page - 1) * page_size).limit(page_size).all()
+    # An explicit ``sort`` naming a WISH_SORT_FIELDS column keeps the
+    # single-column order (+ id tie-breaker); unknown or empty values fall
+    # back to the grouped default.
+    field = sort[1:] if sort and sort.startswith("-") else sort
+    if sort and field in WISH_SORT_FIELDS:
+        column = WISH_SORT_FIELDS[field]
+        order_by = [column.desc() if sort.startswith("-") else column.asc(), Wish.id]
+    else:
+        order_by = wish_grouped_order(direct_family)
+    wishes = query.order_by(*order_by).offset((page - 1) * page_size).limit(page_size).all()
 
     # Build list items — need person/family context and assigned-to names.
-    # Re-query with joinedload to avoid N+1. Preserve the sort order from
-    # the first query so the response reflects the requested sort.
+    # Re-query with joinedload to avoid N+1. The re-query is join-free, so
+    # the grouped default cannot be expressed in it — order by id there and
+    # restore the phase-1 page order in Python.
     cols = ColumnRequest.parse(columns)
     wish_ids = [w.id for w in wishes]
     if wish_ids:
@@ -133,9 +150,11 @@ def list_wishes(
                 joinedload(Wish.assigned_to),
             )
             .filter(Wish.id.in_(wish_ids))
-            .order_by(sort_clause)
+            .order_by(Wish.id)
             .all()
         )
+        position = {wid: i for i, wid in enumerate(wish_ids)}
+        wishes_with_context.sort(key=lambda w: position[w.id])
         # Batch-collect assigned-to users for name resolution (conditional)
         assigned_users: dict[int, User] = {}
         if cols.needs("assigned_to_name"):

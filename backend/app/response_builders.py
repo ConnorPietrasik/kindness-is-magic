@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from typing import Type, TypeVar, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm.util import AliasedClass
 
 from datetime import datetime, timezone
 
@@ -145,6 +146,29 @@ def build_sort_clause(
 
     col = field_map[field]
     return col.desc() if descending else col.asc()
+
+
+def wish_grouped_order(direct_family: AliasedClass) -> list[ColumnElement]:
+    """Grouped default order for wish list endpoints.
+
+    Groups each family's wishes together — owner family's referrer
+    (unassigned families first), owner family, person — with the family
+    wish first in each family block, then wish type in display order
+    (practical, fun, adult) and wish id. The owner family is the person's
+    family or the wish's own family.
+
+    Callers must outer-join Person and the person's Family, plus
+    *direct_family*, an ``aliased(Family)`` on ``Wish.family_id`` for
+    family wishes.
+    """
+    return [
+        func.coalesce(Family.referrer_id, direct_family.referrer_id, 0),
+        func.coalesce(Family.id, direct_family.id),
+        case((Wish.person_id.is_(None), 0), else_=1),
+        Wish.person_id,
+        case((Wish.type == WishType.practical, 0), (Wish.type == WishType.fun, 1), else_=2),
+        Wish.id,
+    ]
 
 
 # ---------------------------------------------------------------------------

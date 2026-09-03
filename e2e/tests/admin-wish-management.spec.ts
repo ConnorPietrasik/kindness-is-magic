@@ -25,7 +25,7 @@ test.describe("Admin Wish Management — read-only", () => {
 
     await page.goto("/admin/wishes");
     await expect(page.getByRole("heading", { name: "Manage Wishes" })).toBeVisible();
-    // Page 1 is family wishes (one per family, created before person wishes) —
+    // Wishes are grouped by family (family wish first in each family block) —
     // a seeded family name should appear
     await expect(page.getByRole("table")).toContainText("The Williams Family", { timeout: 10_000 });
     // The ID column (wish display_id) is visible by default
