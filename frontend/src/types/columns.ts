@@ -52,16 +52,34 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "referrer_id", label: "Referrer ID", visible: false },
     { key: "family_id", label: "Family ID", visible: false },
   ],
+  // Owner chain grouped ahead of the wish's own attributes (defs order is the sheet
+  // layout; the default-visible set keeps today's relative order).
   adminWishes: [
     { key: "display_id", label: "ID", visible: true },
+    // Person (owner) fields
     { key: "person_given_name", label: "Person", visible: true },
-    { key: "family_id", label: "Family", visible: true },
+    { key: "person_role", label: "Role", visible: false },
+    { key: "person_age", label: "Age", visible: false },
+    { key: "person_note", label: "Person Note", visible: false },
+    // Family fields
+    { key: "family_name", label: "Family", visible: true },
+    { key: "family_contact_name", label: "Contact", visible: false },
+    { key: "family_phone_number", label: "Phone", visible: false },
+    { key: "family_address", label: "Address", visible: false },
+    { key: "family_verification_status", label: "Verification", visible: false },
+    { key: "family_pickup_window", label: "Pickup Window", visible: false },
+    { key: "family_bio", label: "Bio", visible: false },
+    // Referrer fields
+    { key: "referrer_name", label: "Referrer", visible: false },
+    { key: "referrer_phone_number", label: "Referrer Phone", visible: false },
+    // Wish's own attributes
     { key: "type", label: "Type", visible: true },
     { key: "description", label: "Description", visible: true },
     { key: "size", label: "Size", visible: true },
     { key: "color", label: "Color", visible: true },
     { key: "assigned_to", label: "Assigned To", visible: true },
     { key: "purchased_at", label: "Purchased", visible: true },
+    { key: "created_at", label: "Created", visible: false },
     { key: "purchased_where", label: "Purchased Where", visible: false },
     { key: "received_at", label: "Received At", visible: false },
     { key: "purchaser_note", label: "Purchaser Note", visible: false },

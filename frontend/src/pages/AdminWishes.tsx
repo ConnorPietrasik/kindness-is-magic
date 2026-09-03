@@ -12,8 +12,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
+import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ColumnHeader } from "../components/ColumnHeader";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { DatePicker } from "../components/DatePicker";
 import { FormField } from "../components/FormField";
@@ -29,35 +31,37 @@ import { useToast } from "../context/ToastContext";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { useFamiliesDropdown, useUsersDropdown } from "../hooks/useDropdowns";
+import { useUsersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminBatchAssignWishes, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
 import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
-import type {
-  AdminWishesListParams,
-  AdminWishUpdate,
-  FamilyDropdownItem,
-  UserDropdownItem,
-  WishBatchAssign,
-  WishDetail,
-  WishListResponse,
-  WishPurchaseMark,
-  WishType,
+import {
+  type AdminWishesListParams,
+  type AdminWishUpdate,
+  personRoleLabel,
+  type UserDropdownItem,
+  type WishBatchAssign,
+  type WishDetail,
+  type WishListResponse,
+  type WishPurchaseMark,
+  type WishType,
 } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminWishes() {
-  const [familyFilter, setFamilyFilter] = useState<number | null>(null);
   const [assignedToFilter, setAssignedToFilter] = useState<number | null>(null);
   const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
   const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
   const [sortField, setSortField] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  // Per-column search: one record keyed by list-param field (date inputs use
+  // `<field>_from` / `<field>_to`); empty entries are omitted from list params.
+  const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
   const [batchAssignOpen, setBatchAssignOpen] = useState(false);
@@ -69,17 +73,66 @@ export default function AdminWishes() {
 
   // Debounce search so the list doesn't refetch on every keystroke
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedColumnSearch = useDebouncedState(columnSearch, 1000, () => pagination.goToPage(1));
+
+  const updateColumnSearch = useCallback((key: string, value: string) => {
+    setColumnSearch((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Sort: clicking a column header cycles asc → desc → clear (grouped-by-family default)
+  const handleSortClick = (field: string) => {
+    setSortField((prev) => {
+      if (prev === field) return `-${field}`;
+      if (prev === `-${field}`) return "";
+      return field;
+    });
+    pagination.goToPage(1);
+  };
 
   // Column visibility
-  const { visibleColumns, apiColumns } = useColumnVisibility("adminWishes");
+  const { visibleColumns, apiColumns, defs } = useColumnVisibility("adminWishes");
   const { widthClass } = useTableWidth("adminWishes");
+
+  // Visible columns in defs order — defs order is the sheet layout, and the
+  // body cells render in it too. (The stored visibleColumns array can hold a
+  // different order, so it must not drive the render order.)
+  const visibleDefs = defs.filter((d) => visibleColumns.includes(d.key));
+
+  // Drop filters for columns that are no longer visible, so a hidden column
+  // can't keep filtering the list with no input left to clear it.
+  useEffect(() => {
+    setColumnSearch((prev) => {
+      const visibleKeys = new Set<string>();
+      for (const d of defs) {
+        if (!visibleColumns.includes(d.key)) continue;
+        const field = searchFieldFor(d.key);
+        const kind = WISH_COLUMN_SEARCH[d.key];
+        if (kind === "text") visibleKeys.add(field);
+        else if (kind === "date") {
+          visibleKeys.add(`${field}_from`);
+          visibleKeys.add(`${field}_to`);
+        }
+      }
+      const kept = Object.fromEntries(Object.entries(prev).filter(([key]) => visibleKeys.has(key)));
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+    });
+  }, [visibleColumns, defs]);
+
+  // Per-column search params — non-empty entries only (empty → omitted)
+  const columnSearchParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(debouncedColumnSearch)) {
+      if (value) params[key] = value;
+    }
+    return params;
+  }, [debouncedColumnSearch]);
 
   // Build list params from filters
   const listParams = useMemo<AdminWishesListParams>(
     () => ({
       ...pagination.params,
+      ...columnSearchParams,
       columns: apiColumns,
-      family_id: familyFilter ?? undefined,
       person_id: undefined,
       assigned_to_id: assignedToFilter ?? undefined,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
@@ -87,7 +140,7 @@ export default function AdminWishes() {
       wish_type: wishTypeFilter || undefined,
       sort: sortField || undefined,
     }),
-    [pagination.params, apiColumns, familyFilter, assignedToFilter, purchasedFilter, debouncedSearch, wishTypeFilter, sortField]
+    [pagination.params, columnSearchParams, apiColumns, assignedToFilter, purchasedFilter, debouncedSearch, wishTypeFilter, sortField]
   );
 
   // CRUD manager — no create/delete (wishes managed via person CRUD)
@@ -108,8 +161,6 @@ export default function AdminWishes() {
     entityName: "Wish",
   });
 
-  // Dropdown lookups
-  const { families } = useFamiliesDropdown();
   // Users for assigned-to / batch-assign — admins + purchasers
   const { users } = useUsersDropdown("admin,purchaser");
 
@@ -223,23 +274,6 @@ export default function AdminWishes() {
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <select
-            aria-label="Family filter"
-            value={familyFilter ?? ""}
-            onChange={(e) => {
-              setFamilyFilter(e.target.value ? parseInt(e.target.value, 10) : null);
-              resetPage();
-            }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          >
-            <option value="">All families</option>
-            {families.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.family_name}
-              </option>
-            ))}
-          </select>
-
-          <select
             aria-label="Assigned to filter"
             value={assignedToFilter ?? ""}
             onChange={(e) => {
@@ -286,32 +320,10 @@ export default function AdminWishes() {
             <option value="family">Family</option>
           </select>
 
-          <select
-            aria-label="Sort"
-            value={sortField}
-            onChange={(e) => {
-              setSortField(e.target.value);
-              resetPage();
-            }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          >
-            <option value="">Default (by family)</option>
-            <option value="id">ID ↑</option>
-            <option value="-id">ID ↓</option>
-            <option value="description">Description ↑</option>
-            <option value="-description">Description ↓</option>
-            <option value="type">Type ↑</option>
-            <option value="-type">Type ↓</option>
-            <option value="purchased_at">Purchased ↑</option>
-            <option value="-purchased_at">Purchased ↓</option>
-            <option value="created_at">Created ↑</option>
-            <option value="-created_at">Created ↓</option>
-          </select>
-
           <input
             type="text"
-            placeholder="Search wishes…"
-            aria-label="Search wishes"
+            placeholder="Search everything…"
+            aria-label="Search everything"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -338,18 +350,23 @@ export default function AdminWishes() {
                   aria-label="Select all wishes on this page"
                 />
               </Th>
-              {visibleColumns.includes("display_id") && <Th>ID</Th>}
-              {visibleColumns.includes("person_given_name") && <Th>Person</Th>}
-              {visibleColumns.includes("family_id") && <Th>Family</Th>}
-              {visibleColumns.includes("type") && <Th>Type</Th>}
-              {visibleColumns.includes("description") && <Th>Description</Th>}
-              {visibleColumns.includes("size") && <Th>Size</Th>}
-              {visibleColumns.includes("color") && <Th>Color</Th>}
-              {visibleColumns.includes("assigned_to") && <Th>Assigned To</Th>}
-              {visibleColumns.includes("purchased_at") && <Th>Purchased</Th>}
-              {visibleColumns.includes("purchased_where") && <Th>Purchased Where</Th>}
-              {visibleColumns.includes("received_at") && <Th>Received At</Th>}
-              {visibleColumns.includes("purchaser_note") && <Th>Purchaser Note</Th>}
+              {visibleDefs.map((d) => (
+                <Th key={d.key}>
+                  {d.key === "display_id" ? (
+                    <span>ID</span>
+                  ) : (
+                    <ColumnHeader
+                      label={d.label}
+                      field={searchFieldFor(d.key)}
+                      searchKind={WISH_COLUMN_SEARCH[d.key]}
+                      sortField={sortField}
+                      columnSearch={columnSearch}
+                      onSort={handleSortClick}
+                      onSearchChange={updateColumnSearch}
+                    />
+                  )}
+                </Th>
+              ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
@@ -381,12 +398,33 @@ export default function AdminWishes() {
                         )}
                       </Td>
                     )}
-                    {visibleColumns.includes("family_id") && (
+                    {visibleColumns.includes("person_role") && <Td>{w.person_role ? personRoleLabel(w.person_role) : "—"}</Td>}
+                    {visibleColumns.includes("person_age") && <Td>{w.person_age ?? "—"}</Td>}
+                    {visibleColumns.includes("person_note") && <Td className="max-w-xs text-xs truncate">{w.person_note || "—"}</Td>}
+                    {visibleColumns.includes("family_name") && (
                       <Td>
                         <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                          {getFamilyName(families, w.family_id)}
+                          {w.family_name ?? `Family #${w.family_id}`}
                         </Link>
                       </Td>
+                    )}
+                    {visibleColumns.includes("family_contact_name") && <Td>{w.family_contact_name ?? "—"}</Td>}
+                    {visibleColumns.includes("family_phone_number") && (
+                      <Td className="whitespace-nowrap">{w.family_phone_number ?? "—"}</Td>
+                    )}
+                    {visibleColumns.includes("family_address") && <Td className="max-w-xs truncate">{w.family_address ?? "—"}</Td>}
+                    {visibleColumns.includes("family_verification_status") && (
+                      <Td>{w.family_verification_status ? <ApprovalBadge status={w.family_verification_status} /> : "—"}</Td>
+                    )}
+                    {visibleColumns.includes("family_pickup_window") && (
+                      <Td className="whitespace-nowrap text-xs">
+                        {w.family_pickup_window ? new Date(w.family_pickup_window).toLocaleDateString() : "—"}
+                      </Td>
+                    )}
+                    {visibleColumns.includes("family_bio") && <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>}
+                    {visibleColumns.includes("referrer_name") && <Td>{w.referrer_name ?? "—"}</Td>}
+                    {visibleColumns.includes("referrer_phone_number") && (
+                      <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>
                     )}
                     {visibleColumns.includes("type") && (
                       <Td>
@@ -407,6 +445,9 @@ export default function AdminWishes() {
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </Td>
+                    )}
+                    {visibleColumns.includes("created_at") && (
+                      <Td className="whitespace-nowrap text-xs text-gray-500">{formatDateTime(w.created_at)}</Td>
                     )}
                     {visibleColumns.includes("purchased_where") && (
                       <Td className="max-w-xs text-xs truncate">{w.purchased_where || "—"}</Td>
@@ -779,10 +820,42 @@ function BatchAssignDialog({
 }
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                             */
+/* Per-column search                                                   */
 /* ------------------------------------------------------------------ */
 
-function getFamilyName(families: FamilyDropdownItem[], familyId: number): string {
-  const family = families.find((f) => f.id === familyId);
-  return family?.family_name ?? `Family #${familyId}`;
+/**
+ * Per-column search for the wishes table: column key → input kind.
+ * Keys absent from the map get no search input ("type" is sortable only);
+ * "display_id" is neither. Text inputs filter via the list-param field of the
+ * same name (assigned_to → assigned_to_name); date columns send
+ * `<field>_from` / `<field>_to`.
+ */
+const WISH_COLUMN_SEARCH: Record<string, "text" | "date"> = {
+  person_given_name: "text",
+  person_role: "text",
+  person_age: "text",
+  person_note: "text",
+  family_name: "text",
+  family_contact_name: "text",
+  family_phone_number: "text",
+  family_address: "text",
+  family_verification_status: "text",
+  family_pickup_window: "date",
+  family_bio: "text",
+  referrer_name: "text",
+  referrer_phone_number: "text",
+  description: "text",
+  size: "text",
+  color: "text",
+  assigned_to: "text",
+  purchased_at: "date",
+  created_at: "date",
+  purchased_where: "text",
+  received_at: "date",
+  purchaser_note: "text",
+};
+
+/** List-param field for a column key (assigned_to → assigned_to_name). */
+function searchFieldFor(key: string): string {
+  return key === "assigned_to" ? "assigned_to_name" : key;
 }

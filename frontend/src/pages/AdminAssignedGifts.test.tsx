@@ -24,6 +24,19 @@ const mockAdminUser: User = {
 };
 
 const wishBase = {
+  person_role: null,
+  person_age: null,
+  person_note: null,
+  family_name: null,
+  family_contact_name: null,
+  family_phone_number: null,
+  family_address: null,
+  family_verification_status: null,
+  family_pickup_window: null,
+  family_bio: null,
+  referrer_name: null,
+  referrer_phone_number: null,
+  created_at: null,
   assigned_to_id: 42,
   assigned_to_name: "Admin",
   purchased_at: null,

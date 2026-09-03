@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { FamilyDropdownItem, UserDropdownItem, WishDetail, WishListResponse, WishListSummary } from "../types";
+import type { AdminWishesListParams, UserDropdownItem, WishDetail, WishListResponse, WishListSummary } from "../types";
 import AdminWishes from "./AdminWishes";
 
 /* ------------------------------------------------------------------ */
@@ -21,13 +21,26 @@ const mockWish1: WishListSummary = {
   color: "Red",
   person_id: 10,
   person_given_name: "Alice",
+  person_role: "daughter",
+  person_age: 9,
+  person_note: "Loves red jackets",
   family_id: 5,
+  family_name: "The Johnsons",
+  family_contact_name: "Carol Johnson",
+  family_phone_number: "555-0101",
+  family_address: "12 Maple Street",
+  family_verification_status: "verified",
+  family_pickup_window: "2025-12-24T17:00:00Z",
+  family_bio: null,
+  referrer_name: "Sam Referrer",
+  referrer_phone_number: "555-0202",
   assigned_to_id: null,
   assigned_to_name: null,
   purchased_at: null,
   purchased_where: null,
   received_at: null,
   purchaser_note: null,
+  created_at: "2025-11-01T09:30:00Z",
 };
 
 const mockWish2: WishListSummary = {
@@ -39,13 +52,26 @@ const mockWish2: WishListSummary = {
   color: null,
   person_id: 11,
   person_given_name: "Bob",
+  person_role: "son",
+  person_age: 12,
+  person_note: null,
   family_id: 5,
+  family_name: "The Johnsons",
+  family_contact_name: "Carol Johnson",
+  family_phone_number: "555-0101",
+  family_address: "12 Maple Street",
+  family_verification_status: "verified",
+  family_pickup_window: "2025-12-24T17:00:00Z",
+  family_bio: null,
+  referrer_name: "Sam Referrer",
+  referrer_phone_number: "555-0202",
   assigned_to_id: 3,
   assigned_to_name: "Jane Admin",
   purchased_at: "2025-12-01T10:00:00Z",
   purchased_where: "Target",
   received_at: "2025-12-20T00:00:00Z",
   purchaser_note: "Got a great deal",
+  created_at: "2025-11-02T10:00:00Z",
 };
 
 const mockFamilyWish: WishListSummary = {
@@ -57,13 +83,26 @@ const mockFamilyWish: WishListSummary = {
   color: null,
   person_id: null,
   person_given_name: null,
+  person_role: null,
+  person_age: null,
+  person_note: null,
   family_id: 5,
+  family_name: null,
+  family_contact_name: null,
+  family_phone_number: null,
+  family_address: null,
+  family_verification_status: null,
+  family_pickup_window: null,
+  family_bio: null,
+  referrer_name: null,
+  referrer_phone_number: null,
   assigned_to_id: null,
   assigned_to_name: null,
   purchased_at: null,
   purchased_where: null,
   received_at: null,
   purchaser_note: null,
+  created_at: "2025-11-03T08:00:00Z",
 };
 
 const mockWishListResponse: WishListResponse = {
@@ -92,11 +131,6 @@ const mockWishDetail: WishDetail = {
   person_family_name: "The Johnsons",
 };
 
-const mockFamily: FamilyDropdownItem = {
-  id: 5,
-  family_name: "The Johnsons",
-};
-
 const mockUser: UserDropdownItem = {
   id: 3,
   display_name: "Jane Admin",
@@ -122,12 +156,12 @@ const wrap = (ui: React.ReactElement, path = "/admin/wishes") => {
 describe("AdminWishes", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
     cleanup();
   });
 
   it("renders loading state initially", () => {
     vi.spyOn(api, "adminListWishes").mockReturnValue(new Promise(() => {}));
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
     wrap(<AdminWishes />);
@@ -136,7 +170,6 @@ describe("AdminWishes", () => {
 
   it("renders wish list with mocked data", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -163,7 +196,6 @@ describe("AdminWishes", () => {
       page_size: 20,
       total_pages: 1,
     });
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -193,7 +225,6 @@ describe("AdminWishes", () => {
 
   it("renders the Color column with values and dash for null", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -209,7 +240,6 @@ describe("AdminWishes", () => {
   it("edit form round-trips color", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
@@ -244,7 +274,6 @@ describe("AdminWishes", () => {
   it("clears color by sending empty string sentinel", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
@@ -274,7 +303,6 @@ describe("AdminWishes", () => {
 
   it("shows empty state when no wishes found", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
     wrap(<AdminWishes />);
@@ -286,7 +314,6 @@ describe("AdminWishes", () => {
 
   it("renders filter controls", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -295,15 +322,13 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("All families")).toBeInTheDocument();
     expect(screen.getByText("All assignees")).toBeInTheDocument();
     expect(screen.getByText("All statuses")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Search wishes…")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search everything…")).toBeInTheDocument();
   });
 
   it("shows purchase status for purchased wishes", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -318,7 +343,6 @@ describe("AdminWishes", () => {
 
   it("disables Mark Purchased button for already purchased wishes", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -336,7 +360,6 @@ describe("AdminWishes", () => {
   it("edit flow opens form and calls update mutation", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
@@ -374,7 +397,6 @@ describe("AdminWishes", () => {
   it("mark-purchased dialog opens and calls mutation", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
@@ -414,7 +436,6 @@ describe("AdminWishes", () => {
   it("mark-purchased dialog shows an error with retry when the detail fetch fails", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish")
       .mockRejectedValueOnce({ response: { data: { detail: "Wish not found" } } })
@@ -441,7 +462,6 @@ describe("AdminWishes", () => {
   it("batch assign dialog opens with selected wishes", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminBatchAssignWishes").mockResolvedValue({ assigned_count: 1 });
 
@@ -471,7 +491,6 @@ describe("AdminWishes", () => {
   it("select all checkbox toggles all rows", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -497,7 +516,6 @@ describe("AdminWishes", () => {
     error.response = { data: { detail: "Validation failed" } };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockRejectedValue(error);
@@ -524,12 +542,11 @@ describe("AdminWishes", () => {
     });
   });
 
-  it("clears checkbox selection when family filter changes", async () => {
+  it("clears checkbox selection when assigned-to filter changes", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListWishes")
       .mockResolvedValueOnce(mockWishListResponse)
       .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
     wrap(<AdminWishes />);
@@ -543,12 +560,12 @@ describe("AdminWishes", () => {
     await user.click(selectAllCheckbox);
     expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
 
-    // Change family filter to a specific family — list re-requests, selection resets
-    const familySelect = screen.getByText("All families").closest("select");
-    expect(familySelect).not.toBeNull();
-    const familyOption = familySelect!.querySelector("option[value='5']") as HTMLElement | null;
-    expect(familyOption).not.toBeNull();
-    await user.selectOptions(familySelect!, familyOption!);
+    // Change the assigned-to filter — list re-requests, selection resets
+    const assignedSelect = screen.getByText("All assignees").closest("select");
+    expect(assignedSelect).not.toBeNull();
+    const userOption = assignedSelect!.querySelector("option[value='3']") as HTMLElement | null;
+    expect(userOption).not.toBeNull();
+    await user.selectOptions(assignedSelect!, userOption!);
 
     // Selection should be cleared after filter change
     await waitFor(() => {
@@ -564,7 +581,6 @@ describe("AdminWishes", () => {
       vi.spyOn(api, "adminListWishes")
         .mockResolvedValueOnce(mockWishListResponse)
         .mockResolvedValueOnce({ wishes: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
-      vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
       vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
       wrap(<AdminWishes />);
@@ -579,7 +595,7 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
 
       // Change search — debounce fires after 1000ms (accelerated by shouldAdvanceTime)
-      const searchInput = screen.getByPlaceholderText("Search wishes…");
+      const searchInput = screen.getByPlaceholderText("Search everything…");
       await user.type(searchInput, "test");
 
       // Wait for debounce + refetch to settle
@@ -602,7 +618,6 @@ describe("AdminWishes", () => {
     };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(wishWithNote);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(wishWithNote);
@@ -646,7 +661,6 @@ describe("AdminWishes", () => {
     };
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(wishAssigned);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(wishAssigned);
@@ -684,7 +698,6 @@ describe("AdminWishes", () => {
     const user = userEvent.setup();
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminUpdateWish").mockResolvedValue(mockWishDetail);
@@ -721,7 +734,6 @@ describe("AdminWishes", () => {
     const user = userEvent.setup();
 
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
-    vi.spyOn(api, "adminGetFamiliesDropdown").mockResolvedValue([mockFamily]);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
     vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
     vi.spyOn(api, "adminMarkPurchased").mockResolvedValue(mockWishDetail);
@@ -768,5 +780,277 @@ describe("AdminWishes", () => {
         })
       );
     });
+  });
+
+  /* ── Spreadsheet view: columns, per-column search, header sorting ── */
+
+  it("keeps deep owner columns hidden by default and offers them in ColumnToggle", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Deep columns are hidden by default
+    expect(screen.queryByRole("button", { name: "Sort by Role" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sort by Referrer" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sort by Created" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Person Note")).not.toBeInTheDocument();
+
+    // …but available in the ColumnToggle popover
+    await user.click(screen.getByRole("button", { name: "Toggle columns" }));
+    expect(screen.getByLabelText("Role")).toBeInTheDocument();
+    expect(screen.getByLabelText("Referrer")).toBeInTheDocument();
+    expect(screen.getByLabelText("Created")).toBeInTheDocument();
+
+    // Enabling one renders its header and cells
+    await user.click(screen.getByLabelText("Role"));
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sort by Role" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Daughter")).toBeInTheDocument();
+    expect(screen.getByText("Son")).toBeInTheDocument();
+  });
+
+  it("keeps headers aligned with cells when the stored column order differs from defs order", async () => {
+    // Simulate a pre-existing stored column list in a non-defs order: the old
+    // default set (plus a stale "family_id" key from before the rename) with
+    // columns appended by later toggles at the end.
+    localStorage.setItem(
+      "kim:columns:adminWishes",
+      JSON.stringify([
+        "display_id",
+        "person_given_name",
+        "family_id",
+        "type",
+        "description",
+        "size",
+        "color",
+        "assigned_to",
+        "purchased_at",
+        "person_role",
+        "person_age",
+      ])
+    );
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Header cell N must sit above body cell N: the Role/Age headers (grouped
+    // after Person in defs order) must align with the role/age values.
+    const ths = Array.from(document.querySelectorAll("thead th"));
+    const tds = Array.from(screen.getByText("Winter jacket").closest("tr")!.querySelectorAll("td"));
+    const roleIdx = ths.findIndex((th) => th.textContent === "Role");
+    const ageIdx = ths.findIndex((th) => th.textContent === "Age");
+    expect(roleIdx).toBeGreaterThan(1);
+    expect(tds[roleIdx]).toHaveTextContent("Daughter");
+    expect(tds[ageIdx]).toHaveTextContent("9");
+  });
+
+  it("renders per-column search inputs only for visible searchable columns", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Text inputs for the visible text-searchable columns
+    expect(screen.getByLabelText("Filter by Person")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Family")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Description")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Size")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Color")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Assigned To")).toBeInTheDocument();
+
+    // From/to date pair for the visible date column
+    expect(screen.getByLabelText("Purchased from")).toBeInTheDocument();
+    expect(screen.getByLabelText("Purchased to")).toBeInTheDocument();
+
+    // No input for the non-searchable ID column or the sort-only Type column
+    expect(screen.queryByLabelText("Filter by ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Type")).not.toBeInTheDocument();
+  });
+
+  it("drops a column's filter when the column is hidden", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    const lastListParams = () => {
+      const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+      return calls[calls.length - 1]?.[0] as AdminWishesListParams | undefined;
+    };
+
+    try {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+
+      // Set a filter on the Size column
+      await user.type(screen.getByLabelText("Filter by Size"), "Red");
+      await waitFor(() => {
+        expect(lastListParams()?.size).toBe("Red");
+      });
+
+      // Hide the Size column via the ColumnToggle popover
+      await user.click(screen.getByRole("button", { name: "Toggle columns" }));
+      await user.click(screen.getByLabelText("Size"));
+      await user.click(screen.getByRole("button", { name: "Apply" }));
+
+      // The input is gone and the param stops being sent
+      expect(screen.queryByLabelText("Filter by Size")).not.toBeInTheDocument();
+      await waitFor(
+        () => {
+          expect(lastListParams()?.size).toBeUndefined();
+        },
+        { timeout: 3000 }
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends a list param for each non-empty column search input", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText("Filter by Person"), "Ali");
+      await user.type(screen.getByLabelText("Filter by Family"), "John");
+
+      // Both non-empty entries are ANDed into the list params
+      await waitFor(() => {
+        expect(api.adminListWishes).toHaveBeenCalledWith(expect.objectContaining({ person_given_name: "Ali", family_name: "John" }));
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends from/to date range params (only the set side when one is empty)", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    const lastListParams = () => {
+      const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+      return calls[calls.length - 1]?.[0] as AdminWishesListParams | undefined;
+    };
+
+    try {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+
+      // from only → only purchased_at_from is sent
+      await user.type(screen.getByLabelText("Purchased from"), "2025-12-01");
+      await waitFor(() => {
+        expect(lastListParams()?.purchased_at_from).toBe("2025-12-01");
+        expect(lastListParams()?.purchased_at_to).toBeUndefined();
+      });
+
+      // to as well → both are sent
+      await user.type(screen.getByLabelText("Purchased to"), "2025-12-31");
+      await waitFor(() => {
+        expect(lastListParams()?.purchased_at_from).toBe("2025-12-01");
+        expect(lastListParams()?.purchased_at_to).toBe("2025-12-31");
+      });
+
+      // Clearing one side drops just that param
+      await user.clear(screen.getByLabelText("Purchased to"));
+      await waitFor(() => {
+        expect(lastListParams()?.purchased_at_from).toBe("2025-12-01");
+        expect(lastListParams()?.purchased_at_to).toBeUndefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cycles column sort asc → desc → default on header click", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const sortButton = () => screen.getByRole("button", { name: "Sort by Description" });
+    const lastListParams = () => {
+      const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+      return calls[calls.length - 1]?.[0] as AdminWishesListParams | undefined;
+    };
+
+    // asc
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("description"));
+    expect(sortButton()).toHaveTextContent("↑");
+
+    // desc
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("-description"));
+    expect(sortButton()).toHaveTextContent("↓");
+
+    // cleared → back to the grouped-by-family default
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBeUndefined());
+    expect(sortButton()).not.toHaveTextContent(/↑|↓/);
+
+    // The ID header is not sortable
+    expect(screen.queryByRole("button", { name: "Sort by ID" })).not.toBeInTheDocument();
+  });
+
+  it("renders the family cell from the server-provided name (fallback to Family #id)", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue({
+      wishes: [mockWish1, mockFamilyWish],
+      total: 2,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+    });
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Server-provided family name (mockFamilyWish sends family_name: null)
+    const aliceRow = screen.getByText("Winter jacket").closest("tr");
+    expect(aliceRow).toHaveTextContent("The Johnsons");
+    const familyWishRow = screen.getByText("A weekend at the beach").closest("tr");
+    expect(familyWishRow).toHaveTextContent("Family #5");
   });
 });

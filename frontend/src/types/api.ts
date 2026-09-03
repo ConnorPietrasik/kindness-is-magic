@@ -74,7 +74,14 @@ export interface InviteListParams extends AdminListParams {
   search?: string;
 }
 
-/** Query params for the admin wishes list endpoint (updated with wish_type + sort). */
+/** Query params for the admin wishes list endpoint (updated with wish_type + sort).
+ *
+ * Per-column search params are named after the list item field (text fields,
+ * plus `<field>_from` / `<field>_to` for the date columns); they AND together
+ * and with the global `search` box. Free-text fields match as substrings;
+ * closed-vocabulary fields (person_role, person_age, family_verification_status)
+ * match as whole values (case-insensitive).
+ */
 export interface AdminWishesListParams extends AdminListParams {
   family_id?: number;
   person_id?: number;
@@ -82,6 +89,34 @@ export interface AdminWishesListParams extends AdminListParams {
   purchased?: string;
   search?: string;
   wish_type?: string;
+  // Per-column text search
+  description?: string;
+  size?: string;
+  color?: string;
+  person_given_name?: string;
+  person_role?: string;
+  person_age?: string;
+  person_note?: string;
+  family_name?: string;
+  family_contact_name?: string;
+  family_phone_number?: string;
+  family_address?: string;
+  family_verification_status?: string;
+  family_bio?: string;
+  referrer_name?: string;
+  referrer_phone_number?: string;
+  assigned_to_name?: string;
+  purchased_where?: string;
+  purchaser_note?: string;
+  // Per-column date ranges (YYYY-MM-DD, inclusive UTC day boundaries)
+  purchased_at_from?: string;
+  purchased_at_to?: string;
+  received_at_from?: string;
+  received_at_to?: string;
+  created_at_from?: string;
+  created_at_to?: string;
+  family_pickup_window_from?: string;
+  family_pickup_window_to?: string;
 }
 
 /** Query params for the admin sent-email log endpoint. */

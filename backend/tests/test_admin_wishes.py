@@ -534,6 +534,448 @@ class TestListWishes:
 
 
 # ---------------------------------------------------------------------------
+# New list fields: columns selection and owner-path resolution
+# ---------------------------------------------------------------------------
+
+
+class TestListWishesNewFields:
+    def test_default_request_includes_new_fields(self, logged_in_admin, wish_tree):
+        """Without a columns param every field (new and old) is sent."""
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        item = resp.json()["wishes"][0]
+        for field in (
+            "created_at",
+            "person_role",
+            "person_age",
+            "person_note",
+            "family_name",
+            "family_contact_name",
+            "family_phone_number",
+            "family_address",
+            "family_verification_status",
+            "family_pickup_window",
+            "family_bio",
+            "referrer_name",
+            "referrer_phone_number",
+        ):
+            assert field in item
+
+    def test_columns_selection_sends_only_requested_new_fields(self, logged_in_admin, wish_tree):
+        """columns=... sends exactly the requested fields (+ required fields)."""
+        resp = logged_in_admin.get("/api/admin/wishes?columns=family_name,referrer_name")
+        assert resp.status_code == 200
+        for item in resp.json()["wishes"]:
+            # Required fields (id/type/description/family_id) are always sent
+            assert set(item) == {"id", "type", "description", "family_id", "family_name", "referrer_name"}
+        # The gated referrer lookup still populates the values
+        assert {w["referrer_name"] for w in resp.json()["wishes"]} == {"Wish Referrer"}
+
+    def test_created_at_matches_record(self, logged_in_admin, wish_tree, db):
+        """The new created_at field carries the wish's actual creation time."""
+        created = datetime(2026, 1, 5, 10, 30, 0, tzinfo=timezone.utc)
+        wish_tree["wishes"][0].created_at = created
+        db.commit()
+        resp = logged_in_admin.get(f"/api/admin/wishes?person_id={wish_tree['person'].id}")
+        assert resp.status_code == 200
+        by_desc = {w["description"]: w for w in resp.json()["wishes"]}
+        assert by_desc["A backpack"]["created_at"] == created.isoformat().replace("+00:00", "Z")
+
+
+class TestOwnerResolution:
+    def test_person_wish_resolves_family_and_referrer(self, logged_in_admin, wish_tree):
+        """A person wish resolves family/referrer through the person's family."""
+        resp = logged_in_admin.get(f"/api/admin/wishes?person_id={wish_tree['person'].id}")
+        assert resp.status_code == 200
+        items = resp.json()["wishes"]
+        assert len(items) == 2
+        for item in items:
+            assert item["family_id"] == wish_tree["family"].id
+            assert item["family_name"] == "Wish Family"
+            assert item["family_contact_name"] == "Wish Contact"
+            assert item["family_phone_number"] == "555-000-0002"
+            assert item["family_verification_status"] == "verified"
+            assert item["referrer_name"] == "Wish Referrer"
+            assert item["referrer_phone_number"] == "555-000-0001"
+            assert item["person_role"] == "son"
+            assert item["person_age"] == 10
+
+    def test_family_wish_resolves_family_and_referrer(self, logged_in_admin, wish_tree):
+        """A family wish resolves family/referrer through its own family; person fields stay None."""
+        resp = logged_in_admin.get(f"/api/admin/wishes?family_id={wish_tree['family'].id}")
+        assert resp.status_code == 200
+        by_type = {w["type"]: w for w in resp.json()["wishes"]}
+        fam = by_type["family"]
+        assert fam["person_id"] is None
+        for field in ("person_given_name", "person_role", "person_age", "person_note"):
+            assert fam[field] is None
+        assert fam["family_id"] == wish_tree["family"].id
+        assert fam["family_name"] == "Wish Family"
+        assert fam["referrer_name"] == "Wish Referrer"
+        # Same owner family as the person wishes in this response
+        assert by_type["practical"]["family_name"] == fam["family_name"]
+
+    def test_family_without_referrer_has_null_referrer_fields(self, logged_in_admin, unassigned_tree, db):
+        """Family (and its person's) wishes with no referrer show None referrer fields."""
+        person = Person(
+            family_id=unassigned_tree["unassigned"].id,
+            given_name="Lonely Kid",
+            age=8,
+            role=PersonRole.son,
+        )
+        db.add(person)
+        db.flush()
+        db.add(Wish(person_id=person.id, type=WishType.fun, description="A kite"))
+        db.commit()
+
+        resp = logged_in_admin.get(f"/api/admin/wishes?family_id={unassigned_tree['unassigned'].id}")
+        assert resp.status_code == 200
+        by_type = {w["type"]: w for w in resp.json()["wishes"]}
+        for item in by_type.values():
+            assert item["family_name"] == "Unassigned Sort Unassigned"
+            assert item["referrer_name"] is None
+            assert item["referrer_phone_number"] is None
+
+    def test_soft_deleted_referrer_displays_none(self, logged_in_admin, wish_tree, db):
+        """A soft-deleted referrer shows as None in items (join excludes it)."""
+        wish_tree["referrer"].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        assert len(resp.json()["wishes"]) == 3
+        for item in resp.json()["wishes"]:
+            assert item["referrer_name"] is None
+            assert item["referrer_phone_number"] is None
+
+    def test_soft_deleted_referrer_unmatchable_in_search(self, logged_in_admin, wish_tree, db):
+        """Search and per-column referrer params cannot match a soft-deleted referrer."""
+        wish_tree["referrer"].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        for param in ("search", "referrer_name"):
+            resp = logged_in_admin.get(f"/api/admin/wishes?{param}=Wish+Referrer")
+            assert resp.status_code == 200
+            assert resp.json()["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Per-column search
+# ---------------------------------------------------------------------------
+
+
+class TestPerColumnSearch:
+    def test_person_fields(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Person column params match as text (enum/age included)."""
+        resp = logged_in_admin.get("/api/admin/wishes?person_given_name=WishChild")
+        assert resp.json()["total"] == 2
+
+        # Enum role matches as a case-insensitive whole value: "son" and
+        # "SON" hit, the prefix "so" does not
+        resp = logged_in_admin.get("/api/admin/wishes?person_role=son")
+        assert resp.json()["total"] == 4
+        resp = logged_in_admin.get("/api/admin/wishes?person_role=SON")
+        assert resp.json()["total"] == 4
+        resp = logged_in_admin.get("/api/admin/wishes?person_role=so")
+        assert resp.json()["total"] == 0
+
+        # Age matches as a whole value, not a substring: "1" hits nothing,
+        # "10" only 10
+        resp = logged_in_admin.get("/api/admin/wishes?person_age=1")
+        assert resp.json()["total"] == 0
+        resp = logged_in_admin.get("/api/admin/wishes?person_age=10")
+        assert resp.json()["total"] == 2
+
+        wish_tree["person"].note = "Allergic to peanuts"
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?person_note=peanuts")
+        assert resp.json()["total"] == 2
+
+    def test_family_fields(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Family column params resolve on both owner paths (6 wishes total)."""
+        second_fam = second_family_with_wishes["family"]
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_name=Second")
+        assert resp.json()["total"] == 3  # 2 person wishes + the family wish
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_contact_name=Second+Contact")
+        assert resp.json()["total"] == 3
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_phone_number=555-000-0003")
+        assert resp.json()["total"] == 3
+
+        wish_tree["family"].address = "12 Maple St"
+        second_fam.bio = "Loves gardening"
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?family_address=Maple")
+        assert resp.json()["total"] == 3
+        resp = logged_in_admin.get("/api/admin/wishes?family_bio=gardening")
+        assert resp.json()["total"] == 3
+
+        # Enum verification status matches as a whole value: "verified" hits,
+        # the prefix "ver" does not
+        resp = logged_in_admin.get("/api/admin/wishes?family_verification_status=verified")
+        assert resp.json()["total"] == 6
+        resp = logged_in_admin.get("/api/admin/wishes?family_verification_status=ver")
+        assert resp.json()["total"] == 0
+
+    def test_referrer_and_assigned_fields(self, logged_in_admin, wish_tree, second_family_with_wishes, admin_user, db):
+        """Referrer and assigned-user column params."""
+        resp = logged_in_admin.get("/api/admin/wishes?referrer_name=Wish+Referrer")
+        assert resp.json()["total"] == 6
+
+        resp = logged_in_admin.get("/api/admin/wishes?referrer_phone_number=555-000-0001")
+        assert resp.json()["total"] == 6
+
+        admin_user.display_name = "Buyer Bob"
+        wish_tree["wishes"][0].assigned_to_id = admin_user.id
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?assigned_to_name=Bob")
+        assert resp.json()["total"] == 1
+
+    def test_wish_own_fields(self, logged_in_admin, wish_tree, db):
+        """The wish's own text columns are per-column searchable."""
+        wish1, wish2 = wish_tree["wishes"]
+        wish1.color = "Blue"
+        wish2.purchased_where = "Target"
+        wish2.purchaser_note = "Got it on sale"
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?description=doll")
+        assert resp.json()["total"] == 1
+        resp = logged_in_admin.get("/api/admin/wishes?size=Medium")
+        assert resp.json()["total"] == 1
+        resp = logged_in_admin.get("/api/admin/wishes?color=Blue")
+        assert resp.json()["total"] == 1
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_where=Target")
+        assert resp.json()["total"] == 1
+        resp = logged_in_admin.get("/api/admin/wishes?purchaser_note=on+sale")
+        assert resp.json()["total"] == 1
+
+    def test_multiple_params_and_together(self, logged_in_admin, wish_tree, second_family_with_wishes):
+        """Several per-column params at once are ANDed."""
+        resp = logged_in_admin.get("/api/admin/wishes?referrer_name=Wish+Referrer&person_age=10")
+        assert resp.json()["total"] == 2
+
+        # ANDing across families yields nothing
+        resp = logged_in_admin.get("/api/admin/wishes?family_name=Wish+Family&person_given_name=SecondChild")
+        assert resp.json()["total"] == 0
+
+        resp = logged_in_admin.get("/api/admin/wishes?description=shoes&size=3Y")
+        assert resp.json()["total"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Date-range search
+# ---------------------------------------------------------------------------
+
+
+class TestDateRangeSearch:
+    def test_to_boundary(self, logged_in_admin, wish_tree, db):
+        """to = end of that UTC day: 23:59 on the to-day included, next day excluded."""
+        w1, w2 = wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 23, 59, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 11, 0, 0, 1, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_to=2026-03-10")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w1.id]
+
+    def test_from_boundary(self, logged_in_admin, wish_tree, db):
+        """from = start of that UTC day: midnight on the from-day included."""
+        w1, w2 = wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 12, 0, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 11, 0, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_from=2026-03-11")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w2.id]
+
+    def test_from_and_to_same_day(self, logged_in_admin, wish_tree, db):
+        """from and to on one day select that day only."""
+        w1, w2 = wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 23, 59, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 11, 0, 0, 1, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_from=2026-03-10&purchased_at_to=2026-03-10")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w1.id]
+
+    def test_created_at_range(self, logged_in_admin, wish_tree, db):
+        w1, w2 = wish_tree["wishes"]
+        w1.created_at = datetime(2026, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+        w2.created_at = datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?created_at_from=2026-02-01")
+        assert resp.status_code == 200
+        # Other rows keep their original (now) timestamps — restrict to w1/w2
+        items = [w for w in resp.json()["wishes"] if w["id"] in (w1.id, w2.id)]
+        assert [w["id"] for w in items] == [w2.id]
+
+    def test_received_at_range(self, logged_in_admin, wish_tree, db):
+        wish_tree["wishes"][0].received_at = datetime(2026, 4, 5, 12, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?received_at_from=2026-04-05&received_at_to=2026-04-05")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [wish_tree["wishes"][0].id]
+
+    def test_family_pickup_window_both_owner_paths(self, logged_in_admin, wish_tree, db):
+        """The pickup-window range resolves on both the person and direct family paths."""
+        wish_tree["family"].pickup_window = datetime(2026, 4, 5, 12, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_pickup_window_from=2026-04-05&family_pickup_window_to=2026-04-05")
+        assert resp.status_code == 200
+        ids = {w["id"] for w in resp.json()["wishes"]}
+        # Person wishes (owner family via person) + the family wish (direct family)
+        assert ids == {w.id for w in wish_tree["wishes"]} | {family_wish(db, wish_tree).id}
+
+    def test_date_range_anded_with_text_search(self, logged_in_admin, wish_tree, db):
+        """Date ranges AND with the global search box."""
+        w1, w2 = wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 23, 59, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 12, 9, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        # "A backpack" was purchased before the window
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_from=2026-03-11&search=backpack")
+        assert resp.json()["total"] == 0
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_to=2026-03-10&search=backpack")
+        assert resp.json()["total"] == 1
+
+    def test_malformed_date_422(self, logged_in_admin, wish_tree):
+        resp = logged_in_admin.get("/api/admin/wishes?purchased_at_from=not-a-date")
+        assert resp.status_code == 422
+        resp = logged_in_admin.get("/api/admin/wishes?family_pickup_window_to=2026-13-45")
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Global search across deep fields
+# ---------------------------------------------------------------------------
+
+
+class TestGlobalSearchDeepFields:
+    def test_referrer_name_and_phone(self, logged_in_admin, wish_tree, second_family_with_wishes):
+        """The global box matches referrer name/phone (all wishes under one referrer)."""
+        resp = logged_in_admin.get("/api/admin/wishes?search=Wish+Referrer")
+        assert resp.json()["total"] == 6
+        resp = logged_in_admin.get("/api/admin/wishes?search=555-000-0001")
+        assert resp.json()["total"] == 6
+
+    def test_family_address(self, logged_in_admin, wish_tree, db):
+        wish_tree["family"].address = "12 Maple St"
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?search=Maple")
+        assert resp.json()["total"] == 3
+
+    def test_assigned_user_name(self, logged_in_admin, wish_tree, admin_user, db):
+        admin_user.display_name = "Buyer Bob"
+        wish_tree["wishes"][0].assigned_to_id = admin_user.id
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?search=Bob")
+        assert resp.json()["total"] == 1
+
+    def test_person_note(self, logged_in_admin, wish_tree, db):
+        wish_tree["person"].note = "Allergic to peanuts"
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?search=peanuts")
+        assert resp.json()["total"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Sorting on the new sort fields
+# ---------------------------------------------------------------------------
+
+
+class TestWishSorting:
+    def test_sort_person_age_asc_nulls_last(self, logged_in_admin, wish_tree, second_family_with_wishes):
+        """person_age asc: children first, family wishes (NULL) at the end."""
+        resp = logged_in_admin.get("/api/admin/wishes?sort=person_age")
+        assert resp.status_code == 200
+        ages = [w["person_age"] for w in resp.json()["wishes"]]
+        assert ages == [10, 10, 12, 12, None, None]
+
+    def test_sort_person_age_desc_nulls_last(self, logged_in_admin, wish_tree, second_family_with_wishes):
+        """person_age desc still leaves family wishes (NULL) at the end."""
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-person_age")
+        assert resp.status_code == 200
+        ages = [w["person_age"] for w in resp.json()["wishes"]]
+        assert ages == [12, 12, 10, 10, None, None]
+
+    def test_sort_purchased_at_desc_nulls_last(self, logged_in_admin, wish_tree, db):
+        """purchased_at desc: purchased first, unpurchased (NULL) last."""
+        wish_tree["wishes"][0].purchased_at = datetime(2026, 3, 10, 9, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-purchased_at")
+        assert resp.status_code == 200
+        items = resp.json()["wishes"]
+        assert items[0]["id"] == wish_tree["wishes"][0].id
+        assert all(w["purchased_at"] is None for w in items[1:])
+
+    def test_sort_family_name(self, logged_in_admin, wish_tree, second_family_with_wishes):
+        resp = logged_in_admin.get("/api/admin/wishes?sort=family_name")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+    def test_sort_family_pickup_window(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        wish_tree["family"].pickup_window = datetime(2026, 4, 1, 9, 0, 0, tzinfo=timezone.utc)
+        second_family_with_wishes["family"].pickup_window = datetime(2026, 3, 1, 9, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=family_pickup_window")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-family_pickup_window")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Wish Family"] * 3 + ["Second Family"] * 3
+
+    def test_sort_referrer_name_nulls_last_both_directions(self, logged_in_admin, unassigned_tree):
+        """Families without a referrer (NULL) sort last in both directions."""
+        for sort_param in ("referrer_name", "-referrer_name"):
+            resp = logged_in_admin.get(f"/api/admin/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            items = resp.json()["wishes"]
+            assert items[0]["referrer_name"] == "Unassigned Sort Referrer"
+            assert items[-1]["referrer_name"] is None
+
+    def test_sort_assigned_to_name_nulls_last(self, logged_in_admin, wish_tree, admin_user, db):
+        """NULLs sort last in both directions — the single assigned wish leads."""
+        admin_user.display_name = "Buyer Bob"
+        wish_tree["wishes"][0].assigned_to_id = admin_user.id
+        db.commit()
+        for sort_param in ("assigned_to_name", "-assigned_to_name"):
+            resp = logged_in_admin.get(f"/api/admin/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            items = resp.json()["wishes"]
+            assert items[0]["assigned_to_name"] == "Buyer Bob"
+            assert all(w["assigned_to_name"] is None for w in items[1:])
+
+    def test_sort_created_at(self, logged_in_admin, wish_tree, db):
+        w1, w2 = wish_tree["wishes"]
+        w1.created_at = datetime(2026, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+        w2.created_at = datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=created_at")
+        assert resp.status_code == 200
+        items = [w for w in resp.json()["wishes"] if w["id"] in (w1.id, w2.id)]
+        assert [w["id"] for w in items] == [w1.id, w2.id]
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-created_at")
+        assert resp.status_code == 200
+        items = [w for w in resp.json()["wishes"] if w["id"] in (w1.id, w2.id)]
+        assert [w["id"] for w in items] == [w2.id, w1.id]
+
+
+# ---------------------------------------------------------------------------
 # Default (grouped) order tests
 # ---------------------------------------------------------------------------
 

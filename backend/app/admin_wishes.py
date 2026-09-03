@@ -4,14 +4,14 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
-from sqlalchemy.orm import Session, aliased, joinedload
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Family, Person, User, Wish, WishType
+from app.models import Family, Person, Referrer, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
@@ -23,9 +23,16 @@ from app.response_builders import (
     escape_like,
     get_active_or_404,
     get_or_404,
+    WISH_DATE_RANGE_FIELDS,
+    WISH_SEARCH_FIELDS,
+    WISH_SEARCH_EXACT_FIELDS,
     WISH_SORT_FIELDS,
+    ASSIGNED_USER,
+    DIRECT_FAMILY,
+    WISH_REFERRER,
     partial_update,
     wish_display_id,
+    wish_global_search_terms,
     wish_grouped_order,
 )
 from app.schemas import (
@@ -54,6 +61,11 @@ def _get_valid_wish_types_for_age(age: int) -> set[WishType]:
     return {WishType.practical, WishType.fun}
 
 
+def _utc_day_start(day: date) -> datetime:
+    """Start of a UTC calendar day as a timezone-aware datetime."""
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+
+
 @admin_wishes_router.get("", response_model_exclude_unset=True)
 def list_wishes(
     page: int = Query(1, ge=1),
@@ -66,6 +78,37 @@ def list_wishes(
     wish_type: WishType | None = Query(None),
     columns: str | None = Query(None),
     sort: str | None = Query(None),
+    # Per-column text search: one optional param per text-searchable field
+    # (named after the item field) — substring ILIKE for free text, whole
+    # (case-insensitive) value for closed vocabularies (role/age/status) —
+    # ANDed together.
+    description: str | None = Query(None),
+    size: str | None = Query(None),
+    color: str | None = Query(None),
+    person_given_name: str | None = Query(None),
+    person_role: str | None = Query(None),
+    person_age: str | None = Query(None),
+    person_note: str | None = Query(None),
+    family_name: str | None = Query(None),
+    family_contact_name: str | None = Query(None),
+    family_phone_number: str | None = Query(None),
+    family_address: str | None = Query(None),
+    family_verification_status: str | None = Query(None),
+    family_bio: str | None = Query(None),
+    referrer_name: str | None = Query(None),
+    referrer_phone_number: str | None = Query(None),
+    assigned_to_name: str | None = Query(None),
+    purchased_where: str | None = Query(None),
+    purchaser_note: str | None = Query(None),
+    # Per-column date ranges: inclusive day boundaries in UTC.
+    purchased_at_from: date | None = Query(None),
+    purchased_at_to: date | None = Query(None),
+    received_at_from: date | None = Query(None),
+    received_at_to: date | None = Query(None),
+    created_at_from: date | None = Query(None),
+    created_at_to: date | None = Query(None),
+    family_pickup_window_from: date | None = Query(None),
+    family_pickup_window_to: date | None = Query(None),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishListResponse:
@@ -73,23 +116,42 @@ def list_wishes(
 
     Person wishes resolve their family through the person; family wishes
     (``person_id`` null) are bound to the family directly, so both sources
-    are outer-joined and handled by the filters and search below.
+    are outer-joined and handled by the filters and search below. The
+    owner family's referrer and the assigned user are outer-joined the same
+    way (soft-deleted rows join as NULL, so search/sort cannot match them).
+
+    Besides the global ``search`` box (OR across every text-searchable
+    field), each text-searchable field has its own optional param (named
+    after the item field; substring for free text, whole case-insensitive
+    value for the closed-vocabulary role/age/status fields) and each of the
+    four date fields has ``<field>_from`` / ``<field>_to`` day-boundary
+    params; all of them AND with the other filters.
 
     Default order groups each family's wishes together — owner family's
     referrer (unassigned families first), owner family, person — with the
     family wish first in each family block, then wish type in display order
     (practical, fun, adult) and wish id. An explicit ``sort`` naming a
     ``WISH_SORT_FIELDS`` column (``-`` prefix for descending) orders by that
-    single column instead; unknown or empty values fall back to the grouped
-    default.
+    single column instead, with NULLs last in both directions; unknown or
+    empty values fall back to the grouped default.
     """
-    # Base query: outer-join Wish → Person → Family for filtering and context
-    direct_family = aliased(Family)
+    # Base query: outer-join Wish → Person → Family (person's family), the
+    # wish's direct family, the owner family's referrer, and the assigned
+    # user — all used by the filters, search, and sort below. The
+    # referrer/user joins carry their soft-delete check in the ON clause.
     query = (
         db.query(Wish)
         .outerjoin(Person, Wish.person_id == Person.id)
         .outerjoin(Family, Person.family_id == Family.id)
-        .outerjoin(direct_family, Wish.family_id == direct_family.id)
+        .outerjoin(DIRECT_FAMILY, Wish.family_id == DIRECT_FAMILY.id)
+        .outerjoin(
+            WISH_REFERRER,
+            and_(
+                WISH_REFERRER.id == func.coalesce(Family.referrer_id, DIRECT_FAMILY.referrer_id),
+                WISH_REFERRER.deleted_at.is_(None),
+            ),
+        )
+        .outerjoin(ASSIGNED_USER, and_(Wish.assigned_to_id == ASSIGNED_USER.id, ASSIGNED_USER.deleted_at.is_(None)))
         .filter(Wish.deleted_at.is_(None))
     )
 
@@ -110,15 +172,49 @@ def list_wishes(
             query = query.filter(Wish.purchased_at.is_(None))
         # "all" means no filter
     if search is not None:
-        pattern = f"%{escape_like(search)}%"
-        query = query.filter(
-            or_(
-                Wish.description.ilike(pattern, escape="\\"),
-                Person.given_name.ilike(pattern, escape="\\"),
-                Family.family_name.ilike(pattern, escape="\\"),
-                direct_family.family_name.ilike(pattern, escape="\\"),
-            )
-        )
+        query = query.filter(or_(*wish_global_search_terms(f"%{escape_like(search)}%")))
+    # Per-column text search: one optional param per text-searchable field,
+    # ANDed with each other and everything above.
+    for field, value in {
+        "description": description,
+        "size": size,
+        "color": color,
+        "person_given_name": person_given_name,
+        "person_role": person_role,
+        "person_age": person_age,
+        "person_note": person_note,
+        "family_name": family_name,
+        "family_contact_name": family_contact_name,
+        "family_phone_number": family_phone_number,
+        "family_address": family_address,
+        "family_verification_status": family_verification_status,
+        "family_bio": family_bio,
+        "referrer_name": referrer_name,
+        "referrer_phone_number": referrer_phone_number,
+        "assigned_to_name": assigned_to_name,
+        "purchased_where": purchased_where,
+        "purchaser_note": purchaser_note,
+    }.items():
+        if value is None:
+            continue
+        pattern = escape_like(value)
+        if field in WISH_SEARCH_EXACT_FIELDS:
+            # Closed vocabulary (enum/age cast to text): whole-value match.
+            query = query.filter(WISH_SEARCH_FIELDS[field].ilike(pattern, escape="\\"))
+        else:
+            query = query.filter(WISH_SEARCH_FIELDS[field].ilike(f"%{pattern}%", escape="\\"))
+    # Per-column date ranges: from = start of that UTC day (inclusive),
+    # to = end of that UTC day (exclusive next-midnight bound).
+    for field, (from_day, to_day) in {
+        "purchased_at": (purchased_at_from, purchased_at_to),
+        "received_at": (received_at_from, received_at_to),
+        "created_at": (created_at_from, created_at_to),
+        "family_pickup_window": (family_pickup_window_from, family_pickup_window_to),
+    }.items():
+        if from_day is not None:
+            query = query.filter(WISH_DATE_RANGE_FIELDS[field] >= _utc_day_start(from_day))
+        if to_day is not None:
+            query = query.filter(WISH_DATE_RANGE_FIELDS[field] < _utc_day_start(to_day + timedelta(days=1)))
     if wish_type is not None:
         query = query.filter(Wish.type == wish_type)
 
@@ -126,13 +222,14 @@ def list_wishes(
 
     # An explicit ``sort`` naming a WISH_SORT_FIELDS column keeps the
     # single-column order (+ id tie-breaker); unknown or empty values fall
-    # back to the grouped default.
+    # back to the grouped default. NULLs sort last in both directions,
+    # uniformly for every sort field.
     field = sort[1:] if sort and sort.startswith("-") else sort
     if sort and field in WISH_SORT_FIELDS:
         column = WISH_SORT_FIELDS[field]
-        order_by = [column.desc() if sort.startswith("-") else column.asc(), Wish.id]
+        order_by = [(column.desc() if sort.startswith("-") else column.asc()).nullslast(), Wish.id]
     else:
-        order_by = wish_grouped_order(direct_family)
+        order_by = wish_grouped_order(DIRECT_FAMILY)
     wishes = query.order_by(*order_by).offset((page - 1) * page_size).limit(page_size).all()
 
     # Build list items — need person/family context and assigned-to names.
@@ -161,9 +258,23 @@ def list_wishes(
             assigned_user_ids = {w.assigned_to_id for w in wishes_with_context if w.assigned_to_id is not None}
             if assigned_user_ids:
                 assigned_users = {u.id: u for u in db.query(User).filter(User.id.in_(assigned_user_ids)).all()}
+        # Batch-collect the page's owner-family referrers (conditional;
+        # soft-deleted referrers display as None)
+        referrer_map: dict[int, Referrer] = {}
+        if cols.needs("referrer_name", "referrer_phone_number"):
+            owner_referrer_ids: set[int] = set()
+            for w in wishes_with_context:
+                owner_family = w.person.family if w.person is not None else w.family
+                if owner_family is not None and owner_family.referrer_id is not None:
+                    owner_referrer_ids.add(owner_family.referrer_id)
+            if owner_referrer_ids:
+                referrer_map = {
+                    r.id: r for r in db.query(Referrer).filter(Referrer.id.in_(owner_referrer_ids), Referrer.deleted_at.is_(None)).all()
+                }
     else:
         wishes_with_context = []
         assigned_users = {}
+        referrer_map = {}
 
     # Batch-compute wish display ids (owner's flat display id + type suffix)
     # from the joinedload query's objects — the ones items are built from.
@@ -183,7 +294,15 @@ def list_wishes(
             wish_display_map[w.id] = wish_display_id(owner_display_id, w.type)
 
     items = [
-        WishListSummary(**build_wish_list_item(w, w.person, display_id=wish_display_map.get(w.id), assigned_users=assigned_users))
+        WishListSummary(
+            **build_wish_list_item(
+                w,
+                w.person,
+                display_id=wish_display_map.get(w.id),
+                assigned_users=assigned_users,
+                referrer_map=referrer_map,
+            )
+        )
         for w in wishes_with_context
     ]
 

@@ -259,7 +259,13 @@ export interface WishSummary {
   deleted_at: string | null;
 }
 
-/** Mirrors WishListSummary — wish with person/family/assignee context for admin list. */
+/** Mirrors WishListSummary — wish with person/family/assignee context for admin list.
+ *
+ * Person-wish rows resolve their family/referrer through the person; family-wish
+ * rows resolve them directly. Person fields are null on family-wish rows;
+ * family/referrer fields are null when the owner family (or its referrer) doesn't
+ * exist (or the referrer is soft-deleted).
+ */
 export interface WishListSummary {
   id: number;
   /** Presentational id (flat form, e.g. "1-1-1A", "1-1-F"); null when column filtering omits it. */
@@ -272,13 +278,32 @@ export interface WishListSummary {
   person_id: number | null;
   /** Null for family wishes (no person). */
   person_given_name: string | null;
+  /** Null for family wishes (no person). */
+  person_role: PersonRole | null;
+  /** Null for family wishes (no person). */
+  person_age: number | null;
+  /** Null for family wishes (no person). */
+  person_note: string | null;
   family_id: number;
+  /** Null when the owner family doesn't exist (or the column is filtered out). */
+  family_name: string | null;
+  /** Null when the owner family doesn't exist (or the column is filtered out). */
+  family_contact_name: string | null;
+  family_phone_number: string | null;
+  family_address: string | null;
+  family_verification_status: FamilyVerificationStatus | null;
+  family_pickup_window: string | null;
+  family_bio: string | null;
+  /** Null when the owner family has no referrer (or it is soft-deleted). */
+  referrer_name: string | null;
+  referrer_phone_number: string | null;
   assigned_to_id: number | null;
   assigned_to_name: string | null;
   purchased_at: string | null;
   purchased_where: string | null;
   received_at: string | null;
   purchaser_note: string | null;
+  created_at: string | null;
 }
 
 /** Payload for marking a wish as purchased. */

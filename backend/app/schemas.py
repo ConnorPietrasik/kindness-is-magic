@@ -976,7 +976,13 @@ class WishBatchMarkPurchased(BaseModel):
 
 
 class WishListSummary(BaseModel):
-    """Flat wish summary for the admin list view."""
+    """Flat wish summary for the admin list view.
+
+    Person-wish rows resolve their family/referrer through the person;
+    family-wish rows resolve them directly. Person fields are None on
+    family-wish rows; family/referrer fields are None when the owner family
+    (or its referrer) doesn't exist (or the referrer is soft-deleted).
+    """
 
     id: int
     display_id: str | None = None
@@ -986,13 +992,26 @@ class WishListSummary(BaseModel):
     color: str | None = None
     person_id: int | None = None
     person_given_name: str | None = None
+    person_role: PersonRole | None = None
+    person_age: int | None = None
+    person_note: str | None = None
     family_id: int
+    family_name: str | None = None
+    family_contact_name: str | None = None
+    family_phone_number: str | None = None
+    family_address: str | None = None
+    family_verification_status: FamilyVerificationStatus | None = None
+    family_pickup_window: datetime | None = None
+    family_bio: str | None = None
+    referrer_name: str | None = None
+    referrer_phone_number: str | None = None
     assigned_to_id: int | None = None
     assigned_to_name: str | None = None
     purchased_at: datetime | None = None
     purchased_where: str | None = None
     received_at: datetime | None = None
     purchaser_note: str | None = None
+    created_at: datetime | None = None
 
 
 class WishListResponse(BaseModel):

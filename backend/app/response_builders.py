@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import Type, TypeVar, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, case, func, select
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy import ColumnElement, String, case, func, select
+from sqlalchemy.orm import DeclarativeBase, Session, aliased
 from sqlalchemy.orm.util import AliasedClass
 
 from datetime import datetime, timezone
@@ -193,6 +193,25 @@ def escape_like(value: str) -> str:
 # Sort-field registries (module-level so they aren't rebuilt per request)
 # ---------------------------------------------------------------------------
 
+# Shared joins for the admin wish list query and its sort/search
+# expressions (see admin_wishes.list_wishes): the wish's own family (family
+# wishes), the owner family's referrer, and the assigned user.
+DIRECT_FAMILY = aliased(Family)
+WISH_REFERRER = aliased(Referrer)
+ASSIGNED_USER = aliased(User)
+
+
+def _owner_family_column(attr: str, *, as_text: bool = False) -> ColumnElement:
+    """Coalesce an owner-family column across both family paths.
+
+    The owner family is the person's family or the wish's direct family
+    (exactly one is joined per wish). *as_text* casts the result to text
+    (for enum columns matched as text in search).
+    """
+    col = func.coalesce(getattr(Family, attr), getattr(DIRECT_FAMILY, attr))
+    return col.cast(String) if as_text else col
+
+
 # Reusable correlated subqueries: aggregate stats over active persons per family.
 # Used by sort registries, filter logic, and public family list endpoint.
 FAMILY_PERSON_COUNT = (
@@ -262,9 +281,93 @@ WISH_SORT_FIELDS: dict[str, ColumnElement] = {
     "description": Wish.description,
     "type": Wish.type,
     "id": Wish.id,
+    "size": Wish.size,
+    "color": Wish.color,
     "purchased_at": Wish.purchased_at,
+    "purchased_where": Wish.purchased_where,
+    "received_at": Wish.received_at,
+    "purchaser_note": Wish.purchaser_note,
     "created_at": Wish.created_at,
+    "person_given_name": Person.given_name,
+    "person_role": Person.role,
+    "person_age": Person.age,
+    "person_note": Person.note,
+    "family_name": _owner_family_column("family_name"),
+    "family_contact_name": _owner_family_column("contact_name"),
+    "family_phone_number": _owner_family_column("phone_number"),
+    "family_address": _owner_family_column("address"),
+    "family_verification_status": _owner_family_column("verification_status"),
+    "family_pickup_window": _owner_family_column("pickup_window"),
+    "family_bio": _owner_family_column("bio"),
+    "referrer_name": WISH_REFERRER.name,
+    "referrer_phone_number": WISH_REFERRER.phone_number,
+    "assigned_to_name": ASSIGNED_USER.display_name,
 }
+
+# Owner-family columns exposed as wish list fields: item field name →
+# Family column attribute. Both family paths are covered by the coalesce in
+# _owner_family_column(); the global-search OR expands them to separate
+# terms instead (wish_global_search_terms).
+WISH_FAMILY_SEARCH_ATTRS: dict[str, str] = {
+    "family_name": "family_name",
+    "family_contact_name": "contact_name",
+    "family_phone_number": "phone_number",
+    "family_address": "address",
+    "family_verification_status": "verification_status",
+    "family_bio": "bio",
+}
+
+# Per-column text search: item field name → column expression. Enum and
+# age columns are cast to text so they match as strings.
+WISH_SEARCH_FIELDS: dict[str, ColumnElement] = {
+    "description": Wish.description,
+    "size": Wish.size,
+    "color": Wish.color,
+    "purchased_where": Wish.purchased_where,
+    "purchaser_note": Wish.purchaser_note,
+    "person_given_name": Person.given_name,
+    "person_role": Person.role.cast(String),
+    "person_age": Person.age.cast(String),
+    "person_note": Person.note,
+    **{field: _owner_family_column(attr, as_text=attr == "verification_status") for field, attr in WISH_FAMILY_SEARCH_ATTRS.items()},
+    "referrer_name": WISH_REFERRER.name,
+    "referrer_phone_number": WISH_REFERRER.phone_number,
+    "assigned_to_name": ASSIGNED_USER.display_name,
+}
+
+# Per-column search fields matched as whole (case-insensitive) values
+# instead of substrings: closed vocabularies where substring matching is
+# surprising ("1" would match ages 10 and 12, "so" would match "son").
+WISH_SEARCH_EXACT_FIELDS: frozenset[str] = frozenset({"person_role", "person_age", "family_verification_status"})
+
+
+# Per-column date-range search: item field name → column expression.
+WISH_DATE_RANGE_FIELDS: dict[str, ColumnElement] = {
+    "purchased_at": Wish.purchased_at,
+    "received_at": Wish.received_at,
+    "created_at": Wish.created_at,
+    "family_pickup_window": _owner_family_column("pickup_window"),
+}
+
+
+def wish_global_search_terms(pattern: str) -> list[ColumnElement]:
+    """ILIKE terms for the admin wish list's global search box.
+
+    Covers every field in WISH_SEARCH_FIELDS. Owner-family fields keep
+    both family paths as separate terms (the person's family OR the wish's
+    direct family) instead of the single coalesced term used for
+    per-column search, so the OR shape matches the existing family-name
+    terms.
+    """
+    terms = [col.ilike(pattern, escape="\\") for field, col in WISH_SEARCH_FIELDS.items() if field not in WISH_FAMILY_SEARCH_ATTRS]
+    for attr in WISH_FAMILY_SEARCH_ATTRS.values():
+        for family_alias in (Family, DIRECT_FAMILY):
+            col = getattr(family_alias, attr)
+            if attr == "verification_status":
+                col = col.cast(String)
+            terms.append(col.ilike(pattern, escape="\\"))
+    return terms
+
 
 PUBLIC_FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "person_count": FAMILY_PERSON_COUNT,
@@ -693,11 +796,15 @@ def build_wish_list_item(
     *,
     display_id: str | None = None,
     assigned_users: dict[int, User] | None = None,
+    referrer_map: dict[int, Referrer] | None = None,
 ) -> dict:
     """Build a dict suitable for WishListSummary (flat admin list view).
 
     *person* is ``None`` for family wishes, which resolve their family
-    directly from ``wish.family_id``.
+    directly from ``wish.family_id``; person-wishes resolve it through the
+    person. The owner family's fields (name, contact, phone, address,
+    verification status, pickup window, bio) and its referrer's fields come
+    from that family.
 
     Pass *display_id* as the pre-computed wish display id (the owner's flat
     display id + type suffix); it stays None when the caller did not
@@ -706,12 +813,22 @@ def build_wish_list_item(
     Pass *assigned_users* as a pre-loaded {user_id: User} map to avoid N+1
     queries.  If omitted the caller is responsible for populating the
     relationship via joinedload.
+
+    Pass *referrer_map* as a pre-loaded {referrer_id: Referrer} map covering
+    the page's owner families (soft-deleted referrers excluded, so they
+    display as None); omit or pass {} when the referrer columns are not
+    requested.
     """
     assigned_to_name: str | None = None
     if wish.assigned_to_id is not None:
         user = assigned_users.get(wish.assigned_to_id) if assigned_users is not None else wish.assigned_to
         if user is not None and user.deleted_at is None:
             assigned_to_name = user.display_name
+
+    owner_family = person.family if person is not None else wish.family
+    referrer = None
+    if owner_family is not None and owner_family.referrer_id is not None and referrer_map is not None:
+        referrer = referrer_map.get(owner_family.referrer_id)
 
     return {
         "id": wish.id,
@@ -722,13 +839,26 @@ def build_wish_list_item(
         "color": wish.color,
         "person_id": wish.person_id,
         "person_given_name": person.given_name if person is not None else None,
+        "person_role": person.role if person is not None else None,
+        "person_age": person.age if person is not None else None,
+        "person_note": person.note if person is not None else None,
         "family_id": wish.family_id if person is None else person.family_id,
+        "family_name": owner_family.family_name if owner_family is not None else None,
+        "family_contact_name": owner_family.contact_name if owner_family is not None else None,
+        "family_phone_number": owner_family.phone_number if owner_family is not None else None,
+        "family_address": owner_family.address if owner_family is not None else None,
+        "family_verification_status": owner_family.verification_status if owner_family is not None else None,
+        "family_pickup_window": owner_family.pickup_window if owner_family is not None else None,
+        "family_bio": owner_family.bio if owner_family is not None else None,
+        "referrer_name": referrer.name if referrer is not None else None,
+        "referrer_phone_number": referrer.phone_number if referrer is not None else None,
         "assigned_to_id": wish.assigned_to_id,
         "assigned_to_name": assigned_to_name,
         "purchased_at": wish.purchased_at,
         "purchased_where": wish.purchased_where,
         "received_at": wish.received_at,
         "purchaser_note": wish.purchaser_note,
+        "created_at": wish.created_at,
     }
 
 
