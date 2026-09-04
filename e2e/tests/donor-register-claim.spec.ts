@@ -36,6 +36,7 @@ const REG_DONOR_EMAIL = `e2e-donor-reg-${SUFFIX}@example.com`;
 const testData: {
   donorUserId?: number;
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
   personId?: number;
 } = {};
@@ -55,6 +56,7 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
     // Isolated family scenario (referrer → family → person with wishes)
     const scenario = await createIsolatedFamilyScenario(api, SUFFIX);
     testData.referrerId = scenario.referrerId;
+    testData.referrerUserId = scenario.referrerUserId;
     testData.familyId = scenario.familyId;
     testData.personId = scenario.personId;
 
@@ -78,6 +80,7 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
     // Clean up in reverse creation order
     if (testData.personId) await deletePersonViaApi(authed, testData.personId);
     if (testData.familyId) await deleteFamilyViaApi(authed, testData.familyId);
+    if (testData.referrerUserId) await deleteUserViaApi(authed, testData.referrerUserId);
     if (testData.referrerId) await deleteReferrerViaApi(authed, testData.referrerId);
 
     await authed.dispose();

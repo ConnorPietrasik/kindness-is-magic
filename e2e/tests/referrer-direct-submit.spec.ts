@@ -21,6 +21,7 @@ import {
   deleteFamilyViaApi,
   deletePersonViaApi,
   deleteReferrerViaApi,
+  deleteUserViaApi,
   loginViaApi,
 } from "../helpers/api";
 
@@ -31,6 +32,7 @@ const FAMILY_WISH = `A warm blanket for everyone ${SUFFIX}`;
 /* Track IDs for cleanup */
 const testData: {
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
   personId?: number;
 } = {};
@@ -45,6 +47,9 @@ test.describe("Referrer Direct Submit", () => {
     }
     if (testData.familyId) {
       await deleteFamilyViaApi(authed, testData.familyId);
+    }
+    if (testData.referrerUserId) {
+      await deleteUserViaApi(authed, testData.referrerUserId);
     }
     if (testData.referrerId) {
       await deleteReferrerViaApi(authed, testData.referrerId);
@@ -62,6 +67,7 @@ test.describe("Referrer Direct Submit", () => {
 
     const scenario = await createIsolatedFamilyScenario(adminApi, SUFFIX, { familyWish: FAMILY_WISH });
     testData.referrerId = scenario.referrerId;
+    testData.referrerUserId = scenario.referrerUserId;
     testData.familyId = scenario.familyId;
     testData.personId = scenario.personId;
 

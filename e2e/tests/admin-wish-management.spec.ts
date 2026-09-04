@@ -123,6 +123,7 @@ const MUTATION_WISH_DESC = `Edited e2e wish ${MUTATION_SUFFIX}`;
 
 const mutationData: {
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
   purchaserUserId?: number;
 } = {};
@@ -141,6 +142,7 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     });
 
     mutationData.referrerId = scenario.referrerId;
+    mutationData.referrerUserId = scenario.referrerUserId;
     mutationData.familyId = scenario.familyId;
 
     // Create a purchaser user for batch-assign test
@@ -167,6 +169,9 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     }
     if (mutationData.familyId) {
       await deleteFamilyViaApi(authed, mutationData.familyId);
+    }
+    if (mutationData.referrerUserId) {
+      await deleteUserViaApi(authed, mutationData.referrerUserId);
     }
     if (mutationData.referrerId) {
       await deleteReferrerViaApi(authed, mutationData.referrerId);
@@ -338,6 +343,7 @@ const SHEET_FUN_DESC = `E2E sheet fun ${SHEET_SUFFIX}`;
 
 const sheetData: {
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
   /** ISO datetime the practical wish was marked purchased at (midday UTC). */
   purchasedAt?: string;
@@ -359,6 +365,7 @@ test.describe.serial("Admin Wish Management — spreadsheet view", () => {
     });
 
     sheetData.referrerId = scenario.referrerId;
+    sheetData.referrerUserId = scenario.referrerUserId;
     sheetData.familyId = scenario.familyId;
 
     // Mark the practical wish purchased at midday UTC yesterday — a known
@@ -385,6 +392,9 @@ test.describe.serial("Admin Wish Management — spreadsheet view", () => {
     const authed = await loginViaApi(req);
     if (sheetData.familyId) {
       await deleteFamilyViaApi(authed, sheetData.familyId);
+    }
+    if (sheetData.referrerUserId) {
+      await deleteUserViaApi(authed, sheetData.referrerUserId);
     }
     if (sheetData.referrerId) {
       await deleteReferrerViaApi(authed, sheetData.referrerId);

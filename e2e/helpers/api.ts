@@ -164,14 +164,18 @@ export async function listReferrersViaApi(
 }
 
 /**
- * List users (admin API) with optional role filter.
+ * List users (admin API) with optional role and search filters.
+ * `search` matches email or display name (contains); callers that need an
+ * exact match should filter the results (e.g. unique-suffixed emails).
  */
 export async function listUsersViaApi(
   request: APIRequestContext,
   role?: string,
+  search?: string,
 ): Promise<{ users: Array<{ id: number; email: string; role: string }>; total: number }> {
   const params = new URLSearchParams();
   if (role) params.set("role", role);
+  if (search) params.set("search", search);
   const resp = await request.get(`/api/admin/users?${params.toString()}`);
   if (!resp.ok()) {
     throw new Error(`listUsersViaApi failed: ${resp.status()}`);
@@ -552,6 +556,7 @@ export async function createIsolatedFamilyScenario(
   },
 ): Promise<{
   referrerId: number;
+  referrerUserId: number;
   referrerEmail: string;
   referrerPassword: string;
   familyId: number;
@@ -588,6 +593,7 @@ export async function createIsolatedFamilyScenario(
 
   return {
     referrerId: referrer.referrerId,
+    referrerUserId: referrer.userId,
     referrerEmail: referrer.email,
     referrerPassword: referrer.password,
     familyId: family.familyId,

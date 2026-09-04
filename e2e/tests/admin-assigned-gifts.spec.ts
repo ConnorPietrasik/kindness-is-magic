@@ -16,6 +16,7 @@ import {
   createPersonViaApi,
   deleteFamilyViaApi,
   deleteReferrerViaApi,
+  deleteUserViaApi,
   listUsersViaApi,
   listWishesViaApi,
   loginViaApi,
@@ -44,6 +45,7 @@ const state: {
   familyId?: number;
   adminUserId?: number;
   wishId?: number;
+  referrerUserId?: number;
 } = {};
 
 test.describe.serial("Admin Assigned Gifts", () => {
@@ -61,6 +63,7 @@ test.describe.serial("Admin Assigned Gifts", () => {
       personFunWish: FUN_WISH_DESC,
     });
     state.referrerId = scenario.referrerId;
+    state.referrerUserId = scenario.referrerUserId;
     state.familyId = scenario.familyId;
 
     // Second person — the batch test's third row. Children must have one
@@ -90,6 +93,9 @@ test.describe.serial("Admin Assigned Gifts", () => {
     const authed = await loginViaApi(req);
     if (state.familyId) {
       await deleteFamilyViaApi(authed, state.familyId);
+    }
+    if (state.referrerUserId) {
+      await deleteUserViaApi(authed, state.referrerUserId);
     }
     if (state.referrerId) {
       await deleteReferrerViaApi(authed, state.referrerId);

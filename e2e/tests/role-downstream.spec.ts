@@ -4,12 +4,14 @@
  * Self-contained: creates full data chain (referrer → family → person → wishes),
  * assigns data to purchaser/delivery users, and approves for public visibility.
  *
- * Intentionally a plain describe, not .serial: no test depends on a mutation
- * made by an earlier test, so the file can run fully in parallel. Under
- * fullyParallel each worker re-imports this file (fresh SUFFIX/testData) and
- * runs beforeAll/afterAll for its own data chain; tests within a worker run
- * in file order. If a test ever depends on an earlier test's mutation,
- * switch to test.describe.serial.
+ * describe.serial: tests share module-level state (SUFFIX/testData) and one
+ * data chain per setup, so they must run in a single worker where
+ * beforeAll/afterAll run exactly once. A plain describe is unsafe here:
+ * module state is cached per worker process (not re-imported per test), and
+ * a worker that receives this file's tests in multiple batches re-runs
+ * beforeAll with the SAME SUFFIX — the second setup reuses the referrer's
+ * email and fails with 409 (emails stay reserved even after soft-delete).
+ * No test depends on an earlier test's mutation, so file order is safe.
  */
 import { test, expect, request } from "@playwright/test";
 import {
@@ -41,6 +43,7 @@ const PASSWORD = "Password123!";
 /* Track IDs for cleanup */
 const testData: {
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
   secondFamilyId?: number;
   purchaserUserId?: number;
@@ -61,6 +64,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
     password: PASSWORD,
   });
   testData.referrerId = referrer.referrerId;
+  testData.referrerUserId = referrer.userId;
 
   // Create family under the referrer
   const family = await createFamilyViaApi(apiContext, referrer.referrerId, {
@@ -163,7 +167,7 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
   await approveWishChain(apiContext, family.familyId, TEST_REFERRER_EMAIL, PASSWORD);
 }
 
-test.describe("Role Downstream", () => {
+test.describe.serial("Role Downstream", () => {
   test.beforeAll(async ({ request: req }) => {
     const api = await loginViaApi(req);
     await setupTestData(api);
@@ -178,6 +182,9 @@ test.describe("Role Downstream", () => {
     }
     if (testData.familyId) {
       await deleteFamilyViaApi(authed, testData.familyId);
+    }
+    if (testData.referrerUserId) {
+      await deleteUserViaApi(authed, testData.referrerUserId);
     }
     if (testData.referrerId) {
       await deleteReferrerViaApi(authed, testData.referrerId);

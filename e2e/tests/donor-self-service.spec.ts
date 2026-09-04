@@ -23,6 +23,7 @@ const testData: {
   donorEmail?: string;
   donorPassword?: string;
   referrerId?: number;
+  referrerUserId?: number;
   familyId?: number;
 } = {};
 
@@ -43,6 +44,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     // Create isolated family scenario (referrer → family → person with wishes)
     const scenario = await createIsolatedFamilyScenario(api, SUFFIX);
     testData.referrerId = scenario.referrerId;
+    testData.referrerUserId = scenario.referrerUserId;
     testData.familyId = scenario.familyId;
 
     // Fully approve the family so it shows up in public families
@@ -55,6 +57,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     const authed = await loginViaApi(req);
     if (testData.donorUserId) await deleteUserViaApi(authed, testData.donorUserId);
     if (testData.familyId) await deleteFamilyViaApi(authed, testData.familyId);
+    if (testData.referrerUserId) await deleteUserViaApi(authed, testData.referrerUserId);
     if (testData.referrerId) await deleteReferrerViaApi(authed, testData.referrerId);
     await authed.dispose();
   });

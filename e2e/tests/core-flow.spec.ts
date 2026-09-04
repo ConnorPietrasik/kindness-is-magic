@@ -19,6 +19,7 @@
 import { test, expect, request } from "@playwright/test";
 import { getAdminEmail, getAdminPassword } from "../helpers/env";
 import { findRowInTable } from "../helpers/assertions";
+import { deleteUserViaApi, listUsersViaApi } from "../helpers/api";
 
 /* Unique test data so re-runs without a DB wipe don't collide */
 const SUFFIX = Math.random().toString(36).slice(2, 8);
@@ -43,6 +44,13 @@ test.describe("Core Flow", () => {
       data: { email: getAdminEmail(), password: getAdminPassword() },
     });
 
+    /* Users created via UI registration — look up by unique email */
+    for (const email of [TEST_FAMILY_EMAIL, TEST_REFERRER_EMAIL]) {
+      const users = await listUsersViaApi(req, undefined, email);
+      const user = users.users.find((u) => u.email === email);
+      if (user) await deleteUserViaApi(req, user.id);
+    }
+
     /* Clean up in reverse creation order */
     if (testData.personId) {
       await req.delete(`/api/admin/people/${testData.personId}`);
@@ -53,6 +61,7 @@ test.describe("Core Flow", () => {
     if (testData.referrerId) {
       await req.delete(`/api/admin/referrers/${testData.referrerId}`);
     }
+    await req.dispose();
   });
 
   test("full core flow: invite → register → approve → review → public wish list", async ({ browser }) => {

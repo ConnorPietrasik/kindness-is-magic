@@ -7,12 +7,31 @@
  * Uses a random suffix on emails so re-runs without DB wipe don't collide.
  */
 import { test, expect } from "@playwright/test";
-import { listReferrersViaApi, loginViaApi, resetReferrerSentEmailsViaApi } from "../helpers/api";
+import {
+  deleteUserViaApi,
+  listReferrersViaApi,
+  listUsersViaApi,
+  loginViaApi,
+  resetReferrerSentEmailsViaApi,
+} from "../helpers/api";
 
 /* Unique suffix so re-runs without a DB wipe don't hit "Email already registered" */
 const SUFFIX = Math.random().toString(36).slice(2, 8);
 
 test.describe("Invite and self-registration", () => {
+  /* Referrer users created via UI self-registration — look up by unique email
+     and delete (the second registration attempt in the reject test fails, so
+     no user exists for second-user-invite) */
+  test.afterAll(async ({ request: req }) => {
+    const authed = await loginViaApi(req);
+    for (const email of [`e2e-invite-${SUFFIX}@example.com`, `first-user-invite-${SUFFIX}@example.com`]) {
+      const users = await listUsersViaApi(authed, "referrer", email);
+      const user = users.users.find((u) => u.email === email);
+      if (user) await deleteUserViaApi(authed, user.id);
+    }
+    await authed.dispose();
+  });
+
   test("admin generates invite code and referrer self-registers", async ({ browser }) => {
     /* ── Step 1: Admin generates invite code ── */
     const adminContext = await browser.newContext({

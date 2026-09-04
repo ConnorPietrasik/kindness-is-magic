@@ -37,7 +37,7 @@ Unlike those five roles, there is no `donor.json` storageState. Donor users are 
 - Use `{ exact: true }` when text could collide (e.g., "Family" matches "Family ID: N").
 - Reuse helpers from `helpers/auth.ts`, `helpers/assertions.ts`, and `helpers/api.ts`.
 - **Unique test data per run.** Use `Math.random().toString(36).slice(2, 8)` suffixes on names/emails so re-runs without a DB wipe don't collide with stale records from prior runs.
-- **`test.describe.serial()` for shared module state.** When tests within a file share module-level variables (IDs, credentials), wrap them in `test.describe.serial()` so they run in order on a single worker. Parallel tests get independent module instances with different random values.
+- **`test.describe.serial()` for shared module state.** When tests within a file share module-level variables (IDs, credentials), wrap them in `test.describe.serial()` so they run in order on a single worker. Module state is cached per worker process, **not per test**: a plain `describe` whose tests land in multiple batches on the same worker re-runs `beforeAll` with the same import-time values (e.g. the same random email), and setup collides with its own earlier data (409 — emails stay reserved even after soft-delete).
 - **APIs for setup/teardown only.** Use `helpers/api.ts` to create test data before tests and clean up in `test.afterAll`. Do not use APIs to find IDs, navigate, or verify state that the test is meant to exercise through the UI. If a test is about the UI, the UI is the path.
 
 ## Cleanup — The Golden Rule
