@@ -4,8 +4,10 @@
  * These tests run in the "guest" project (no pre-authenticated state).
  * Role-based access control tests live in role-guards.spec.ts.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { loginAsAdmin, loginAsReferrer, loginAsFamily, logout } from "../helpers/auth";
+import { getAdminEmail, getAdminPassword, getSecretKey } from "../helpers/env";
+import { makeExpiredAccessToken } from "../helpers/jwt";
 
 test.describe("Authentication", () => {
   test("login with valid admin credentials redirects to dashboard", async ({ page }) => {
@@ -45,6 +47,37 @@ test.describe("Authentication", () => {
 
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  });
+
+  test("page reload with expired access token stays logged in via refresh token", async ({ page }) => {
+    await loginAsAdmin(page);
+    await expect(page).toHaveURL(/\/dashboard/);
+
+    // Id + role of the logged-in user, from the live session.
+    const me = (await (await page.request.get("/api/auth/me")).json()) as { id: number; role: string };
+
+    // Replace the access-token cookie with a correctly signed but EXPIRED
+    // JWT — the state the browser is in after the 30-minute access-token
+    // window lapses while the refresh token is still valid.
+    const expiredToken = await makeExpiredAccessToken(getSecretKey(), me.id, me.role);
+    await page.context().addCookies([
+      {
+        name: "access_token",
+        value: expiredToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+    ]);
+
+    // On reload the /me check 401s; the app must silently refresh (valid
+    // refresh-token cookie) and keep the user on the dashboard instead of
+    // redirecting to /login. Wait for the settled dashboard content first —
+    // the URL can still read /dashboard during boot before a redirect.
+    await page.reload();
+    await expect(page.getByText("Admin")).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test("root redirect sends admin to dashboard", async ({ page }) => {
@@ -100,5 +133,39 @@ test.describe("Authentication", () => {
     await page.getByRole("button", { name: "Log Out" }).click();
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  });
+
+  test("two concurrent refreshes with the same token both succeed (tab race)", async () => {
+    /* Browser cookie jars are shared across tabs: two tabs whose access
+     * tokens just expired both fire /refresh with the same pre-rotation
+     * refresh token. Without the grace window, the loser of the race gets
+     * 401 "revoked" and is logged out. Both must succeed. */
+    const loginCtx = await playwrightRequest.newContext({ baseURL: "http://localhost" });
+    const login = await loginCtx.post("/api/auth/login", {
+      data: { email: getAdminEmail(), password: getAdminPassword() },
+    });
+    expect(login.ok()).toBeTruthy();
+    const sharedToken = (login.headers()["set-cookie"] ?? "").match(/refresh_token=([^;,\s]+)/)?.[1];
+    expect(sharedToken).toBeTruthy();
+    await loginCtx.dispose();
+
+    /* Two independent contexts, both pinned to the same pre-rotation token.
+     * Pin via an explicit Cookie header — this Playwright version's
+     * APIRequestContext has no cookie-jar API. */
+    const cookieHeader = { Cookie: `refresh_token=${sharedToken}` };
+    const [ctxA, ctxB] = await Promise.all([
+      playwrightRequest.newContext({ baseURL: "http://localhost" }),
+      playwrightRequest.newContext({ baseURL: "http://localhost" }),
+    ]);
+
+    const results = await Promise.all(
+      [ctxA, ctxB].map(async (ctx) => {
+        const resp = await ctx.post("/api/auth/refresh", { headers: cookieHeader });
+        await ctx.dispose();
+        return resp.ok();
+      }),
+    );
+
+    expect(results).toEqual([true, true]);
   });
 });

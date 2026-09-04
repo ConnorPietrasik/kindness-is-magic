@@ -139,7 +139,10 @@ api.interceptors.response.use(
     const originalRequest = error.config as ExtendedRequestConfig | undefined;
 
     // Only attempt refresh on 401, skip the refresh endpoint and the auth check.
-    // A 401 on /api/auth/me simply means "not logged in" — nothing to refresh.
+    // /api/auth/me is excluded here (not in fetchCurrentUser) because a refresh
+    // failure on it would dispatch onFailedRefresh, redirecting anonymous
+    // visitors on public pages to /login. fetchCurrentUser handles its own
+    // refresh-and-retry and reports "logged out" (null) instead.
     if (
       error.response?.status === 401 &&
       originalRequest &&
@@ -195,8 +198,14 @@ export function fetchCurrentUser(): Promise<User | null> {
     .get("/api/auth/me")
     .then((res) => res.data as User)
     .catch((err) => {
-      if (err?.response?.status === 401) return null;
-      throw err;
+      if (err?.response?.status !== 401) throw err;
+      // A 401 here only means the access token is expired/invalid — a valid
+      // refresh token may still exist. The response interceptor skips /me, so
+      // attempt the silent refresh (deduped with in-flight refreshes) and
+      // retry once. If the refresh also fails, the session is truly over.
+      return refreshToken()
+        .then(() => api.get("/api/auth/me").then((res) => res.data as User))
+        .catch(() => null);
     });
 }
 

@@ -65,12 +65,35 @@ describe("auth API functions", () => {
     expect(result).toEqual({ id: 1, role: "admin" });
   });
 
-  it("fetchCurrentUser — returns null on 401", async () => {
-    const error = Object.assign(new Error("Unauthorized"), {
-      response: { status: 401, data: { detail: "Not authenticated" } },
+  it("fetchCurrentUser — 401 with usable refresh token: refreshes and retries /me", async () => {
+    const me401 = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Token expired" } },
     });
-    mockAxiosInstance.get.mockRejectedValueOnce(error);
+    mockAxiosInstance.get.mockRejectedValueOnce(me401);
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 1, role: "admin" } });
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { user: { id: 1, role: "admin" } } });
+
     const result = await apiModule.fetchCurrentUser();
+
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/refresh");
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ id: 1, role: "admin" });
+  });
+
+  it("fetchCurrentUser — 401 with expired refresh token: returns null, no /me retry", async () => {
+    const me401 = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Token expired" } },
+    });
+    const refresh401 = Object.assign(new Error("Unauthorized"), {
+      response: { status: 401, data: { detail: "Refresh token has been revoked" } },
+    });
+    mockAxiosInstance.get.mockRejectedValueOnce(me401);
+    mockAxiosInstance.post.mockRejectedValueOnce(refresh401);
+
+    const result = await apiModule.fetchCurrentUser();
+
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/auth/refresh");
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
     expect(result).toBeNull();
   });
 

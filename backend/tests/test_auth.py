@@ -27,6 +27,27 @@ class TestLogin:
         assert "access_token" in resp.cookies
         assert "refresh_token" in resp.cookies
 
+    def test_login_commits_refresh_token_row(self, test_client: TestClient, db: Session, admin_user):
+        """The refresh-token row created at login must be COMMITTED.
+
+        In production each request gets its own session, so a row that is
+        only flushed (not committed) is rolled back when the request ends —
+        the cookie exists but /refresh answers 401 "revoked", forcing
+        re-login as soon as the access token expires. (The shared test
+        session would not surface this: the row is visible there either way.)
+        """
+        from app.models import RefreshToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        token = test_client.cookies.get("refresh_token")
+        assert token
+
+        row = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+        assert row is not None
+        # After a commit the object leaves the pending-insertion state;
+        # a flush-only row would still be in db.new.
+        assert row not in db.new
+
     def test_login_wrong_password(self, test_client: TestClient, admin_user):
         resp = test_client.post(
             "/api/auth/login",
@@ -511,23 +532,64 @@ class TestRefresh:
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
 
-    def test_refresh_rotates_token_cannot_reuse_old(self, test_client: TestClient, admin_user):
-        """After a successful refresh, the old refresh token is marked used
-        and cannot be presented again."""
+    def test_refresh_rotation_stamps_rotated_at(self, test_client: TestClient, db: Session, admin_user):
+        """Rotation keeps the old row and stamps rotated_at (grace window)."""
+        from app.models import RefreshToken
+
         login_as(test_client, "admin@test.com", "AdminPass123!")
         old_refresh = test_client.cookies.get("refresh_token")
 
-        # First rotation — succeeds
         resp1 = test_client.post("/api/auth/refresh")
         assert resp1.status_code == 200
         new_refresh = test_client.cookies.get("refresh_token")
         assert new_refresh != old_refresh
 
-        # Replay the old token — should fail
+        row = db.query(RefreshToken).filter(RefreshToken.token == old_refresh).first()
+        assert row is not None
+        assert row.rotated_at is not None
+
+    def test_refresh_replay_within_grace_window_succeeds(self, test_client: TestClient, admin_user):
+        """A concurrent client presenting the pre-rotation token right after
+        another client rotated it (browser cookie jars are shared across
+        tabs) is still accepted — the point of the grace window. Both
+        clients end up with valid tokens."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        old_refresh = test_client.cookies.get("refresh_token")
+
+        # First rotation
+        resp1 = test_client.post("/api/auth/refresh")
+        assert resp1.status_code == 200
+
+        # Replay the old token immediately
         test_client.cookies.set("refresh_token", old_refresh)
         resp2 = test_client.post("/api/auth/refresh")
-        assert resp2.status_code == 401
-        assert "revoked" in resp2.json()["detail"].lower()
+        assert resp2.status_code == 200
+        # A fresh token was issued (read from the response, not the client
+        # jar — the jar holds both the old and new entries after the set above)
+        new_token = resp2.cookies.get("refresh_token")
+        assert new_token != old_refresh
+
+    def test_refresh_replay_after_grace_window_fails(self, test_client: TestClient, db: Session, admin_user):
+        """A replay outside the grace window is treated as a stolen token."""
+        from datetime import timedelta
+
+        from app.config import REFRESH_ROTATION_GRACE_SECONDS
+        from app.models import RefreshToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        old_refresh = test_client.cookies.get("refresh_token")
+
+        assert test_client.post("/api/auth/refresh").status_code == 200
+
+        # Backdate the rotation to simulate the window having lapsed
+        row = db.query(RefreshToken).filter(RefreshToken.token == old_refresh).first()
+        row.rotated_at = datetime.now(timezone.utc) - timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS + 1)
+        db.commit()
+
+        test_client.cookies.set("refresh_token", old_refresh)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["detail"].lower()
 
     def test_refresh_after_logout_fails(self, test_client: TestClient, admin_user):
         """A refresh token extracted before logout cannot be used after logout."""
@@ -538,6 +600,28 @@ class TestRefresh:
 
         # Try to refresh with the pre-logout token
         test_client.cookies.set("refresh_token", refresh_before_logout)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["detail"].lower()
+
+    def test_logout_invalidates_pre_rotation_token(self, test_client: TestClient, admin_user):
+        """Logout must also kill the grace window: after rotating and then
+        logging out with the post-rotation token, the pre-rotation token
+        cannot refresh its way back in (it is still inside the grace
+        window, but logout hard-deletes rotated rows)."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        old_refresh = test_client.cookies.get("refresh_token")
+
+        # Rotate — the jar now holds the post-rotation token
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 200
+
+        # Log out with the current token
+        resp = test_client.post("/api/auth/logout")
+        assert resp.status_code == 200
+
+        # Replay the pre-rotation token — must fail despite the grace window
+        test_client.cookies.set("refresh_token", old_refresh)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
         assert "revoked" in resp.json()["detail"].lower()

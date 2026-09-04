@@ -64,6 +64,19 @@ export function getAdminEmail(): string {
 }
 
 /**
+ * Get the JWT signing key (SECRET_KEY) from the project .env file.
+ * Used to forge a valid-but-expired access token in refresh tests.
+ */
+export function getSecretKey(): string {
+  const env = readProjectEnv();
+  const key = env.get("SECRET_KEY");
+  if (!key) {
+    throw new Error("SECRET_KEY not found in .env.");
+  }
+  return key;
+}
+
+/**
  * Check whether DEBUG is enabled in the .env file.
  * E2E tests require DEBUG=true so the backend is in development mode.
  */

@@ -378,8 +378,12 @@ class RefreshToken(Base):
     """Server-side refresh token tracking for security.
 
     Each issued refresh token is recorded here.  On rotation (the /refresh
-    endpoint) the old row is deleted and a new row is inserted.
-    Logout and password-change also delete rows, preventing replay.
+    endpoint) the old row is stamped with ``rotated_at`` instead of deleted,
+    so a concurrent client that still holds the pre-rotation token (the
+    browser cookie jar is shared across tabs) is tolerated for a short grace
+    window after rotation.  Rows outside the window are garbage-collected on
+    the next refresh.  Logout and password-change hard-delete rows, ending
+    the session for good.
     """
 
     __tablename__ = "refresh_tokens"
@@ -392,6 +396,7 @@ class RefreshToken(Base):
     )
     token: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", backref="refresh_tokens")

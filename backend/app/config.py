@@ -14,3 +14,10 @@ MAX_FAMILY_PERSONS = 10
 
 # Maximum active gift-claims per user
 GIFT_CLAIM_CAP = 5
+
+# After a refresh token is rotated, how long (seconds) the pre-rotation token
+# is still accepted. The browser cookie jar is shared across tabs, so two tabs
+# can legitimately present the same refresh token at the same moment; the
+# window lets the slower of the two complete its rotation instead of being
+# logged out. Presentations outside the window are treated as replays (401).
+REFRESH_ROTATION_GRACE_SECONDS = 60

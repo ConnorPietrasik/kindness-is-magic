@@ -8,7 +8,7 @@ import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.config import APP_BASE_URL
+from app.config import APP_BASE_URL, REFRESH_ROTATION_GRACE_SECONDS
 
 from app.auth import (
     INVITE_EXPIRY_HOURS,
@@ -73,6 +73,11 @@ def _issue_session(response: Response, user: User, db: Session) -> None:
 
     Used by every endpoint that logs a user in (login, refresh rotation,
     and the self-registration flows).
+
+    The refresh-token row is only flushed — the caller MUST ``db.commit()``
+    afterwards, or the row is rolled back at the end of the request and
+    /refresh answers 401 "revoked" (the cookie exists but the server has
+    no record of the token).
     """
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
@@ -170,6 +175,7 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
     _assert_referrer_login_allowed(user, db)
 
     _issue_session(response, user, db)
+    db.commit()
 
     logger.info("User logged in: %s (role=%s)", user.email, user.role)
 
@@ -191,14 +197,19 @@ def logout(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
-    """Clear auth cookies and delete the server-side refresh token."""
-    # Delete the refresh token so it cannot be replayed
-    if refresh_token_cookie:
-        db.query(RefreshToken).filter(
-            RefreshToken.user_id == _user.id,
-            RefreshToken.token == refresh_token_cookie,
-        ).delete(synchronize_session="fetch")
-        db.commit()
+    """Clear auth cookies and delete the server-side refresh tokens.
+
+    Drops the presented token plus this user's rotated (grace-window) rows,
+    so a pre-rotation token cannot refresh its way back in after logout.
+    """
+    # Delete the presented token and all rotated rows so nothing can be replayed.
+    # (``token == None`` renders as ``IS NULL`` and never matches — the token
+    # column is not nullable — so a missing cookie still clears rotated rows.)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == _user.id,
+        (RefreshToken.token == refresh_token_cookie) | RefreshToken.rotated_at.isnot(None),
+    ).delete(synchronize_session="fetch")
+    db.commit()
 
     clear_auth_cookies(response)
     logger.info("User logged out: %s", _user.email)
@@ -220,8 +231,11 @@ def refresh(
 ):
     """Rotate refresh token and issue a new access token.
 
-    The old refresh token must exist in the DB (logout, password change,
-    or previous rotation deletes it).
+    The old refresh token must exist in the DB (logout and password change
+    delete it outright). Rotation stamps the row with ``rotated_at`` rather
+    than deleting it, so a concurrent client that still holds the
+    pre-rotation token (cookie jars are shared across tabs) is accepted
+    within REFRESH_ROTATION_GRACE_SECONDS of the rotation.
     """
     if not refresh_token_cookie:
         raise HTTPException(status_code=401, detail="No refresh token")
@@ -238,7 +252,9 @@ def refresh(
     # Rejected referrers cannot refresh tokens
     _assert_referrer_login_allowed(user, db)
 
-    # Validate the token exists on the server and delete it (rotation)
+    # Validate the token exists on the server. Rotation stamps rotated_at
+    # instead of deleting the row so a concurrent client presenting the
+    # same (pre-rotation) token within the grace window still succeeds.
     stored = (
         db.query(RefreshToken)
         .filter(
@@ -250,7 +266,22 @@ def refresh(
     if not stored:
         raise HTTPException(status_code=401, detail="Refresh token has been revoked")
 
-    db.delete(stored)
+    now = datetime.now(timezone.utc)
+    if stored.rotated_at is None:
+        stored.rotated_at = now
+    elif now - stored.rotated_at > timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS):
+        # A replay well after rotation — treat as a stolen token.
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+    # Within the grace window: a concurrent client replaying the token.
+    # Tolerate it, but do NOT slide rotated_at — otherwise a captured token
+    # could be replayed forever, minting new tokens indefinitely.
+
+    # Housekeeping: drop this user's rotated rows past the grace window
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.rotated_at.isnot(None),
+        RefreshToken.rotated_at < now - timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS),
+    ).delete(synchronize_session=False)
 
     # Issue new tokens and set cookies
     _issue_session(response, user, db)
@@ -562,8 +593,10 @@ def register_referrer(
     invite.redeemed_by_referrer_id = referrer.id
     db.commit()
 
-    # 5. Issue auth cookies (auto-login)
+    # 5. Issue auth cookies (auto-login) — commit so the refresh-token row
+    # persists (see _issue_session)
     _issue_session(response, user, db)
+    db.commit()
 
     logger.info("Referrer self-registered via invite %s: %s", data.code, data.email)
 
@@ -626,8 +659,10 @@ async def register_family(
 
     db.commit()
 
-    # 4. Issue auth cookies (auto-login)
+    # 4. Issue auth cookies (auto-login) — commit so the refresh-token row
+    # persists (see _issue_session)
     _issue_session(response, user, db)
+    db.commit()
 
     logger.info("Family self-registered via invite: %s (referrer_id=%s)", data.email, referrer.id)
 
@@ -701,8 +736,10 @@ def register_donor(
     db.commit()
     db.refresh(user)
 
-    # 3. Issue auth cookies (auto-login)
+    # 3. Issue auth cookies (auto-login) — commit so the refresh-token row
+    # persists (see _issue_session)
     _issue_session(response, user, db)
+    db.commit()
 
     logger.info("Donor self-registered: %s", data.email)
 
