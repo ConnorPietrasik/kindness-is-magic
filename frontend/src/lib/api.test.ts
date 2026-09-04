@@ -341,9 +341,9 @@ describe("admin user API functions", () => {
 
   it("adminListUsers with params — merges filters", async () => {
     mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
-    await apiModule.adminListUsers({ page: 2, page_size: 10, role: "admin", search: "test" });
+    await apiModule.adminListUsers({ page: 2, page_size: 10, roles: "admin", search: "test" });
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users", {
-      params: { page: 2, page_size: 10, role: "admin", search: "test" },
+      params: { page: 2, page_size: 10, roles: "admin", search: "test" },
     });
   });
 
@@ -395,9 +395,9 @@ describe("admin user API functions", () => {
 
   it("adminListDeletedUsers with params", async () => {
     mockAxiosInstance.get.mockResolvedValueOnce({ data: { users: [], total: 0, page: 1, page_size: 20, total_pages: 0 } });
-    await apiModule.adminListDeletedUsers({ page: 2, page_size: 10, role: "admin", search: "test" });
+    await apiModule.adminListDeletedUsers({ page: 2, page_size: 10, roles: "admin", search: "test" });
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/users/deleted", {
-      params: { page: 2, page_size: 10, role: "admin", search: "test" },
+      params: { page: 2, page_size: 10, roles: "admin", search: "test" },
     });
   });
 

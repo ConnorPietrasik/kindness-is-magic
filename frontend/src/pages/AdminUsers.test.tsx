@@ -155,7 +155,7 @@ describe("AdminUsers", () => {
     await user.selectOptions(roleSelect!, "referrer");
 
     await waitFor(() => {
-      expect(api.adminListUsers).toHaveBeenLastCalledWith(expect.objectContaining({ role: "referrer" }));
+      expect(api.adminListUsers).toHaveBeenLastCalledWith(expect.objectContaining({ roles: "referrer" }));
     });
   });
 

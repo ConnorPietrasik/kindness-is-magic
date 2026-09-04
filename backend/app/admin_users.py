@@ -132,19 +132,16 @@ user_admin_router = APIRouter(
 )
 
 
-def _apply_role_filter(query, role: str | None, roles: str | None):
+def _apply_role_filter(query, roles: str | None):
     """Apply role filtering to a user query.
 
-    Supports single ``role`` (backward-compatible) or comma-separated
-    ``roles`` for multi-role filtering (e.g. ``roles=admin,purchaser``).
-    If both are provided, ``roles`` takes precedence.
+    ``roles`` is comma-separated for multi-role filtering
+    (e.g. ``roles=admin,purchaser``).
     """
     if roles is not None:
         role_values = [r.strip() for r in roles.split(",") if r.strip()]
         if role_values:
             query = query.filter(User.role.in_(role_values))
-    elif role is not None:
-        query = query.filter(User.role == role)
     return query
 
 
@@ -160,7 +157,7 @@ def get_users_dropdown(
     (e.g. ``roles=delivery`` or ``roles=admin,purchaser``).
     """
     query = db.query(User).filter(User.deleted_at.is_(None))
-    query = _apply_role_filter(query, None, roles)
+    query = _apply_role_filter(query, roles)
     users = query.order_by(User.id).all()
     return [UserDropdownItem(id=u.id, display_name=u.display_name) for u in users]
 
@@ -169,7 +166,6 @@ def get_users_dropdown(
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    role: str | None = Query(None),
     roles: str | None = Query(None),
     search: str | None = Query(None),
     columns: str | None = Query(None),
@@ -179,11 +175,11 @@ def list_users(
 ) -> UserListResponse:
     """List active (non-deleted) users.
 
-    Supports single ``role`` filter (backward-compatible) or
-    comma-separated ``roles`` for multi-role filtering.
+    ``roles`` is an optional comma-separated role filter
+    (e.g. ``roles=admin,purchaser``).
     """
     query = db.query(User).filter(User.deleted_at.is_(None))
-    query = _apply_role_filter(query, role, roles)
+    query = _apply_role_filter(query, roles)
     if search is not None:
         pattern = f"%{escape_like(search)}%"
         query = query.filter(
@@ -223,16 +219,15 @@ def list_users(
 def list_deleted_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    role: str | None = Query(None),
+    roles: str | None = Query(None),
     search: str | None = Query(None),
     columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> UserListResponse:
-    """List soft-deleted users."""
+    """List soft-deleted users. ``roles`` is an optional comma-separated role filter."""
     query = db.query(User).filter(User.deleted_at.isnot(None))
-    if role is not None:
-        query = query.filter(User.role == role)
+    query = _apply_role_filter(query, roles)
     if search is not None:
         pattern = f"%{escape_like(search)}%"
         query = query.filter(

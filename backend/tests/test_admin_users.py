@@ -73,17 +73,23 @@ class TestAdminListUsers:
         assert body["page_size"] == 2
         assert body["total_pages"] >= 3
 
-    def test_filter_by_role(self, test_client: TestClient, admin_user, referrer_user):
+    def test_filter_by_roles(self, test_client: TestClient, admin_user, referrer_user):
         _admin_login(test_client)
-        resp = test_client.get("/api/admin/users?role=admin")
+        resp = test_client.get("/api/admin/users?roles=admin")
         assert resp.status_code == 200
         body = resp.json()
         assert all(u["role"] == "admin" for u in body["users"])
 
-        resp = test_client.get("/api/admin/users?role=referrer")
+        resp = test_client.get("/api/admin/users?roles=referrer")
         assert resp.status_code == 200
         body = resp.json()
         assert all(u["role"] == "referrer" for u in body["users"])
+
+        # Multi-role filter
+        resp = test_client.get("/api/admin/users?roles=admin,referrer")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert {u["role"] for u in body["users"]} == {"admin", "referrer"}
 
     def test_search_by_email(self, test_client: TestClient, admin_user, referrer_user):
         _admin_login(test_client)
@@ -157,7 +163,7 @@ class TestAdminListUsers:
 
     def test_summary_has_joined_names(self, test_client: TestClient, admin_user, referrer_user, referrer_record):
         _admin_login(test_client)
-        resp = test_client.get("/api/admin/users?role=referrer")
+        resp = test_client.get("/api/admin/users?roles=referrer")
         assert resp.status_code == 200
         body = resp.json()
         referrer_entry = [u for u in body["users"] if u["email"] == "referrer@test.com"][0]

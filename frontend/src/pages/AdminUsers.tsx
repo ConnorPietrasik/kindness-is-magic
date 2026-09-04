@@ -85,7 +85,7 @@ export default function AdminUsers() {
     () => ({
       ...pagination.params,
       columns: apiColumns,
-      role: roleFilter || undefined,
+      roles: roleFilter || undefined,
       search: searchQuery || undefined,
       sort: sortField || undefined,
     }),

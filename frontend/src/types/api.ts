@@ -31,8 +31,7 @@ export interface AdminListParams extends PaginationParams {
 
 /** Query params for the admin users list endpoint. */
 export interface AdminUsersListParams extends AdminListParams {
-  role?: string;
-  roles?: string;
+  roles?: string; // comma-separated role names, e.g. "admin,purchaser"
   search?: string;
 }
 

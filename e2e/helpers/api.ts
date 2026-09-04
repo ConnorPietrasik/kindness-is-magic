@@ -164,17 +164,18 @@ export async function listReferrersViaApi(
 }
 
 /**
- * List users (admin API) with optional role and search filters.
- * `search` matches email or display name (contains); callers that need an
- * exact match should filter the results (e.g. unique-suffixed emails).
+ * List users (admin API) with optional roles and search filters.
+ * `roles` is comma-separated (e.g. "admin,purchaser"); `search` matches email
+ * or display name (contains); callers that need an exact match should filter
+ * the results (e.g. unique-suffixed emails).
  */
 export async function listUsersViaApi(
   request: APIRequestContext,
-  role?: string,
+  roles?: string,
   search?: string,
 ): Promise<{ users: Array<{ id: number; email: string; role: string }>; total: number }> {
   const params = new URLSearchParams();
-  if (role) params.set("role", role);
+  if (roles) params.set("roles", roles);
   if (search) params.set("search", search);
   const resp = await request.get(`/api/admin/users?${params.toString()}`);
   if (!resp.ok()) {
