@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -55,6 +55,7 @@ describe("DonorClaims", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it("renders claims with status and commitment badges", async () => {
@@ -111,5 +112,49 @@ describe("DonorClaims", () => {
     wrap(<DonorClaims />);
 
     expect(await screen.findByText("Unable to Load Sponsorships")).toBeInTheDocument();
+  });
+
+  describe("column order", () => {
+    const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+
+    it("renders columns in the user's custom order from localStorage", async () => {
+      localStorage.setItem("kim:columnOrder:donorClaims", JSON.stringify(["created", "family", "status", "commitment"]));
+      vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveClaim]);
+
+      wrap(<DonorClaims />);
+      await screen.findByText("2-1");
+
+      expect(headerOrder()).toEqual(["Created", "Family", "Status", "Commitment", "Actions"]);
+    });
+
+    it("drag reorders columns, persists to localStorage, and reset restores the default", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveClaim]);
+
+      wrap(<DonorClaims />);
+      await screen.findByText("2-1");
+      expect(headerOrder()).toEqual(["Family", "Status", "Commitment", "Created", "Actions"]);
+
+      const created = screen.getByRole("columnheader", { name: "Created" });
+      const family = screen.getByRole("columnheader", { name: "Family" });
+      family.getBoundingClientRect = () =>
+        ({ left: 0, width: 200, top: 0, bottom: 0, right: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+      // jsdom drag events carry no clientX; the component treats that as
+      // the left edge, so the column drops before the target.
+      fireEvent.dragStart(created, { dataTransfer: {} });
+      fireEvent.dragOver(family, { dataTransfer: {} });
+      fireEvent.drop(family, { dataTransfer: {} });
+
+      expect(headerOrder()).toEqual(["Created", "Family", "Status", "Commitment", "Actions"]);
+      expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaims")!)).toEqual(["created", "family", "status", "commitment"]);
+
+      // Reset-order button appears once the order is customized
+      expect(screen.getByRole("button", { name: "Reset order" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Reset order" }));
+
+      expect(headerOrder()).toEqual(["Family", "Status", "Commitment", "Created", "Actions"]);
+      expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaims")!)).toEqual(["family", "status", "commitment", "created"]);
+    });
   });
 });

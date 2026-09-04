@@ -1,5 +1,3 @@
-e2e 409 error fix
-Admin page custom column ordering
 Delivery slips for the delivery people: where to drive + family name + phone number; Admins should see delivery slips too
 Hide CSV import - maybe make a nested view for rarely-used admin functions? It’s mostly used for demo and testing
 Add deadlines: family info, donor bringing gifts, others? - admin set

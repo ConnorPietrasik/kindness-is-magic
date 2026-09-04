@@ -7,7 +7,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useMemo, useState } from "react";
+import React, { Fragment, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
@@ -16,6 +16,7 @@ import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { DraggableTh } from "../components/DraggableTh";
 import { defaultReferrerForm } from "../components/defaults";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -23,6 +24,7 @@ import { Pagination } from "../components/Pagination";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -82,9 +84,13 @@ export default function AdminReferrers() {
     },
   });
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminReferrers");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminReferrers", visibleColumns);
   const { widthClass } = useTableWidth("adminReferrers");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
@@ -148,6 +154,18 @@ export default function AdminReferrers() {
 
   if (listLoading) return <PageSpinner />;
 
+  // Header cells per column key (the fixed ID column stays first).
+  const referrerHeaders: Record<string, React.ReactNode> = {
+    name: "Name",
+    family_limit: "Family Limit",
+    phone_number: "Phone",
+    family_invite_code: "Invite Code",
+    approval_status: "Approval",
+    approved_by_admin_name: "Approved By",
+    approved_at: "Approved At",
+    created_at: "Created",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -158,6 +176,11 @@ export default function AdminReferrers() {
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
             <Button onClick={() => navigate(route.adminInviteCodes(true))}>Invite Referrers</Button>
+            {!isDeletedView && !isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
           </div>
@@ -218,177 +241,179 @@ export default function AdminReferrers() {
             <Table>
               <TableHead>
                 <Th>ID</Th>
-                {visibleColumns.includes("name") && <Th>Name</Th>}
-                {visibleColumns.includes("family_limit") && <Th>Family Limit</Th>}
-                {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
-                {visibleColumns.includes("family_invite_code") && <Th>Invite Code</Th>}
-                {visibleColumns.includes("approval_status") && <Th>Approval</Th>}
-                {visibleColumns.includes("approved_by_admin_name") && <Th>Approved By</Th>}
-                {visibleColumns.includes("approved_at") && <Th>Approved At</Th>}
-                {visibleColumns.includes("created_at") && <Th>Created</Th>}
+                {displayColumns.map((key) => (
+                  <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                    {referrerHeaders[key]}
+                  </DraggableTh>
+                ))}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
-                {referrers.map((r) => (
-                  <React.Fragment key={r.id}>
-                    <Tr>
-                      <Td>{r.id}</Td>
-                      {visibleColumns.includes("name") && <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>}
-                      {visibleColumns.includes("family_limit") && (
+                {referrers.map((r) => {
+                  const referrerCells: Record<string, React.ReactNode> = {
+                    name: <Td className={r.deleted_at != null ? "text-gray-400" : ""}>{r.name}</Td>,
+                    family_limit: (
+                      <Td>
+                        {r.family_count ?? 0} / {r.family_limit}
+                      </Td>
+                    ),
+                    phone_number: <Td>{r.phone_number || "—"}</Td>,
+                    family_invite_code: <Td className="font-mono text-xs">{r.family_invite_code}</Td>,
+                    approval_status: (
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <ApprovalBadge status={r.approval_status} />
+                          {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
+                            <>
+                              <Button
+                                variant="success"
+                                size="sm"
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setApproveConfirm(r.id)}
+                                disabled={approveMut.isPending || rejectMut.isPending}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setRejectConfirm(r.id)}
+                                disabled={approveMut.isPending || rejectMut.isPending}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </Td>
+                    ),
+                    approved_by_admin_name: <Td>{r.approved_by_admin_name || "—"}</Td>,
+                    approved_at: (
+                      <Td className="text-xs text-gray-500">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : "—"}</Td>
+                    ),
+                    created_at: <Td className="text-xs text-gray-500">{new Date(r.created_at).toLocaleDateString()}</Td>,
+                  };
+                  return (
+                    <React.Fragment key={r.id}>
+                      <Tr>
+                        <Td>{r.id}</Td>
+                        {displayColumns.map((key) => (
+                          <Fragment key={key}>{referrerCells[key]}</Fragment>
+                        ))}
                         <Td>
-                          {r.family_count ?? 0} / {r.family_limit}
-                        </Td>
-                      )}
-                      {visibleColumns.includes("phone_number") && <Td>{r.phone_number || "—"}</Td>}
-                      {visibleColumns.includes("family_invite_code") && <Td className="font-mono text-xs">{r.family_invite_code}</Td>}
-                      {visibleColumns.includes("approval_status") && (
-                        <Td>
-                          <div className="flex items-center gap-2">
-                            <ApprovalBadge status={r.approval_status} />
-                            {!isDeletedView && !r.deleted_at && r.approval_status === "pending" && (
+                          <div className="flex flex-wrap gap-2">
+                            {!isDeletedView && !r.deleted_at && (
+                              <Link
+                                to={route.adminReferrerFamilies(r.id)}
+                                className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                              >
+                                Manage
+                              </Link>
+                            )}
+                            {!isDeletedView && !r.deleted_at && (
                               <>
                                 <Button
-                                  variant="success"
+                                  variant="secondary"
                                   size="sm"
-                                  className="px-2 py-1 text-xs"
-                                  onClick={() => setApproveConfirm(r.id)}
-                                  disabled={approveMut.isPending || rejectMut.isPending}
+                                  className="px-3 py-1.5 text-xs"
+                                  onClick={() => (editingId === r.id ? cancelForm() : openEdit(r.id))}
                                 >
-                                  Approve
+                                  {editingId === r.id ? "Done" : "Edit"}
                                 </Button>
-                                <Button
-                                  variant="danger"
-                                  size="sm"
-                                  className="px-2 py-1 text-xs"
-                                  onClick={() => setRejectConfirm(r.id)}
-                                  disabled={approveMut.isPending || rejectMut.isPending}
-                                >
-                                  Reject
-                                </Button>
+                                {r.approval_status === "pending" && (
+                                  <>
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      className="px-2 py-1 text-xs"
+                                      onClick={() => setApproveConfirm(r.id)}
+                                      disabled={approveMut.isPending || rejectMut.isPending}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      className="px-2 py-1 text-xs"
+                                      onClick={() => setRejectConfirm(r.id)}
+                                      disabled={approveMut.isPending || rejectMut.isPending}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                <ActionsDropdown
+                                  items={[
+                                    ...(!isDeletedView && !r.deleted_at && r.approval_status === "pending"
+                                      ? [
+                                          {
+                                            label: "Approve",
+                                            onClick: () => setApproveConfirm(r.id),
+                                          },
+                                          {
+                                            label: "Reject",
+                                            variant: "danger" as const,
+                                            onClick: () => setRejectConfirm(r.id),
+                                          },
+                                        ]
+                                      : []),
+                                    {
+                                      label: "Reset Sent Emails",
+                                      onClick: () => setResetSentEmailsConfirm(r.id),
+                                    },
+                                    {
+                                      label: "Delete",
+                                      variant: "danger" as const,
+                                      onClick: () => confirmDelete(r.id),
+                                    },
+                                  ]}
+                                  disabled={
+                                    deleteMut?.isPending || approveMut.isPending || rejectMut.isPending || resetSentEmailsMut.isPending
+                                  }
+                                />
                               </>
                             )}
-                          </div>
-                        </Td>
-                      )}
-                      {visibleColumns.includes("approved_by_admin_name") && <Td>{r.approved_by_admin_name || "—"}</Td>}
-                      {visibleColumns.includes("approved_at") && (
-                        <Td className="text-xs text-gray-500">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : "—"}</Td>
-                      )}
-                      {visibleColumns.includes("created_at") && (
-                        <Td className="text-xs text-gray-500">{new Date(r.created_at).toLocaleDateString()}</Td>
-                      )}
-                      <Td>
-                        <div className="flex flex-wrap gap-2">
-                          {!isDeletedView && !r.deleted_at && (
-                            <Link
-                              to={route.adminReferrerFamilies(r.id)}
-                              className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                            >
-                              Manage
-                            </Link>
-                          )}
-                          {!isDeletedView && !r.deleted_at && (
-                            <>
+                            {isDeletedView && (
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 className="px-3 py-1.5 text-xs"
-                                onClick={() => (editingId === r.id ? cancelForm() : openEdit(r.id))}
+                                onClick={() => setRestoreConfirm(r.id)}
+                                disabled={restoreMut?.isPending}
                               >
-                                {editingId === r.id ? "Done" : "Edit"}
+                                Restore
                               </Button>
-                              {r.approval_status === "pending" && (
-                                <>
-                                  <Button
-                                    variant="success"
-                                    size="sm"
-                                    className="px-2 py-1 text-xs"
-                                    onClick={() => setApproveConfirm(r.id)}
-                                    disabled={approveMut.isPending || rejectMut.isPending}
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    className="px-2 py-1 text-xs"
-                                    onClick={() => setRejectConfirm(r.id)}
-                                    disabled={approveMut.isPending || rejectMut.isPending}
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                              <ActionsDropdown
-                                items={[
-                                  ...(!isDeletedView && !r.deleted_at && r.approval_status === "pending"
-                                    ? [
-                                        {
-                                          label: "Approve",
-                                          onClick: () => setApproveConfirm(r.id),
-                                        },
-                                        {
-                                          label: "Reject",
-                                          variant: "danger" as const,
-                                          onClick: () => setRejectConfirm(r.id),
-                                        },
-                                      ]
-                                    : []),
-                                  {
-                                    label: "Reset Sent Emails",
-                                    onClick: () => setResetSentEmailsConfirm(r.id),
-                                  },
-                                  {
-                                    label: "Delete",
-                                    variant: "danger" as const,
-                                    onClick: () => confirmDelete(r.id),
-                                  },
-                                ]}
-                                disabled={
-                                  deleteMut?.isPending || approveMut.isPending || rejectMut.isPending || resetSentEmailsMut.isPending
-                                }
-                              />
-                            </>
-                          )}
-                          {isDeletedView && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => setRestoreConfirm(r.id)}
-                              disabled={restoreMut?.isPending}
-                            >
-                              Restore
-                            </Button>
-                          )}
-                        </div>
-                      </Td>
-                    </Tr>
-                    {editingId === r.id && (
-                      <Tr key={`${r.id}-edit`}>
-                        <Td colSpan={visibleColumns.length + 2} className="!py-3">
-                          <div className="rounded-xl bg-gray-50 p-4">
-                            {detailLoading ? (
-                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                                <Spinner size="sm" />
-                                <span className="text-sm font-medium">Loading…</span>
-                              </div>
-                            ) : detail ? (
-                              <ReferrerForm
-                                title={`Edit Referrer #${r.id}`}
-                                initial={detail}
-                                isEdit={true}
-                                onSubmit={handleUpdate}
-                                onCancel={cancelForm}
-                                loading={!!updateMut?.isPending}
-                              />
-                            ) : null}
+                            )}
                           </div>
                         </Td>
                       </Tr>
-                    )}
-                  </React.Fragment>
-                ))}
+                      {editingId === r.id && (
+                        <Tr key={`${r.id}-edit`}>
+                          <Td colSpan={displayColumns.length + 2} className="!py-3">
+                            <div className="rounded-xl bg-gray-50 p-4">
+                              {detailLoading ? (
+                                <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                  <Spinner size="sm" />
+                                  <span className="text-sm font-medium">Loading…</span>
+                                </div>
+                              ) : detail ? (
+                                <ReferrerForm
+                                  title={`Edit Referrer #${r.id}`}
+                                  initial={detail}
+                                  isEdit={true}
+                                  onSubmit={handleUpdate}
+                                  onCancel={cancelForm}
+                                  loading={!!updateMut?.isPending}
+                                />
+                              ) : null}
+                            </div>
+                          </Td>
+                        </Tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

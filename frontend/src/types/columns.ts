@@ -1,4 +1,4 @@
-/** Column visibility registry for admin list tables. */
+/** Column registry for list tables (drives visibility toggles + column order). */
 
 export interface ColumnDef {
   key: string; // backend field name
@@ -100,7 +100,46 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "sender_name", label: "Sender", visible: true },
     { key: "sent_at", label: "Sent", visible: true },
   ],
+  // Donor tables — order only (no visibility toggle on these pages).
+  donorClaims: [
+    { key: "family", label: "Family", visible: true },
+    { key: "status", label: "Status", visible: true },
+    { key: "commitment", label: "Commitment", visible: true },
+    { key: "created", label: "Created", visible: true },
+  ],
+  donorClaimWishes: [
+    { key: "name", label: "Name", visible: true },
+    { key: "age", label: "Age", visible: true },
+    // The two wish columns move as a unit (adult rows span both with one cell).
+    { key: "practical_wish", label: "Practical Wish", visible: true },
+    { key: "fun_wish", label: "Fun Wish", visible: true },
+  ],
 };
+
+/**
+ * Normalize a stored column order against the column registry.
+ *
+ * Keeps only keys present in the registry (in stored order), drops
+ * duplicates, and appends any missing keys at the end in registry order.
+ * Non-array input (malformed JSON, etc.) yields the default registry order.
+ */
+export function normalizeColumnOrder(stored: unknown, defs: ColumnDef[]): string[] {
+  const valid = new Set(defs.map((d) => d.key));
+  const result: string[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(stored)) {
+    for (const key of stored) {
+      if (typeof key === "string" && valid.has(key) && !seen.has(key)) {
+        result.push(key);
+        seen.add(key);
+      }
+    }
+  }
+  for (const def of defs) {
+    if (!seen.has(def.key)) result.push(def.key);
+  }
+  return result;
+}
 
 /** Column key → backend field names (for aliases that need multiple fields). */
 export const COLUMN_FIELD_MAP: Record<string, string[]> = {

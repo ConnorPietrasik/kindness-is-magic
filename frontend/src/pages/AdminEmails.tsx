@@ -7,13 +7,17 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import type React from "react";
+import { Fragment, useMemo, useState } from "react";
+import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
+import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
-import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { Table, TableBody, TableHead, Td, Tr } from "../components/Table";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
@@ -49,9 +53,13 @@ export default function AdminEmails() {
   const [kindFilter, setKindFilter] = useState<EmailKind | "">("");
   const [statusFilter, setStatusFilter] = useState<EmailStatus | "">("");
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminSentEmails");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminSentEmails", visibleColumns);
   const { widthClass } = useTableWidth("adminSentEmails");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
@@ -81,6 +89,15 @@ export default function AdminEmails() {
 
   if (isLoading) return <PageSpinner />;
 
+  // Header cells per column key.
+  const emailHeaders: Record<string, React.ReactNode> = {
+    recipient_email: "Recipient",
+    kind: "Kind",
+    status: "Status",
+    sender_name: "Sender",
+    sent_at: "Sent",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -89,7 +106,14 @@ export default function AdminEmails() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Sent Emails</h2>
-          <ColumnToggle resourceKey="adminSentEmails" />
+          <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
+            <ColumnToggle resourceKey="adminSentEmails" />
+          </div>
         </div>
 
         {/* Info note */}
@@ -150,24 +174,29 @@ export default function AdminEmails() {
         ) : (
           <Table>
             <TableHead>
-              {visibleColumns.includes("recipient_email") && <Th>Recipient</Th>}
-              {visibleColumns.includes("kind") && <Th>Kind</Th>}
-              {visibleColumns.includes("status") && <Th>Status</Th>}
-              {visibleColumns.includes("sender_name") && <Th>Sender</Th>}
-              {visibleColumns.includes("sent_at") && <Th>Sent</Th>}
+              {displayColumns.map((key) => (
+                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                  {emailHeaders[key]}
+                </DraggableTh>
+              ))}
             </TableHead>
             <TableBody>
-              {emails.map((email) => (
-                <Tr key={email.id}>
-                  {visibleColumns.includes("recipient_email") && <Td className="font-medium text-gray-900">{email.recipient_email}</Td>}
-                  {visibleColumns.includes("kind") && <Td>{KIND_LABELS[email.kind]}</Td>}
-                  {visibleColumns.includes("status") && <Td>{formatEmailStatus(email.status, email.failure_reason)}</Td>}
-                  {visibleColumns.includes("sender_name") && <Td>{email.sender_name ?? <span className="text-gray-400">—</span>}</Td>}
-                  {visibleColumns.includes("sent_at") && (
-                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(email.sent_at)}</Td>
-                  )}
-                </Tr>
-              ))}
+              {emails.map((email) => {
+                const emailCells: Record<string, React.ReactNode> = {
+                  recipient_email: <Td className="font-medium text-gray-900">{email.recipient_email}</Td>,
+                  kind: <Td>{KIND_LABELS[email.kind]}</Td>,
+                  status: <Td>{formatEmailStatus(email.status, email.failure_reason)}</Td>,
+                  sender_name: <Td>{email.sender_name ?? <span className="text-gray-400">—</span>}</Td>,
+                  sent_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(email.sent_at)}</Td>,
+                };
+                return (
+                  <Tr key={email.id}>
+                    {displayColumns.map((key) => (
+                      <Fragment key={key}>{emailCells[key]}</Fragment>
+                    ))}
+                  </Tr>
+                );
+              })}
             </TableBody>
           </Table>
         )}

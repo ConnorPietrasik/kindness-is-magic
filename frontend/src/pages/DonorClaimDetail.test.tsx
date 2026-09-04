@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -89,9 +89,9 @@ const mockClaim: FamilyClaimDetail = {
   ],
 };
 
-function renderClaim(user: typeof mockDonorUser | typeof mockAdminUser) {
+function renderClaim(user: typeof mockDonorUser | typeof mockAdminUser, claim: FamilyClaimDetail = mockClaim) {
   vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(user);
-  vi.spyOn(api, "donorGetClaim").mockResolvedValue(mockClaim);
+  vi.spyOn(api, "donorGetClaim").mockResolvedValue(claim);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={["/donor/claims/1"]}>
@@ -120,6 +120,7 @@ describe("DonorClaimDetail", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it("renders the claim details for the owner", async () => {
@@ -203,6 +204,69 @@ describe("DonorClaimDetail", () => {
 
     await waitFor(() => {
       expect(markSpy).toHaveBeenCalledWith(1, 10, { purchased_where: "Target", purchaser_note: "Gift card inside" });
+    });
+  });
+
+  describe("wish table column order", () => {
+    const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+
+    const dragBefore = (source: HTMLElement, target: HTMLElement) => {
+      target.getBoundingClientRect = () =>
+        ({ left: 0, width: 200, top: 0, bottom: 0, right: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+      // jsdom drag events carry no clientX; the component treats that as
+      // the left edge, so the unit drops before the target.
+      fireEvent.dragStart(source, { dataTransfer: {} });
+      fireEvent.dragOver(target, { dataTransfer: {} });
+      fireEvent.drop(target, { dataTransfer: {} });
+    };
+
+    it("drag reorders the wish table columns and persists the order", async () => {
+      renderClaim(mockDonorUser);
+      await waitFor(() => expect(screen.getByText("Family Members & Wishes")).toBeInTheDocument());
+
+      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+
+      const age = screen.getByRole("columnheader", { name: "Age" });
+      const name = screen.getByRole("columnheader", { name: "Name" });
+      dragBefore(age, name);
+
+      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaimWishes")!)).toEqual(["age", "name", "practical_wish", "fun_wish"]);
+
+      // Reset-order button appears and restores the default layout
+      const resetBtn = await screen.findByRole("button", { name: "Reset order" });
+      const user = userEvent.setup();
+      await user.click(resetBtn);
+      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+    });
+
+    it("the paired wish columns move together as one unit", async () => {
+      renderClaim(mockDonorUser);
+      await waitFor(() => expect(screen.getByText("Family Members & Wishes")).toBeInTheDocument());
+
+      const funWish = screen.getByRole("columnheader", { name: "Fun Wish" });
+      const age = screen.getByRole("columnheader", { name: "Age" });
+      dragBefore(funWish, age);
+
+      // The whole pair lands before Age, still adjacent
+      expect(headerOrder()).toEqual(["Name", "Practical Wish", "Fun Wish", "Age", "Actions"]);
+      expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaimWishes")!)).toEqual(["name", "practical_wish", "fun_wish", "age"]);
+    });
+
+    it("restores a persisted wish table order", async () => {
+      localStorage.setItem("kim:columnOrder:donorClaimWishes", JSON.stringify(["age", "name", "practical_wish", "fun_wish"]));
+      renderClaim(mockDonorUser);
+      await waitFor(() => expect(screen.getByText("Family Members & Wishes")).toBeInTheDocument());
+
+      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish", "Actions"]);
+    });
+
+    it("shows Reset order on an empty claim when the persisted order is customized", async () => {
+      localStorage.setItem("kim:columnOrder:donorClaimWishes", JSON.stringify(["age", "name", "practical_wish", "fun_wish"]));
+      renderClaim(mockDonorUser, { ...mockClaim, people: [] });
+
+      await screen.findByText("No family members added yet.");
+      expect(screen.getByRole("button", { name: "Reset order" })).toBeInTheDocument();
     });
   });
 });

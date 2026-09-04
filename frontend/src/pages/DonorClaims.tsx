@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
+import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { donorListClaims } from "../lib/api";
 import { donorClaims } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -21,6 +24,9 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
 
 export default function DonorClaims() {
   const [statusFilter, setStatusFilter] = useState<string>("");
+
+  // User column order (all registry columns are always visible here).
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("donorClaims");
 
   const {
     data: claims,
@@ -52,6 +58,11 @@ export default function DonorClaims() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">My Sponsorships</h2>
           <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             <select
               aria-label="Sponsorship status filter"
               value={statusFilter}
@@ -83,15 +94,16 @@ export default function DonorClaims() {
         ) : (
           <Table>
             <TableHead>
-              <Th>Family</Th>
-              <Th>Status</Th>
-              <Th>Commitment</Th>
-              <Th>Created</Th>
+              {orderedKeys.map((key) => (
+                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                  {claimHeaders[key]}
+                </DraggableTh>
+              ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
               {claims.map((claim) => (
-                <ClaimRow key={claim.id} claim={claim} />
+                <ClaimRow key={claim.id} claim={claim} displayColumns={orderedKeys} />
               ))}
             </TableBody>
           </Table>
@@ -101,22 +113,41 @@ export default function DonorClaims() {
   );
 }
 
-function ClaimRow({ claim }: { claim: FamilyClaimSummary }) {
-  return (
-    <Tr data-id={claim.id}>
+const claimHeaders: Record<string, React.ReactNode> = {
+  family: "Family",
+  status: "Status",
+  commitment: "Commitment",
+  created: "Created",
+};
+
+function ClaimRow({ claim, displayColumns }: { claim: FamilyClaimSummary; displayColumns: string[] }) {
+  const cells: Record<string, React.ReactNode> = {
+    family: (
       <Td>
         <Link to={route.donorClaimDetail(claim.id)} className="font-medium text-btn-start hover:underline">
           {claim.family.display_id}
         </Link>
         {claim.family.bio && <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">{claim.family.bio}</p>}
       </Td>
+    ),
+    status: (
       <Td>
         <StatusBadge status={getClaimStatus(claim.fulfilled_at)} />
       </Td>
+    ),
+    commitment: (
       <Td>
         <CommitmentBadge type={claim.commitment_type} />
       </Td>
-      <Td className="text-xs text-gray-500">{formatDateTime(claim.created_at)}</Td>
+    ),
+    created: <Td className="text-xs text-gray-500">{formatDateTime(claim.created_at)}</Td>,
+  };
+
+  return (
+    <Tr data-id={claim.id}>
+      {displayColumns.map((key) => (
+        <Fragment key={key}>{cells[key]}</Fragment>
+      ))}
       <Td>
         <Link
           to={route.donorClaimDetail(claim.id)}

@@ -8,7 +8,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
@@ -16,6 +16,7 @@ import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { DraggableTh } from "../components/DraggableTh";
 import { ErrorBox } from "../components/ErrorBox";
 import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
@@ -24,6 +25,7 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -70,9 +72,13 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminUsers");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminUsers", visibleColumns);
   const { widthClass } = useTableWidth("adminUsers");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
@@ -184,6 +190,17 @@ export default function AdminUsers() {
 
   if (listLoading) return <PageSpinner />;
 
+  // Header cells per column key.
+  const userHeaders: Record<string, React.ReactNode> = {
+    email: "Email",
+    display_name: "Display Name",
+    role: "Role",
+    linked_to: "Linked to",
+    created_at: "Created",
+    referrer_id: "Referrer ID",
+    family_id: "Family ID",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -193,6 +210,11 @@ export default function AdminUsers() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Users</h2>
           <div className="flex items-center gap-3">
+            {!isDeletedView && !isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             {!isDeletedView && <ColumnToggle resourceKey="adminUsers" />}
             {!isDeletedView && <Button onClick={openCreate}>+ Add User</Button>}
           </div>
@@ -278,123 +300,124 @@ export default function AdminUsers() {
           ) : (
             <Table>
               <TableHead>
-                {visibleColumns.includes("email") && <Th>Email</Th>}
-                {visibleColumns.includes("display_name") && <Th>Display Name</Th>}
-                {visibleColumns.includes("role") && <Th>Role</Th>}
-                {visibleColumns.includes("linked_to") && <Th>Linked to</Th>}
-                {visibleColumns.includes("created_at") && <Th>Created</Th>}
-                {visibleColumns.includes("referrer_id") && <Th>Referrer ID</Th>}
-                {visibleColumns.includes("family_id") && <Th>Family ID</Th>}
+                {displayColumns.map((key) => (
+                  <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                    {userHeaders[key]}
+                  </DraggableTh>
+                ))}
                 <Th>Actions</Th>
               </TableHead>
               <TableBody>
-                {users.map((u) => (
-                  <React.Fragment key={u.id}>
-                    <Tr>
-                      {visibleColumns.includes("email") && <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>}
-                      {visibleColumns.includes("display_name") && (
-                        <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name}</Td>
-                      )}
-                      {visibleColumns.includes("role") && (
-                        <Td>
-                          <RoleBadge role={u.role} />
-                        </Td>
-                      )}
-                      {visibleColumns.includes("linked_to") && (
-                        <Td>
-                          {u.referrer_id ? (
-                            <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
-                              {u.referrer_name}
-                            </Link>
-                          ) : u.family_id ? (
-                            <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
-                              {u.family_name}
-                            </Link>
-                          ) : (
-                            "—"
-                          )}
-                        </Td>
-                      )}
-                      {visibleColumns.includes("created_at") && (
-                        <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>
-                      )}
-                      {visibleColumns.includes("referrer_id") && <Td className="text-xs text-gray-500">{u.referrer_id ?? "—"}</Td>}
-                      {visibleColumns.includes("family_id") && <Td className="text-xs text-gray-500">{u.family_id ?? "—"}</Td>}
+                {users.map((u) => {
+                  const userCells: Record<string, React.ReactNode> = {
+                    email: <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.email}</Td>,
+                    display_name: <Td className={u.deleted_at != null ? "text-gray-400" : ""}>{u.display_name}</Td>,
+                    role: (
                       <Td>
-                        <div className="flex gap-2">
-                          {!isDeletedView && u.deleted_at == null && (
-                            <>
+                        <RoleBadge role={u.role} />
+                      </Td>
+                    ),
+                    linked_to: (
+                      <Td>
+                        {u.referrer_id ? (
+                          <Link to={route.adminReferrerFamilies(u.referrer_id)} className="text-btn-start hover:underline">
+                            {u.referrer_name}
+                          </Link>
+                        ) : u.family_id ? (
+                          <Link to={route.adminFamilyPeople(u.family_id)} className="text-btn-start hover:underline">
+                            {u.family_name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </Td>
+                    ),
+                    created_at: <Td className="text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</Td>,
+                    referrer_id: <Td className="text-xs text-gray-500">{u.referrer_id ?? "—"}</Td>,
+                    family_id: <Td className="text-xs text-gray-500">{u.family_id ?? "—"}</Td>,
+                  };
+                  return (
+                    <React.Fragment key={u.id}>
+                      <Tr>
+                        {displayColumns.map((key) => (
+                          <Fragment key={key}>{userCells[key]}</Fragment>
+                        ))}
+                        <Td>
+                          <div className="flex gap-2">
+                            {!isDeletedView && u.deleted_at == null && (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="px-3 py-1.5 text-xs"
+                                  onClick={() => (editingId === u.id ? cancelForm() : openEdit(u.id))}
+                                >
+                                  {editingId === u.id ? "Done" : "Edit"}
+                                </Button>
+                                <ActionsDropdown
+                                  items={[
+                                    {
+                                      label: "Reset Pw",
+                                      variant: "secondary" as const,
+                                      onClick: () => {
+                                        setResetPasswordId(u.id);
+                                        setResetForm({ password: "", confirmPassword: "" });
+                                      },
+                                      disabled: !!editingId,
+                                    },
+                                    {
+                                      label: "Delete",
+                                      variant: "danger" as const,
+                                      onClick: () => confirmDelete(u.id),
+                                    },
+                                  ]}
+                                  disabled={deleteMut.isPending}
+                                />
+                              </>
+                            )}
+                            {isDeletedView && (
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 className="px-3 py-1.5 text-xs"
-                                onClick={() => (editingId === u.id ? cancelForm() : openEdit(u.id))}
+                                onClick={() => setRestoreConfirm(u.id)}
+                                disabled={restoreMut.isPending}
                               >
-                                {editingId === u.id ? "Done" : "Edit"}
+                                Restore
                               </Button>
-                              <ActionsDropdown
-                                items={[
-                                  {
-                                    label: "Reset Pw",
-                                    variant: "secondary" as const,
-                                    onClick: () => {
-                                      setResetPasswordId(u.id);
-                                      setResetForm({ password: "", confirmPassword: "" });
-                                    },
-                                    disabled: !!editingId,
-                                  },
-                                  {
-                                    label: "Delete",
-                                    variant: "danger" as const,
-                                    onClick: () => confirmDelete(u.id),
-                                  },
-                                ]}
-                                disabled={deleteMut.isPending}
-                              />
-                            </>
-                          )}
-                          {isDeletedView && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => setRestoreConfirm(u.id)}
-                              disabled={restoreMut.isPending}
-                            >
-                              Restore
-                            </Button>
-                          )}
-                        </div>
-                      </Td>
-                    </Tr>
-                    {editingId === u.id && (
-                      <Tr key={`${u.id}-edit`}>
-                        <Td colSpan={visibleColumns.length + 1} className="!py-3">
-                          <div className="rounded-xl bg-gray-50 p-4">
-                            {detailLoading ? (
-                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                                <Spinner size="sm" />
-                                <span className="text-sm font-medium">Loading…</span>
-                              </div>
-                            ) : detail ? (
-                              <UserForm
-                                title="Edit User"
-                                initial={detail}
-                                isEdit={true}
-                                referrers={referrers}
-                                families={families}
-                                onCreate={handleCreateUser}
-                                onUpdate={handleUpdateUser}
-                                onCancel={cancelForm}
-                                loading={!!updateMut.isPending}
-                              />
-                            ) : null}
+                            )}
                           </div>
                         </Td>
                       </Tr>
-                    )}
-                  </React.Fragment>
-                ))}
+                      {editingId === u.id && (
+                        <Tr key={`${u.id}-edit`}>
+                          <Td colSpan={displayColumns.length + 1} className="!py-3">
+                            <div className="rounded-xl bg-gray-50 p-4">
+                              {detailLoading ? (
+                                <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                  <Spinner size="sm" />
+                                  <span className="text-sm font-medium">Loading…</span>
+                                </div>
+                              ) : detail ? (
+                                <UserForm
+                                  title="Edit User"
+                                  initial={detail}
+                                  isEdit={true}
+                                  referrers={referrers}
+                                  families={families}
+                                  onCreate={handleCreateUser}
+                                  onUpdate={handleUpdateUser}
+                                  onCancel={cancelForm}
+                                  loading={!!updateMut.isPending}
+                                />
+                              ) : null}
+                            </div>
+                          </Td>
+                        </Tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

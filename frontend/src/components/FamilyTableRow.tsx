@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { route } from "../lib/routes";
 import type { FamilyDetail } from "../types";
@@ -10,7 +11,7 @@ import { Td } from "./Table";
 
 export interface FamilyTableRowProps {
   family: FamilyDetail;
-  /** Visible column keys (from useColumnVisibility). */
+  /** Ordered visible column keys — cells render in this array's order. */
   visibleColumns: string[];
   /** Whether the row is shown in the deleted tab. */
   isDeletedView: boolean;
@@ -39,8 +40,8 @@ export interface FamilyTableRowProps {
 /**
  * FamilyTableRow — shared data cells + actions column for admin family tables.
  *
- * Renders the `<Td>` cells for a family row (driven by `visibleColumns`),
- * so every admin family table renders identical columns in a single order.
+ * Renders the `<Td>` cells for a family row in the order of `visibleColumns`,
+ * so every admin family table renders identical columns from a shared cell map.
  * The surrounding `<Tr>` (with the lock-level row highlight from
  * `getLockLevelRowClass`), the header, and any expanded edit row stay with
  * the page/table that owns them.
@@ -63,89 +64,89 @@ export function FamilyTableRow({
   isRestoring,
   isLockActionPending,
 }: FamilyTableRowProps) {
+  // Shared cell map — pages render these in the order they choose.
+  const cells: Record<string, React.ReactNode> = {
+    display_id: (
+      <Td className="whitespace-nowrap text-xs text-gray-400">
+        <DisplayId displayId={f.display_id} familyId={f.id} referrerId={f.referrer_id} />
+      </Td>
+    ),
+    family_name: (
+      <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
+        {f.family_name}
+        {f.deleted_at == null && f.referrer_notes != null && (
+          <span className="ml-1 text-xs" title="Has internal notes">
+            📝
+          </span>
+        )}
+        {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
+          <Link
+            to={route.familyWishList(f.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Wish List"
+            className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
+            title="Wish List"
+          >
+            📄
+          </Link>
+        )}
+      </Td>
+    ),
+    family_wish: <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>,
+    contact_name: <Td>{f.contact_name}</Td>,
+    referrer_id: (
+      <Td>
+        {f.referrer_id != null ? (
+          <Link to={route.adminReferrerFamilies(f.referrer_id)} className="text-sm text-violet-600 transition-colors hover:text-violet-800">
+            {f.referrer_name || referrerMap?.[f.referrer_id] || `ID ${f.referrer_id}`}
+          </Link>
+        ) : (
+          "—"
+        )}
+      </Td>
+    ),
+    delivery: <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>,
+    claim: (
+      <Td>
+        {f.claim_status != null ? (
+          <ClaimBadge
+            status={f.claim_status}
+            commitmentType={f.claim_commitment_type ?? ""}
+            donorName={f.claim_donor_name ?? undefined}
+            claimId={f.claim_id ?? undefined}
+          />
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </Td>
+    ),
+    phone_number: <Td>{f.phone_number || "—"}</Td>,
+    person_count: <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>,
+    verification_status: (
+      <Td>
+        <ApprovalBadge status={f.verification_status} />
+      </Td>
+    ),
+    pickup_window: <Td className="text-xs">{f.pickup_window || "—"}</Td>,
+    wish_lock_level: (
+      <Td>
+        <span className="text-xs capitalize">{f.wish_lock_level}</span>
+      </Td>
+    ),
+    wish_review_requested_at: (
+      <Td className="text-xs text-gray-500">
+        {f.wish_review_requested_at ? new Date(f.wish_review_requested_at).toLocaleDateString() : "—"}
+      </Td>
+    ),
+    wish_rejection_reason: <Td className="max-w-xs text-xs text-gray-500 truncate">{f.wish_rejection_reason || "—"}</Td>,
+  };
+
   return (
     <>
-      {visibleColumns.includes("display_id") && (
-        <Td className="whitespace-nowrap text-xs text-gray-400">
-          <DisplayId displayId={f.display_id} familyId={f.id} referrerId={f.referrer_id} />
-        </Td>
-      )}
-      {visibleColumns.includes("family_name") && (
-        <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
-          {f.family_name}
-          {f.deleted_at == null && f.referrer_notes != null && (
-            <span className="ml-1 text-xs" title="Has internal notes">
-              📝
-            </span>
-          )}
-          {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
-            <Link
-              to={route.familyWishList(f.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Wish List"
-              className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-              title="Wish List"
-            >
-              📄
-            </Link>
-          )}
-        </Td>
-      )}
-      {visibleColumns.includes("family_wish") && <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>}
-      {visibleColumns.includes("contact_name") && <Td>{f.contact_name}</Td>}
-      {visibleColumns.includes("referrer_id") && (
-        <Td>
-          {f.referrer_id != null ? (
-            <Link
-              to={route.adminReferrerFamilies(f.referrer_id)}
-              className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-            >
-              {f.referrer_name || referrerMap?.[f.referrer_id] || `ID ${f.referrer_id}`}
-            </Link>
-          ) : (
-            "—"
-          )}
-        </Td>
-      )}
-      {visibleColumns.includes("delivery") && (
-        <Td>{f.delivery_user_name || (f.delivery_user_id != null ? `ID ${f.delivery_user_id}` : "—")}</Td>
-      )}
-      {visibleColumns.includes("claim") && (
-        <Td>
-          {f.claim_status != null ? (
-            <ClaimBadge
-              status={f.claim_status}
-              commitmentType={f.claim_commitment_type ?? ""}
-              donorName={f.claim_donor_name ?? undefined}
-              claimId={f.claim_id ?? undefined}
-            />
-          ) : (
-            <span className="text-xs text-gray-400">—</span>
-          )}
-        </Td>
-      )}
-      {visibleColumns.includes("phone_number") && <Td>{f.phone_number || "—"}</Td>}
-      {visibleColumns.includes("person_count") && <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>}
-      {visibleColumns.includes("verification_status") && (
-        <Td>
-          <ApprovalBadge status={f.verification_status} />
-        </Td>
-      )}
-      {visibleColumns.includes("pickup_window") && <Td className="text-xs">{f.pickup_window || "—"}</Td>}
-      {visibleColumns.includes("wish_lock_level") && (
-        <Td>
-          <span className="text-xs capitalize">{f.wish_lock_level}</span>
-        </Td>
-      )}
-      {visibleColumns.includes("wish_review_requested_at") && (
-        <Td className="text-xs text-gray-500">
-          {f.wish_review_requested_at ? new Date(f.wish_review_requested_at).toLocaleDateString() : "—"}
-        </Td>
-      )}
-      {visibleColumns.includes("wish_rejection_reason") && (
-        <Td className="max-w-xs text-xs text-gray-500 truncate">{f.wish_rejection_reason || "—"}</Td>
-      )}
+      {visibleColumns.map((key) => (
+        <Fragment key={key}>{cells[key]}</Fragment>
+      ))}
       <Td>
         <div className="flex gap-2">
           {!isDeletedView && f.deleted_at == null && (

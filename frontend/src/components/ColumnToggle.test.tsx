@@ -73,8 +73,21 @@ describe("ColumnToggle", () => {
 
   it("resets to defaults and closes popover on Reset click", async () => {
     const user = userEvent.setup();
-    // Pre-set non-default columns
+    // Pre-set non-default columns and a non-default column order
     localStorage.setItem("kim:columns:adminReferrers", JSON.stringify(["phone_number", "created_at"]));
+    localStorage.setItem(
+      "kim:columnOrder:adminReferrers",
+      JSON.stringify([
+        "created_at",
+        "name",
+        "family_limit",
+        "phone_number",
+        "family_invite_code",
+        "approval_status",
+        "approved_by_admin_name",
+        "approved_at",
+      ])
+    );
 
     render(<ColumnToggle resourceKey="adminReferrers" />);
 
@@ -86,6 +99,16 @@ describe("ColumnToggle", () => {
 
     expect(screen.queryByText("Columns")).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("kim:columns:adminReferrers") ?? "[]")).toEqual(["name", "family_limit"]);
+    expect(JSON.parse(localStorage.getItem("kim:columnOrder:adminReferrers") ?? "[]")).toEqual([
+      "name",
+      "family_limit",
+      "phone_number",
+      "family_invite_code",
+      "approval_status",
+      "approved_by_admin_name",
+      "approved_at",
+      "created_at",
+    ]);
   });
 
   it("dispatches custom event on Apply so other hook instances sync", async () => {

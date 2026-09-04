@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
@@ -14,6 +15,7 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { wishText } from "../components/WishCell";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { type UseColumnOrderResult, useColumnOrder } from "../hooks/useColumnOrder";
 import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
 import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -25,6 +27,9 @@ export default function DonorClaimDetail() {
   const { id } = useParams<{ id: string }>();
   const claimId = id ? parseInt(id, 10) : NaN;
   const { user, isAdmin } = useAuth();
+
+  // User column order for the members & wishes table.
+  const columnOrder = useColumnOrder("donorClaimWishes");
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: donorClaim(claimId),
@@ -100,11 +105,26 @@ export default function DonorClaimDetail() {
         )}
 
         {/* Wish list */}
-        <h3 className="mb-3 text-base font-semibold text-gray-900">Family Members & Wishes</h3>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-base font-semibold text-gray-900">Family Members & Wishes</h3>
+          {/* Shown even on empty claims — the persisted order applies to
+              every claim's wish table, so it can be reset from any of them. */}
+          {!columnOrder.isDefaultOrder && (
+            <Button variant="secondary" className="h-8 px-3 text-xs" onClick={columnOrder.resetOrder}>
+              Reset order
+            </Button>
+          )}
+        </div>
         {data.people.length === 0 ? (
           <Card className="py-8 text-center text-gray-400">No family members added yet.</Card>
         ) : (
-          <WishTable people={data.people} commitmentType={data.commitment_type} canAct={canAct} claimId={claimId} />
+          <WishTable
+            people={data.people}
+            commitmentType={data.commitment_type}
+            canAct={canAct}
+            claimId={claimId}
+            columnOrder={columnOrder}
+          />
         )}
       </main>
     </div>
@@ -115,24 +135,49 @@ export default function DonorClaimDetail() {
 /* Wish Table                                                          */
 /* ------------------------------------------------------------------ */
 
+/** The two wish columns must stay adjacent — adult rows span both with one cell. */
+const WISH_UNIT = ["practical_wish", "fun_wish"];
+
+const wishHeaders: Record<string, React.ReactNode> = {
+  name: "Name",
+  age: "Age",
+  practical_wish: "Practical Wish",
+  fun_wish: "Fun Wish",
+};
+
 function WishTable({
   people,
   commitmentType,
   canAct,
   claimId,
+  columnOrder,
 }: {
   people: { given_name: string; role: PersonRole; age: number; note: string | null; wishes: WishSummary[] }[];
   commitmentType: CommitmentType;
   canAct: boolean;
   claimId: number;
+  columnOrder: UseColumnOrderResult;
 }) {
+  const { orderedKeys, reorder, moveBy } = columnOrder;
+
+  const unitFor = (key: string) => (key === "practical_wish" || key === "fun_wish" ? WISH_UNIT : [key]);
+
+  // Resolve the drop target to the outer edge of its unit so the paired
+  // wish columns always land adjacent.
+  const handleReorder = (dragged: string[], targetKey: string, position: "before" | "after") => {
+    const targetUnit = unitFor(targetKey);
+    if (position === "before") reorder(dragged, targetUnit[0]!, "before");
+    else reorder(dragged, targetUnit[targetUnit.length - 1]!, "after");
+  };
+
   return (
     <Table>
       <TableHead>
-        <Th>Name</Th>
-        <Th>Age</Th>
-        <Th>Practical Wish</Th>
-        <Th>Fun Wish</Th>
+        {orderedKeys.map((key) => (
+          <DraggableTh key={key} unit={unitFor(key)} onReorder={handleReorder} onMoveBy={moveBy}>
+            {wishHeaders[key]}
+          </DraggableTh>
+        ))}
         {hasNotes(people) && <Th>Note</Th>}
         {commitmentType === "gifts" && canAct && <Th>Actions</Th>}
       </TableHead>
@@ -142,22 +187,27 @@ function WishTable({
           const practicalOrAdult = activeWishes.find((w) => w.type === "practical" || w.type === "adult");
           const fun = activeWishes.find((w) => w.type === "fun");
           const isAdult = person.age >= 18;
-          return (
-            <Tr key={idx}>
+          const personCells: Record<string, React.ReactNode> = {
+            name: (
               <Td className="font-medium text-gray-900">
                 {personRoleLabel(person.role)} {person.given_name}
               </Td>
-              <Td>{person.age}</Td>
-              {isAdult ? (
-                <Td colSpan={2} className="max-w-xs">
-                  {practicalOrAdult ? wishText(practicalOrAdult) : "—"}
-                </Td>
-              ) : (
-                <>
-                  <Td className="max-w-xs">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</Td>
-                  <Td className="max-w-xs">{fun ? wishText(fun) : "—"}</Td>
-                </>
-              )}
+            ),
+            age: <Td>{person.age}</Td>,
+            practical_wish: isAdult ? (
+              <Td colSpan={2} className="max-w-xs">
+                {practicalOrAdult ? wishText(practicalOrAdult) : "—"}
+              </Td>
+            ) : (
+              <Td className="max-w-xs">{practicalOrAdult ? wishText(practicalOrAdult) : "—"}</Td>
+            ),
+            fun_wish: isAdult ? null : <Td className="max-w-xs">{fun ? wishText(fun) : "—"}</Td>,
+          };
+          return (
+            <Tr key={idx}>
+              {orderedKeys.map((key) => (
+                <Fragment key={key}>{personCells[key]}</Fragment>
+              ))}
               {hasNotes(people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}
               {commitmentType === "gifts" && canAct && (
                 <Td>

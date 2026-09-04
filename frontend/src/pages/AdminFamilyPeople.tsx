@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useState } from "react";
+import React, { Fragment, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
@@ -14,6 +14,7 @@ import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DisplayId } from "../components/DisplayId";
+import { DraggableTh } from "../components/DraggableTh";
 import { defaultFamilyForm, defaultPersonForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { HeaderBar } from "../components/HeaderBar";
@@ -30,6 +31,7 @@ import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { useReferrersDropdown } from "../hooks/useDropdowns";
@@ -82,9 +84,22 @@ export default function AdminFamilyPeople() {
   const [searchParams] = useSearchParams();
   const cameFromReferrer = searchParams.get("from") === "referrer";
 
-  // Column visibility (shared with adminPeople)
+  // Column visibility + user column order (shared with the main people
+  // page — same column registry, so one order applies to both tables).
+  // This per-family sub-table omits the Family column (context already
+  // implies it), so both render order and keyboard stepping skip it.
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder(
+    "adminPeople",
+    visibleColumns.filter((k) => k !== "family_id")
+  );
   const { widthClass } = useTableWidth("adminPeople");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(
+    () => orderedKeys.filter((k) => visibleColumns.includes(k) && k !== "family_id"),
+    [orderedKeys, visibleColumns]
+  );
 
   // Family detail (needed only when coming from referrer to build back link)
   const { data: familyDetail } = useQuery({
@@ -113,7 +128,14 @@ export default function AdminFamilyPeople() {
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family &amp; People</h2>
-          <ColumnToggle resourceKey="adminPeople" />
+          <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
+            <ColumnToggle resourceKey="adminPeople" />
+          </div>
         </div>
 
         <HierarchicalManage
@@ -154,7 +176,9 @@ export default function AdminFamilyPeople() {
                 rows={rows as PersonDetail[]}
                 callbacks={callbacks}
                 isDeletedView={ctx.isDeletedView}
-                visibleColumns={visibleColumns}
+                displayColumns={displayColumns}
+                onReorder={reorder}
+                onMoveBy={moveBy}
               />
             ),
             title: "People",
@@ -348,18 +372,32 @@ function FamilyCard(
 /* Children table render                                               */
 /* ------------------------------------------------------------------ */
 
+/** Header cells per column key (the paired wish headers render inline, below). */
+const personHeaders: Record<string, React.ReactNode> = {
+  display_id: "ID",
+  given_name: "Name",
+  age: "Age",
+  role: "Role",
+  note: "Note",
+  created_at: "Created",
+};
+
 function PeopleTable({
   rows,
   callbacks,
   isDeletedView,
-  visibleColumns,
+  displayColumns,
+  onReorder,
+  onMoveBy,
 }: {
   rows: PersonDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
-  visibleColumns: string[];
+  displayColumns: string[];
+  onReorder: (dragged: string[], targetKey: string, position: "before" | "after") => void;
+  onMoveBy: (unit: string[], delta: -1 | 1) => void;
 }) {
-  const actionColSpan = visibleColumns.length + 1 + (visibleColumns.includes("wishes") ? 1 : 0);
+  const actionColSpan = displayColumns.length + 1 + (displayColumns.includes("wishes") ? 1 : 0);
   return (
     <Table className="mb-6">
       {rows.length === 0 ? (
@@ -373,94 +411,107 @@ function PeopleTable({
       ) : (
         <>
           <TableHead>
-            {visibleColumns.includes("display_id") && <Th>ID</Th>}
-            {visibleColumns.includes("given_name") && <Th>Name</Th>}
-            {visibleColumns.includes("age") && <Th>Age</Th>}
-            {visibleColumns.includes("wishes") && (
-              <>
-                <Th>Practical Wish</Th>
-                <Th>Fun Wish</Th>
-              </>
+            {displayColumns.map((key) =>
+              key === "wishes" ? (
+                // The two wish headers share one unit so they always move
+                // together (adult rows span both with one colSpan=2 cell).
+                <React.Fragment key={key}>
+                  <DraggableTh unit={["wishes"]} onReorder={onReorder} onMoveBy={onMoveBy}>
+                    Practical Wish
+                  </DraggableTh>
+                  <DraggableTh unit={["wishes"]} onReorder={onReorder} onMoveBy={onMoveBy}>
+                    Fun Wish
+                  </DraggableTh>
+                </React.Fragment>
+              ) : (
+                <DraggableTh key={key} unit={[key]} onReorder={onReorder} onMoveBy={onMoveBy}>
+                  {personHeaders[key]}
+                </DraggableTh>
+              )
             )}
-            {visibleColumns.includes("role") && <Th>Role</Th>}
-            {visibleColumns.includes("note") && <Th>Note</Th>}
-            {visibleColumns.includes("created_at") && <Th>Created</Th>}
             <Th>Actions</Th>
           </TableHead>
           <TableBody>
-            {rows.map((p) => (
-              <React.Fragment key={p.id}>
-                <Tr>
-                  {visibleColumns.includes("display_id") && <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>}
-                  {visibleColumns.includes("given_name") && <Td className="font-medium text-gray-900">{p.given_name}</Td>}
-                  {visibleColumns.includes("age") && <Td>{p.age}</Td>}
-                  {visibleColumns.includes("wishes") &&
-                    (p.age >= 18 ? (
-                      <WishCellAdult wishes={p.wishes} />
-                    ) : (
-                      <>
-                        <WishCellType wishes={p.wishes} type="practical" />
-                        <WishCellType wishes={p.wishes} type="fun" />
-                      </>
+            {rows.map((p) => {
+              // "wishes" is one logical column — adults get a single
+              // colSpan=2 cell, children get one cell per wish type.
+              const personCells: Record<string, React.ReactNode> = {
+                display_id: <Td className="whitespace-nowrap text-xs text-gray-400">{p.display_id}</Td>,
+                given_name: <Td className="font-medium text-gray-900">{p.given_name}</Td>,
+                age: <Td>{p.age}</Td>,
+                wishes:
+                  p.age >= 18 ? (
+                    <WishCellAdult wishes={p.wishes} />
+                  ) : (
+                    <>
+                      <WishCellType wishes={p.wishes} type="practical" />
+                      <WishCellType wishes={p.wishes} type="fun" />
+                    </>
+                  ),
+                role: <Td>{personRoleLabel(p.role)}</Td>,
+                note: <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>,
+                created_at: <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>,
+              };
+              return (
+                <React.Fragment key={p.id}>
+                  <Tr>
+                    {displayColumns.map((key) => (
+                      <Fragment key={key}>{personCells[key]}</Fragment>
                     ))}
-                  {visibleColumns.includes("role") && <Td>{personRoleLabel(p.role)}</Td>}
-                  {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
-                  {visibleColumns.includes("created_at") && (
-                    <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>
-                  )}
-                  <Td>
-                    <div className="flex items-center gap-2">
-                      {!isDeletedView && (
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => (callbacks.isEditing(p.id) ? callbacks.cancelForm?.() : callbacks.onEdit(p.id))}
-                        >
-                          {callbacks.isEditing(p.id) ? "Done" : "Edit"}
-                        </Button>
-                      )}
-                      {isDeletedView ? (
-                        <Button
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => callbacks.onRestore(p.id)}
-                          disabled={callbacks.isRestoring}
-                        >
-                          Restore
-                        </Button>
-                      ) : (
-                        <ActionsDropdown
-                          items={[
-                            {
-                              label: "Delete",
-                              variant: "danger" as const,
-                              onClick: () => callbacks.onDelete(p.id),
-                            },
-                          ]}
-                          disabled={callbacks.isDeleting}
-                        />
-                      )}
-                    </div>
-                  </Td>
-                </Tr>
-                {callbacks.editingId === p.id && (
-                  <Tr key={`${p.id}-edit`}>
-                    <Td colSpan={actionColSpan} className="!py-3">
-                      <div className="rounded-xl bg-gray-50 p-4">
-                        {callbacks.detailLoading ? (
-                          <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                            <Spinner size="sm" />
-                            <span className="text-sm font-medium">Loading…</span>
-                          </div>
-                        ) : callbacks.editFormComponent && callbacks.editFormProps ? (
-                          <callbacks.editFormComponent {...callbacks.editFormProps} />
-                        ) : null}
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        {!isDeletedView && (
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => (callbacks.isEditing(p.id) ? callbacks.cancelForm?.() : callbacks.onEdit(p.id))}
+                          >
+                            {callbacks.isEditing(p.id) ? "Done" : "Edit"}
+                          </Button>
+                        )}
+                        {isDeletedView ? (
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => callbacks.onRestore(p.id)}
+                            disabled={callbacks.isRestoring}
+                          >
+                            Restore
+                          </Button>
+                        ) : (
+                          <ActionsDropdown
+                            items={[
+                              {
+                                label: "Delete",
+                                variant: "danger" as const,
+                                onClick: () => callbacks.onDelete(p.id),
+                              },
+                            ]}
+                            disabled={callbacks.isDeleting}
+                          />
+                        )}
                       </div>
                     </Td>
                   </Tr>
-                )}
-              </React.Fragment>
-            ))}
+                  {callbacks.editingId === p.id && (
+                    <Tr key={`${p.id}-edit`}>
+                      <Td colSpan={actionColSpan} className="!py-3">
+                        <div className="rounded-xl bg-gray-50 p-4">
+                          {callbacks.detailLoading ? (
+                            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                              <Spinner size="sm" />
+                              <span className="text-sm font-medium">Loading…</span>
+                            </div>
+                          ) : callbacks.editFormComponent && callbacks.editFormProps ? (
+                            <callbacks.editFormComponent {...callbacks.editFormProps} />
+                          ) : null}
+                        </div>
+                      </Td>
+                    </Tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </TableBody>
         </>
       )}

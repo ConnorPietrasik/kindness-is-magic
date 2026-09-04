@@ -7,7 +7,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useMemo, useState } from "react";
+import React, { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
@@ -15,6 +15,7 @@ import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
 import { DisplayId } from "../components/DisplayId";
+import { DraggableTh } from "../components/DraggableTh";
 import { defaultPersonForm } from "../components/defaults";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -24,6 +25,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -65,9 +67,13 @@ export default function AdminPeople() {
   const [maxAge, setMaxAge] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminPeople", visibleColumns);
   const { widthClass } = useTableWidth("adminPeople");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
   const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
@@ -203,6 +209,79 @@ export default function AdminPeople() {
 
   const people = listData?.people ?? [];
 
+  // Header cells per column key (filter inputs / sort button stay inline).
+  const peopleHeaders: Record<string, React.ReactNode> = {
+    display_id: "ID",
+    given_name: (
+      <div className="flex flex-col gap-1">
+        <span>Name</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by name"
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    age: (
+      <button
+        type="button"
+        onClick={handleSortToggle}
+        className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
+      >
+        Age
+        <span className="text-[10px]">{sortField === "age" ? "↑" : sortField === "-age" ? "↓" : "⇅"}</span>
+      </button>
+    ),
+    wishes: (
+      <div className="flex flex-col gap-1">
+        <span>Wishes (Practical + Fun)</span>
+        <input
+          type="text"
+          placeholder="Filter wishes…"
+          aria-label="Filter by wishes"
+          value={searchWish}
+          onChange={(e) => setSearchWish(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    family_id: "Family",
+    role: (
+      <div className="flex flex-col gap-1">
+        <span>Role</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by role"
+          value={searchRole}
+          onChange={(e) => setSearchRole(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    note: (
+      <div className="flex flex-col gap-1">
+        <span>Note</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by note"
+          value={searchNote}
+          onChange={(e) => setSearchNote(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    created_at: "Created",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -212,6 +291,11 @@ export default function AdminPeople() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage People</h2>
           <div className="flex items-center gap-3">
+            {!isDeletedView && !isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             {!isDeletedView && <ColumnToggle resourceKey="adminPeople" />}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Person</Button>}
           </div>
@@ -290,199 +374,130 @@ export default function AdminPeople() {
           {/* Table — always rendered so column headers / filters stay visible */}
           <Table>
             <TableHead>
-              {visibleColumns.includes("display_id") && <Th>ID</Th>}
-              {visibleColumns.includes("given_name") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Name</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by name"
-                      value={searchName}
-                      onChange={(e) => setSearchName(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("age") && (
-                <Th>
-                  <button
-                    type="button"
-                    onClick={handleSortToggle}
-                    className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
-                  >
-                    Age
-                    <span className="text-[10px]">{sortField === "age" ? "↑" : sortField === "-age" ? "↓" : "⇅"}</span>
-                  </button>
-                </Th>
-              )}
-              {visibleColumns.includes("wishes") && (
-                <Th colSpan={2}>
-                  <div className="flex flex-col gap-1">
-                    <span>Wishes (Practical + Fun)</span>
-                    <input
-                      type="text"
-                      placeholder="Filter wishes…"
-                      aria-label="Filter by wishes"
-                      value={searchWish}
-                      onChange={(e) => setSearchWish(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("family_id") && <Th>Family</Th>}
-              {visibleColumns.includes("role") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Role</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by role"
-                      value={searchRole}
-                      onChange={(e) => setSearchRole(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("note") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Note</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by note"
-                      value={searchNote}
-                      onChange={(e) => setSearchNote(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("created_at") && <Th>Created</Th>}
+              {displayColumns.map((key) => (
+                <DraggableTh key={key} unit={[key]} colSpan={key === "wishes" ? 2 : undefined} onReorder={reorder} onMoveBy={moveBy}>
+                  {peopleHeaders[key]}
+                </DraggableTh>
+              ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
               {people.length === 0 ? (
                 <Tr>
                   <Td
-                    colSpan={visibleColumns.length + (visibleColumns.includes("wishes") ? 1 : 0) + 1}
+                    colSpan={displayColumns.length + (displayColumns.includes("wishes") ? 1 : 0) + 1}
                     className="!text-center !text-gray-400 py-12"
                   >
                     {isDeletedView ? "No deleted people." : "No people yet."}
                   </Td>
                 </Tr>
               ) : (
-                people.map((p) => (
-                  <React.Fragment key={p.id}>
-                    <Tr data-id={p.id}>
-                      {visibleColumns.includes("display_id") && (
-                        <Td className="whitespace-nowrap text-xs text-gray-400">
-                          <DisplayId displayId={p.display_id} familyId={p.family_id} />
-                        </Td>
-                      )}
-                      {visibleColumns.includes("given_name") && (
-                        <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>
-                      )}
-                      {visibleColumns.includes("age") && <Td>{p.age}</Td>}
-                      {visibleColumns.includes("wishes") &&
-                        (p.age >= 18 ? (
-                          <WishCellAdult wishes={p.wishes} />
-                        ) : (
-                          <>
-                            <WishCellType wishes={p.wishes} type="practical" />
-                            <WishCellType wishes={p.wishes} type="fun" />
-                          </>
-                        ))}
-                      {visibleColumns.includes("family_id") && (
-                        <Td>
-                          <Link
-                            to={route.adminFamilyPeople(p.family_id)}
-                            className="text-sm text-violet-600 transition-colors hover:text-violet-800"
-                          >
-                            {familyMap[p.family_id] || `ID ${p.family_id}`}
-                          </Link>
-                        </Td>
-                      )}
-                      {visibleColumns.includes("role") && <Td>{personRoleLabel(p.role)}</Td>}
-                      {visibleColumns.includes("note") && <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>}
-                      {visibleColumns.includes("created_at") && (
-                        <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>
-                      )}
+                people.map((p) => {
+                  const personCells: Record<string, React.ReactNode> = {
+                    display_id: (
+                      <Td className="whitespace-nowrap text-xs text-gray-400">
+                        <DisplayId displayId={p.display_id} familyId={p.family_id} />
+                      </Td>
+                    ),
+                    given_name: <Td className={p.deleted_at != null ? "text-gray-400" : ""}>{p.given_name}</Td>,
+                    age: <Td>{p.age}</Td>,
+                    // "wishes" is one logical column — adults get a single
+                    // colSpan=2 cell, children get one cell per wish type.
+                    wishes:
+                      p.age >= 18 ? (
+                        <WishCellAdult wishes={p.wishes} />
+                      ) : (
+                        <>
+                          <WishCellType wishes={p.wishes} type="practical" />
+                          <WishCellType wishes={p.wishes} type="fun" />
+                        </>
+                      ),
+                    family_id: (
                       <Td>
-                        <div className="flex gap-2">
-                          {!isDeletedView && p.deleted_at == null && (
-                            <>
+                        <Link
+                          to={route.adminFamilyPeople(p.family_id)}
+                          className="text-sm text-violet-600 transition-colors hover:text-violet-800"
+                        >
+                          {familyMap[p.family_id] || `ID ${p.family_id}`}
+                        </Link>
+                      </Td>
+                    ),
+                    role: <Td>{personRoleLabel(p.role)}</Td>,
+                    note: <Td className="max-w-xs text-xs truncate">{p.note || "—"}</Td>,
+                    created_at: <Td className="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</Td>,
+                  };
+                  return (
+                    <React.Fragment key={p.id}>
+                      <Tr data-id={p.id}>
+                        {displayColumns.map((key) => (
+                          <Fragment key={key}>{personCells[key]}</Fragment>
+                        ))}
+                        <Td>
+                          <div className="flex gap-2">
+                            {!isDeletedView && p.deleted_at == null && (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="px-3 py-1.5 text-xs"
+                                  onClick={() => (editingId === p.id ? cancelForm() : openEdit(p.id))}
+                                >
+                                  {editingId === p.id ? "Done" : "Edit"}
+                                </Button>
+                                <ActionsDropdown
+                                  items={[
+                                    {
+                                      label: "Delete",
+                                      variant: "danger" as const,
+                                      onClick: () => confirmDelete(p.id),
+                                    },
+                                  ]}
+                                  disabled={deleteMut?.isPending}
+                                />
+                              </>
+                            )}
+                            {isDeletedView && (
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 className="px-3 py-1.5 text-xs"
-                                onClick={() => (editingId === p.id ? cancelForm() : openEdit(p.id))}
+                                onClick={() => setRestoreConfirm(p.id)}
+                                disabled={personRestoreMut.isPending || familyRestoreMut.isPending}
                               >
-                                {editingId === p.id ? "Done" : "Edit"}
+                                Restore
                               </Button>
-                              <ActionsDropdown
-                                items={[
-                                  {
-                                    label: "Delete",
-                                    variant: "danger" as const,
-                                    onClick: () => confirmDelete(p.id),
-                                  },
-                                ]}
-                                disabled={deleteMut?.isPending}
-                              />
-                            </>
-                          )}
-                          {isDeletedView && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="px-3 py-1.5 text-xs"
-                              onClick={() => setRestoreConfirm(p.id)}
-                              disabled={personRestoreMut.isPending || familyRestoreMut.isPending}
-                            >
-                              Restore
-                            </Button>
-                          )}
-                        </div>
-                      </Td>
-                    </Tr>
-                    {editingId === p.id && (
-                      <Tr key={`${p.id}-edit`}>
-                        <Td colSpan={visibleColumns.length + (visibleColumns.includes("wishes") ? 2 : 1)} className="!py-3">
-                          <div className="rounded-xl bg-gray-50 p-4">
-                            {detailLoading ? (
-                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                                <Spinner size="sm" />
-                                <span className="text-sm font-medium">Loading…</span>
-                              </div>
-                            ) : detail ? (
-                              <PersonForm
-                                title={`Edit Person #${detail.display_id}`}
-                                initial={detail}
-                                isEdit={true}
-                                familyMap={familyMap}
-                                familyOptionsLoading={familiesLoading}
-                                onSubmit={handleUpdate}
-                                onCancel={cancelForm}
-                                loading={!!updateMut?.isPending}
-                              />
-                            ) : null}
+                            )}
                           </div>
                         </Td>
                       </Tr>
-                    )}
-                  </React.Fragment>
-                ))
+                      {editingId === p.id && (
+                        <Tr key={`${p.id}-edit`}>
+                          <Td colSpan={displayColumns.length + (displayColumns.includes("wishes") ? 2 : 1)} className="!py-3">
+                            <div className="rounded-xl bg-gray-50 p-4">
+                              {detailLoading ? (
+                                <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                  <Spinner size="sm" />
+                                  <span className="text-sm font-medium">Loading…</span>
+                                </div>
+                              ) : detail ? (
+                                <PersonForm
+                                  title={`Edit Person #${detail.display_id}`}
+                                  initial={detail}
+                                  isEdit={true}
+                                  familyMap={familyMap}
+                                  familyOptionsLoading={familiesLoading}
+                                  onSubmit={handleUpdate}
+                                  onCancel={cancelForm}
+                                  loading={!!updateMut?.isPending}
+                                />
+                              ) : null}
+                            </div>
+                          </Td>
+                        </Tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>

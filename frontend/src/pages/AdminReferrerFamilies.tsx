@@ -6,12 +6,13 @@
  * tabs (active/deleted), pagination, restore confirmation, dialogs.
  */
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DraggableTh } from "../components/DraggableTh";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { FamilyTableRow } from "../components/FamilyTableRow";
@@ -25,6 +26,7 @@ import { InfoRow } from "../components/InfoRow";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { useTableWidth } from "../hooks/useTableWidth";
@@ -73,9 +75,14 @@ export default function AdminReferrerFamilies() {
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
 
-  // Column visibility (shared with adminFamilies)
+  // Column visibility + user column order (shared with the main families
+  // page — same column registry, so one order applies to both tables).
   const { visibleColumns, apiColumns } = useColumnVisibility("adminFamilies");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminFamilies", visibleColumns);
   const { widthClass } = useTableWidth("adminFamilies");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -84,7 +91,14 @@ export default function AdminReferrerFamilies() {
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Referrer &amp; Families</h2>
-          <ColumnToggle resourceKey="adminFamilies" />
+          <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
+            <ColumnToggle resourceKey="adminFamilies" />
+          </div>
         </div>
 
         <HierarchicalManage
@@ -116,7 +130,9 @@ export default function AdminReferrerFamilies() {
                 rows={rows as FamilyDetail[]}
                 callbacks={callbacks}
                 isDeletedView={ctx.isDeletedView}
-                visibleColumns={visibleColumns}
+                displayColumns={displayColumns}
+                onReorder={reorder}
+                onMoveBy={moveBy}
                 onResetLock={(id) => resetMut.mutate(id)}
                 onFullyApprove={(id) => fullyApproveMut.mutate(id)}
                 isLockActionPending={resetMut.isPending || fullyApproveMut.isPending}
@@ -223,11 +239,31 @@ function ReferrerCard(props: HierarchicalManageParentRenderProps<ReferrerDetail>
 /* Children table render                                               */
 /* ------------------------------------------------------------------ */
 
+/** Header cells per column key (same set as the main families page, minus its filter inputs). */
+const familyHeaders: Record<string, React.ReactNode> = {
+  display_id: "ID",
+  family_name: "Family Name",
+  family_wish: "Family Wish",
+  contact_name: "Contact",
+  referrer_id: "Referrer",
+  delivery: "Delivery",
+  claim: "Sponsorship",
+  phone_number: "Phone",
+  person_count: "People",
+  verification_status: "Verification",
+  pickup_window: "Pickup Window",
+  wish_lock_level: "Lock Level",
+  wish_review_requested_at: "Review Requested",
+  wish_rejection_reason: "Rejection Reason",
+};
+
 function FamiliesTable({
   rows,
   callbacks,
   isDeletedView,
-  visibleColumns,
+  displayColumns,
+  onReorder,
+  onMoveBy,
   onResetLock,
   onFullyApprove,
   isLockActionPending,
@@ -235,7 +271,9 @@ function FamiliesTable({
   rows: FamilyDetail[];
   callbacks: HierarchicalManageChildCallbacks;
   isDeletedView: boolean;
-  visibleColumns: string[];
+  displayColumns: string[];
+  onReorder: (dragged: string[], targetKey: string, position: "before" | "after") => void;
+  onMoveBy: (unit: string[], delta: -1 | 1) => void;
   onResetLock: (id: number) => void;
   onFullyApprove: (id: number) => void;
   isLockActionPending: boolean;
@@ -252,22 +290,13 @@ function FamiliesTable({
 
   return (
     <Table>
-      {/* Header columns follow the same order as FamilyTableRow (shared "adminFamilies" column registry). */}
+      {/* Columns render in the shared "adminFamilies" user order (same registry as the main families page). */}
       <TableHead>
-        {visibleColumns.includes("display_id") && <Th>ID</Th>}
-        {visibleColumns.includes("family_name") && <Th>Family Name</Th>}
-        {visibleColumns.includes("family_wish") && <Th>Family Wish</Th>}
-        {visibleColumns.includes("contact_name") && <Th>Contact</Th>}
-        {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
-        {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
-        {visibleColumns.includes("claim") && <Th>Sponsorship</Th>}
-        {visibleColumns.includes("phone_number") && <Th>Phone</Th>}
-        {visibleColumns.includes("person_count") && <Th>People</Th>}
-        {visibleColumns.includes("verification_status") && <Th>Verification</Th>}
-        {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
-        {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
-        {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
-        {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
+        {displayColumns.map((key) => (
+          <DraggableTh key={key} unit={[key]} onReorder={onReorder} onMoveBy={onMoveBy}>
+            {familyHeaders[key]}
+          </DraggableTh>
+        ))}
         <Th>Actions</Th>
       </TableHead>
       <TableBody>
@@ -276,7 +305,7 @@ function FamiliesTable({
             <Tr className={getLockLevelRowClass(f)}>
               <FamilyTableRow
                 family={f}
-                visibleColumns={visibleColumns}
+                visibleColumns={displayColumns}
                 isDeletedView={isDeletedView}
                 isEditing={callbacks.isEditing(f.id)}
                 fromReferrer
@@ -292,7 +321,7 @@ function FamiliesTable({
             </Tr>
             {callbacks.editingId === f.id && (
               <Tr key={`${f.id}-edit`}>
-                <Td colSpan={visibleColumns.length + 1} className="!py-3">
+                <Td colSpan={displayColumns.length + 1} className="!py-3">
                   <div className="rounded-xl bg-gray-50 p-4">
                     {callbacks.detailLoading ? (
                       <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

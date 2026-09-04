@@ -9,7 +9,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { ApprovalBadge } from "../components/ApprovalBadge";
@@ -18,6 +18,7 @@ import { Card } from "../components/Card";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { DatePicker } from "../components/DatePicker";
+import { DraggableTh } from "../components/DraggableTh";
 import { FormField } from "../components/FormField";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { MarkPurchasedDialog } from "../components/MarkPurchasedDialog";
@@ -28,6 +29,7 @@ import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishTypeBadge } from "../components/WishTypeBadge";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
@@ -49,6 +51,7 @@ import {
   type WishPurchaseMark,
   type WishType,
 } from "../types";
+import type { ColumnDef } from "../types/columns";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -89,14 +92,19 @@ export default function AdminWishes() {
     pagination.goToPage(1);
   };
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns, defs } = useColumnVisibility("adminWishes");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminWishes", visibleColumns);
   const { widthClass } = useTableWidth("adminWishes");
 
-  // Visible columns in defs order — defs order is the sheet layout, and the
-  // body cells render in it too. (The stored visibleColumns array can hold a
-  // different order, so it must not drive the render order.)
-  const visibleDefs = defs.filter((d) => visibleColumns.includes(d.key));
+  // Visible columns in the user's custom order — that order is the sheet
+  // layout, and the body cells render in it too.
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
+  const defByKey = useMemo(() => {
+    const map: Record<string, ColumnDef> = {};
+    for (const d of defs) map[d.key] = d;
+    return map;
+  }, [defs]);
 
   // Drop filters for columns that are no longer visible, so a hidden column
   // can't keep filtering the list with no input left to clear it.
@@ -264,6 +272,11 @@ export default function AdminWishes() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Wishes</h2>
           <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             <ColumnToggle resourceKey="adminWishes" />
             <Button onClick={() => setBatchAssignOpen(true)} disabled={selectedIds.size === 0 || batchAssignMut.isPending}>
               Batch Assign ({selectedIds.size})
@@ -350,182 +363,179 @@ export default function AdminWishes() {
                   aria-label="Select all wishes on this page"
                 />
               </Th>
-              {visibleDefs.map((d) => (
-                <Th key={d.key}>
-                  {d.key === "display_id" ? (
+              {displayColumns.map((key) => (
+                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                  {key === "display_id" ? (
                     <span>ID</span>
                   ) : (
                     <ColumnHeader
-                      label={d.label}
-                      field={searchFieldFor(d.key)}
-                      searchKind={WISH_COLUMN_SEARCH[d.key]}
+                      label={defByKey[key]?.label ?? key}
+                      field={searchFieldFor(key)}
+                      searchKind={WISH_COLUMN_SEARCH[key]}
                       sortField={sortField}
                       columnSearch={columnSearch}
                       onSort={handleSortClick}
                       onSearchChange={updateColumnSearch}
                     />
                   )}
-                </Th>
+                </DraggableTh>
               ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
-              {wishes.map((w) => (
-                <React.Fragment key={w.id}>
-                  <Tr key={w.id}>
+              {wishes.map((w) => {
+                const wishCells: Record<string, React.ReactNode> = {
+                  display_id: <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>,
+                  person_given_name: (
                     <Td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(w.id)}
-                        onChange={() => toggleSelect(w.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
-                        aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
-                      />
-                    </Td>
-                    {visibleColumns.includes("display_id") && (
-                      <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
-                    )}
-                    {visibleColumns.includes("person_given_name") && (
-                      <Td>
-                        {/* person_given_name is null only for family wishes — person_id is
-                            not in the column-filtered list response */}
-                        {w.person_given_name == null ? (
-                          <span className="font-medium">Family</span>
-                        ) : (
-                          <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                            {w.person_given_name}
-                          </Link>
-                        )}
-                      </Td>
-                    )}
-                    {visibleColumns.includes("person_role") && <Td>{w.person_role ? personRoleLabel(w.person_role) : "—"}</Td>}
-                    {visibleColumns.includes("person_age") && <Td>{w.person_age ?? "—"}</Td>}
-                    {visibleColumns.includes("person_note") && <Td className="max-w-xs text-xs truncate">{w.person_note || "—"}</Td>}
-                    {visibleColumns.includes("family_name") && (
-                      <Td>
+                      {/* person_given_name is null only for family wishes — person_id is
+                          not in the column-filtered list response */}
+                      {w.person_given_name == null ? (
+                        <span className="font-medium">Family</span>
+                      ) : (
                         <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
-                          {w.family_name ?? `Family #${w.family_id}`}
+                          {w.person_given_name}
                         </Link>
-                      </Td>
-                    )}
-                    {visibleColumns.includes("family_contact_name") && <Td>{w.family_contact_name ?? "—"}</Td>}
-                    {visibleColumns.includes("family_phone_number") && (
-                      <Td className="whitespace-nowrap">{w.family_phone_number ?? "—"}</Td>
-                    )}
-                    {visibleColumns.includes("family_address") && <Td className="max-w-xs truncate">{w.family_address ?? "—"}</Td>}
-                    {visibleColumns.includes("family_verification_status") && (
-                      <Td>{w.family_verification_status ? <ApprovalBadge status={w.family_verification_status} /> : "—"}</Td>
-                    )}
-                    {visibleColumns.includes("family_pickup_window") && (
-                      <Td className="whitespace-nowrap text-xs">
-                        {w.family_pickup_window ? new Date(w.family_pickup_window).toLocaleDateString() : "—"}
-                      </Td>
-                    )}
-                    {visibleColumns.includes("family_bio") && <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>}
-                    {visibleColumns.includes("referrer_name") && <Td>{w.referrer_name ?? "—"}</Td>}
-                    {visibleColumns.includes("referrer_phone_number") && (
-                      <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>
-                    )}
-                    {visibleColumns.includes("type") && (
-                      <Td>
-                        <WishTypeBadge type={w.type} />
-                      </Td>
-                    )}
-                    {visibleColumns.includes("description") && <Td className="max-w-xs truncate">{w.description}</Td>}
-                    {visibleColumns.includes("size") && <Td>{w.size ?? "—"}</Td>}
-                    {visibleColumns.includes("color") && <Td>{w.color ?? "—"}</Td>}
-                    {visibleColumns.includes("assigned_to") && <Td>{w.assigned_to_name ?? "—"}</Td>}
-                    {visibleColumns.includes("purchased_at") && (
-                      <Td>
-                        {w.purchased_at ? (
-                          <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
-                            ✓ {formatDateTime(w.purchased_at)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </Td>
-                    )}
-                    {visibleColumns.includes("created_at") && (
-                      <Td className="whitespace-nowrap text-xs text-gray-500">{formatDateTime(w.created_at)}</Td>
-                    )}
-                    {visibleColumns.includes("purchased_where") && (
-                      <Td className="max-w-xs text-xs truncate">{w.purchased_where || "—"}</Td>
-                    )}
-                    {visibleColumns.includes("received_at") && (
-                      <Td className="text-xs text-gray-500">{w.received_at ? new Date(w.received_at).toLocaleDateString() : "—"}</Td>
-                    )}
-                    {visibleColumns.includes("purchaser_note") && <Td className="max-w-xs text-xs truncate">{w.purchaser_note || "—"}</Td>}
-                    <Td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
-                        >
-                          {editingId === w.id ? "Done" : "Edit"}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => setMarkPurchasedId(w.id)}
-                          disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                        >
-                          Mark Purchased
-                        </Button>
-                        <ActionsDropdown
-                          items={[
-                            {
-                              label: "Assign…",
-                              variant: "secondary" as const,
-                              onClick: () => {
-                                setSelectedIds(new Set([w.id]));
-                                setBatchAssignOpen(true);
-                              },
-                              disabled: batchAssignMut.isPending,
-                            },
-                            ...(w.assigned_to_id != null
-                              ? [
-                                  {
-                                    label: "Unassign",
-                                    variant: "secondary" as const,
-                                    onClick: () => openEdit(w.id),
-                                    disabled: !!editingId && editingId !== w.id,
-                                  },
-                                ]
-                              : []),
-                          ]}
-                          disabled={updateMut.isPending}
-                        />
-                      </div>
+                      )}
                     </Td>
-                  </Tr>
-                  {editingId === w.id && (
-                    <Tr key={`${w.id}-edit`}>
-                      <Td colSpan={visibleColumns.length + 2} className="!py-3">
-                        <div className="rounded-xl bg-gray-50 p-4">
-                          {detailLoading ? (
-                            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                              <Spinner size="sm" />
-                              <span className="text-sm font-medium">Loading…</span>
-                            </div>
-                          ) : detail ? (
-                            <WishEditForm
-                              wish={detail}
-                              users={users}
-                              onSave={handleUpdateWish}
-                              onCancel={cancelForm}
-                              loading={updateMut.isPending}
-                            />
-                          ) : null}
+                  ),
+                  person_role: <Td>{w.person_role ? personRoleLabel(w.person_role) : "—"}</Td>,
+                  person_age: <Td>{w.person_age ?? "—"}</Td>,
+                  person_note: <Td className="max-w-xs text-xs truncate">{w.person_note || "—"}</Td>,
+                  family_name: (
+                    <Td>
+                      <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">
+                        {w.family_name ?? `Family #${w.family_id}`}
+                      </Link>
+                    </Td>
+                  ),
+                  family_contact_name: <Td>{w.family_contact_name ?? "—"}</Td>,
+                  family_phone_number: <Td className="whitespace-nowrap">{w.family_phone_number ?? "—"}</Td>,
+                  family_address: <Td className="max-w-xs truncate">{w.family_address ?? "—"}</Td>,
+                  family_verification_status: (
+                    <Td>{w.family_verification_status ? <ApprovalBadge status={w.family_verification_status} /> : "—"}</Td>
+                  ),
+                  family_pickup_window: (
+                    <Td className="whitespace-nowrap text-xs">
+                      {w.family_pickup_window ? new Date(w.family_pickup_window).toLocaleDateString() : "—"}
+                    </Td>
+                  ),
+                  family_bio: <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>,
+                  referrer_name: <Td>{w.referrer_name ?? "—"}</Td>,
+                  referrer_phone_number: <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>,
+                  type: (
+                    <Td>
+                      <WishTypeBadge type={w.type} />
+                    </Td>
+                  ),
+                  description: <Td className="max-w-xs truncate">{w.description}</Td>,
+                  size: <Td>{w.size ?? "—"}</Td>,
+                  color: <Td>{w.color ?? "—"}</Td>,
+                  assigned_to: <Td>{w.assigned_to_name ?? "—"}</Td>,
+                  purchased_at: (
+                    <Td>
+                      {w.purchased_at ? (
+                        <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
+                          ✓ {formatDateTime(w.purchased_at)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </Td>
+                  ),
+                  created_at: <Td className="whitespace-nowrap text-xs text-gray-500">{formatDateTime(w.created_at)}</Td>,
+                  purchased_where: <Td className="max-w-xs text-xs truncate">{w.purchased_where || "—"}</Td>,
+                  received_at: (
+                    <Td className="text-xs text-gray-500">{w.received_at ? new Date(w.received_at).toLocaleDateString() : "—"}</Td>
+                  ),
+                  purchaser_note: <Td className="max-w-xs text-xs truncate">{w.purchaser_note || "—"}</Td>,
+                };
+                return (
+                  <React.Fragment key={w.id}>
+                    <Tr key={w.id}>
+                      <Td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(w.id)}
+                          onChange={() => toggleSelect(w.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
+                          aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
+                        />
+                      </Td>
+                      {displayColumns.map((key) => (
+                        <Fragment key={key}>{wishCells[key]}</Fragment>
+                      ))}
+                      <Td>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
+                          >
+                            {editingId === w.id ? "Done" : "Edit"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => setMarkPurchasedId(w.id)}
+                            disabled={w.purchased_at != null || markPurchasedMut.isPending}
+                          >
+                            Mark Purchased
+                          </Button>
+                          <ActionsDropdown
+                            items={[
+                              {
+                                label: "Assign…",
+                                variant: "secondary" as const,
+                                onClick: () => {
+                                  setSelectedIds(new Set([w.id]));
+                                  setBatchAssignOpen(true);
+                                },
+                                disabled: batchAssignMut.isPending,
+                              },
+                              ...(w.assigned_to_id != null
+                                ? [
+                                    {
+                                      label: "Unassign",
+                                      variant: "secondary" as const,
+                                      onClick: () => openEdit(w.id),
+                                      disabled: !!editingId && editingId !== w.id,
+                                    },
+                                  ]
+                                : []),
+                            ]}
+                            disabled={updateMut.isPending}
+                          />
                         </div>
                       </Td>
                     </Tr>
-                  )}
-                </React.Fragment>
-              ))}
+                    {editingId === w.id && (
+                      <Tr key={`${w.id}-edit`}>
+                        <Td colSpan={displayColumns.length + 2} className="!py-3">
+                          <div className="rounded-xl bg-gray-50 p-4">
+                            {detailLoading ? (
+                              <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                                <Spinner size="sm" />
+                                <span className="text-sm font-medium">Loading…</span>
+                              </div>
+                            ) : detail ? (
+                              <WishEditForm
+                                wish={detail}
+                                users={users}
+                                onSave={handleUpdateWish}
+                                onCancel={cancelForm}
+                                loading={updateMut.isPending}
+                              />
+                            ) : null}
+                          </div>
+                        </Td>
+                      </Tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         )}

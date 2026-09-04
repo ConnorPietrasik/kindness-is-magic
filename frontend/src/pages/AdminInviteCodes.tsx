@@ -6,13 +6,14 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DraggableTh } from "../components/DraggableTh";
 import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
@@ -20,6 +21,7 @@ import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
@@ -51,9 +53,13 @@ export default function AdminInviteCodes() {
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminInvites");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminInvites", visibleColumns);
   const { widthClass } = useTableWidth("adminInvites");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
@@ -91,6 +97,17 @@ export default function AdminInviteCodes() {
 
   if (listLoading) return <PageSpinner />;
 
+  // Header cells per column key.
+  const inviteHeaders: Record<string, React.ReactNode> = {
+    code: "Code",
+    family_limit: "Family Limit",
+    locked_email: "Locked Email",
+    created_by_admin_name: "Created By",
+    created_at: "Created",
+    redeemed: "Redeemed",
+    referrer_approval_status: "Status",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -100,6 +117,11 @@ export default function AdminInviteCodes() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Invite Codes</h2>
           <div className="flex items-center gap-3">
+            {!isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             <ColumnToggle resourceKey="adminInvites" />
             <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide Generator" : "+ Generate New"}</Button>
           </div>
@@ -163,28 +185,22 @@ export default function AdminInviteCodes() {
         ) : (
           <Table>
             <TableHead>
-              {visibleColumns.includes("code") && <Th>Code</Th>}
-              {visibleColumns.includes("family_limit") && <Th>Family Limit</Th>}
-              {visibleColumns.includes("locked_email") && <Th>Locked Email</Th>}
-              {visibleColumns.includes("created_by_admin_name") && <Th>Created By</Th>}
-              {visibleColumns.includes("created_at") && <Th>Created</Th>}
-              {visibleColumns.includes("redeemed") && <Th>Redeemed</Th>}
-              {visibleColumns.includes("referrer_approval_status") && <Th>Status</Th>}
+              {displayColumns.map((key) => (
+                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                  {inviteHeaders[key]}
+                </DraggableTh>
+              ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
-              {invites.map((invite) => (
-                <Tr key={invite.id}>
-                  {visibleColumns.includes("code") && <Td className="font-mono font-semibold">{invite.code}</Td>}
-                  {visibleColumns.includes("family_limit") && <Td>{invite.family_limit}</Td>}
-                  {visibleColumns.includes("locked_email") && <Td>{invite.locked_email ?? <span className="text-gray-400">—</span>}</Td>}
-                  {visibleColumns.includes("created_by_admin_name") && (
-                    <Td>{invite.created_by_admin_name ?? <span className="text-gray-400">—</span>}</Td>
-                  )}
-                  {visibleColumns.includes("created_at") && (
-                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>
-                  )}
-                  {visibleColumns.includes("redeemed") && (
+              {invites.map((invite) => {
+                const inviteCells: Record<string, React.ReactNode> = {
+                  code: <Td className="font-mono font-semibold">{invite.code}</Td>,
+                  family_limit: <Td>{invite.family_limit}</Td>,
+                  locked_email: <Td>{invite.locked_email ?? <span className="text-gray-400">—</span>}</Td>,
+                  created_by_admin_name: <Td>{invite.created_by_admin_name ?? <span className="text-gray-400">—</span>}</Td>,
+                  created_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>,
+                  redeemed: (
                     <Td>
                       {invite.redeemed ? (
                         <span className="text-sm text-gray-600">
@@ -197,8 +213,8 @@ export default function AdminInviteCodes() {
                         <span className="text-sm text-gray-400">No</span>
                       )}
                     </Td>
-                  )}
-                  {visibleColumns.includes("referrer_approval_status") && (
+                  ),
+                  referrer_approval_status: (
                     <Td>
                       {invite.redeemed && invite.referrer_approval_status ? (
                         <ApprovalBadge status={invite.referrer_approval_status} />
@@ -206,22 +222,29 @@ export default function AdminInviteCodes() {
                         <span className="text-xs text-gray-400">—</span>
                       )}
                     </Td>
-                  )}
-                  <Td>
-                    {!invite.redeemed && (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => setRevokeConfirm(invite.id)}
-                        disabled={revokeMut.isPending}
-                      >
-                        Revoke
-                      </Button>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
+                  ),
+                };
+                return (
+                  <Tr key={invite.id}>
+                    {displayColumns.map((key) => (
+                      <Fragment key={key}>{inviteCells[key]}</Fragment>
+                    ))}
+                    <Td>
+                      {!invite.redeemed && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setRevokeConfirm(invite.id)}
+                          disabled={revokeMut.isPending}
+                        >
+                          Revoke
+                        </Button>
+                      )}
+                    </Td>
+                  </Tr>
+                );
+              })}
             </TableBody>
           </Table>
         )}

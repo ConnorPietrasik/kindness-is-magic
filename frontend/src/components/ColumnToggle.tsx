@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useTableWidth } from "../hooks/useTableWidth";
 
@@ -16,6 +17,7 @@ interface ColumnToggleProps {
 
 export function ColumnToggle({ resourceKey }: ColumnToggleProps) {
   const { visibleColumns, setVisibleColumns, defs } = useColumnVisibility(resourceKey);
+  const { resetOrder } = useColumnOrder(resourceKey);
   const { widthMode, setWidthMode, widthModes } = useTableWidth(resourceKey);
   const [open, setOpen] = useState(false);
   const [pendingColumns, setPendingColumns] = useState(visibleColumns);
@@ -49,6 +51,7 @@ export function ColumnToggle({ resourceKey }: ColumnToggleProps) {
   const handleReset = () => {
     const defaults = defs.filter((c) => c.visible).map((c) => c.key);
     setVisibleColumns(defaults);
+    resetOrder();
     setWidthMode("compact");
     setOpen(false);
   };

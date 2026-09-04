@@ -12,6 +12,7 @@ import { Button } from "../components/Button";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
+import { DraggableTh } from "../components/DraggableTh";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { FamilyTableRow } from "../components/FamilyTableRow";
@@ -20,6 +21,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
@@ -74,9 +76,13 @@ export default function AdminFamilies() {
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
-  // Column visibility
+  // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminFamilies");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminFamilies", visibleColumns);
   const { widthClass } = useTableWidth("adminFamilies");
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
   const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
@@ -208,6 +214,85 @@ export default function AdminFamilies() {
 
   if (listLoading) return <PageSpinner />;
 
+  // Header cells per column key (filter inputs / sort button stay inline).
+  const familyHeaders: Record<string, React.ReactNode> = {
+    display_id: "ID",
+    family_name: (
+      <div className="flex flex-col gap-1">
+        <span>Family Name</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by family name"
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    family_wish: (
+      <div className="flex flex-col gap-1">
+        <span>Family Wish</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by family wish"
+          value={searchWish}
+          onChange={(e) => setSearchWish(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    contact_name: (
+      <div className="flex flex-col gap-1">
+        <span>Contact</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by contact name"
+          value={searchContact}
+          onChange={(e) => setSearchContact(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    referrer_id: "Referrer",
+    delivery: "Delivery",
+    claim: "Sponsorship",
+    phone_number: (
+      <div className="flex flex-col gap-1">
+        <span>Phone</span>
+        <input
+          type="text"
+          placeholder="Filter…"
+          aria-label="Filter by phone number"
+          value={searchPhone}
+          onChange={(e) => setSearchPhone(e.target.value)}
+          className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
+          autoComplete="off"
+        />
+      </div>
+    ),
+    person_count: (
+      <button
+        type="button"
+        onClick={handleSortToggle}
+        className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
+      >
+        Person Count
+        <span className="text-[10px]">{sortField === "person_count" ? "↑" : sortField === "-person_count" ? "↓" : "⇅"}</span>
+      </button>
+    ),
+    verification_status: "Verification",
+    pickup_window: "Pickup Window",
+    wish_lock_level: "Lock Level",
+    wish_review_requested_at: "Review Requested",
+    wish_rejection_reason: "Rejection Reason",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" />
@@ -217,6 +302,11 @@ export default function AdminFamilies() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
           <div className="flex items-center gap-3">
+            {!isDeletedView && !isDefaultOrder && (
+              <Button variant="secondary" onClick={resetOrder}>
+                Reset order
+              </Button>
+            )}
             {!isDeletedView && <ColumnToggle resourceKey="adminFamilies" />}
             {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
           </div>
@@ -314,97 +404,17 @@ export default function AdminFamilies() {
           {/* Table — always rendered so column headers / filters stay visible */}
           <Table>
             <TableHead>
-              {visibleColumns.includes("display_id") && <Th>ID</Th>}
-              {visibleColumns.includes("family_name") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Family Name</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by family name"
-                      value={searchName}
-                      onChange={(e) => setSearchName(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("family_wish") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Family Wish</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by family wish"
-                      value={searchWish}
-                      onChange={(e) => setSearchWish(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("contact_name") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Contact</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by contact name"
-                      value={searchContact}
-                      onChange={(e) => setSearchContact(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("referrer_id") && <Th>Referrer</Th>}
-              {visibleColumns.includes("delivery") && <Th>Delivery</Th>}
-              {visibleColumns.includes("claim") && <Th>Sponsorship</Th>}
-              {visibleColumns.includes("phone_number") && (
-                <Th>
-                  <div className="flex flex-col gap-1">
-                    <span>Phone</span>
-                    <input
-                      type="text"
-                      placeholder="Filter…"
-                      aria-label="Filter by phone number"
-                      value={searchPhone}
-                      onChange={(e) => setSearchPhone(e.target.value)}
-                      className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
-                      autoComplete="off"
-                    />
-                  </div>
-                </Th>
-              )}
-              {visibleColumns.includes("person_count") && (
-                <Th>
-                  <button
-                    type="button"
-                    onClick={handleSortToggle}
-                    className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
-                  >
-                    Person Count
-                    <span className="text-[10px]">{sortField === "person_count" ? "↑" : sortField === "-person_count" ? "↓" : "⇅"}</span>
-                  </button>
-                </Th>
-              )}
-              {visibleColumns.includes("verification_status") && <Th>Verification</Th>}
-              {visibleColumns.includes("pickup_window") && <Th>Pickup Window</Th>}
-              {visibleColumns.includes("wish_lock_level") && <Th>Lock Level</Th>}
-              {visibleColumns.includes("wish_review_requested_at") && <Th>Review Requested</Th>}
-              {visibleColumns.includes("wish_rejection_reason") && <Th>Rejection Reason</Th>}
+              {displayColumns.map((key) => (
+                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                  {familyHeaders[key]}
+                </DraggableTh>
+              ))}
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
               {families.length === 0 ? (
                 <Tr>
-                  <Td colSpan={visibleColumns.length + 1} className="!text-center !text-gray-400 py-12">
+                  <Td colSpan={displayColumns.length + 1} className="!text-center !text-gray-400 py-12">
                     {isDeletedView ? "No deleted families." : "No families yet."}
                   </Td>
                 </Tr>
@@ -414,7 +424,7 @@ export default function AdminFamilies() {
                     <Tr data-id={f.id} className={getLockLevelRowClass(f)}>
                       <FamilyTableRow
                         family={f}
-                        visibleColumns={visibleColumns}
+                        visibleColumns={displayColumns}
                         isDeletedView={isDeletedView}
                         isEditing={editingId === f.id}
                         referrerMap={referrerMap}
@@ -432,7 +442,7 @@ export default function AdminFamilies() {
                     </Tr>
                     {editingId === f.id && (
                       <Tr key={`${f.id}-edit`}>
-                        <Td colSpan={visibleColumns.length + 1} className="!py-3">
+                        <Td colSpan={displayColumns.length + 1} className="!py-3">
                           <div className="rounded-xl bg-gray-50 p-4">
                             {detailLoading ? (
                               <div className="flex items-center justify-center gap-3 py-6 text-btn-start">

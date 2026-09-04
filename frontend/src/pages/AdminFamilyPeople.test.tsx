@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -86,6 +86,7 @@ describe("AdminFamilyPeople", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it("renders the family card and the people table", async () => {
@@ -133,6 +134,65 @@ describe("AdminFamilyPeople", () => {
     });
     await waitFor(() => {
       expect(screen.getByText("Family fully approved and visible to donors")).toBeInTheDocument();
+    });
+  });
+
+  describe("people table column order", () => {
+    const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+
+    const dragBefore = (source: HTMLElement, target: HTMLElement) => {
+      target.getBoundingClientRect = () =>
+        ({ left: 0, width: 200, top: 0, bottom: 0, right: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+      // jsdom drag events carry no clientX; the component treats that as
+      // the left edge, so the unit drops before the target.
+      fireEvent.dragStart(source, { dataTransfer: {} });
+      fireEvent.dragOver(target, { dataTransfer: {} });
+      fireEvent.drop(target, { dataTransfer: {} });
+    };
+
+    it("renders the columns in a persisted custom order (shared with the main people page)", async () => {
+      localStorage.setItem("kim:columnOrder:adminPeople", JSON.stringify(["age", "given_name", "wishes", "display_id"]));
+      renderPage();
+      await screen.findByText("Sam");
+
+      // The Family column is omitted on this page even though it's in the order.
+      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish", "ID", "Actions"]);
+    });
+
+    it("drag reorders the paired wish headers as one unit and persists", async () => {
+      renderPage();
+      await screen.findByText("Sam");
+      expect(headerOrder()).toEqual(["ID", "Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+
+      // Drag the second wish header — the whole pair lands before Name.
+      const funWish = screen.getByRole("columnheader", { name: "Fun Wish" });
+      const name = screen.getByRole("columnheader", { name: "Name" });
+      dragBefore(funWish, name);
+
+      expect(headerOrder()).toEqual(["ID", "Practical Wish", "Fun Wish", "Name", "Age", "Actions"]);
+      expect(JSON.parse(localStorage.getItem("kim:columnOrder:adminPeople")!)).toEqual([
+        "display_id",
+        "wishes",
+        "given_name",
+        "age",
+        "family_id",
+        "role",
+        "note",
+        "created_at",
+      ]);
+    });
+
+    it("reset order restores the registry order and hides the button", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("kim:columnOrder:adminPeople", JSON.stringify(["age", "given_name", "wishes", "display_id"]));
+      renderPage();
+      await screen.findByText("Sam");
+
+      const resetBtn = screen.getByRole("button", { name: "Reset order" });
+      await user.click(resetBtn);
+
+      expect(headerOrder()).toEqual(["ID", "Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(screen.queryByRole("button", { name: "Reset order" })).not.toBeInTheDocument();
     });
   });
 });
