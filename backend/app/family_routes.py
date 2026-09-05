@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.display_ids import compute_display_ids
 from app.models import Family, Person, User, WishLockLevel
-from app.permissions import require_family
+from app.permissions import check_wish_edit_lock, require_family
 from app.response_builders import (
     attach_family_wish,
     batch_load_person_wishes,
@@ -33,21 +33,6 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/family", tags=["family"])
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
-_FAMILY_LOCKED_MSG = "Your family profile is locked for editing. Contact your referrer to request changes."
-
-
-def _check_family_edit_lock(fam: Family) -> None:
-    """Raise 403 if the family cannot edit at the current lock level."""
-    if fam.wish_lock_level != WishLockLevel.family:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_FAMILY_LOCKED_MSG,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +56,7 @@ def update_self(
     db: Session = Depends(get_db),
 ) -> FamilySelfServiceDetail:
     fam = get_active_or_404(db, Family, user.family_id, "Family record not found")
-    _check_family_edit_lock(fam)
+    check_wish_edit_lock(user, fam)
 
     partial_update(fam, body, exclude={"family_wish"})
 
@@ -171,7 +156,7 @@ def create_person(
 ) -> PersonDetail:
     family_id = user.family_id
     fam = get_active_or_404(db, Family, family_id, "Family record not found")
-    _check_family_edit_lock(fam)
+    check_wish_edit_lock(user, fam)
     check_family_person_cap(db, family_id)
 
     per = create_person_with_wishes(

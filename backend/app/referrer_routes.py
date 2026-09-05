@@ -25,7 +25,7 @@ from app.models import (
     User,
     WishLockLevel,
 )
-from app.permissions import FamilyOwner, require_family_owner, require_referrer
+from app.permissions import FamilyOwner, check_wish_edit_lock, require_family_owner, require_referrer
 from app.response_builders import (
     attach_family_wish,
     batch_load_family_wishes,
@@ -195,7 +195,7 @@ def update_family(
     # Lock check applies only to standard family edits.
     standard_data = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "referrer_notes"}
     if standard_data:
-        _check_referrer_edit_lock(owner.family)
+        check_wish_edit_lock(owner.user, owner.family)
         partial_update(owner.family, body, exclude={"referrer_notes", "family_wish"})
 
     # The family wish lives on its wish row
@@ -219,7 +219,7 @@ def delete_family(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> Response:
-    _check_referrer_edit_lock(owner.family)
+    check_wish_edit_lock(owner.user, owner.family)
     fam = owner.family
     # Soft-delete the family's people and all its wishes to avoid orphans.
     now = datetime.now(timezone.utc)
@@ -357,17 +357,6 @@ async def reject_family(
 # ---------------------------------------------------------------------------
 # Referrer — Wish Approval Review
 # ---------------------------------------------------------------------------
-
-_REFERRER_LOCKED_MSG = "This family is locked (admin-approved). Contact an admin to make changes."
-
-
-def _check_referrer_edit_lock(fam: Family) -> None:
-    """Raise 403 if the referrer cannot edit at the current lock level."""
-    if fam.wish_lock_level == WishLockLevel.admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_REFERRER_LOCKED_MSG,
-        )
 
 
 @router.get("/review-queue")
@@ -552,7 +541,7 @@ def create_family_person(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> PersonDetail:
-    _check_referrer_edit_lock(owner.family)
+    check_wish_edit_lock(owner.user, owner.family)
     check_family_person_cap(db, fid)
     per = create_person_with_wishes(
         db,

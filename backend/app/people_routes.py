@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Family, Person, User, UserRole, WishLockLevel
-from app.permissions import PersonOwner, require_person_owner
+from app.models import Family, Person
+from app.permissions import PersonOwner, check_wish_edit_lock, require_person_owner
 from app.response_builders import (
     build_person_detail,
     get_active_or_404,
@@ -29,35 +29,6 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/people", tags=["people"])
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
-
-def _check_person_edit_lock(user: User, family: Family) -> None:
-    """Raise 403 if the user's role is blocked by the current wish lock level.
-
-    - Admin: never blocked
-    - Referrer: blocked at ``admin`` lock
-    - Family: blocked at ``referrer`` or ``admin`` lock
-    """
-    if user.role == UserRole.admin:
-        return
-
-    if user.role == UserRole.family:
-        if family.wish_lock_level != WishLockLevel.family:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your family profile is locked for editing. Contact your referrer to request changes.",
-            )
-
-    elif user.role == UserRole.referrer:
-        if family.wish_lock_level == WishLockLevel.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="This family is locked (admin-approved). Contact an admin to make changes.",
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +65,7 @@ def update_person(
     family = per.family if per.family else db.query(Family).get(per.family_id)
     if family is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
-    _check_person_edit_lock(owner.user, family)
+    check_wish_edit_lock(owner.user, family)
 
     # Validate wishes against age if both are provided
     if body.wishes is not None:
@@ -129,7 +100,7 @@ def delete_person(
     family = per.family if per.family else db.query(Family).get(per.family_id)
     if family is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
-    _check_person_edit_lock(owner.user, family)
+    check_wish_edit_lock(owner.user, family)
 
     now = datetime.now(timezone.utc)
     per.deleted_at = now

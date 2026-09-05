@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload, Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import User, UserRole
+from app.models import Family, User, UserRole, WishLockLevel
 
 
 def _get_user_or_raise(
@@ -88,6 +88,41 @@ def require_claim_capable(current_user: User = Depends(_get_user_or_raise)) -> U
             detail="You do not have permission to manage sponsorships",
         )
     return current_user
+
+
+# ---------------------------------------------------------------------------
+# Wish edit lock
+# ---------------------------------------------------------------------------
+
+_FAMILY_LOCKED_MSG = "Your family profile is locked for editing. Contact your referrer to request changes."
+_REFERRER_LOCKED_MSG = "This family is locked (admin-approved). Contact an admin to make changes."
+
+
+def check_wish_edit_lock(user: User, family: Family) -> None:
+    """Raise 403 if the user cannot edit the family's standard fields at the current lock level.
+
+    - Admin: never blocked
+    - Referrer: blocked only at ``admin`` lock
+    - Family: blocked at ``referrer`` or ``admin`` lock
+
+    ``referrer_notes`` bypasses this check by convention — apply it only to
+    standard family/person edits.
+    """
+    if user.role == UserRole.admin:
+        return
+
+    if user.role == UserRole.referrer:
+        if family.wish_lock_level == WishLockLevel.admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=_REFERRER_LOCKED_MSG,
+            )
+    elif user.role == UserRole.family:
+        if family.wish_lock_level != WishLockLevel.family:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=_FAMILY_LOCKED_MSG,
+            )
 
 
 # ---------------------------------------------------------------------------
