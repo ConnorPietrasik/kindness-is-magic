@@ -6,14 +6,13 @@ All endpoints are guarded with ``require_delivery``.
 import logging
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.display_ids import compute_display_ids
-from app.models import Family, FamilyVerificationStatus, Person, User
+from app.models import Family, FamilyVerificationStatus, User
 from app.permissions import require_delivery
-from app.response_builders import build_packing_slips
+from app.response_builders import batch_load_person_counts, build_packing_slips
 from app.schemas import PackingSlipItem
 
 logger = logging.getLogger(__name__)
@@ -46,18 +45,8 @@ def list_families(
         .all()
     )
 
-    # Batch person counts
-    if families:
-        family_ids = [f.id for f in families]
-        counts = (
-            db.query(Person.family_id, func.count(Person.id))
-            .filter(Person.family_id.in_(family_ids), Person.deleted_at.is_(None))
-            .group_by(Person.family_id)
-            .all()
-        )
-        count_map = {fid: cnt for fid, cnt in counts}
-    else:
-        count_map = {}
+    # Batch person counts (scoped to the assigned families)
+    count_map = batch_load_person_counts(db, [f.id for f in families])
 
     # Compute display IDs (flat view)
     pos_map = compute_display_ids(db, "family", families, scope=None)

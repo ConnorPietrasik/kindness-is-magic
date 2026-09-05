@@ -8,7 +8,6 @@ ownership of the target family in a single dependency.
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -29,6 +28,7 @@ from app.permissions import FamilyOwner, check_wish_edit_lock, require_family_ow
 from app.response_builders import (
     attach_family_wish,
     batch_load_family_wishes,
+    batch_load_person_counts,
     batch_load_person_wishes,
     build_family_detail,
     build_family_list_item,
@@ -251,9 +251,8 @@ def list_pending_families(
         .all()
     )
 
-    # Single aggregation query instead of N+1 count() calls
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-    count_map = {fid: cnt for fid, cnt in counts}
+    # Batch person counts (scoped to the pending families)
+    count_map = batch_load_person_counts(db, [f.id for f in families])
 
     # Family wishes are wish rows — batch-load descriptions for the page
     family_wish_map = batch_load_family_wishes(db, [f.id for f in families])
@@ -377,9 +376,8 @@ def list_review_queue(
         .all()
     )
 
-    # Batch person counts
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-    count_map = {fid: cnt for fid, cnt in counts}
+    # Batch person counts (scoped to the queue's families)
+    count_map = batch_load_person_counts(db, [f.id for f in families])
 
     # All families in this queue belong to the current referrer — single lookup
     referrer_map: dict[int, str] = {}

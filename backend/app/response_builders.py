@@ -366,6 +366,23 @@ def restore_family_cascade(db: Session, family_id: int) -> None:
     )
 
 
+def batch_load_person_counts(db: Session, family_ids: list[int]) -> dict[int, int]:
+    """Load the active (non-deleted) person count for a batch of family IDs.
+
+    Returns ``{family_id: count}`` (families with no active persons are
+    omitted; use ``.get(fid, 0)``).
+    """
+    if not family_ids:
+        return {}
+    rows = (
+        db.query(Person.family_id, func.count(Person.id))
+        .filter(Person.family_id.in_(family_ids), Person.deleted_at.is_(None))
+        .group_by(Person.family_id)
+        .all()
+    )
+    return {fid: cnt for fid, cnt in rows}
+
+
 def batch_load_person_wishes(db: Session, person_ids: list[int]) -> dict[int, list[Wish]]:
     """Load all active wishes for a batch of person IDs in a single query.
 
@@ -762,10 +779,7 @@ def load_family_list_context(
 
     family_ids = [f.id for f in families]
 
-    count_map: dict[int, int] = {}
-    if cols.needs("person_count"):
-        counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-        count_map = {fid: cnt for fid, cnt in counts}
+    count_map: dict[int, int] = batch_load_person_counts(db, family_ids) if cols.needs("person_count") else {}
 
     family_wish_map = batch_load_family_wishes(db, family_ids) if cols.needs("family_wish") else {}
 

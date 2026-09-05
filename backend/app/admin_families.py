@@ -16,7 +16,6 @@ from app.display_ids import compute_display_ids
 from app.models import (
     Family,
     FamilyVerificationStatus,
-    Person,
     Referrer,
     User,
     UserRole,
@@ -26,6 +25,7 @@ from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
 from app.response_builders import (
     attach_family_wish,
+    batch_load_person_counts,
     build_family_detail,
     build_family_list_item,
     build_family_review_summary,
@@ -196,9 +196,8 @@ def list_review_queue(
         .all()
     )
 
-    # Batch person counts
-    counts = db.query(Person.family_id, func.count(Person.id)).filter(Person.deleted_at.is_(None)).group_by(Person.family_id).all()
-    count_map = {fid: cnt for fid, cnt in counts}
+    # Batch person counts (scoped to the queue's families)
+    count_map = batch_load_person_counts(db, [f.id for f in families])
 
     # Batch referrer names
     referrer_ids = {f.referrer_id for f in families if f.referrer_id is not None}
