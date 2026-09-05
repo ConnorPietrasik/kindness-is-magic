@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from app.column_filter import ColumnRequest
 from app.config import MAX_FAMILY_PERSONS
-from app.display_ids import compute_display_ids, wish_display_id
+from app.display_ids import compute_display_ids, compute_position_maps, wish_display_id
 from app.models import (
     Family,
     FamilyVerificationStatus,
@@ -31,7 +31,15 @@ from app.models import (
     Wish,
     WishType,
 )
-from app.schemas import _CLEAR, FamilyClaimSummary, FamilyInfo, WishCreate, WishSummary
+from app.schemas import (
+    _CLEAR,
+    FamilyClaimSummary,
+    FamilyInfo,
+    PackingSlipItem,
+    PackingSlipPersonItem,
+    WishCreate,
+    WishSummary,
+)
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -929,6 +937,72 @@ def build_user_detail(
         "referrer_name": referrer_name,
         "family_name": family_name,
     }
+
+
+# ---------------------------------------------------------------------------
+# Packing slips
+# ---------------------------------------------------------------------------
+
+
+def build_packing_slips(db: Session, families: list[Family]) -> list[PackingSlipItem]:
+    """Build packing-slip data for a batch of families.
+
+    One batched pass per data type — no per-family queries:
+
+    * Family display IDs use the unscoped flat format.
+    * Person display IDs are within-family positions; position maps are
+      scope-independent (ROW_NUMBER partitions by family), so a single pass
+      over the whole batch yields the same positions as a per-family call,
+      without a query round-trip per family.
+    * Family wishes come from the families' wish rows.
+
+    Items are returned in the order of *families*; families without active
+    people get an empty ``people`` list.
+    """
+    if not families:
+        return []
+
+    family_ids = [f.id for f in families]
+
+    fam_display_map = compute_display_ids(db, "family", families, scope=None)
+    family_wish_map = batch_load_family_wishes(db, family_ids)
+
+    people = (
+        db.query(Person).filter(Person.family_id.in_(family_ids), Person.deleted_at.is_(None)).order_by(Person.family_id, Person.id).all()
+    )
+    wishes_by_person = batch_load_person_wishes(db, [p.id for p in people])
+
+    people_by_family: dict[int, list[Person]] = {fid: [] for fid in family_ids}
+    for p in people:
+        people_by_family.setdefault(p.family_id, []).append(p)
+
+    person_display_map: dict[int, str] = {}
+    if people:
+        fam_pos_map, _, per_pos_map = compute_position_maps(db, "person", people, scope=None)
+        person_display_map = {p.id: str(per_pos_map[p.id]) for p in people if p.id in per_pos_map and p.family_id in fam_pos_map}
+
+    result: list[PackingSlipItem] = []
+    for fam in families:
+        fam_people = people_by_family.get(fam.id, [])
+        result.append(
+            PackingSlipItem(
+                id=fam.id,
+                display_id=fam_display_map.get(fam.id, "0"),
+                family_wish=family_wish_map.get(fam.id, ""),
+                people=[
+                    PackingSlipPersonItem(
+                        display_id=person_display_map.get(p.id, "0"),
+                        given_name=p.given_name,
+                        role=p.role,
+                        age=p.age,
+                        note=p.note,
+                        wishes=[build_wish_summary(w, person_display_map.get(p.id, "0")) for w in wishes_by_person.get(p.id, [])],
+                    )
+                    for p in fam_people
+                ],
+            )
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------

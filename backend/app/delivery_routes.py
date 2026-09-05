@@ -10,18 +10,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.display_ids import compute_display_ids, compute_position_maps
+from app.display_ids import compute_display_ids
 from app.models import Family, FamilyVerificationStatus, Person, User
 from app.permissions import require_delivery
-from app.response_builders import (
-    batch_load_family_wishes,
-    batch_load_person_wishes,
-    build_wish_summary,
-)
-from app.schemas import (
-    PackingSlipItem,
-    PackingSlipPersonItem,
-)
+from app.response_builders import build_packing_slips
+from app.schemas import PackingSlipItem
 
 logger = logging.getLogger(__name__)
 
@@ -110,62 +103,6 @@ def get_packing_slips(
     if not families:
         return []
 
-    # Compute family display IDs (flat view)
-    fam_display_map = compute_display_ids(db, "family", families, scope=None)
-
-    # Batch-load family wish descriptions (wish rows)
-    family_wish_map = batch_load_family_wishes(db, [f.id for f in families])
-
-    # Collect people across all families
-    family_ids_set = [f.id for f in families]
-    people = (
-        db.query(Person)
-        .filter(
-            Person.family_id.in_(family_ids_set),
-            Person.deleted_at.is_(None),
-        )
-        .order_by(Person.family_id, Person.id)
-        .all()
-    )
-
-    # Batch-load wishes
-    person_ids = [p.id for p in people]
-    wishes_by_person = batch_load_person_wishes(db, person_ids)
-
-    # Group people by family
-    people_by_family: dict[int, list[Person]] = {fid: [] for fid in family_ids_set}
-    for p in people:
-        people_by_family.setdefault(p.family_id, []).append(p)
-
-    # Compute person display IDs (one batched pass over all people — position
-    # maps are scope-independent, so within-family positions are unchanged).
-    person_display_map: dict[int, str] = {}
-    if people:
-        fam_pos_map, _, per_pos_map = compute_position_maps(db, "person", people, scope=None)
-        person_display_map = {p.id: str(per_pos_map[p.id]) for p in people if p.id in per_pos_map and p.family_id in fam_pos_map}
-
-    # Assemble response
-    result: list[PackingSlipItem] = []
-    for fam in families:
-        fam_people = people_by_family.get(fam.id, [])
-        result.append(
-            PackingSlipItem(
-                id=fam.id,
-                display_id=fam_display_map.get(fam.id, "0"),
-                family_wish=family_wish_map.get(fam.id, ""),
-                people=[
-                    PackingSlipPersonItem(
-                        display_id=person_display_map.get(p.id, "0"),
-                        given_name=p.given_name,
-                        role=p.role,
-                        age=p.age,
-                        note=p.note,
-                        wishes=[build_wish_summary(w, person_display_map.get(p.id, "0")) for w in wishes_by_person.get(p.id, [])],
-                    )
-                    for p in fam_people
-                ],
-            )
-        )
-
+    result = build_packing_slips(db, families)
     logger.info("Delivery %s listed packing slips (families=%d)", current_user.email, len(result))
     return result
