@@ -10,30 +10,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
+from app.display_ids import compute_display_ids, wish_display_id
 from app.models import Family, Person, Referrer, User, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
-    column_filtered_page,
     build_wish_detail,
     build_wish_list_item,
-    ColumnRequest,
-    compute_display_ids,
-    escape_like,
     get_active_or_404,
     get_or_404,
-    WISH_DATE_RANGE_FIELDS,
-    WISH_SEARCH_FIELDS,
-    WISH_SEARCH_EXACT_FIELDS,
-    WISH_SORT_FIELDS,
-    ASSIGNED_USER,
-    DIRECT_FAMILY,
-    WISH_REFERRER,
     partial_update,
-    wish_display_id,
-    wish_global_search_terms,
-    wish_grouped_order,
 )
 from app.schemas import (
     _CLEAR,
@@ -44,6 +32,18 @@ from app.schemas import (
     WishListResponse,
     WishListSummary,
     WishPurchaseMark,
+)
+from app.search_sort import (
+    ASSIGNED_USER,
+    DIRECT_FAMILY,
+    WISH_DATE_RANGE_FIELDS,
+    WISH_REFERRER,
+    WISH_SEARCH_EXACT_FIELDS,
+    WISH_SEARCH_FIELDS,
+    WISH_SORT_FIELDS,
+    escape_like,
+    wish_global_search_terms,
+    wish_grouped_order,
 )
 
 logger = logging.getLogger(__name__)
@@ -386,16 +386,16 @@ def batch_mark_purchased(
     for wid in wish_ids:
         wish = wish_map[wid]
         # purchaser_note=None is a no-op — notes are per-item
-        apply_purchase_fields(wish, purchased_at=purchased_at, purchased_where=body.purchased_where, purchaser_note=None)
+        apply_purchase_fields(
+            wish,
+            purchased_at=purchased_at,
+            purchased_where=body.purchased_where,
+            purchaser_note=None,
+            received_at=body.received_at,
+        )
 
         # Assign to the calling admin
         wish.assigned_to_id = admin.id
-
-        # received_at follows partial-update convention (None means no-op)
-        if body.received_at is _CLEAR:
-            wish.received_at = None
-        elif body.received_at is not None:
-            wish.received_at = body.received_at
 
     db.commit()
 
@@ -470,17 +470,11 @@ def mark_purchased(
         purchased_at=body.purchased_at or datetime.now(timezone.utc),
         purchased_where=body.purchased_where,
         purchaser_note=body.purchaser_note,
+        received_at=body.received_at,
     )
 
     # Assign to the calling admin
     wish.assigned_to_id = admin.id
-
-    # received_at follows partial-update convention (None means no-op)
-    if body.received_at is _CLEAR:
-        wish.received_at = None
-    elif body.received_at is not None:
-        wish.received_at = body.received_at
-    # None means no-op
 
     db.commit()
     db.refresh(wish)

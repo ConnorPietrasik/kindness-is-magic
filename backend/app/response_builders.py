@@ -1,21 +1,25 @@
-"""Shared helpers for building response dicts and applying partial updates.
+"""Shared helpers for building API response dicts.
 
-Centralises logic that was duplicated across admin_*_routes, referrer_routes,
-and family_routes.
+Houses the response builders (detail/list items, family info), the
+partial-update machinery, and the domain operations the builders and routes
+share (soft-delete/restore cascades, wish sync/attach, person creation,
+404 lookups). Display-ID computation lives in ``app.display_ids``, column
+filtering in ``app.column_filter``, and sort/search field registries in
+``app.search_sort``.
 """
 
-import math
 from dataclasses import dataclass
-from typing import Type, TypeVar, Literal
+from typing import Type, TypeVar
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, String, case, func, select
-from sqlalchemy.orm import DeclarativeBase, Session, aliased
-from sqlalchemy.orm.util import AliasedClass
+from sqlalchemy import func
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from datetime import datetime, timezone
 
+from app.column_filter import ColumnRequest
 from app.config import MAX_FAMILY_PERSONS
+from app.display_ids import compute_display_ids, wish_display_id
 from app.models import (
     Family,
     FamilyVerificationStatus,
@@ -23,13 +27,11 @@ from app.models import (
     Person,
     PersonRole,
     Referrer,
-    ReferrerInviteToken,
-    SentEmail,
     User,
     Wish,
     WishType,
 )
-from app.schemas import _CLEAR, WishCreate, WishSummary
+from app.schemas import _CLEAR, FamilyClaimSummary, FamilyInfo, WishCreate, WishSummary
 
 T = TypeVar("T", bound=DeclarativeBase)
 
@@ -68,10 +70,10 @@ def _batch_family_aggregates(db: Session, family_ids: list[int]) -> dict[int, tu
     return {fid: (pc, ma, xa) for fid, pc, ma, xa in rows}
 
 
-def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, dict]:
-    """Build family info dicts for a batch of families in a single pass.
+def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, FamilyInfo]:
+    """Build family info for a batch of families in a single pass.
 
-    Returns ``{family_id: {id, display_id, bio, person_count, min_age, max_age}}``.
+    Returns ``{family_id: FamilyInfo}``.
     """
     if not families:
         return {}
@@ -86,302 +88,38 @@ def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, di
     agg_map = _batch_family_aggregates(db, family_ids)
 
     return {
-        fid: {
-            "id": fid,
-            "display_id": display_id_map.get(fid, "0"),
-            "bio": fam_map[fid].bio,
-            "person_count": agg_map.get(fid, (0, None, None))[0],
-            "min_age": agg_map.get(fid, (0, None, None))[1],
-            "max_age": agg_map.get(fid, (0, None, None))[2],
-        }
+        fid: FamilyInfo(
+            id=fid,
+            display_id=display_id_map.get(fid, "0"),
+            bio=fam_map[fid].bio,
+            person_count=agg_map.get(fid, (0, None, None))[0],
+            min_age=agg_map.get(fid, (0, None, None))[1],
+            max_age=agg_map.get(fid, (0, None, None))[2],
+        )
         for fid in family_ids
     }
 
 
-def build_family_info(fam: Family, db: Session) -> dict:
-    """Build the family info dict used in claim/public responses.
+def build_family_info(fam: Family, db: Session) -> FamilyInfo:
+    """Build the family info used in claim/public responses.
 
     For single families. Use ``batch_build_family_info()`` for lists.
     """
     result = batch_build_family_info(db, [fam])
-    return result.get(fam.id, {"id": fam.id, "display_id": "0", "bio": fam.bio, "person_count": 0})
+    return result.get(fam.id, FamilyInfo(id=fam.id, display_id="0", bio=fam.bio, person_count=0))
 
 
-# ---------------------------------------------------------------------------
-# Sorting helper
-# ---------------------------------------------------------------------------
-
-
-def build_sort_clause(
-    sort_param: str | None,
-    field_map: dict[str, ColumnElement],
-    default_clause: ColumnElement,
-) -> ColumnElement:
-    """Parse a ``sort`` query param into a SQLAlchemy order-by clause.
-
-    The param format is ``field`` (ascending) or ``-field`` (descending).
-    The *field_map* dict maps allowed field names to SQLAlchemy column
-    expressions.  If the param is missing, empty, or references an
-    unknown field, *default_clause* is returned unchanged.
-
-    Example::
-
-        clause = build_sort_clause(
-            sort="-created_at",
-            field_map={"name": Referrer.name, "created_at": Referrer.created_at},
-            default_clause=Referrer.id.asc(),
-        )
-    """
-    if not sort_param:
-        return default_clause
-
-    descending = False
-    field = sort_param
-    if field.startswith("-"):
-        descending = True
-        field = field[1:]
-
-    if field not in field_map:
-        return default_clause
-
-    col = field_map[field]
-    return col.desc() if descending else col.asc()
-
-
-def wish_grouped_order(direct_family: AliasedClass) -> list[ColumnElement]:
-    """Grouped default order for wish list endpoints.
-
-    Groups each family's wishes together — owner family's referrer
-    (unassigned families first), owner family, person — with the family
-    wish first in each family block, then wish type in display order
-    (practical, fun, adult) and wish id. The owner family is the person's
-    family or the wish's own family.
-
-    Callers must outer-join Person and the person's Family, plus
-    *direct_family*, an ``aliased(Family)`` on ``Wish.family_id`` for
-    family wishes.
-    """
-    return [
-        func.coalesce(Family.referrer_id, direct_family.referrer_id, 0),
-        func.coalesce(Family.id, direct_family.id),
-        case((Wish.person_id.is_(None), 0), else_=1),
-        Wish.person_id,
-        case((Wish.type == WishType.practical, 0), (Wish.type == WishType.fun, 1), else_=2),
-        Wish.id,
-    ]
-
-
-# ---------------------------------------------------------------------------
-# Search-pattern helper
-# ---------------------------------------------------------------------------
-
-
-def escape_like(value: str) -> str:
-    """Escape LIKE/ILIKE wildcards so user search input matches literally.
-
-    Without escaping, a ``%`` or ``_`` typed by the user acts as pattern
-    syntax (a search for ``50%`` behaves like ``50``).  Pair the result
-    with the ``escape="\\"` kwarg on the ilike/like call::
-
-        pattern = f"%{escape_like(search)}%"
-        query = query.filter(Wish.description.ilike(pattern, escape="\\"))
-    """
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-# ---------------------------------------------------------------------------
-# Sort-field registries (module-level so they aren't rebuilt per request)
-# ---------------------------------------------------------------------------
-
-# Shared joins for the admin wish list query and its sort/search
-# expressions (see admin_wishes.list_wishes): the wish's own family (family
-# wishes), the owner family's referrer, and the assigned user.
-DIRECT_FAMILY = aliased(Family)
-WISH_REFERRER = aliased(Referrer)
-ASSIGNED_USER = aliased(User)
-
-
-def _owner_family_column(attr: str, *, as_text: bool = False) -> ColumnElement:
-    """Coalesce an owner-family column across both family paths.
-
-    The owner family is the person's family or the wish's direct family
-    (exactly one is joined per wish). *as_text* casts the result to text
-    (for enum columns matched as text in search).
-    """
-    col = func.coalesce(getattr(Family, attr), getattr(DIRECT_FAMILY, attr))
-    return col.cast(String) if as_text else col
-
-
-# Reusable correlated subqueries: aggregate stats over active persons per family.
-# Used by sort registries, filter logic, and public family list endpoint.
-FAMILY_PERSON_COUNT = (
-    select(func.count(Person.id)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
-)
-
-FAMILY_MIN_AGE = (
-    select(func.min(Person.age)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
-)
-
-FAMILY_MAX_AGE = (
-    select(func.max(Person.age)).where(Person.family_id == Family.id, Person.deleted_at.is_(None)).correlate(Family).scalar_subquery()
-)
-
-# The family wish is now a Wish row (type=family, family_id set, no person).
-# At most one active family wish exists per family (partial unique index), so
-# this scalar subquery is unambiguous.
-FAMILY_WISH = (
-    select(Wish.description)
-    .where(Wish.family_id == Family.id, Wish.type == WishType.family, Wish.deleted_at.is_(None))
-    .correlate(Family)
-    .scalar_subquery()
-)
-
-FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
-    "family_name": Family.family_name,
-    "id": Family.id,
-    "created_at": Family.created_at,
-    "verification_status": Family.verification_status,
-    "wish_lock_level": Family.wish_lock_level,
-    "referrer_id": func.coalesce(Family.referrer_id, 0),
-    "person_count": FAMILY_PERSON_COUNT,
-}
-
-INVITE_SORT_FIELDS: dict[str, ColumnElement] = {
-    "code": ReferrerInviteToken.code,
-    "id": ReferrerInviteToken.id,
-    "created_at": ReferrerInviteToken.created_at,
-    "expires_at": ReferrerInviteToken.expires_at,
-}
-
-PERSON_SORT_FIELDS: dict[str, ColumnElement] = {
-    "given_name": Person.given_name,
-    "age": Person.age,
-    "id": Person.id,
-    "created_at": Person.created_at,
-    "family_id": Person.family_id,
-}
-
-REFERRER_SORT_FIELDS: dict[str, ColumnElement] = {
-    "name": Referrer.name,
-    "id": Referrer.id,
-    "created_at": Referrer.created_at,
-    "approved_at": Referrer.approved_at,
-    "approval_status": Referrer.approval_status,
-}
-
-USER_SORT_FIELDS: dict[str, ColumnElement] = {
-    "display_name": User.display_name,
-    "email": User.email,
-    "role": User.role,
-    "id": User.id,
-    "created_at": User.created_at,
-}
-
-WISH_SORT_FIELDS: dict[str, ColumnElement] = {
-    "description": Wish.description,
-    "type": Wish.type,
-    "id": Wish.id,
-    "size": Wish.size,
-    "color": Wish.color,
-    "purchased_at": Wish.purchased_at,
-    "purchased_where": Wish.purchased_where,
-    "received_at": Wish.received_at,
-    "purchaser_note": Wish.purchaser_note,
-    "created_at": Wish.created_at,
-    "person_given_name": Person.given_name,
-    "person_role": Person.role,
-    "person_age": Person.age,
-    "person_note": Person.note,
-    "family_name": _owner_family_column("family_name"),
-    "family_contact_name": _owner_family_column("contact_name"),
-    "family_phone_number": _owner_family_column("phone_number"),
-    "family_address": _owner_family_column("address"),
-    "family_verification_status": _owner_family_column("verification_status"),
-    "family_pickup_window": _owner_family_column("pickup_window"),
-    "family_bio": _owner_family_column("bio"),
-    "referrer_name": WISH_REFERRER.name,
-    "referrer_phone_number": WISH_REFERRER.phone_number,
-    "assigned_to_name": ASSIGNED_USER.display_name,
-}
-
-# Owner-family columns exposed as wish list fields: item field name →
-# Family column attribute. Both family paths are covered by the coalesce in
-# _owner_family_column(); the global-search OR expands them to separate
-# terms instead (wish_global_search_terms).
-WISH_FAMILY_SEARCH_ATTRS: dict[str, str] = {
-    "family_name": "family_name",
-    "family_contact_name": "contact_name",
-    "family_phone_number": "phone_number",
-    "family_address": "address",
-    "family_verification_status": "verification_status",
-    "family_bio": "bio",
-}
-
-# Per-column text search: item field name → column expression. Enum and
-# age columns are cast to text so they match as strings.
-WISH_SEARCH_FIELDS: dict[str, ColumnElement] = {
-    "description": Wish.description,
-    "size": Wish.size,
-    "color": Wish.color,
-    "purchased_where": Wish.purchased_where,
-    "purchaser_note": Wish.purchaser_note,
-    "person_given_name": Person.given_name,
-    "person_role": Person.role.cast(String),
-    "person_age": Person.age.cast(String),
-    "person_note": Person.note,
-    **{field: _owner_family_column(attr, as_text=attr == "verification_status") for field, attr in WISH_FAMILY_SEARCH_ATTRS.items()},
-    "referrer_name": WISH_REFERRER.name,
-    "referrer_phone_number": WISH_REFERRER.phone_number,
-    "assigned_to_name": ASSIGNED_USER.display_name,
-}
-
-# Per-column search fields matched as whole (case-insensitive) values
-# instead of substrings: closed vocabularies where substring matching is
-# surprising ("1" would match ages 10 and 12, "so" would match "son").
-WISH_SEARCH_EXACT_FIELDS: frozenset[str] = frozenset({"person_role", "person_age", "family_verification_status"})
-
-
-# Per-column date-range search: item field name → column expression.
-WISH_DATE_RANGE_FIELDS: dict[str, ColumnElement] = {
-    "purchased_at": Wish.purchased_at,
-    "received_at": Wish.received_at,
-    "created_at": Wish.created_at,
-    "family_pickup_window": _owner_family_column("pickup_window"),
-}
-
-
-def wish_global_search_terms(pattern: str) -> list[ColumnElement]:
-    """ILIKE terms for the admin wish list's global search box.
-
-    Covers every field in WISH_SEARCH_FIELDS. Owner-family fields keep
-    both family paths as separate terms (the person's family OR the wish's
-    direct family) instead of the single coalesced term used for
-    per-column search, so the OR shape matches the existing family-name
-    terms.
-    """
-    terms = [col.ilike(pattern, escape="\\") for field, col in WISH_SEARCH_FIELDS.items() if field not in WISH_FAMILY_SEARCH_ATTRS]
-    for attr in WISH_FAMILY_SEARCH_ATTRS.values():
-        for family_alias in (Family, DIRECT_FAMILY):
-            col = getattr(family_alias, attr)
-            if attr == "verification_status":
-                col = col.cast(String)
-            terms.append(col.ilike(pattern, escape="\\"))
-    return terms
-
-
-PUBLIC_FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
-    "person_count": FAMILY_PERSON_COUNT,
-    "min_age": FAMILY_MIN_AGE,
-    "max_age": FAMILY_MAX_AGE,
-}
-
-EMAIL_SORT_FIELDS: dict[str, ColumnElement] = {
-    "recipient_email": SentEmail.recipient_email,
-    "kind": SentEmail.kind,
-    "status": SentEmail.status,
-    "sent_at": SentEmail.sent_at,
-    "id": SentEmail.id,
-}
+def build_claim_summary(claim: FamilyClaim, family: FamilyInfo, email_error: str | None = None) -> FamilyClaimSummary:
+    """Build a FamilyClaimSummary from a claim and its family info."""
+    return FamilyClaimSummary(
+        id=claim.id,
+        family=family,
+        commitment_type=claim.commitment_type,
+        notes=claim.notes,
+        created_at=claim.created_at,
+        fulfilled_at=claim.fulfilled_at,
+        email_error=email_error,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1250,13 +988,14 @@ def apply_purchase_fields(
     purchased_at,
     purchased_where: str | None,
     purchaser_note,
+    received_at=None,
 ) -> None:
     """Apply the purchase fields shared by the mark-purchased flows.
 
-    Applies ``purchased_at`` and ``purchaser_note`` with the
-    partial-update convention (None = no-op, ``_CLEAR`` = clear to NULL —
-    the mark endpoints resolve an omitted ``purchased_at`` to now before
-    calling), and overwrites ``purchased_where`` (None clears it).
+    Applies ``purchased_at``, ``purchaser_note`` and ``received_at`` with
+    the partial-update convention (None = no-op, ``_CLEAR`` = clear to
+    NULL — the mark endpoints resolve an omitted ``purchased_at`` to now
+    before calling), and overwrites ``purchased_where`` (None clears it).
     """
     if purchased_at is _CLEAR:
         wish.purchased_at = None
@@ -1267,368 +1006,7 @@ def apply_purchase_fields(
         wish.purchaser_note = None
     elif purchaser_note is not None:
         wish.purchaser_note = purchaser_note
-
-
-# ---------------------------------------------------------------------------
-# Column filtering
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ColumnRequest:
-    """Parsed column filter from the ``columns`` query parameter.
-
-    Use ``request.needs("field_name")`` to check whether a column
-    (and its dependent DB lookups) are required for the response.
-    When the client sends no ``columns`` param, all fields are needed.
-    """
-
-    _requested: set[str] | None = None
-
-    @classmethod
-    def parse(cls, columns: str | None) -> "ColumnRequest":
-        if columns is None:
-            return cls(None)
-        return cls({c.strip() for c in columns.split(",") if c.strip()})
-
-    def needs(self, *field_names: str) -> bool:
-        """Return True if any of the given field names are needed."""
-        if self._requested is None:
-            return True
-        return any(name in self._requested for name in field_names)
-
-
-def _get_required_fields(item) -> set[str]:
-    """Extract required field names from a Pydantic model instance."""
-    required: set[str] = set()
-    for name, field_info in type(item).model_fields.items():
-        if field_info.is_required():
-            required.add(name)
-    return required
-
-
-def apply_column_filter(items: list, columns: str | None, *, always_include: set[str] | None = None) -> list[dict]:
-    """Filter model instances (or dicts) to only include requested columns.
-
-    When *columns* is None, return full model_dump for each item (or the dicts
-    as-is).
-    When *columns* is provided, serialize with model_dump(include=...) using
-    the comma-separated field names. *always_include* fields are forced into
-    the selection (e.g. "id" for mutations, "wishes" for people).
-
-    Required fields from the Pydantic model are always included regardless of
-    the column filter, so the partial dicts remain valid against the response
-    schema.
-
-    Raises 400 if any requested column name is not a valid field on the
-    response model (whitelist enforcement).
-    """
-    if columns is None:
-        if items and isinstance(items[0], dict):
-            return list(items)
-        return [item.model_dump() for item in items]
-
-    requested = set(c.strip() for c in columns.split(",") if c.strip())
-    if always_include:
-        requested.update(always_include)
-
-    # Always include required fields so partial dicts satisfy the response schema
-    if items and hasattr(type(items[0]), "model_fields"):
-        requested.update(_get_required_fields(items[0]))
-
-    # Validate against whitelist — reject unknown column names
-    if items and hasattr(type(items[0]), "model_fields"):
-        allowed = set(type(items[0]).model_fields.keys())
-        unknown = requested - allowed
-        if unknown:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown column(s): {', '.join(sorted(unknown))}",
-            )
-
-    if items and isinstance(items[0], dict):
-        return [{k: v for k, v in item.items() if k in requested} for item in items]
-    return [item.model_dump(include=requested) for item in items]
-
-
-def column_filtered_page(
-    items: list,
-    columns: str | None,
-    *,
-    key: str,
-    total: int,
-    page: int,
-    page_size: int,
-    always_include: set[str] | None = None,
-) -> dict:
-    """Build the paginated, column-filtered list envelope.
-
-    Returns ``{"<key>": items, "total", "page", "page_size", "total_pages"}`` where the
-    items are filtered through :func:`apply_column_filter`.
-
-    NOTE: Returns a plain dict (not the ``*ListResponse`` model) because
-    apply_column_filter produces partial dicts with only requested columns.
-    FastAPI validates this dict against the annotated response model —
-    required fields are always included so validation passes.
-    """
-    return {
-        key: apply_column_filter(items, columns, always_include=always_include),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Display ID computation
-# ---------------------------------------------------------------------------
-
-# Suffix appended to the owner's display_id to form a wish display_id — a
-# pure function of wish type (no DB enumeration).
-_WISH_TYPE_SUFFIXES: dict[WishType, str] = {
-    WishType.practical: "A",
-    WishType.fun: "B",
-    WishType.adult: "X",
-    WishType.family: "-F",
-}
-
-
-def wish_display_id(owner_display_id: str, wish_type: WishType) -> str:
-    """Compute a wish's presentational ``display_id`` from its owner's.
-
-    ``display_id = {owner_display_id}{suffix}`` where the suffix is a pure
-    function of the wish's type:
-
-    +----------------+--------+
-    | Wish type      | Suffix |
-    +================+========+
-    | ``practical``  | ``A``  |
-    +----------------+--------+
-    | ``fun``        | ``B``  |
-    +----------------+--------+
-    | ``adult``      | ``X``  |
-    +----------------+--------+
-    | ``family``     | ``-F`` |
-    +----------------+--------+
-
-    Person wishes get a bare letter (e.g. ``1-1-1A``); family wishes get a
-    dash + ``F`` (e.g. ``1-1-F``) so they read as "the family's wish" and
-    cannot collide with person wishes.
-
-    *owner_display_id* should be in the view's existing format: flat views
-    pass the full owner id (person ``1-1-1``, family ``1-1``); scoped views
-    (where the person id is the bare within-family position) pass ``1``,
-    yielding ``1A`` / ``1-F`` accordingly.
-    """
-    return f"{owner_display_id}{_WISH_TYPE_SUFFIXES[wish_type]}"
-
-
-def compute_position_maps(
-    db: Session,
-    entity_type: Literal["family", "person"],
-    page_entities: list,
-    scope: int | None = None,
-) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
-    """Compute the raw ROW_NUMBER position maps behind display IDs.
-
-    Returns ``(fam_pos_map, fam_ref_map, per_pos_map)`` where:
-
-    * ``fam_pos_map`` — ``{family_id: position}`` within the referrer
-      partition.
-    * ``fam_ref_map`` — ``{family_id: referrer_id_or_0}``.
-    * ``per_pos_map`` — ``{person_id: position}`` within the family
-      partition (empty for ``entity_type="family"``).
-
-    The maps are scope-independent: only the string formatting in
-    ``compute_display_ids()`` depends on ``scope``.  Endpoints that need
-    positions for entities spanning multiple scopes (e.g. packing slips over
-    many families) can call this once for the whole batch instead of calling
-    ``compute_display_ids()`` per scope, avoiding a query round-trip per
-    scope.
-
-    ``page_entities`` must be non-empty; the family window is resolved from
-    the families referenced by the page (see ``compute_display_ids``).
-    """
-    if not page_entities:
-        return {}, {}, {}
-
-    # ROW_NUMBER must be computed over the full partition to preserve
-    # pagination continuity.  We scope the query by referrer_id so it
-    # doesn't scan the entire table.
-    page_family_ids = {e.family_id if entity_type == "person" else e.id for e in page_entities}
-
-    if entity_type == "family":
-        # Collect the referrer_ids that appear on this page
-        page_referrer_ids = {(e.referrer_id if e.referrer_id is not None else 0) for e in page_entities}
-    else:
-        # For person views we need family positions — resolve referrer_ids
-        # from the families referenced by the page's people.
-        fam_rows = db.query(Family.id, Family.referrer_id).filter(Family.id.in_(page_family_ids)).all()
-        page_referrer_ids = {(ref_id if ref_id is not None else 0) for _, ref_id in fam_rows}
-
-    # Build the family-position filter.
-    # For family views, ``scope`` is a referrer_id.
-    # For person views, ``scope`` is a family_id — so we always use the
-    # page_referrer_ids approach (resolved from the page's families).
-    if entity_type == "family" and scope is not None:
-        # Scoped family view (e.g. admin with referrer_id, or referrer's
-        # own view).  Compute over all verified families for that referrer.
-        fam_filter = [
-            Family.deleted_at.is_(None),
-            Family.verification_status == FamilyVerificationStatus.verified,
-            Family.referrer_id == scope,
-        ]
-    else:
-        # Flat family view or any person view — compute over all verified
-        # families whose referrer_id appears on the current page.
-        fam_filter = [
-            Family.deleted_at.is_(None),
-            Family.verification_status == FamilyVerificationStatus.verified,
-            func.coalesce(Family.referrer_id, 0).in_(page_referrer_ids),
-        ]
-
-    positions = (
-        db.query(
-            Family.id,
-            Family.referrer_id,
-            func.row_number()
-            .over(
-                partition_by=func.coalesce(Family.referrer_id, 0),
-                order_by=Family.id,
-            )
-            .label("rn"),
-        )
-        .filter(*fam_filter)
-        .all()
-    )
-
-    fam_pos_map: dict[int, int] = {}
-    fam_ref_map: dict[int, int] = {}  # family_id -> referrer_id_or_0
-    for fid, ref_id, rn in positions:
-        fam_pos_map[fid] = int(rn)
-        fam_ref_map[fid] = ref_id if ref_id is not None else 0
-
-    # Filter by family_id, not person_id, so ROW_NUMBER is computed over all
-    # people in each family (preserves pagination continuity).
-    per_pos_map: dict[int, int] = {}
-    if entity_type == "person":
-        if scope is not None:
-            per_filter = [
-                Person.deleted_at.is_(None),
-                Person.family_id == scope,
-            ]
-        else:
-            per_filter = [
-                Person.deleted_at.is_(None),
-                Person.family_id.in_(page_family_ids),
-            ]
-
-        positions = (
-            db.query(
-                Person.id,
-                func.row_number()
-                .over(
-                    partition_by=Person.family_id,
-                    order_by=Person.id,
-                )
-                .label("rn"),
-            )
-            .filter(*per_filter)
-            .all()
-        )
-        per_pos_map = {pid: int(rn) for pid, rn in positions}
-
-    return fam_pos_map, fam_ref_map, per_pos_map
-
-
-def compute_display_ids(
-    db: Session,
-    entity_type: Literal["family", "person"],
-    page_entities: list,
-    scope: int | None = None,
-    *,
-    show_status_labels: bool = False,
-) -> dict[int, str]:
-    """Compute stable display IDs for a page of entities.
-
-    Display IDs are hierarchical positions based on ROW_NUMBER over *active
-    only* entities (verified, non-deleted).  Positions are ordered by database
-    ``id`` so they are stable across viewers and pagination — a position shifts
-    only when an entity before it is created, deleted, restored, or changes
-    verification status.
-
-    Format by view:
-
-    +---------------------+---------------------------+----------------------------------+
-    | View                | Family                    | Person                           |
-    +=====================+===========================+==================================+
-    | Flat (admin)        | ``{ref_or_0}-{pos}``      | ``{ref_or_0}-{fam}-{per}``       |
-    +---------------------+---------------------------+----------------------------------+
-    | Scoped to referrer  | ``{pos}``                 | n/a                              |
-    +---------------------+---------------------------+----------------------------------+
-    | Scoped to family    | n/a                       | ``{per}``                        |
-    +---------------------+---------------------------+----------------------------------+
-
-    Non-enumerated entities (pending, rejected, deleted) receive ``"0"`` or,
-    when ``show_status_labels`` is True, their status label (``"PENDING"``,
-    ``"REJECTED"``, ``"DELETED"``).
-
-    Args:
-        db: database session.
-        entity_type: ``"family"`` or ``"person"``.
-        page_entities: entities on the current page (used to scope queries).
-        scope: ``referrer_id`` for family views, ``family_id`` for person
-            views. ``None`` for flat (unscoped) views.
-        show_status_labels: if True, non-enumerated entities get their status
-            label instead of ``"0"``.
-
-    Returns:
-        ``{entity.id: display_id}`` for each entity in page_entities.
-    """
-    fam_pos_map, fam_ref_map, per_pos_map = compute_position_maps(db, entity_type, page_entities, scope)
-
-    # ------------------------------------------------------------------ #
-    # Format display IDs
-    # ------------------------------------------------------------------ #
-    result: dict[int, str] = {}
-
-    for entity in page_entities:
-        eid = entity.id
-
-        if entity_type == "family":
-            if eid in fam_pos_map:
-                pos = fam_pos_map[eid]
-                ref = fam_ref_map[eid]
-                if scope is not None:
-                    result[eid] = str(pos)
-                else:
-                    result[eid] = f"{ref}-{pos}"
-            else:
-                # Not in active enumeration (pending / rejected / deleted)
-                if show_status_labels:
-                    if entity.deleted_at is not None:
-                        result[eid] = "DELETED"
-                    else:
-                        result[eid] = entity.verification_status.value.upper()
-                else:
-                    result[eid] = "0"
-
-        elif entity_type == "person":
-            fid = entity.family_id
-            if eid in per_pos_map and fid in fam_pos_map:
-                fpos = fam_pos_map[fid]
-                ppos = per_pos_map[eid]
-                ref = fam_ref_map[fid]
-                if scope is not None:
-                    # Scoped to family — show person position only
-                    result[eid] = str(ppos)
-                else:
-                    result[eid] = f"{ref}-{fpos}-{ppos}"
-            else:
-                if show_status_labels and entity.deleted_at is not None:
-                    result[eid] = "DELETED"
-                else:
-                    result[eid] = "0"
-
-    return result
+    if received_at is _CLEAR:
+        wish.received_at = None
+    elif received_at is not None:
+        wish.received_at = received_at

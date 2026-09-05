@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.display_ids import compute_display_ids
 from app.models import Family, Person, User, WishLockLevel
 from app.permissions import require_family
 from app.response_builders import (
@@ -18,7 +19,6 @@ from app.response_builders import (
     build_person_detail,
     build_person_list_item,
     check_family_person_cap,
-    compute_display_ids,
     create_person_with_wishes,
     get_active_or_404,
     partial_update,

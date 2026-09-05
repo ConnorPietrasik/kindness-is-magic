@@ -25,6 +25,7 @@ from app.response_builders import (
     apply_purchase_fields,
     batch_build_family_info,
     batch_load_person_wishes,
+    build_claim_summary,
     build_family_info,
     get_active_or_404,
     get_or_404,
@@ -36,6 +37,7 @@ from app.schemas import (
     FamilyClaimDetail,
     FamilyClaimSummary,
     FamilyClaimUpdate,
+    FamilyInfo,
     PersonWishItem,
     UserResponse,
     WishSummary,
@@ -105,14 +107,7 @@ def list_claims(
     family_info_map = batch_build_family_info(db, list(families.values()))
 
     return [
-        FamilyClaimSummary(
-            id=c.id,
-            family=family_info_map.get(c.family_id, {"id": c.family_id, "display_id": "0", "bio": None, "person_count": 0}),
-            commitment_type=c.commitment_type,
-            notes=c.notes,
-            created_at=c.created_at,
-            fulfilled_at=c.fulfilled_at,
-        )
+        build_claim_summary(c, family_info_map.get(c.family_id, FamilyInfo(id=c.family_id, display_id="0", bio=None, person_count=0)))
         for c in claims
     ]
 
@@ -194,14 +189,7 @@ def update_claim(
     db.refresh(claim)
 
     fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
-    return FamilyClaimSummary(
-        id=claim.id,
-        family=build_family_info(fam, db),
-        commitment_type=claim.commitment_type,
-        notes=claim.notes,
-        created_at=claim.created_at,
-        fulfilled_at=claim.fulfilled_at,
-    )
+    return build_claim_summary(claim, build_family_info(fam, db))
 
 
 # ---------------------------------------------------------------------------
@@ -290,11 +278,4 @@ def fulfill_claim(
     logger.info("Admin %s fulfilled claim %s", admin.id, claim_id)
 
     fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
-    return FamilyClaimSummary(
-        id=claim.id,
-        family=build_family_info(fam, db),
-        commitment_type=claim.commitment_type,
-        notes=claim.notes,
-        created_at=claim.created_at,
-        fulfilled_at=claim.fulfilled_at,
-    )
+    return build_claim_summary(claim, build_family_info(fam, db))

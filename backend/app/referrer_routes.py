@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.display_ids import compute_display_ids
 from app.models import (
     EmailKind,
     EmailStatus,
@@ -36,7 +37,6 @@ from app.response_builders import (
     build_person_list_item,
     build_referrer_detail,
     check_family_person_cap,
-    compute_display_ids,
     create_person_with_wishes,
     get_or_404,
     load_family_list_context,

@@ -1115,7 +1115,7 @@ class TestComputePositionMapsBatching:
 
     def test_batched_matches_per_family_scoped(self, referrer_record, db: Session):
         from app.models import FamilyVerificationStatus, Person, PersonRole
-        from app.response_builders import compute_position_maps
+        from app.display_ids import compute_position_maps
 
         fams = []
         for i in range(3):

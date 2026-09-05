@@ -24,14 +24,14 @@ def _admin_login(client: TestClient) -> dict:
 
 class TestColumnRequest:
     def test_parse_none_means_all_needed(self):
-        from app.response_builders import ColumnRequest
+        from app.column_filter import ColumnRequest
 
         req = ColumnRequest.parse(None)
         assert req.needs("anything") is True
         assert req.needs("a", "b", "c") is True
 
     def test_parse_comma_separated(self):
-        from app.response_builders import ColumnRequest
+        from app.column_filter import ColumnRequest
 
         req = ColumnRequest.parse("id,name,created_at")
         assert req.needs("id") is True
@@ -40,21 +40,21 @@ class TestColumnRequest:
         assert req.needs("bio") is False
 
     def test_parse_strips_whitespace(self):
-        from app.response_builders import ColumnRequest
+        from app.column_filter import ColumnRequest
 
         req = ColumnRequest.parse(" id , name , created_at ")
         assert req.needs("id") is True
         assert req.needs("name") is True
 
     def test_parse_empty_string_means_no_columns(self):
-        from app.response_builders import ColumnRequest
+        from app.column_filter import ColumnRequest
 
         req = ColumnRequest.parse("")
         assert req._requested == set()
         assert req.needs("anything") is False
 
     def test_needs_accepts_multiple(self):
-        from app.response_builders import ColumnRequest
+        from app.column_filter import ColumnRequest
 
         req = ColumnRequest.parse("id,name")
         assert req.needs("bio", "name") is True  # name matches
@@ -68,22 +68,22 @@ class TestColumnRequest:
 
 class TestEscapeLike:
     def test_escapes_percent(self):
-        from app.response_builders import escape_like
+        from app.search_sort import escape_like
 
         assert escape_like("50%") == "50\\%"
 
     def test_escapes_underscore(self):
-        from app.response_builders import escape_like
+        from app.search_sort import escape_like
 
         assert escape_like("a_b") == "a\\_b"
 
     def test_escapes_backslash(self):
-        from app.response_builders import escape_like
+        from app.search_sort import escape_like
 
         assert escape_like("a\\b") == "a\\\\b"
 
     def test_plain_text_unchanged(self):
-        from app.response_builders import escape_like
+        from app.search_sort import escape_like
 
         assert escape_like("backpack") == "backpack"
 
@@ -114,7 +114,7 @@ class TestApplyColumnFilter:
         )
 
     def test_none_returns_full_dump(self, family_item):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
 
         result = apply_column_filter([family_item], None)
         assert len(result) == 1
@@ -122,7 +122,7 @@ class TestApplyColumnFilter:
         assert "bio" in result[0]
 
     def test_filters_to_requested_plus_required(self, family_item):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
 
         result = apply_column_filter([family_item], "id,family_name")
         assert len(result) == 1
@@ -140,7 +140,7 @@ class TestApplyColumnFilter:
         assert "address" in result[0]
 
     def test_always_include_forced(self, family_item):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
 
         result = apply_column_filter([family_item], "family_name", always_include={"id", "display_id"})
         assert "id" in result[0]
@@ -149,7 +149,7 @@ class TestApplyColumnFilter:
         assert "bio" not in result[0]
 
     def test_required_fields_always_included(self, family_item):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
 
         result = apply_column_filter([family_item], "bio")
         assert "id" in result[0]  # required
@@ -157,7 +157,7 @@ class TestApplyColumnFilter:
         assert "bio" in result[0]  # requested
 
     def test_unknown_column_returns_400(self, family_item):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
@@ -166,7 +166,7 @@ class TestApplyColumnFilter:
         assert "nonexistent_field" in exc_info.value.detail
 
     def test_filters_dict_items(self):
-        from app.response_builders import apply_column_filter
+        from app.column_filter import apply_column_filter
 
         items = [{"id": 1, "name": "A", "extra": "data"}]
         result = apply_column_filter(items, "id,name")

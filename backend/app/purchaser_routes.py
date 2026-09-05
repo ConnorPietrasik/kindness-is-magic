@@ -12,21 +12,17 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.database import get_db
+from app.display_ids import compute_display_ids, wish_display_id
 from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_purchaser
 from app.response_builders import (
     apply_purchase_fields,
     build_wish_detail,
-    compute_display_ids,
-    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
-    wish_display_id,
-    wish_grouped_order,
 )
 from app.schemas import (
-    _CLEAR,
     PurchaserWishListResponse,
     PurchaserWishSummary,
     PurchaserWishUpdate,
@@ -34,6 +30,7 @@ from app.schemas import (
     WishDetail,
     WishPurchaseMark,
 )
+from app.search_sort import escape_like, wish_grouped_order
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +70,14 @@ def _build_purchaser_wish_item(wish: Wish, person: Person | None, family_display
     data["wish_lock_level"] = family.wish_lock_level if family is not None else None
     del data["person_family_name"]
     return data
+
+
+def get_assigned_wish_or_403(db: Session, wish_id: int, user: User) -> Wish:
+    """Fetch an active wish assigned to *user*, else raise 404/403."""
+    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
+    if wish.assigned_to_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This wish is not assigned to you")
+    return wish
 
 
 @purchaser_router.get("/wishes")
@@ -196,13 +201,7 @@ def get_wish(
     current_user: User = Depends(require_purchaser),
 ) -> WishDetail:
     """Get detail of a single wish assigned to the current purchaser."""
-    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-
-    if wish.assigned_to_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This wish is not assigned to you",
-        )
+    wish = get_assigned_wish_or_403(db, wish_id, current_user)
 
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
     return WishDetail(**build_wish_detail(wish, person, db))
@@ -221,13 +220,7 @@ def mark_purchased(
     ``''`` clears), ``purchased_where``, ``purchaser_note``, and
     ``received_at``.  Does **not** change ``assigned_to_id``.
     """
-    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-
-    if wish.assigned_to_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This wish is not assigned to you",
-        )
+    wish = get_assigned_wish_or_403(db, wish_id, current_user)
 
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 
@@ -237,14 +230,8 @@ def mark_purchased(
         purchased_at=body.purchased_at or datetime.now(timezone.utc),
         purchased_where=body.purchased_where,
         purchaser_note=body.purchaser_note,
+        received_at=body.received_at,
     )
-
-    # received_at follows partial-update convention (None means no-op)
-    if body.received_at is _CLEAR:
-        wish.received_at = None
-    elif body.received_at is not None:
-        wish.received_at = body.received_at
-    # None means no-op
 
     db.commit()
     db.refresh(wish)
@@ -287,13 +274,13 @@ def batch_mark_purchased(
     for wid in wish_ids:
         wish = wish_map[wid]
         # purchaser_note=None is a no-op — notes are per-item
-        apply_purchase_fields(wish, purchased_at=purchased_at, purchased_where=body.purchased_where, purchaser_note=None)
-
-        # received_at follows partial-update convention (None means no-op)
-        if body.received_at is _CLEAR:
-            wish.received_at = None
-        elif body.received_at is not None:
-            wish.received_at = body.received_at
+        apply_purchase_fields(
+            wish,
+            purchased_at=purchased_at,
+            purchased_where=body.purchased_where,
+            purchaser_note=None,
+            received_at=body.received_at,
+        )
 
     db.commit()
 
@@ -315,13 +302,7 @@ def update_wish(
     exposes purchaser_note and received_at, naturally blocking other
     fields.
     """
-    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-
-    if wish.assigned_to_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This wish is not assigned to you",
-        )
+    wish = get_assigned_wish_or_403(db, wish_id, current_user)
 
     person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
 

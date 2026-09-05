@@ -10,7 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import String
 from sqlalchemy.orm import Session
 
+from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
+from app.display_ids import compute_display_ids
 from app.models import Family, FamilyVerificationStatus, Person, User, Wish
 from sqlalchemy import or_ as sql_or
 from app.permissions import require_admin
@@ -18,15 +20,9 @@ from app.response_builders import (
     batch_load_person_wishes,
     build_person_detail,
     build_person_list_item,
-    build_sort_clause,
     build_wish_detail,
     build_wish_summary,
-    column_filtered_page,
-    ColumnRequest,
-    compute_display_ids,
     create_person_with_wishes,
-    PERSON_SORT_FIELDS,
-    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
@@ -46,6 +42,7 @@ from app.schemas import (
     WishUpdate,
     validate_wishes_for_age,
 )
+from app.search_sort import PERSON_SORT_FIELDS, build_sort_clause, escape_like
 
 logger = logging.getLogger(__name__)
 

@@ -1474,11 +1474,26 @@ class DonorSelfRegisterResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class FamilyInfo(BaseModel):
+    """Minimal family info carried by claim responses.
+
+    Deliberately PII-free (no family name/contact/address) — donors see
+    only the display id and household summary.
+    """
+
+    id: int
+    display_id: str
+    bio: str | None = None
+    person_count: int
+    min_age: int | None = None
+    max_age: int | None = None
+
+
 class FamilyClaimSummary(BaseModel):
     """Compact claim representation for list views."""
 
     id: int
-    family: dict  # {id, display_id, bio, person_count, min_age, max_age}
+    family: FamilyInfo
     commitment_type: CommitmentType
     notes: str | None = None
     created_at: datetime
@@ -1499,7 +1514,7 @@ class FamilyClaimDetail(BaseModel):
     """Full claim detail with wish list."""
 
     id: int
-    family: dict  # {id, display_id, bio, person_count, min_age, max_age}
+    family: FamilyInfo
     commitment_type: CommitmentType
     notes: str | None = None
     created_at: datetime

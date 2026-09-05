@@ -8,11 +8,12 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.models import EmailKind, EmailStatus, SentEmail, User
 from app.permissions import require_admin
-from app.response_builders import EMAIL_SORT_FIELDS, ColumnRequest, build_sort_clause, column_filtered_page, escape_like
 from app.schemas import EmailListResponse, SentEmailSummary
+from app.search_sort import EMAIL_SORT_FIELDS, build_sort_clause, escape_like
 
 logger = logging.getLogger(__name__)
 

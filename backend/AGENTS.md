@@ -25,10 +25,10 @@ Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware 
 - **Referrer approval:** Unlocked invite codes start as `pending`; email-locked codes and admin-created referrers are auto-`approved`. Rejected referrers cannot log in. Pending referrers are blocked from `send-family-invite`.
 - **Invite codes:** Referrer tokens use `KRI-` prefix, family tokens use `KFI-` prefix (10 chars each). Use `generate_invite_code(prefix=...)` from `auth.py`.
 - **Role-based access:** Six roles — `admin`, `referrer`, `family`, `purchaser`, `delivery`, `donor`. Auth dependencies (`auth.py`) validate JWTs (from HttpOnly cookies) and attach the current user to the request. `permissions.py` provides role-check, ownership-check, and capability-check dependencies (e.g. `require_claim_capable`).
-- **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline. List endpoints build items with the list-item builders there and return via `column_filtered_page()`.
+- **Response builders:** `response_builders.py` constructs API response dicts. Route handlers delegate to these rather than building responses inline. List endpoints build items with the list-item builders there and return via `column_filtered_page()` (`column_filter.py`).
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
 - **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked.
-- **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `response_builders.py` — see its docstring for format and enumeration rules (multi-scope endpoints such as packing slips batch via `compute_position_maps()`).
+- **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `display_ids.py` — see its docstring for format and enumeration rules (multi-scope endpoints such as packing slips batch via `compute_position_maps()`).
 
 ## Project Structure
 
@@ -44,6 +44,9 @@ All app code lives under `app/` (flat, no subdirectories):
 | `auth_routes.py` | Login, register, password reset, token refresh, referrer/family self-registration via invites |
 | `permissions.py` | Role-check, ownership-check, and capability-check dependencies |
 | `response_builders.py` | Response dict construction |
+| `column_filter.py` | Column filtering for admin list endpoints (`columns` param parsing, `needs()` checks, page envelope) |
+| `display_ids.py` | Display ID computation (hierarchical positions, wish display IDs) |
+| `search_sort.py` | Sort/search infrastructure (sort-clause parsing, LIKE escaping, sort/search field registries) |
 | `user_validation.py` | Shared user registration validation logic |
 | `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
 | `admin_referrers.py` | Admin CRUD for referrers + approve/reject |

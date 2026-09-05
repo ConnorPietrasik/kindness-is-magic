@@ -21,6 +21,7 @@ from app.mail import (
     send_email,
     send_admin_notification,
 )
+from app.display_ids import compute_display_ids
 from app.permissions import require_claim_capable
 from app.models import (
     CommitmentType,
@@ -33,15 +34,10 @@ from app.models import (
     WishLockLevel,
 )
 from app.response_builders import (
-    PUBLIC_FAMILY_SORT_FIELDS,
-    FAMILY_MAX_AGE,
-    FAMILY_MIN_AGE,
-    FAMILY_PERSON_COUNT,
     batch_load_family_wishes,
     batch_load_person_wishes,
+    build_claim_summary,
     build_family_info,
-    build_sort_clause,
-    compute_display_ids,
     get_active_or_404,
 )
 from app.schemas import (
@@ -53,6 +49,7 @@ from app.schemas import (
     PublicFamilySummary,
     WishSummary,
 )
+from app.search_sort import FAMILY_MAX_AGE, FAMILY_MIN_AGE, FAMILY_PERSON_COUNT, PUBLIC_FAMILY_SORT_FIELDS, build_sort_clause
 
 logger = logging.getLogger(__name__)
 
@@ -469,12 +466,4 @@ async def claim_family(
     if data.commitment_type == CommitmentType.gifts:
         email_error = await _send_claim_confirmation(claim, fam, user, db)
 
-    return FamilyClaimSummary(
-        id=claim.id,
-        family=build_family_info(fam, db),
-        commitment_type=claim.commitment_type,
-        notes=claim.notes,
-        created_at=claim.created_at,
-        fulfilled_at=claim.fulfilled_at,
-        email_error=email_error,
-    )
+    return build_claim_summary(claim, build_family_info(fam, db), email_error=email_error)

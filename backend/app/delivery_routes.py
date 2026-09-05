@@ -10,14 +10,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.display_ids import compute_display_ids, compute_position_maps
 from app.models import Family, FamilyVerificationStatus, Person, User
 from app.permissions import require_delivery
 from app.response_builders import (
     batch_load_family_wishes,
     batch_load_person_wishes,
     build_wish_summary,
-    compute_display_ids,
-    compute_position_maps,
 )
 from app.schemas import (
     PackingSlipItem,

@@ -11,21 +11,17 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
+from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.models import Family, Referrer, User, UserRole, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     _CLEAR,
     _resolve_sentinels,
-    build_sort_clause,
     build_user_detail,
-    column_filtered_page,
-    ColumnRequest,
-    escape_like,
     get_active_or_404,
     get_or_404,
     partial_update,
-    USER_SORT_FIELDS,
 )
 from app.schemas import (
     AdminUserCreate,
@@ -35,6 +31,7 @@ from app.schemas import (
     UserListResponse,
     UserPasswordReset,
 )
+from app.search_sort import USER_SORT_FIELDS, build_sort_clause, escape_like
 from app.user_validation import validate_user_role_consistency
 
 logger = logging.getLogger(__name__)
