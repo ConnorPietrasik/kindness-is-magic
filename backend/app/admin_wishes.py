@@ -363,9 +363,10 @@ def batch_mark_purchased(
 
     Mirrors the single mark-purchased semantics for every selected wish:
     ``purchased_at`` from the body (omitted/null defaults to now, ``''``
-    clears), ``purchased_where`` overwritten (None clears), ``received_at``
-    per the partial-update sentinel convention, and ``assigned_to_id`` set
-    to the calling admin.  ``purchaser_note`` is not touched.
+    clears), ``purchased_where`` overwritten (None or ``''`` clears),
+    ``received_at`` per the partial-update sentinel convention, and
+    ``assigned_to_id`` set to the calling admin.  ``purchaser_note`` is
+    not touched.
     """
     # Deduplicate so repeated IDs don't inflate the count
     seen: set[int] = set()

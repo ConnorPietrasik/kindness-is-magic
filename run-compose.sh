@@ -51,7 +51,6 @@ fi
 # and tears everything down when you Ctrl+C or it exits.
 if [ "$1" = "testdb" ]; then
   shift
-  sudo docker compose --profile test down -v --remove-orphans 2>/dev/null
   cleanup() {
     sudo docker rm -f kindness-is-magic-test_db-1 2>/dev/null || true
     sudo docker network rm kindness-is-magic_kindnet 2>/dev/null || true

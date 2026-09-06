@@ -81,6 +81,25 @@ class TestReferrerSetNotes:
         assert resp.status_code == 200
         assert resp.json()["referrer_notes"] is None
 
+    def test_referrer_notes_junk_type_422(self, test_client: TestClient, referrer_with_full_tree):
+        """Non-string junk is rejected with 422 (previously slipped through to the DB)."""
+        _tree_referrer_login(test_client)
+        fam = referrer_with_full_tree["family"]
+        resp = test_client.patch(
+            f"/api/referrer/families/{fam.id}",
+            json={"referrer_notes": 42},
+        )
+        assert resp.status_code == 422
+
+    def test_referrer_notes_overlong_422(self, test_client: TestClient, referrer_with_full_tree):
+        _tree_referrer_login(test_client)
+        fam = referrer_with_full_tree["family"]
+        resp = test_client.patch(
+            f"/api/referrer/families/{fam.id}",
+            json={"referrer_notes": "x" * 1001},
+        )
+        assert resp.status_code == 422
+
     def test_referrer_notes_present_in_get_family(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
@@ -279,6 +298,25 @@ class TestAdminNotes:
         )
         assert resp.status_code == 200
         assert resp.json()["referrer_notes"] is None
+
+    def test_admin_referrer_notes_junk_type_422(self, test_client: TestClient, admin_user, referrer_with_full_tree):
+        """Non-string junk is rejected with 422 (previously slipped through to the DB)."""
+        _admin_login(test_client)
+        fam = referrer_with_full_tree["family"]
+        resp = test_client.patch(
+            f"/api/admin/families/{fam.id}",
+            json={"referrer_notes": [1]},
+        )
+        assert resp.status_code == 422
+
+    def test_admin_referrer_notes_overlong_422(self, test_client: TestClient, admin_user, referrer_with_full_tree):
+        _admin_login(test_client)
+        fam = referrer_with_full_tree["family"]
+        resp = test_client.patch(
+            f"/api/admin/families/{fam.id}",
+            json={"referrer_notes": "x" * 1001},
+        )
+        assert resp.status_code == 422
 
     def test_admin_get_family_includes_notes(self, test_client: TestClient, admin_user, referrer_with_full_tree):
         _admin_login(test_client)

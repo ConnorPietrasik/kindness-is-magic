@@ -250,9 +250,9 @@ def batch_mark_purchased(
 
     Mirrors the single mark-purchased semantics for every selected wish:
     ``purchased_at`` from the body (omitted/null defaults to now, ``''``
-    clears), ``purchased_where`` overwritten (None clears), ``received_at``
-    per the partial-update sentinel convention.  Does **not** touch
-    ``purchaser_note`` or change ``assigned_to_id``.
+    clears), ``purchased_where`` overwritten (None or ``''`` clears),
+    ``received_at`` per the partial-update sentinel convention.  Does
+    **not** touch ``purchaser_note`` or change ``assigned_to_id``.
     Fail-fast on any missing/soft-deleted ID or any ID not assigned to
     the caller.
     """

@@ -1,9 +1,9 @@
 """Pydantic request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, ValidationInfo, field_validator, model_serializer, model_validator
 
 from app.models import (
     CommitmentType,
@@ -132,6 +132,65 @@ def _validate_nullable_datetime(v):
     raise ValueError("must be an ISO 8601 datetime (e.g. 2026-02-14T09:30:00Z)")
 
 
+def clearable_text(max_length: int, zero_as_clear: bool = False):
+    """Field type for a clearable partial-update text field.
+
+    Omitted or ``null`` → no-op; ``""`` → :data:`_CLEAR` (clear to NULL);
+    with *zero_as_clear* also ``"0"`` → ``_CLEAR`` (the UI's N/A marker for
+    wish size/color — it is not a storable value there).
+
+    Non-string input and over-length input 422. Both are enforced in the
+    validator rather than as field constraints because the ``object`` union
+    member (which exists only to carry the sentinel) would let any junk
+    value through validation and reach the DB.
+    """
+
+    def _validate(v: Any, info: ValidationInfo) -> Any:
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError(f"{info.field_name} must be a string")
+        if v == "" or (zero_as_clear and v == "0"):
+            return _CLEAR
+        if len(v) > max_length:
+            raise ValueError(f"{info.field_name} must be {max_length} characters or fewer")
+        return sanitize_plain_text(v)
+
+    return Annotated[str | None | object, Field(default=None), BeforeValidator(_validate)]
+
+
+def clearable_datetime():
+    """Field type for a clearable partial-update datetime field.
+
+    Omitted or ``null`` → no-op; ``""`` → :data:`_CLEAR` (clear to NULL);
+    ISO-8601 strings parse to datetime; anything else 422s (see
+    :func:`_validate_nullable_datetime`).
+    """
+    return Annotated[datetime | None | object, Field(default=None), BeforeValidator(_validate_nullable_datetime)]
+
+
+def clearable_fk():
+    """Field type for a clearable partial-update FK field.
+
+    Omitted or ``null`` → no-op; ``0`` → :data:`_CLEAR` (clear the FK to
+    NULL — ids are SERIAL starting at 1, so 0 is never a valid id);
+    non-integer input 422s. Booleans are an ``int`` subclass in Python and
+    are rejected explicitly — without the check they would ride the
+    ``object`` union member through to the route's target-existence query.
+    """
+
+    def _validate(v: Any, info: ValidationInfo) -> Any:
+        if v is None:
+            return v
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise ValueError(f"{info.field_name} must be an integer")
+        if v == 0:
+            return _CLEAR
+        return v
+
+    return Annotated[int | None | object, Field(default=None), BeforeValidator(_validate)]
+
+
 class UpdateProfile(BaseModel):
     """Update the authenticated user's profile."""
 
@@ -150,7 +209,7 @@ class UpdateProfile(BaseModel):
             raise ValueError("display_name must be 40 characters or fewer")
         if isinstance(v, str):
             return sanitize_plain_text(v)
-        return v
+        raise ValueError("display_name must be a string")
 
     def to_update_dict(self) -> dict:
         """Return only fields that should be written to the DB.
@@ -159,6 +218,7 @@ class UpdateProfile(BaseModel):
         * Field sent as ``null`` → excluded (no-op)
         * Field sent as ``"Name"`` → included as the string
         * Field sent as ``""`` → rejected (display_name is non-nullable)
+        * Field sent as non-string junk → rejected
         """
         result: dict[str, str | None] = {}
         dn = self.display_name
@@ -495,12 +555,7 @@ class FamilyUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = Field(None, min_length=1, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
-    pickup_window: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("pickup_window", mode="before")
-    @classmethod
-    def _pickup_window_validate(cls, v):
-        return _validate_nullable_datetime(v)
+    pickup_window: clearable_datetime()
 
     @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
     @classmethod
@@ -527,18 +582,7 @@ class ReferrerFamilyUpdate(FamilyUpdate):
     Sending ``""`` clears the notes to NULL.
     """
 
-    referrer_notes: str | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("referrer_notes", mode="before")
-    @classmethod
-    def _referrer_notes_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 1000:
-            raise ValueError("referrer_notes must be 1000 characters or fewer")
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    referrer_notes: clearable_text(1000)
 
 
 class AdminFamilyUpdate(FamilyUpdate):
@@ -547,20 +591,9 @@ class AdminFamilyUpdate(FamilyUpdate):
     Send ``0`` to unassign a referrer or delivery person (set FK to NULL).
     """
 
-    referrer_id: Optional[int] = None
-    referrer_notes: str | None | object = Field(default=None)  # type: ignore[assignment]
-    delivery_user_id: Optional[int] = None
-
-    @field_validator("referrer_notes", mode="before")
-    @classmethod
-    def _referrer_notes_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 1000:
-            raise ValueError("referrer_notes must be 1000 characters or fewer")
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    referrer_id: clearable_fk()
+    referrer_notes: clearable_text(1000)
+    delivery_user_id: clearable_fk()
 
 
 class FamilyDetail(BaseModel):
@@ -702,18 +735,15 @@ class FamilyListResponse(BaseModel):
 
 
 def _normalize_size_or_color(v: str | None) -> str | None:
-    """Normalize an optional size/color tag: ``None``, ``""`` and ``"0"`` → ``None`` (N/A).
+    """Normalize an optional size/color tag: ``None``/``""``/``"0"`` → ``None`` (N/A); other values sanitize.
 
-    Shared by the per-field ``normalize_size`` / ``normalize_color``
-    validators on WishCreate / WishUpdate / AdminWishUpdate. The
-    partial-update schemas map ``""`` to the ``_CLEAR`` sentinel before
-    calling, so an explicitly-sent empty string clears the column.
+    ``"0"`` is the UI's N/A marker for size/color. Used by the WishCreate
+    ``normalize_size`` / ``normalize_color`` validators (create path —
+    no ``_CLEAR`` sentinel).
     """
     if v is None or v == "" or v == "0":
         return None
-    if isinstance(v, str):
-        return sanitize_plain_text(v)
-    return v
+    return sanitize_plain_text(v)
 
 
 class WishCreate(BaseModel):
@@ -745,17 +775,16 @@ class WishCreate(BaseModel):
 class WishUpdate(BaseModel):
     """Partial update for a wish.
 
-    Send ``""`` to clear size or color to NULL (the ``_CLEAR`` sentinel
-    is resolved by :func:`app.response_builders.partial_update`).
+    Size/color: omitted or ``null`` is a no-op, ``""`` or ``"0"`` (the UI's
+    N/A marker) clears to NULL — the ``_CLEAR`` sentinel is resolved by
+    :func:`app.response_builders.partial_update`.
     """
 
     type: WishType | None = None
     description: Optional[str] = Field(None, min_length=1, max_length=100)
-    # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
-    # the 20-char limit is enforced in the validators (constraints can't apply
-    # to a union containing object).
-    size: str | None | object = Field(default=None)  # type: ignore[assignment]
-    color: str | None | object = Field(default=None)  # type: ignore[assignment]
+    # "0" is the UI's N/A marker for size/color — it clears like "".
+    size: clearable_text(20, zero_as_clear=True)
+    color: clearable_text(20, zero_as_clear=True)
 
     @field_validator("description")
     @classmethod
@@ -763,26 +792,6 @@ class WishUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
-
-    @field_validator("size", mode="before")
-    @classmethod
-    def normalize_size(cls, v):
-        """Map '0' to None (N/A size); '' clears to NULL (``_CLEAR`` sentinel)."""
-        if v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 20:
-            raise ValueError("size must be 20 characters or fewer")
-        return _normalize_size_or_color(v)
-
-    @field_validator("color", mode="before")
-    @classmethod
-    def normalize_color(cls, v):
-        """Map '0' to None (N/A color); '' clears to NULL (``_CLEAR`` sentinel)."""
-        if v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 20:
-            raise ValueError("color must be 20 characters or fewer")
-        return _normalize_size_or_color(v)
 
 
 class WishSummary(BaseModel):
@@ -821,21 +830,14 @@ class AdminWishUpdate(BaseModel):
 
     type: WishType | None = None
     description: Optional[str] = Field(None, min_length=1, max_length=100)
-    # `object` in the union carries the _CLEAR sentinel ("" → clear to NULL);
-    # the 20-char limit is enforced in the validators (constraints can't apply
-    # to a union containing object).
-    size: str | None | object = Field(default=None)  # type: ignore[assignment]
-    color: str | None | object = Field(default=None)  # type: ignore[assignment]
-    assigned_to_id: int | None | object = Field(default=None)  # type: ignore[assignment]
-    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-    purchased_where: str | None = None
-    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("purchased_at", mode="before")
-    @classmethod
-    def _purchased_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
+    # "0" is the UI's N/A marker for size/color — it clears like "".
+    size: clearable_text(20, zero_as_clear=True)
+    color: clearable_text(20, zero_as_clear=True)
+    assigned_to_id: clearable_fk()
+    purchased_at: clearable_datetime()
+    purchased_where: clearable_text(200)
+    received_at: clearable_datetime()
+    purchaser_note: clearable_text(400)
 
     @field_validator("description")
     @classmethod
@@ -843,54 +845,6 @@ class AdminWishUpdate(BaseModel):
         if v is None:
             return v
         return sanitize_plain_text(v)
-
-    @field_validator("size", mode="before")
-    @classmethod
-    def normalize_size(cls, v):
-        """Map '0' to None (N/A size); '' clears to NULL (``_CLEAR`` sentinel)."""
-        if v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 20:
-            raise ValueError("size must be 20 characters or fewer")
-        return _normalize_size_or_color(v)
-
-    @field_validator("color", mode="before")
-    @classmethod
-    def normalize_color(cls, v):
-        """Map '0' to None (N/A color); '' clears to NULL (``_CLEAR`` sentinel)."""
-        if v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 20:
-            raise ValueError("color must be 20 characters or fewer")
-        return _normalize_size_or_color(v)
-
-    @field_validator("assigned_to_id", mode="before")
-    @classmethod
-    def _assigned_to_id_validate(cls, v):
-        if isinstance(v, int) and v == 0:
-            return _CLEAR
-        return v
-
-    @field_validator("purchased_where")
-    @classmethod
-    def _purchased_where_validate(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        return sanitize_plain_text(v)
-
-    @field_validator("received_at", mode="before")
-    @classmethod
-    def _received_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
-
-    @field_validator("purchaser_note", mode="before")
-    @classmethod
-    def _purchaser_note_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
 
 
 class WishPurchaseMark(BaseModel):
@@ -900,36 +854,10 @@ class WishPurchaseMark(BaseModel):
     server's current time; ``''`` clears it to NULL.
     """
 
-    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-    purchased_where: str | None = None
-    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
-    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("purchased_at", mode="before")
-    @classmethod
-    def _purchased_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
-
-    @field_validator("purchased_where")
-    @classmethod
-    def _purchased_where_validate(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        return sanitize_plain_text(v)
-
-    @field_validator("purchaser_note", mode="before")
-    @classmethod
-    def _purchaser_note_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
-
-    @field_validator("received_at", mode="before")
-    @classmethod
-    def _received_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
+    purchased_at: clearable_datetime()
+    purchased_where: clearable_text(200)
+    purchaser_note: clearable_text(400)
+    received_at: clearable_datetime()
 
 
 class WishBatchAssign(BaseModel):
@@ -947,32 +875,16 @@ class WishBatchMarkPurchased(BaseModel):
 
     Semantics mirror the single mark-purchased endpoints: ``purchased_at``
     is taken from the body (omitted/null defaults to now, ``''`` clears),
-    ``purchased_where`` is overwritten (``None`` clears), and ``received_at``
-    follows the partial-update sentinel convention (``""`` clears, omitted
-    is a no-op).  ``purchaser_note`` is not touched — notes are per-item.
+    ``purchased_where`` is overwritten (``None`` or ``''`` clears), and
+    ``received_at`` follows the partial-update sentinel convention (``""``
+    clears, omitted is a no-op).  ``purchaser_note`` is not touched — notes
+    are per-item.
     """
 
     wish_ids: list[int] = Field(..., min_length=1)
-    purchased_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-    purchased_where: str | None = None
-    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("purchased_at", mode="before")
-    @classmethod
-    def _purchased_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
-
-    @field_validator("purchased_where")
-    @classmethod
-    def _purchased_where_validate(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        return sanitize_plain_text(v)
-
-    @field_validator("received_at", mode="before")
-    @classmethod
-    def _received_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
+    purchased_at: clearable_datetime()
+    purchased_where: clearable_text(200)
+    received_at: clearable_datetime()
 
 
 class WishListSummary(BaseModel):
@@ -1060,22 +972,8 @@ class PurchaserWishUpdate(BaseModel):
     Uses exclude_unset=True so omitted fields are no-ops.
     """
 
-    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
-    received_at: datetime | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("purchaser_note", mode="before")
-    @classmethod
-    def _purchaser_note_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
-
-    @field_validator("received_at", mode="before")
-    @classmethod
-    def _received_at_validate(cls, v):
-        return _validate_nullable_datetime(v)
+    purchaser_note: clearable_text(400)
+    received_at: clearable_datetime()
 
 
 class PurchaserWishListResponse(BaseModel):
@@ -1240,8 +1138,8 @@ class AdminUserUpdate(BaseModel):
 
     display_name: Optional[str] = Field(None, max_length=40)
     role: Optional[UserRole] = None
-    referrer_id: Optional[int] = None
-    family_id: Optional[int] = None
+    referrer_id: clearable_fk()
+    family_id: clearable_fk()
 
     @field_validator("display_name")
     @classmethod
@@ -1541,18 +1439,7 @@ class FamilyClaimUpdate(BaseModel):
     """
 
     commitment_type: CommitmentType | None = None
-    notes: str | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("notes", mode="before")
-    @classmethod
-    def _notes_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str) and len(v) > 500:
-            raise ValueError("notes must be 500 characters or fewer")
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    notes: clearable_text(500)
 
 
 class DonorWishPurchaseMark(BaseModel):
@@ -1561,24 +1448,8 @@ class DonorWishPurchaseMark(BaseModel):
     Like WishPurchaseMark but **no received_at** — that's set by delivery.
     """
 
-    purchased_where: str | None = None
-    purchaser_note: str | None | object = Field(default=None)  # type: ignore[assignment]
-
-    @field_validator("purchased_where")
-    @classmethod
-    def _purchased_where_validate(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        return sanitize_plain_text(v)
-
-    @field_validator("purchaser_note", mode="before")
-    @classmethod
-    def _purchaser_note_validate(cls, v):
-        if isinstance(v, str) and v == "":
-            return _CLEAR
-        if isinstance(v, str):
-            return sanitize_plain_text(v)
-        return v
+    purchased_where: clearable_text(200)
+    purchaser_note: clearable_text(400)
 
 
 class DonorWishPurchaseResponse(BaseModel):

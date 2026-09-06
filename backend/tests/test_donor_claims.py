@@ -497,6 +497,35 @@ class TestClaimCRUD:
         assert resp.status_code == 200
         assert resp.json()["notes"] == "Updated notes"
 
+    def test_update_own_claim_notes_junk_rejected(self, test_client: TestClient, db: Session):
+        """Non-string junk on notes 422s (previously slipped through to the DB)."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        resp = test_client.patch(f"/api/donor/claims/{claim_id}", json={"notes": 42})
+        assert resp.status_code == 422
+
+    def test_update_own_claim_notes_overlong_rejected(self, test_client: TestClient, db: Session):
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        resp = test_client.patch(f"/api/donor/claims/{claim_id}", json={"notes": "x" * 501})
+        assert resp.status_code == 422
+
     def test_update_own_claim_commitment_type(self, test_client: TestClient, db: Session):
         """Update own claim commitment_type → 200."""
         _create_donor(test_client)
@@ -667,6 +696,28 @@ class TestMarkPurchased:
         assert body["purchased_where"] == "Target"
         assert body["purchaser_note"] == "Got it!"
         assert body["assigned_to_id"] is not None
+
+    def test_mark_purchased_empty_purchased_where_clears(self, test_client: TestClient, db: Session):
+        """'' on purchased_where clears it to NULL (previously stored '' as-is)."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+        wish = data["wishes"][0]
+        wish.purchased_where = "Old store"
+        db.commit()
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        resp = test_client.post(
+            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
+            json={"purchased_where": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_where"] is None
 
     def test_mark_purchased_no_received_at(self, test_client: TestClient, db: Session):
         """Mark wish purchased does NOT set received_at."""

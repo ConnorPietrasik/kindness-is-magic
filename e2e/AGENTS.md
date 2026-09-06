@@ -10,6 +10,8 @@ curl -sf http://localhost/login > /dev/null 2>&1 && echo "up" || echo "down"
 
 If the stack is down, **ask the user to bring it up** before proceeding.
 
+If the stack is up, it always contains the current code. Do not waste time probing.
+
 Run and capture output:
 
 ```bash

@@ -44,14 +44,6 @@ from app.schemas import (
 T = TypeVar("T", bound=DeclarativeBase)
 
 
-def _is_clear_sentinel(value) -> bool:
-    """Check for the 0 sentinel meaning 'clear this FK to None'.
-
-    Referrer IDs are SERIAL starting at 1, so 0 is never a valid id.
-    """
-    return value == 0
-
-
 # ---------------------------------------------------------------------------
 # Batch family info helpers
 # ---------------------------------------------------------------------------
@@ -1027,8 +1019,9 @@ def build_packing_slips(db: Session, families: list[Family]) -> list[PackingSlip
 def _resolve_sentinels(obj, update_data: dict) -> dict:
     """Resolve sentinel values in update data before they are applied.
 
-    * ``0`` on a nullable FK column → ``_CLEAR`` (clear the FK to NULL).
-    * ``""`` on any nullable column → ``_CLEAR`` (clear to NULL).
+    * ``_CLEAR`` (emitted by the ``clearable_*`` schema factories for
+      ``0``/``''`` on clearable fields) passes through unchanged.
+    * ``""`` on any other nullable column → ``_CLEAR`` (clear to NULL).
     * ``None`` is left as-is (means "don't change").
 
     Returns a new dict with resolved values. Callers can inspect the result
@@ -1039,9 +1032,8 @@ def _resolve_sentinels(obj, update_data: dict) -> dict:
     for field, value in update_data.items():
         if value is None:
             resolved[field] = None
-            continue
-        if _is_clear_sentinel(value) and field in columns and columns[field].nullable:
-            resolved[field] = _CLEAR  # 0 sentinel means "clear FK"
+        elif value is _CLEAR:
+            resolved[field] = _CLEAR
         elif isinstance(value, str) and value == "" and field in columns and columns[field].nullable:
             resolved[field] = _CLEAR  # "" on nullable field means "clear"
         else:
@@ -1054,8 +1046,9 @@ def partial_update(obj, schema_model, *, exclude: set[str] | None = None):
 
     Fields omitted by the client are excluded (via ``exclude_unset``).
     Fields sent as ``null`` are ignored (no change).
-    Fields sent as ``0`` on nullable FK columns clear the value (set to ``None``).
-    Fields sent as ``""`` on nullable string columns clear the value (set to ``None``).
+    Fields sent as ``0`` (FKs) or ``""`` (other nullable columns) clear the
+    value (set to ``None``) — ``clearable_*`` schema fields arrive as the
+    ``_CLEAR`` sentinel, everything else is resolved by ``_resolve_sentinels``.
 
     Pass ``exclude`` to skip specific fields (e.g. ``{'wishes'}``).
     """
@@ -1074,7 +1067,7 @@ def apply_purchase_fields(
     wish: Wish,
     *,
     purchased_at,
-    purchased_where: str | None,
+    purchased_where: str | None | object,
     purchaser_note,
     received_at=None,
 ) -> None:
@@ -1083,13 +1076,14 @@ def apply_purchase_fields(
     Applies ``purchased_at``, ``purchaser_note`` and ``received_at`` with
     the partial-update convention (None = no-op, ``_CLEAR`` = clear to
     NULL — the mark endpoints resolve an omitted ``purchased_at`` to now
-    before calling), and overwrites ``purchased_where`` (None clears it).
+    before calling), and overwrites ``purchased_where`` (``_CLEAR`` or
+    None clears it).
     """
     if purchased_at is _CLEAR:
         wish.purchased_at = None
     elif purchased_at is not None:
         wish.purchased_at = purchased_at
-    wish.purchased_where = purchased_where
+    wish.purchased_where = None if purchased_where is _CLEAR else purchased_where
     if purchaser_note is _CLEAR:
         wish.purchaser_note = None
     elif purchaser_note is not None:

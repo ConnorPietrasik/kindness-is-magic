@@ -805,6 +805,24 @@ class TestPurchaserBatchMarkPurchased:
             assert fresh[w.id].purchased_at is not None
             assert fresh[w.id].purchased_where is None
 
+    def test_batch_mark_empty_purchased_where_clears(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """purchased_where='' clears any existing value (previously stored '' as-is)."""
+        wishes = purchaser_wish_tree["wishes"]
+        for w in wishes:
+            w.purchased_where = "Old store"
+        db.commit()
+
+        resp = logged_in_purchaser.post(
+            "/api/purchaser/wishes/batch-mark-purchased",
+            json={"wish_ids": [w.id for w in wishes], "purchased_where": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"marked_count": 2}
+
+        fresh = {w.id: w for w in db.query(Wish).filter(Wish.id.in_([w.id for w in wishes])).all()}
+        for w in wishes:
+            assert fresh[w.id].purchased_where is None
+
     def test_batch_mark_received_at_clear(self, logged_in_purchaser, purchaser_wish_tree, db):
         """received_at='' clears any existing value (partial-update sentinel)."""
         wishes = purchaser_wish_tree["wishes"]
@@ -1007,6 +1025,30 @@ class TestPurchaserUpdateWish:
         )
         assert resp.status_code == 200
         assert resp.json()["received_at"] is None
+
+    def test_update_purchaser_note_junk_type_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """Non-string junk on purchaser_note 422s (previously slipped through to the DB)."""
+        resp = logged_in_purchaser.patch(
+            f"/api/purchaser/wishes/{purchaser_wish_tree['wishes'][0].id}",
+            json={"purchaser_note": 42},
+        )
+        assert resp.status_code == 422
+
+    def test_update_received_at_junk_type_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """Non-string junk on received_at 422s."""
+        resp = logged_in_purchaser.patch(
+            f"/api/purchaser/wishes/{purchaser_wish_tree['wishes'][0].id}",
+            json={"received_at": [1]},
+        )
+        assert resp.status_code == 422
+
+    def test_update_purchaser_note_overlong_422(self, logged_in_purchaser, purchaser_wish_tree):
+        """Over-length purchaser_note 422s (new — column is String(400))."""
+        resp = logged_in_purchaser.patch(
+            f"/api/purchaser/wishes/{purchaser_wish_tree['wishes'][0].id}",
+            json={"purchaser_note": "x" * 401},
+        )
+        assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------

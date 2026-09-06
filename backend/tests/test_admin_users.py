@@ -577,6 +577,17 @@ class TestAdminUpdateUser:
         assert body["referrer_id"] is None
         assert body["family_id"] is None
 
+    def test_422_fk_junk_type(self, test_client: TestClient, admin_user):
+        """Non-integer junk on the FK fields is rejected with 422 (strings, booleans)."""
+        _admin_login(test_client)
+        for field in ("referrer_id", "family_id"):
+            for junk in ("1", True):
+                resp = test_client.patch(
+                    f"/api/admin/users/{admin_user.id}",
+                    json={field: junk},
+                )
+                assert resp.status_code == 422, (field, junk, resp.status_code)
+
     def test_422_fk_to_soft_deleted_referrer(self, test_client: TestClient, admin_user, db: Session):
         from app.models import Referrer
 

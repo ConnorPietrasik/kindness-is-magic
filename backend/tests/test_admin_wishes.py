@@ -1228,6 +1228,53 @@ class TestPatchWish:
         assert resp.status_code == 200
         assert resp.json()["size"] is None
 
+    def test_update_size_zero_clears(self, test_client, admin_user, wish_tree, db):
+        """Sending '0' (the UI's N/A marker) clears size to NULL."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.size = "Large"
+        db.commit()
+
+        resp = test_client.patch(f"/api/admin/wishes/{wish.id}", json={"size": "0"})
+        assert resp.status_code == 200
+        assert resp.json()["size"] is None
+
+    def test_update_size_junk_type_422(self, test_client, admin_user, wish_tree):
+        """Non-string junk on size 422s (previously slipped through to the DB)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(f"/api/admin/wishes/{wish_tree['wishes'][0].id}", json={"size": [1]})
+        assert resp.status_code == 422
+
+    def test_update_purchased_where_junk_type_422(self, test_client, admin_user, wish_tree):
+        """Non-string junk on purchased_where 422s."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"purchased_where": 42},
+        )
+        assert resp.status_code == 422
+
+    def test_update_purchaser_note_overlong_422(self, test_client, admin_user, wish_tree):
+        """Over-length purchaser_note 422s (new — column is String(400))."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"purchaser_note": "x" * 401},
+        )
+        assert resp.status_code == 422
+
     def test_change_type_valid(self, test_client, admin_user, wish_tree, db):
         """Change type to another valid type for person's age (after removing conflict)."""
         test_client.post(
@@ -1315,6 +1362,26 @@ class TestPatchWish:
         )
         assert resp.status_code == 200
         assert resp.json()["assigned_to_id"] is None
+
+    def test_set_assigned_to_id_junk_type_422(self, test_client, admin_user, wish_tree):
+        """Non-integer junk 422s (lists hit the DB, non-numeric strings 500'd in the route)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish_id = wish_tree["wishes"][0].id
+        for junk in ([1], "abc"):
+            resp = test_client.patch(f"/api/admin/wishes/{wish_id}", json={"assigned_to_id": junk})
+            assert resp.status_code == 422
+
+    def test_set_assigned_to_id_boolean_422(self, test_client, admin_user, wish_tree):
+        """true 422s (previously slipped through the object union and 500'd in the route query)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(f"/api/admin/wishes/{wish_tree['wishes'][0].id}", json={"assigned_to_id": True})
+        assert resp.status_code == 422
 
     def test_set_purchased_at(self, test_client, admin_user, wish_tree):
         """Set purchased_at."""
@@ -1501,6 +1568,23 @@ class TestMarkPurchased:
             json={"purchased_at": "not-a-date"},
         )
         assert resp.status_code == 422
+
+    def test_mark_purchased_empty_purchased_where_clears(self, test_client, admin_user, wish_tree, db):
+        """'' on purchased_where clears it to NULL (previously stored '' as-is)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.purchased_where = "Old store"
+        db.commit()
+
+        resp = test_client.post(
+            f"/api/admin/wishes/{wish.id}/mark-purchased",
+            json={"purchased_where": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["purchased_where"] is None
 
     def test_mark_purchased_family_wish(self, test_client, admin_user, wish_tree, db):
         """Family wish can be marked purchased (person fields stay null)."""

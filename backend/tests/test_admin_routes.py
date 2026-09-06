@@ -457,6 +457,16 @@ class TestAdminUpdateFamily:
         )
         assert resp.status_code == 404
 
+    def test_422_update_referrer_id_junk_type(self, test_client: TestClient, admin_user, family_record):
+        """Non-integer junk (strings, booleans) is rejected with 422."""
+        _admin_login(test_client)
+        for junk in ("1", True):
+            resp = test_client.patch(
+                f"/api/admin/families/{family_record.id}",
+                json={"referrer_id": junk},
+            )
+            assert resp.status_code == 422
+
     def test_200_restore_soft_deleted_family(self, test_client: TestClient, admin_user, family_record, db: Session):
         _admin_login(test_client)
         # Soft-delete the family
@@ -651,6 +661,15 @@ class TestAdminUpdateFamily:
         resp = test_client.patch(
             f"/api/admin/families/{family_record.id}",
             json={"pickup_window": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
+    def test_422_pickup_window_junk_type(self, test_client: TestClient, admin_user, family_record):
+        """Non-string junk is rejected with 422 (previously slipped through to the DB)."""
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/families/{family_record.id}",
+            json={"pickup_window": [1]},
         )
         assert resp.status_code == 422
 

@@ -542,7 +542,7 @@ def _process_people(
             summary.people_errors += 1
             continue
 
-        # size (optional, empty/0 → NULL)
+        # size (optional, empty/0 → NULL — "0" is the N/A marker)
         size_raw = rec.get("size", "").strip()
         size: str | None = None
         if size_raw and size_raw != "0":
@@ -551,7 +551,7 @@ def _process_people(
             except ValueError:
                 size = None
 
-        # color (optional, empty/0 → NULL)
+        # color (optional, empty/0 → NULL — "0" is the N/A marker)
         color_raw = rec.get("color", "").strip()
         color: str | None = None
         if color_raw and color_raw != "0":

@@ -106,6 +106,17 @@ def test_admin_unassign_delivery_user(test_client, admin_user, family_for_delive
     assert data["delivery_user_name"] is None
 
 
+def test_admin_assign_delivery_user_junk_type_422(test_client, admin_user, family_for_delivery):
+    """Non-integer junk (strings, booleans) is rejected with 422."""
+    login_as(test_client, "admin@test.com", "AdminPass123!")
+    for junk in ("1", True):
+        resp = test_client.patch(
+            f"/api/admin/families/{family_for_delivery.id}",
+            json={"delivery_user_id": junk},
+        )
+        assert resp.status_code == 422
+
+
 def test_admin_assign_non_delivery_user_returns_422(test_client, admin_user, family_for_delivery, non_delivery_user):
     login_as(test_client, "admin@test.com", "AdminPass123!")
     resp = test_client.patch(

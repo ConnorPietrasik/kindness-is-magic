@@ -38,6 +38,7 @@ from app.response_builders import (
     soft_delete_family_cascade,
 )
 from app.schemas import (
+    _CLEAR,
     AdminFamilyUpdate,
     FamilyCreate,
     FamilyDetail,
@@ -325,11 +326,12 @@ def update_family(
 ) -> FamilyDetail:
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify or restore soft-deleted families.
     fam = get_or_404(db, Family, fam_id, "Family not found")
-    # Validate referrer exists if referrer_id is being changed (0 means clear to NULL)
-    if body.referrer_id is not None and body.referrer_id != 0:
+    # Validate referrer exists if referrer_id is being changed
+    # (0 arrives as the _CLEAR sentinel — clearing skips target validation)
+    if body.referrer_id is not None and body.referrer_id is not _CLEAR:
         get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
-    # Validate delivery_user_id if being changed (0 means clear to NULL)
-    if body.delivery_user_id is not None and body.delivery_user_id != 0:
+    # Validate delivery_user_id if being changed (0 arrives as _CLEAR — skip)
+    if body.delivery_user_id is not None and body.delivery_user_id is not _CLEAR:
         delivery_user = get_or_404(db, User, body.delivery_user_id, "Delivery user not found")
         if delivery_user.deleted_at is not None:
             raise HTTPException(status_code=422, detail="Delivery user is soft-deleted")

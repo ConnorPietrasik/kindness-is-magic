@@ -92,9 +92,10 @@ class TestWishUpdate:
         update = WishUpdate(size="XL")
         assert update.size == "XL"
 
-    def test_size_zero_becomes_none(self):
+    def test_size_zero_becomes_clear(self):
+        """'0' (the UI's N/A marker) maps to the _CLEAR sentinel, not a no-op."""
         update = WishUpdate(size="0")
-        assert update.size is None
+        assert update.size is _CLEAR
 
     def test_size_empty_becomes_clear(self):
         """'' maps to the _CLEAR sentinel so partial_update clears the column."""
@@ -105,14 +106,38 @@ class TestWishUpdate:
         update = WishUpdate(color="Blue")
         assert update.color == "Blue"
 
-    def test_color_zero_becomes_none(self):
+    def test_color_zero_becomes_clear(self):
         update = WishUpdate(color="0")
-        assert update.color is None
+        assert update.color is _CLEAR
 
     def test_color_empty_becomes_clear(self):
         """'' maps to the _CLEAR sentinel so partial_update clears the column."""
         update = WishUpdate(color="")
         assert update.color is _CLEAR
+
+    def test_size_junk_type_rejected(self):
+        """Non-string junk 422s instead of slipping through to the DB."""
+        with pytest.raises(ValidationError):
+            WishUpdate(size=42)
+        with pytest.raises(ValidationError):
+            WishUpdate(size=[1])
+
+    def test_size_integer_zero_rejected(self):
+        """Integer 0 is not a clear sentinel for text fields — ``''`` clears."""
+        with pytest.raises(ValidationError):
+            WishUpdate(size=0)
+
+    def test_color_junk_type_rejected(self):
+        with pytest.raises(ValidationError):
+            WishUpdate(color={"a": 1})
+
+    def test_size_max_length(self):
+        with pytest.raises(ValidationError):
+            WishUpdate(size="x" * 21)
+
+    def test_size_null_is_noop(self):
+        """null maps to None (partial-update no-op)."""
+        assert WishUpdate(size=None).size is None
 
 
 # ---------------------------------------------------------------------------
@@ -125,9 +150,9 @@ class TestAdminWishUpdate:
         update = AdminWishUpdate(color="Red")
         assert update.color == "Red"
 
-    def test_color_zero_becomes_none(self):
+    def test_color_zero_becomes_clear(self):
         update = AdminWishUpdate(color="0")
-        assert update.color is None
+        assert update.color is _CLEAR
 
     def test_color_empty_becomes_clear(self):
         """'' maps to the _CLEAR sentinel so partial_update clears the column."""
@@ -141,6 +166,79 @@ class TestAdminWishUpdate:
     def test_size_max_length(self):
         with pytest.raises(ValidationError):
             AdminWishUpdate(size="x" * 21)
+
+    def test_purchaser_note_junk_type_rejected(self):
+        """Non-string junk 422s instead of slipping through to the DB."""
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchaser_note=42)
+
+    def test_purchased_where_junk_type_rejected(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchased_where=42)
+
+    def test_purchased_where_max_length(self):
+        """Over-length purchased_where 422s (column is String(200))."""
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchased_where="x" * 201)
+
+    def test_purchaser_note_max_length(self):
+        """Over-length purchaser_note 422s (column is String(400))."""
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchaser_note="x" * 401)
+
+    def test_purchased_at_iso_string_parses(self):
+        """ISO-8601 strings parse to datetime."""
+        update = AdminWishUpdate(purchased_at="2026-01-15T10:30:00Z")
+        assert update.purchased_at is not None
+        assert update.purchased_at.year == 2026
+
+    def test_purchased_at_junk_rejected(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(purchased_at=42)
+
+    def test_purchased_at_empty_clears(self):
+        """'' maps to the _CLEAR sentinel so the caller clears the column."""
+        assert AdminWishUpdate(purchased_at="").purchased_at is _CLEAR
+
+    def test_purchased_at_null_is_noop(self):
+        """null maps to None (partial-update no-op)."""
+        assert AdminWishUpdate(purchased_at=None).purchased_at is None
+
+    def test_received_at_empty_clears(self):
+        """'' maps to the _CLEAR sentinel so the caller clears the column."""
+        assert AdminWishUpdate(received_at="").received_at is _CLEAR
+
+    def test_received_at_invalid_string_rejected(self):
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(received_at="not-a-datetime")
+
+    def test_purchaser_note_empty_clears(self):
+        """'' maps to the _CLEAR sentinel so the caller clears the column."""
+        assert AdminWishUpdate(purchaser_note="").purchaser_note is _CLEAR
+
+    def test_purchased_where_empty_clears(self):
+        """'' maps to the _CLEAR sentinel (previously stored '' as-is)."""
+        assert AdminWishUpdate(purchased_where="").purchased_where is _CLEAR
+
+    def test_assigned_to_id_zero_clears(self):
+        """0 maps to the _CLEAR sentinel (clear the FK to NULL)."""
+        assert AdminWishUpdate(assigned_to_id=0).assigned_to_id is _CLEAR
+
+    def test_assigned_to_id_junk_rejected(self):
+        """Non-integer junk 422s (lists hit the DB, non-numeric strings 500'd in the route)."""
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(assigned_to_id=[1])
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(assigned_to_id="abc")
+
+    def test_assigned_to_id_boolean_rejected(self):
+        """Booleans are an int subclass — rejected explicitly (previously a 500 in the route)."""
+        with pytest.raises(ValidationError):
+            AdminWishUpdate(assigned_to_id=True)
+
+    def test_assigned_to_id_null_is_noop(self):
+        """null maps to None (partial-update no-op)."""
+        assert AdminWishUpdate(assigned_to_id=None).assigned_to_id is None
 
 
 # ---------------------------------------------------------------------------

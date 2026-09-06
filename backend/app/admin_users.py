@@ -328,7 +328,7 @@ def update_user(
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify soft-deleted users.
     user = get_or_404(db, User, user_id, "User not found")
 
-    # Resolve sentinels (0 → _CLEAR for FKs) so validation sees the effective values.
+    # Resolve sentinels so validation sees the effective values (0/'' → _CLEAR).
     update_data = body.model_dump(exclude_unset=True)
     resolved = _resolve_sentinels(user, update_data)
     raw_ref = resolved.get("referrer_id", user.referrer_id) if "referrer_id" in resolved else user.referrer_id

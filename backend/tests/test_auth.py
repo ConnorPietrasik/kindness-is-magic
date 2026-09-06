@@ -740,6 +740,16 @@ class TestUpdateProfile:
         )
         assert resp.status_code == 422
 
+    def test_patch_display_name_junk_rejected(self, test_client: TestClient, admin_user):
+        """Non-string junk is rejected (previously coerced into the DB column)."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        for junk in (42, [1]):
+            resp = test_client.patch(
+                "/api/auth/me",
+                json={"display_name": junk},
+            )
+            assert resp.status_code == 422
+
     def test_patch_referrer_can_update(self, test_client: TestClient, referrer_user, db: Session):
         """Referrer users can also update their display_name."""
         from app.models import User
