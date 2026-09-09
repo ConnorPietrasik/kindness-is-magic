@@ -70,6 +70,16 @@ All query keys are defined here as `as const` arrays. Reference these exports in
 
 ## Testing
 
+### Running
+
+Run and capture output:
+
+```bash
+cd /dockerx/kindness-is-magic/frontend && npm run test > /tmp/frontend-test-output.txt 2>&1
+```
+
+Check the exit code. `tail -1` the file for the summary; on failure, read it for tracebacks.
+
 ### What to test where
 
 - **Vitest** — pure utilities, API layer, hooks, context, route guards, and components with non-trivial logic. Tests run in jsdom with no real network.
