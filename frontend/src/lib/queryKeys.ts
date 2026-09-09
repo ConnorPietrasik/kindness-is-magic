@@ -170,6 +170,8 @@ export const adminReviewQueue = ["adminReviewQueue"] as const;
 
 /** Packing slips for printing (static key — params handled inline) */
 export const adminPackingSlips = ["adminPackingSlips"] as const;
+/** Delivery slips for printing (static key — params handled inline) */
+export const adminDeliverySlips = ["adminDeliverySlips"] as const;
 
 // ---------------------------------------------------------------------------
 // Public — Families (donor browse)

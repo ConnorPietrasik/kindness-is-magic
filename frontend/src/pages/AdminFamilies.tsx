@@ -429,12 +429,14 @@ export default function AdminFamilies() {
                         isEditing={editingId === f.id}
                         referrerMap={referrerMap}
                         showPackingSlipAction
+                        showDeliverySlipAction
                         onEdit={(id) => (editingId === id ? cancelForm() : openEdit(id))}
                         onDelete={(id) => confirmDelete(id)}
                         onRestore={(id) => setRestoreConfirm(id)}
                         onResetLock={(id) => setResetConfirm(id)}
                         onFullyApprove={(id) => setFullyApproveConfirm(id)}
                         onViewPackingSlip={(id) => navigate(route.adminPackingSlips([id]))}
+                        onViewDeliverySlip={(id) => navigate(route.adminDeliverySlips([id]))}
                         isDeleting={deleteMut?.isPending ?? false}
                         isRestoring={restoreMut.isPending}
                         isLockActionPending={resetMut.isPending || fullyApproveMut.isPending}

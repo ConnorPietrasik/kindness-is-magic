@@ -38,6 +38,7 @@ export type {
   ClaimStatus,
   CommitmentType,
   DeliveryFamilySummary,
+  DeliverySlipItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishPurchaseMark,

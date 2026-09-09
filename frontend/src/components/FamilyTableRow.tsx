@@ -23,6 +23,8 @@ export interface FamilyTableRowProps {
   fromReferrer?: boolean;
   /** Show "View Packing Slip" in the actions menu (admin families page). */
   showPackingSlipAction?: boolean;
+  /** Show "View Delivery Slip" in the actions menu (admin families page). */
+  showDeliverySlipAction?: boolean;
   /** Toggles the row's inline edit form (open if closed, close if open). */
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
@@ -31,6 +33,8 @@ export interface FamilyTableRowProps {
   onFullyApprove: (id: number) => void;
   /** Required when `showPackingSlipAction` is set. */
   onViewPackingSlip?: (id: number) => void;
+  /** Required when `showDeliverySlipAction` is set. */
+  onViewDeliverySlip?: (id: number) => void;
   isDeleting: boolean;
   isRestoring: boolean;
   /** True while a reset-lock / fully-approve mutation is in-flight (disables the menu). */
@@ -54,12 +58,14 @@ export function FamilyTableRow({
   referrerMap,
   fromReferrer = false,
   showPackingSlipAction = false,
+  showDeliverySlipAction = false,
   onEdit,
   onDelete,
   onRestore,
   onResetLock,
   onFullyApprove,
   onViewPackingSlip,
+  onViewDeliverySlip,
   isDeleting,
   isRestoring,
   isLockActionPending,
@@ -169,6 +175,14 @@ export function FamilyTableRow({
                         {
                           label: "View Packing Slip",
                           onClick: () => onViewPackingSlip(f.id),
+                        },
+                      ]
+                    : []),
+                  ...(showDeliverySlipAction && onViewDeliverySlip
+                    ? [
+                        {
+                          label: "View Delivery Slip",
+                          onClick: () => onViewDeliverySlip(f.id),
                         },
                       ]
                     : []),

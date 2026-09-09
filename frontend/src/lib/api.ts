@@ -22,6 +22,7 @@ import type {
   AdminWishUpdate,
   CommitmentType,
   DeliveryFamilySummary,
+  DeliverySlipItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishPurchaseMark,
@@ -379,6 +380,27 @@ export function adminResetWishState(id: number): Promise<FamilyDetail> {
 export function adminGetPackingSlips(familyIds?: number[]): Promise<PackingSlipItem[]> {
   const params = familyIds && familyIds.length > 0 ? { family_ids: familyIds.join(",") } : undefined;
   return apiGet("/api/admin/families/packing-slips", params);
+}
+
+/** Scope filter for the admin delivery-slips endpoint. */
+export type DeliverySlipScope = "all" | "assigned" | "unassigned";
+
+export interface AdminDeliverySlipsParams {
+  /** DB IDs of specific families — takes precedence over scope when present. */
+  familyIds?: number[];
+  /** everyone | assigned | unassigned (default "all"); only applied without familyIds. */
+  scope?: DeliverySlipScope;
+  /** Equality filter on top of scope: only families assigned to this delivery person. */
+  deliveryUserId?: number;
+}
+
+/** Fetch delivery slips (family PII) for verified families, with optional scope filters. */
+export function adminGetDeliverySlips(params?: AdminDeliverySlipsParams): Promise<DeliverySlipItem[]> {
+  const q: Record<string, string> = {};
+  if (params?.familyIds && params.familyIds.length > 0) q.family_ids = params.familyIds.join(",");
+  if (params?.scope) q.scope = params.scope;
+  if (params?.deliveryUserId != null) q.delivery_user_id = String(params.deliveryUserId);
+  return apiGet("/api/admin/families/delivery-slips", Object.keys(q).length > 0 ? q : undefined);
 }
 
 // ---------------------------------------------------------------------------

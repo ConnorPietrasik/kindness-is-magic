@@ -33,6 +33,7 @@ from app.models import (
 )
 from app.schemas import (
     _CLEAR,
+    DeliverySlipItem,
     FamilyClaimSummary,
     FamilyInfo,
     PackingSlipItem,
@@ -1009,6 +1010,39 @@ def build_packing_slips(db: Session, families: list[Family]) -> list[PackingSlip
             )
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Delivery slips
+# ---------------------------------------------------------------------------
+
+
+def build_delivery_slips(db: Session, families: list[Family]) -> list[DeliverySlipItem]:
+    """Build delivery-slip data for a batch of families.
+
+    One batched pass — no per-family queries:
+
+    * Family display IDs use the unscoped flat format, so the slip matches
+      the box/packing-slip labels.
+
+    Items are returned in the order of *families*.
+    """
+    if not families:
+        return []
+
+    fam_display_map = compute_display_ids(db, "family", families, scope=None)
+
+    return [
+        DeliverySlipItem(
+            id=fam.id,
+            display_id=fam_display_map.get(fam.id, "0"),
+            family_name=fam.family_name,
+            address=fam.address,
+            contact_name=fam.contact_name,
+            phone_number=fam.phone_number,
+        )
+        for fam in families
+    ]
 
 
 # ---------------------------------------------------------------------------

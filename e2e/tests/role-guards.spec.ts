@@ -23,27 +23,32 @@ const GUARDS: { role: string; route: string; redirect: RegExp }[] = [
   { role: "admin", route: "/family/dashboard", redirect: /\/dashboard/ },
   { role: "admin", route: "/purchaser/assigned-gifts", redirect: /\/dashboard/ },
   { role: "admin", route: "/delivery", redirect: /\/dashboard/ },
+  { role: "admin", route: "/delivery/delivery-slips", redirect: /\/dashboard/ },
 
   // Referrer cannot access admin, family, purchaser, delivery routes
   { role: "referrer", route: "/admin/referrers", redirect: /\/dashboard/ },
   { role: "referrer", route: "/family/dashboard", redirect: /\/dashboard/ },
   { role: "referrer", route: "/purchaser/assigned-gifts", redirect: /\/dashboard/ },
   { role: "referrer", route: "/delivery", redirect: /\/dashboard/ },
+  { role: "referrer", route: "/delivery/delivery-slips", redirect: /\/dashboard/ },
 
   // Family cannot access admin, referrer, purchaser, delivery routes
   { role: "family", route: "/admin/referrers", redirect: /\/dashboard/ },
   { role: "family", route: "/referrer/families", redirect: /\/dashboard/ },
   { role: "family", route: "/purchaser/assigned-gifts", redirect: /\/dashboard/ },
   { role: "family", route: "/delivery", redirect: /\/dashboard/ },
+  { role: "family", route: "/delivery/delivery-slips", redirect: /\/dashboard/ },
 
   // Purchaser cannot access admin, referrer, family, delivery routes
   { role: "purchaser", route: "/admin/wishes", redirect: /\/dashboard/ },
   { role: "purchaser", route: "/referrer/dashboard", redirect: /\/dashboard/ },
   { role: "purchaser", route: "/family/dashboard", redirect: /\/dashboard/ },
   { role: "purchaser", route: "/delivery", redirect: /\/dashboard/ },
+  { role: "purchaser", route: "/delivery/delivery-slips", redirect: /\/dashboard/ },
 
   // Delivery cannot access admin, referrer, family, purchaser routes
   { role: "delivery", route: "/admin/families", redirect: /\/dashboard/ },
+  { role: "delivery", route: "/admin/delivery-slips", redirect: /\/dashboard/ },
   { role: "delivery", route: "/referrer/dashboard", redirect: /\/dashboard/ },
   { role: "delivery", route: "/family/dashboard", redirect: /\/dashboard/ },
   { role: "delivery", route: "/purchaser/assigned-gifts", redirect: /\/dashboard/ },

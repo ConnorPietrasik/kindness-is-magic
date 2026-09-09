@@ -69,6 +69,20 @@ describe("DeliveryDashboard", () => {
     expect(screen.getByText("3 people")).toBeInTheDocument();
   });
 
+  it("links to the packing slips and delivery slips pages", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(mockDeliveryUser);
+    vi.spyOn(api, "deliveryListFamilies").mockResolvedValue([mockFamily]);
+
+    wrap(<DeliveryDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Welcome, Dan Delivery!")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("link", { name: "📦 View Packing Slips" })).toHaveAttribute("href", "/delivery/packing-slips");
+    expect(screen.getByRole("link", { name: "🚚 View Delivery Slips" })).toHaveAttribute("href", "/delivery/delivery-slips");
+  });
+
   it("shows the empty state when no families are assigned", async () => {
     vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(mockDeliveryUser);
     vi.spyOn(api, "deliveryListFamilies").mockResolvedValue([]);

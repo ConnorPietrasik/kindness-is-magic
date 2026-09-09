@@ -146,6 +146,7 @@ export default function Dashboard() {
               <NavCard to={ROUTES.ADMIN_WISHES} icon="🎁" label="Manage Wishes" desc="Assign & track gift purchases" />
               <NavCard to={ROUTES.ADMIN_ASSIGNED_GIFTS} icon="🛍️" label="My Assigned Gifts" desc="View and manage gifts assigned to you" />
               <NavCard to={ROUTES.ADMIN_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for volunteers" />
+              <NavCard to={ROUTES.ADMIN_DELIVERY_SLIPS} icon="🚚" label="Delivery Slips" desc="Print delivery slips for drivers" />
               <NavCard to={ROUTES.ADMIN_EMAILS} icon="📧" label="Sent Emails" desc="Full log of emails the app has sent" />
               <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and sponsor families" />
             </>

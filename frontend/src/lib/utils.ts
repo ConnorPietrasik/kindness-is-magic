@@ -304,3 +304,44 @@ export function formatApiError(error: unknown, fallback = "An error occurred"): 
   if (typeof obj.message === "string") return obj.message;
   return fallback;
 }
+
+/* ------------------------------------------------------------------ */
+/* Delivery slip print layout                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Printable content width in px for portrait paper with the 8mm `@page`
+ * margin that DeliverySlipsView uses. Sized for A4 (the narrower of
+ * A4/Letter at 96dpi) — anything that fits here also fits Letter.
+ */
+export const SLIP_PRINT_CONTENT_WIDTH_PX = 733;
+/**
+ * Column gap for the delivery-slip grid. Keep in sync with the view's
+ * `gap-x-4` class (1rem = 16px).
+ */
+export const SLIP_COLUMN_GAP_PX = 16;
+/** Maximum number of slip columns on a page. */
+export const SLIP_MAX_COLUMNS = 3;
+
+/**
+ * Pick the delivery-slip column count for a print page.
+ *
+ * *longestCardWidth* is the intrinsic width of the widest slip card (its
+ * longest text line, unwrapped). Returns the largest column count up to
+ * *maxColumns* for which `n * card + (n - 1) * gap <= pageWidth`, so no
+ * column is narrower than its content — no wrapping, no overflow. Falls
+ * back to a single column when even one card doesn't fit; the card then
+ * shrinks and wraps instead of running off the page.
+ */
+export function chooseSlipColumns(
+  longestCardWidth: number,
+  pageWidth: number = SLIP_PRINT_CONTENT_WIDTH_PX,
+  gap: number = SLIP_COLUMN_GAP_PX,
+  maxColumns: number = SLIP_MAX_COLUMNS
+): number {
+  if (longestCardWidth <= 0) return maxColumns;
+  for (let n = maxColumns; n >= 1; n--) {
+    if (n * longestCardWidth + (n - 1) * gap <= pageWidth) return n;
+  }
+  return 1;
+}

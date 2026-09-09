@@ -26,6 +26,7 @@ from app.permissions import require_admin
 from app.response_builders import (
     attach_family_wish,
     batch_load_person_counts,
+    build_delivery_slips,
     build_family_detail,
     build_family_list_item,
     build_family_review_summary,
@@ -40,6 +41,7 @@ from app.response_builders import (
 from app.schemas import (
     _CLEAR,
     AdminFamilyUpdate,
+    DeliverySlipItem,
     FamilyCreate,
     FamilyDetail,
     FamilyDropdownItem,
@@ -221,8 +223,35 @@ def list_review_queue(
 
 
 # ---------------------------------------------------------------------------
-# Packing slips (must be defined BEFORE /{fam_id} to avoid path collision)
+# Packing slips and delivery slips (must be defined BEFORE /{fam_id} to
+# avoid path collision)
 # ---------------------------------------------------------------------------
+
+
+def resolve_slip_families_by_ids(db: Session, family_ids: str) -> list[Family]:
+    """Resolve the ``family_ids`` slip parameter to a family list.
+
+    Comma-separated DB IDs. 400 on non-numeric input, 404 if any ID is
+    deleted or does not exist (the whole request fails — none are skipped).
+    Survivors are filtered to verified only, in the order requested. An
+    empty or whitespace-only param yields an empty list.
+    """
+    try:
+        requested_ids = [int(x.strip()) for x in family_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid family_ids parameter")
+
+    if not requested_ids:
+        return []
+
+    families_by_id = {f.id: f for f in db.query(Family).filter(Family.id.in_(requested_ids)).all()}
+    for rid in requested_ids:
+        fam = families_by_id.get(rid)
+        if fam is None or fam.deleted_at is not None:
+            raise HTTPException(status_code=404, detail=f"Family {rid} not found or deleted")
+
+    # Filter to verified only (among the requested)
+    return [families_by_id[rid] for rid in requested_ids if families_by_id[rid].verification_status == FamilyVerificationStatus.verified]
 
 
 @family_admin_router.get("/packing-slips")
@@ -240,28 +269,7 @@ def get_packing_slips(
     """
     # --- Resolve families --------------------------------------------------- #
     if family_ids is not None:
-        # Parse comma-separated IDs
-        try:
-            requested_ids = [int(x.strip()) for x in family_ids.split(",") if x.strip()]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid family_ids parameter")
-
-        if not requested_ids:
-            return []
-
-        families = db.query(Family).filter(Family.id.in_(requested_ids)).all()
-        found_ids = {f.id for f in families}
-        for rid in requested_ids:
-            if rid not in found_ids:
-                raise HTTPException(status_code=404, detail=f"Family {rid} not found or deleted")
-
-        # Reject any deleted families
-        for f in families:
-            if f.deleted_at is not None:
-                raise HTTPException(status_code=404, detail=f"Family {f.id} not found or deleted")
-
-        # Filter to verified only (among the requested)
-        families = [f for f in families if f.verification_status == FamilyVerificationStatus.verified]
+        families = resolve_slip_families_by_ids(db, family_ids)
     else:
         # Default: all admin-locked, verified, non-deleted families
         families = (
@@ -276,6 +284,52 @@ def get_packing_slips(
         )
 
     return build_packing_slips(db, families)
+
+
+@family_admin_router.get("/delivery-slips")
+def get_delivery_slips(
+    family_ids: str | None = Query(None),
+    scope: str = Query("all"),
+    delivery_user_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[DeliverySlipItem]:
+    """Return delivery-slip data for verified, non-deleted families.
+
+    * With ``family_ids`` → only the specified families (takes precedence over
+      scope; 404 for any ID that is deleted or does not exist).
+    * Without it, ``scope`` narrows the population: ``all`` (default) |
+      ``assigned`` | ``unassigned``.
+    * ``delivery_user_id`` adds an equality filter on top of scope (400 on
+      non-numeric input; an empty value is treated as absent).
+    """
+    # --- Resolve families --------------------------------------------------- #
+    if family_ids is not None:
+        families = resolve_slip_families_by_ids(db, family_ids)
+    else:
+        if scope not in ("all", "assigned", "unassigned"):
+            raise HTTPException(status_code=400, detail="Invalid scope parameter")
+
+        filters = [
+            Family.deleted_at.is_(None),
+            Family.verification_status == FamilyVerificationStatus.verified,
+        ]
+        if scope == "assigned":
+            filters.append(Family.delivery_user_id.isnot(None))
+        elif scope == "unassigned":
+            filters.append(Family.delivery_user_id.is_(None))
+
+        if delivery_user_id is not None and delivery_user_id.strip():
+            try:
+                user_id = int(delivery_user_id.strip())
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid delivery_user_id parameter")
+            get_active_or_404(db, User, user_id, "Delivery user not found")
+            filters.append(Family.delivery_user_id == user_id)
+
+        families = db.query(Family).filter(*filters).order_by(Family.id).all()
+
+    return build_delivery_slips(db, families)
 
 
 @family_admin_router.get("/{fam_id}")

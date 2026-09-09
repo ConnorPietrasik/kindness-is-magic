@@ -622,6 +622,20 @@ export interface PersonDetail {
 // Delivery
 // ---------------------------------------------------------------------------
 
+/**
+ * Mirrors backend DeliverySlipItem. Unlike packing slips, this deliberately
+ * carries family PII — the driver needs it to identify the household and
+ * call if lost.
+ */
+export interface DeliverySlipItem {
+  id: number;
+  display_id: string;
+  family_name: string;
+  address: string;
+  contact_name: string;
+  phone_number: string;
+}
+
 /** Summary of a family assigned to a delivery person (returned by /api/delivery/families). */
 export interface DeliveryFamilySummary {
   id: number;

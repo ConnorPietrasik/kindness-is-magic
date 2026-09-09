@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  chooseSlipColumns,
   clearPendingClaimFamilyId,
   formatApiError,
   formatDateTime,
@@ -463,5 +464,36 @@ describe("getWishSubmitAction", () => {
   it("returns null at admin lock regardless of rejection reason", () => {
     expect(getWishSubmitAction({ wish_lock_level: "admin", wish_rejection_reason: null })).toBeNull();
     expect(getWishSubmitAction({ wish_lock_level: "admin", wish_rejection_reason: "stale" })).toBeNull();
+  });
+});
+
+describe("chooseSlipColumns", () => {
+  it("uses the max columns for narrow cards", () => {
+    expect(chooseSlipColumns(100)).toBe(3);
+  });
+
+  it("drops to two columns once three no longer fit (233 fits, 234 doesn't)", () => {
+    expect(chooseSlipColumns(233)).toBe(3);
+    expect(chooseSlipColumns(234)).toBe(2);
+  });
+
+  it("drops to one column once two no longer fit (358 fits, 359 doesn't)", () => {
+    expect(chooseSlipColumns(358)).toBe(2);
+    expect(chooseSlipColumns(359)).toBe(1);
+  });
+
+  it("keeps one column for cards wider than the page", () => {
+    expect(chooseSlipColumns(1000)).toBe(1);
+  });
+
+  it("defaults to the max columns when the width is unknown", () => {
+    expect(chooseSlipColumns(0)).toBe(3);
+    expect(chooseSlipColumns(-5)).toBe(3);
+  });
+
+  it("respects custom page width, gap, and max columns", () => {
+    expect(chooseSlipColumns(100, 1000, 10, 4)).toBe(4);
+    expect(chooseSlipColumns(300, 1000, 10, 4)).toBe(3);
+    expect(chooseSlipColumns(300, 700, 10, 2)).toBe(2);
   });
 });

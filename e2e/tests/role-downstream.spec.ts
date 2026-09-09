@@ -1,5 +1,5 @@
 /**
- * Role Downstream — purchaser assigned gifts, delivery packing slips, public wish list.
+ * Role Downstream — purchaser assigned gifts, delivery packing slips, delivery slips, public wish list.
  *
  * Self-contained: creates full data chain (referrer → family → person → wishes),
  * assigns data to purchaser/delivery users, and approves for public visibility.
@@ -27,12 +27,15 @@ import {
   deleteUserViaApi,
   loginViaApi,
 } from "../helpers/api";
+import { findRowInTable } from "../helpers/assertions";
 import { getAdminEmail, getAdminPassword } from "../helpers/env";
 
 const SUFFIX = Math.random().toString(36).slice(2, 8);
 const TEST_REFERRER_NAME = `E2E Downstream Ref ${SUFFIX}`;
 const TEST_REFERRER_EMAIL = `e2e-ds-ref-${SUFFIX}@example.com`;
 const TEST_FAMILY_NAME = `E2E Downstream Family ${SUFFIX}`;
+const TEST_FAMILY_ADDRESS = "456 Downstream Avenue";
+const TEST_FAMILY_PHONE = "555-111-2222";
 const TEST_FAMILY2_NAME = `E2E Downstream Early Family ${SUFFIX}`;
 const TEST_PERSON_NAME = `Child ${SUFFIX}`;
 const TEST_PERSON2_NAME = `Early Child ${SUFFIX}`;
@@ -71,8 +74,8 @@ async function setupTestData(apiContext: Awaited<ReturnType<typeof request.newCo
     familyName: TEST_FAMILY_NAME,
     familyWish: "A warm blanket for everyone",
     contactName: "Test Contact",
-    phoneNumber: "555-111-2222",
-    address: "none",
+    phoneNumber: TEST_FAMILY_PHONE,
+    address: TEST_FAMILY_ADDRESS,
   });
   testData.familyId = family.familyId;
 
@@ -438,6 +441,84 @@ test.describe.serial("Role Downstream", () => {
     const card = page.locator(".packing-slip-card").first();
     expect(await card.evaluate((el) => getComputedStyle(el).breakInside)).toBe("avoid");
     expect(await card.evaluate((el) => getComputedStyle(el).breakAfter)).not.toBe("page");
+
+    await context.close();
+  });
+
+  // ── Delivery slip tests (PII intentionally shown to the driver) ─────────
+
+  test("delivery slip page shows family name, address, and phone for the assigned family", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_DELIVERY_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/delivery/delivery-slips");
+
+    // Only our assigned family is shown, with the PII the driver needs
+    const card = page.locator(".delivery-slip-card").filter({ hasText: TEST_FAMILY_NAME });
+    await expect(card).toHaveCount(1, { timeout: 10_000 });
+    await expect(card).toContainText(TEST_FAMILY_ADDRESS);
+    await expect(card).toContainText(TEST_FAMILY_PHONE);
+
+    await context.close();
+  });
+
+  test("admin opens the delivery slip from a family row action", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/families");
+    await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible({ timeout: 10_000 });
+
+    const row = (await findRowInTable(page, TEST_FAMILY_NAME, { maxPages: 20 }))!;
+    expect(row).not.toBeNull();
+    await row.getByRole("button", { name: "More actions" }).click();
+    await row.getByRole("menuitem", { name: "View Delivery Slip" }).click();
+
+    await page.waitForURL(/\/admin\/delivery-slips\?family_ids=\d+/, { timeout: 10_000 });
+    const card = page.locator(".delivery-slip-card").filter({ hasText: TEST_FAMILY_NAME });
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await expect(card).toContainText(TEST_FAMILY_ADDRESS);
+    await expect(card).toContainText(TEST_FAMILY_PHONE);
+
+    await context.close();
+  });
+
+  test("admin scope selector filters which delivery slips are shown", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/delivery-slips");
+
+    const scopeSelect = page.getByLabel("Scope");
+    const ourCard = page.locator(".delivery-slip-card").filter({ hasText: TEST_FAMILY_NAME });
+
+    // Everyone (default) — the assigned family is shown
+    await expect(scopeSelect).toHaveValue("all");
+    await expect(ourCard.first()).toBeVisible({ timeout: 10_000 });
+
+    // Assigned (to anyone) — still shown
+    await scopeSelect.selectOption("assigned");
+    await expect(ourCard.first()).toBeVisible({ timeout: 10_000 });
+
+    // Assigned (to specific person) — the list is withheld until a person
+    // is picked, then picking our delivery user shows it again
+    await scopeSelect.selectOption("specific");
+    await expect(ourCard).toHaveCount(0, { timeout: 10_000 });
+    const personSelect = page.getByLabel("Delivery person");
+    await personSelect.selectOption({ label: `Delivery ${SUFFIX}` });
+    await expect(ourCard.first()).toBeVisible({ timeout: 10_000 });
+
+    // Unassigned — our family has a delivery person, so it disappears
+    await scopeSelect.selectOption("unassigned");
+    await expect(ourCard).toHaveCount(0, { timeout: 10_000 });
 
     await context.close();
   });

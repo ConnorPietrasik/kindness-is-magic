@@ -31,6 +31,7 @@ const ReferrerReviewQueue: LazyExoticComponent<ComponentType<unknown>> = lazy(()
 const AdminUsers: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminUsers"));
 const AdminWishReview: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishReview"));
 const AdminPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminPackingSlips"));
+const AdminDeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminDeliverySlips"));
 const AdminWishes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishes"));
 const AdminAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminAssignedGifts"));
 const AdminEmails: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmails"));
@@ -38,6 +39,7 @@ const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => i
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
+const DeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliverySlips"));
 const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
 const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
@@ -174,6 +176,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
               <AdminPackingSlips />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_DELIVERY_SLIPS}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminDeliverySlips />
             </ProtectedRoute>
           }
         />
@@ -334,6 +344,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["delivery"] as UserRole[]}>
               <DeliveryPackingSlips />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_SLIPS}
+          element={
+            <ProtectedRoute roles={["delivery"] as UserRole[]}>
+              <DeliverySlips />
             </ProtectedRoute>
           }
         />

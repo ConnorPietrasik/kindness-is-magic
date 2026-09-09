@@ -28,6 +28,7 @@ export const ROUTES = {
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
   ADMIN_WISH_REVIEW: "/admin/wish-review",
   ADMIN_PACKING_SLIPS: "/admin/packing-slips",
+  ADMIN_DELIVERY_SLIPS: "/admin/delivery-slips",
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
   ADMIN_EMAILS: "/admin/emails",
@@ -48,6 +49,7 @@ export const ROUTES = {
   // ── Delivery self-service ────────────────────────────────
   DELIVERY_DASHBOARD: "/delivery",
   DELIVERY_PACKING_SLIPS: "/delivery/packing-slips",
+  DELIVERY_SLIPS: "/delivery/delivery-slips",
 
   // ── Donor self-service ───────────────────────────────────
   DONOR_CLAIMS: "/donor/claims",
@@ -74,5 +76,7 @@ export const route = {
   familyWishList: (id: number | string) => `/families/${id}/wish-list`,
   adminPackingSlips: (familyIds?: number[]) =>
     familyIds && familyIds.length > 0 ? `/admin/packing-slips?family_ids=${familyIds.join(",")}` : "/admin/packing-slips",
+  adminDeliverySlips: (familyIds?: number[]) =>
+    familyIds && familyIds.length > 0 ? `/admin/delivery-slips?family_ids=${familyIds.join(",")}` : "/admin/delivery-slips",
   donorClaimDetail: (id: number | string) => `/donor/claims/${id}`,
 };

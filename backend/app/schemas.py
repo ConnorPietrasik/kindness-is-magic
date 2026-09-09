@@ -1274,6 +1274,26 @@ class PackingSlipItem(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Delivery slip schemas
+# ---------------------------------------------------------------------------
+
+
+class DeliverySlipItem(BaseModel):
+    """One family on a delivery slip.
+
+    Unlike the packing slip, this deliberately carries family PII — the
+    driver needs it to identify the household and call if lost.
+    """
+
+    id: int
+    display_id: str
+    family_name: str
+    address: str
+    contact_name: str
+    phone_number: str
+
+
+# ---------------------------------------------------------------------------
 # Self-service schemas (referrer / family — no FK IDs in body)
 # ---------------------------------------------------------------------------
 

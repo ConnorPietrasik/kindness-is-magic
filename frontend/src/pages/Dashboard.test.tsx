@@ -167,6 +167,17 @@ describe("Dashboard", () => {
     expect(tile).toHaveAttribute("href", "/admin/assigned-gifts");
   });
 
+  it("shows the packing and delivery slip tiles for admins", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const packing = await screen.findByRole("link", { name: /Packing Slips/ });
+    expect(packing).toHaveAttribute("href", "/admin/packing-slips");
+    const delivery = screen.getByRole("link", { name: /Delivery Slips/ });
+    expect(delivery).toHaveAttribute("href", "/admin/delivery-slips");
+  });
+
   it("shows the gift-claim progress toward the cap for donors", async () => {
     vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveGiftClaim, { ...mockActiveGiftClaim, id: 2 }]);
 

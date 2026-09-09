@@ -60,6 +60,7 @@ function renderRow(props: Partial<FamilyTableRowProps> = {}) {
     onResetLock: vi.fn(),
     onFullyApprove: vi.fn(),
     onViewPackingSlip: vi.fn(),
+    onViewDeliverySlip: vi.fn(),
   };
   const utils = render(
     <MemoryRouter>
@@ -130,6 +131,7 @@ describe("FamilyTableRow", () => {
     expect(within(menu).getByRole("menuitem", { name: "Fully Approve" })).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "Reset Lock" })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "View Packing Slip" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "View Delivery Slip" })).not.toBeInTheDocument();
   });
 
   it("admin-locked row: Reset Lock shown, Fully Approve hidden, wish-list link present", async () => {
@@ -149,6 +151,15 @@ describe("FamilyTableRow", () => {
     await user.click(within(menu).getByRole("menuitem", { name: "View Packing Slip" }));
 
     expect(callbacks.onViewPackingSlip).toHaveBeenCalledWith(1);
+  });
+
+  it("shows View Delivery Slip and calls the callback when enabled", async () => {
+    const { user, callbacks } = renderRow({ showDeliverySlipAction: true });
+
+    const menu = await openMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: "View Delivery Slip" }));
+
+    expect(callbacks.onViewDeliverySlip).toHaveBeenCalledWith(1);
   });
 
   it("menu callbacks fire for delete, reset lock, and fully approve", async () => {
