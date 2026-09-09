@@ -11,6 +11,7 @@ import { PhoneInput } from "../components/PhoneInput";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useDashboardTiles } from "../hooks/useDashboardTiles";
 import {
   changePasswordRequest,
   donorListClaims,
@@ -132,26 +133,11 @@ export default function Dashboard() {
           <QueueAlert count={adminReviewQueueData.length} label="awaiting your wish approval" to={ROUTES.ADMIN_WISH_REVIEW} />
         )}
 
+        {/* Admin navigation tiles (per-admin show/hide) */}
+        {user?.role === "admin" && <AdminTiles />}
+
         {/* Navigation cards */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {user?.role === "admin" && (
-            <>
-              <NavCard to={ROUTES.ADMIN_USERS} icon="👤" label="Manage Users" desc="Create, edit, delete users" />
-              <NavCard to={ROUTES.ADMIN_REFERRERS} icon="👥" label="Manage Referrers" desc="Create, edit, delete referrers" />
-              <NavCard to={ROUTES.ADMIN_FAMILIES} icon="🏠" label="Manage Families" desc="Create, edit, delete families" />
-              <NavCard to={ROUTES.ADMIN_PEOPLE} icon="✨" label="Manage People" desc="Create, edit, delete people" />
-              <NavCard to={ROUTES.ADMIN_CSV_UPLOAD} icon="📊" label="CSV Import" desc="Bulk-import referrers, families, people & users" />
-              <NavCard to={ROUTES.ADMIN_INVITE_CODES} icon="💌" label="Invite Codes" desc="Manage invite codes for self-registration" />
-              <NavCard to={ROUTES.ADMIN_WISH_REVIEW} icon="📋" label="Wish Approval" desc="Approve or reject family wishes" />
-              <NavCard to={ROUTES.ADMIN_WISHES} icon="🎁" label="Manage Wishes" desc="Assign & track gift purchases" />
-              <NavCard to={ROUTES.ADMIN_ASSIGNED_GIFTS} icon="🛍️" label="My Assigned Gifts" desc="View and manage gifts assigned to you" />
-              <NavCard to={ROUTES.ADMIN_PACKING_SLIPS} icon="📦" label="Packing Slips" desc="Print packing slips for volunteers" />
-              <NavCard to={ROUTES.ADMIN_DELIVERY_SLIPS} icon="🚚" label="Delivery Slips" desc="Print delivery slips for drivers" />
-              <NavCard to={ROUTES.ADMIN_EMAILS} icon="📧" label="Sent Emails" desc="Full log of emails the app has sent" />
-              <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and sponsor families" />
-            </>
-          )}
-
           {user?.role === "referrer" && (
             <>
               <NavCard to={ROUTES.REFERRER_FAMILIES} icon="🏠" label="My Families" desc="Manage your verified families" />
@@ -478,6 +464,100 @@ function NavCard({ to, icon, label, desc }: NavCardProps) {
       <span className="text-sm font-semibold text-gray-900 group-hover:text-btn-start">{label}</span>
       <span className="text-xs text-gray-400">{desc}</span>
     </Link>
+  );
+}
+
+/**
+ * AdminTiles — admin nav tile grid driven by the DASHBOARD_TILES registry,
+ * with a per-admin show/hide toggle (persisted to localStorage).
+ */
+function AdminTiles() {
+  const { visibleTiles, defs } = useDashboardTiles("admin");
+
+  return (
+    <div className="mb-6">
+      <div className="mb-2 flex justify-end">
+        <TileToggle roleKey="admin" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {defs
+          .filter((tile) => visibleTiles.includes(tile.key))
+          .map((tile) => (
+            <NavCard key={tile.key} to={tile.route} icon={tile.icon} label={tile.label} desc={tile.desc} />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * TileToggle — gear icon button opening a popover with tile checkboxes.
+ *
+ * Uses useDashboardTiles internally. Unlike ColumnToggle, changes apply
+ * immediately — tiles trigger no fetch, so there is no staged "Apply".
+ */
+interface TileToggleProps {
+  /** Role whose DASHBOARD_TILES entry drives the toggle (e.g. "admin"). */
+  roleKey: string;
+}
+
+function TileToggle({ roleKey }: TileToggleProps) {
+  const { visibleTiles, toggleTile, resetTiles, defs } = useDashboardTiles(roleKey);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+        aria-label="Toggle dashboard tiles"
+        title="Toggle dashboard tiles"
+      >
+        ⚙️
+      </button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
+          <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Tiles</p>
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {defs.map((tile) => (
+              <label key={tile.key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={visibleTiles.includes(tile.key)}
+                  onChange={() => toggleTile(tile.key)}
+                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  autoComplete="off"
+                />
+                {tile.label}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={resetTiles}
+              className="w-full rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

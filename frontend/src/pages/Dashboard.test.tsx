@@ -7,6 +7,7 @@ import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { FamilyClaimSummary, FamilyReviewQueueItem, PendingFamilySummary, ReferrerDetail, User } from "../types";
+import { DASHBOARD_TILES } from "../types/tiles";
 import Dashboard from "./Dashboard";
 
 /* ------------------------------------------------------------------ */
@@ -118,6 +119,7 @@ function renderDashboard(user: User) {
 describe("Dashboard", () => {
   afterEach(() => {
     cleanup();
+    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -272,5 +274,108 @@ describe("Dashboard — profile card", () => {
       // Second arg is React Query's mutation context (mutationFn is passed directly).
       expect(api.updateMyProfile).toHaveBeenCalledWith("New Admin Name", expect.anything());
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Admin tile show/hide
+/* ------------------------------------------------------------------ */
+
+describe("Dashboard — admin tiles", () => {
+  const user = userEvent.setup();
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("shows the default-visible tiles and the toggle by default (CSV Import hidden)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const gear = await screen.findByRole("button", { name: "Toggle dashboard tiles" });
+    expect(gear).toBeInTheDocument();
+    for (const tile of DASHBOARD_TILES.admin ?? []) {
+      if (tile.visible) {
+        expect(screen.getByRole("link", { name: new RegExp(tile.label) })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("link", { name: new RegExp(tile.label) })).not.toBeInTheDocument();
+      }
+    }
+  });
+
+  it("enables the default-hidden CSV Import tile and persists the choice", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Toggle dashboard tiles" }));
+    await user.click(screen.getByRole("checkbox", { name: "CSV Import" }));
+
+    expect(screen.getByRole("link", { name: /CSV Import/ })).toBeInTheDocument();
+    const stored = JSON.parse(localStorage.getItem("kim:dashboardTiles:admin") ?? "[]") as string[];
+    expect(stored).toContain("csv-upload");
+  });
+
+  it("hides a tile when unchecked and persists the choice", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Toggle dashboard tiles" }));
+    await user.click(screen.getByRole("checkbox", { name: "Manage Users" }));
+
+    expect(screen.queryByRole("link", { name: /Manage Users/ })).not.toBeInTheDocument();
+    const stored = JSON.parse(localStorage.getItem("kim:dashboardTiles:admin") ?? "[]") as string[];
+    expect(stored).not.toContain("users");
+    expect(stored).toContain("wishes");
+  });
+
+  it("restores hidden tiles from localStorage on a fresh render", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    localStorage.setItem("kim:dashboardTiles:admin", JSON.stringify(["users", "wishes"]));
+
+    renderDashboard(adminUser);
+
+    await screen.findByRole("button", { name: "Toggle dashboard tiles" });
+    expect(screen.getByRole("link", { name: /Manage Users/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Manage Wishes/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Manage Referrers/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Sent Emails/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /CSV Import/ })).not.toBeInTheDocument();
+  });
+
+  it("restores the default tiles via Reset (CSV Import stays hidden)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    localStorage.setItem("kim:dashboardTiles:admin", JSON.stringify(["users", "csv-upload"]));
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Toggle dashboard tiles" }));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    for (const tile of DASHBOARD_TILES.admin ?? []) {
+      if (tile.visible) {
+        expect(screen.getByRole("link", { name: new RegExp(tile.label) })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("link", { name: new RegExp(tile.label) })).not.toBeInTheDocument();
+      }
+    }
+    expect(JSON.parse(localStorage.getItem("kim:dashboardTiles:admin") ?? "[]")).toEqual(
+      (DASHBOARD_TILES.admin ?? []).filter((d) => d.visible).map((d) => d.key)
+    );
+  });
+
+  it("does not show the tile toggle for non-admin roles", async () => {
+    vi.spyOn(api, "getReferrerMe").mockResolvedValue(mockReferrerDetail);
+    vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
+    vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(referrerUser);
+
+    await screen.findByRole("link", { name: /My Families/ });
+    expect(screen.queryByRole("button", { name: "Toggle dashboard tiles" })).not.toBeInTheDocument();
   });
 });

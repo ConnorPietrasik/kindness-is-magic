@@ -96,3 +96,5 @@ export type {
   WishType,
 } from "./domain";
 export { getClaimStatus, PERSON_ROLES, personRoleLabel, WISH_TYPE } from "./domain";
+export type { DashboardTileDef } from "./tiles";
+export { DASHBOARD_TILES } from "./tiles";
