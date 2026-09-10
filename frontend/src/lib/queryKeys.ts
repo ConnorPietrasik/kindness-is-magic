@@ -174,6 +174,15 @@ export const adminPackingSlips = ["adminPackingSlips"] as const;
 export const adminDeliverySlips = ["adminDeliverySlips"] as const;
 
 // ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+
+/** Public deadline rows — the single globally cached display query (feeds all banners) */
+export const deadlines = ["deadlines"] as const;
+/** Admin deadline rows (admin settings list) */
+export const adminDeadlines = ["adminDeadlines"] as const;
+
+// ---------------------------------------------------------------------------
 // Public — Families (donor browse)
 // ---------------------------------------------------------------------------
 

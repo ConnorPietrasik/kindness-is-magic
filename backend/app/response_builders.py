@@ -21,6 +21,7 @@ from app.column_filter import ColumnRequest
 from app.config import MAX_FAMILY_PERSONS
 from app.display_ids import compute_display_ids, compute_position_maps, wish_display_id
 from app.models import (
+    Deadline,
     Family,
     FamilyVerificationStatus,
     FamilyClaim,
@@ -33,6 +34,8 @@ from app.models import (
 )
 from app.schemas import (
     _CLEAR,
+    DeadlineItem,
+    DeadlineListResponse,
     DeliverySlipItem,
     FamilyClaimSummary,
     FamilyInfo,
@@ -142,6 +145,26 @@ def get_active_or_404(db: Session, model: Type[T], id: int, detail: str = "Not f
     if getattr(obj, "deleted_at", None) is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
     return obj
+
+
+# ---------------------------------------------------------------------------
+# Deadline builders
+# ---------------------------------------------------------------------------
+
+
+def build_deadline_item(deadline: Deadline) -> DeadlineItem:
+    """Build a deadline list item (the public and admin lists share the shape)."""
+    return DeadlineItem.model_validate(deadline)
+
+
+def build_deadline_list(db: Session) -> DeadlineListResponse:
+    """All deadline rows, ordered by type, then due_date ASC (NULLs last), then id.
+
+    Shared by the public (``/api/deadlines``) and admin (``/api/admin/deadlines``)
+    list endpoints.
+    """
+    rows = db.query(Deadline).order_by(Deadline.type, Deadline.due_date.asc().nulls_last(), Deadline.id).all()
+    return DeadlineListResponse(deadlines=[build_deadline_item(d) for d in rows])
 
 
 # ---------------------------------------------------------------------------

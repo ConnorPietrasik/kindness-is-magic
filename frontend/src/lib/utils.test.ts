@@ -4,6 +4,7 @@ import {
   clearPendingClaimFamilyId,
   formatApiError,
   formatDateTime,
+  formatDay,
   formatEmailStatus,
   fromDatetimeLocalValue,
   getLockLevelRowClass,
@@ -35,6 +36,33 @@ describe("formatDateTime", () => {
 
   it("returns em-dash for empty string", () => {
     expect(formatDateTime("")).toBe("—");
+  });
+});
+
+describe("formatDay", () => {
+  it("formats a date-only ISO string from its components (local day)", () => {
+    const result = formatDay("2026-12-15");
+    expect(result).not.toBe("—");
+    expect(result).toContain("2026");
+    // Same local-day construction as the implementation contract
+    expect(result).toBe(new Date(2026, 11, 15).toLocaleDateString(undefined, { dateStyle: "medium" }));
+  });
+
+  it("does not shift the day in western timezones (naive new Date(str) would)", () => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+    try {
+      // Sanity: the naive parse lands on the previous day in LA time
+      expect(new Date("2026-12-15").toLocaleDateString(undefined, { dateStyle: "medium" })).toContain("14");
+      expect(formatDay("2026-12-15")).toContain("15");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("returns em-dash for empty values", () => {
+    expect(formatDay(null)).toBe("—");
+    expect(formatDay(undefined)).toBe("—");
+    expect(formatDay("")).toBe("—");
   });
 });
 

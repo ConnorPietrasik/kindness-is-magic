@@ -111,6 +111,11 @@ def _env_isolation(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("ADMIN_EMAIL", raising=False)
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     monkeypatch.setenv("DEBUG", "true")
+    # Tests run the app lifespan per test; without this guard a past-dated
+    # enforced deadline row created by a test would let the daily
+    # deadline-check task run the batches on the shared test DB mid-suite,
+    # racing the tests' own state assertions.
+    monkeypatch.setenv("DISABLE_BACKGROUND_TASKS", "1")
     # Ensure our test DATABASE_URL and secrets are set
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-do-not-use-in-production-aaaabbbbccccdddd")

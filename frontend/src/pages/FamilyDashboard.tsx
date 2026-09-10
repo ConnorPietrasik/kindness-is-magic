@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { defaultFamilyForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
 import { FamilyLockBanner } from "../components/FamilyLockBanner";
@@ -26,6 +27,7 @@ import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageSpinner } from "../components/Spinner";
 import { useToast } from "../context/ToastContext";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { cancelFamilyReview, getFamilyMe, patchFamilyMe, requestFamilyReview } from "../lib/api";
 import { familyMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -43,6 +45,8 @@ export default function FamilyDashboard() {
     queryKey: familyMe,
     queryFn: getFamilyMe,
   });
+
+  const familyInfoDeadline = useDeadlineBanner("family_info");
 
   const updateSelfMut = useMutation({
     mutationFn: patchFamilyMe,
@@ -96,6 +100,9 @@ export default function FamilyDashboard() {
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Family Dashboard</h2>
+
+        {/* ── Family information deadline banner ─────────────── */}
+        <DeadlineBanner result={familyInfoDeadline} />
 
         {/* ── Pending verification banner (legacy) ────────────── */}
         {familyInfo?.verification_status === "pending" && (

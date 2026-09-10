@@ -1186,3 +1186,54 @@ describe("claim family API functions", () => {
     expect(result).toEqual({ id: 1, status: "active", commitment_type: "gifts" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+describe("deadline API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("listDeadlines — GET /api/deadlines (public)", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { deadlines: [{ id: 1 }] } });
+    const result = await apiModule.listDeadlines();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/deadlines");
+    expect(result).toEqual({ deadlines: [{ id: 1 }] });
+  });
+
+  it("adminListDeadlines — GET /api/admin/deadlines", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { deadlines: [{ id: 1 }] } });
+    const result = await apiModule.adminListDeadlines();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/deadlines");
+    expect(result).toEqual({ deadlines: [{ id: 1 }] });
+  });
+
+  it("adminCreateDeadline — POST /api/admin/deadlines (empty due_date normalized to null)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 9 } });
+    const result = await apiModule.adminCreateDeadline({
+      type: "gift_dropoff",
+      label: "Gift drop-off",
+      due_date: "",
+      mode: "enforced",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/deadlines", {
+      type: "gift_dropoff",
+      label: "Gift drop-off",
+      due_date: null,
+      mode: "enforced",
+    });
+    expect(result).toEqual({ id: 9 });
+  });
+
+  it("adminUpdateDeadline — PATCH /api/admin/deadlines/:id", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { id: 3, mode: "enforced" } });
+    const result = await apiModule.adminUpdateDeadline(3, { mode: "enforced" });
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/admin/deadlines/3", { mode: "enforced" });
+    expect(result).toEqual({ id: 3, mode: "enforced" });
+  });
+
+  it("adminDeleteDeadline — DELETE /api/admin/deadlines/:id", async () => {
+    mockAxiosInstance.delete.mockResolvedValueOnce({ data: null });
+    await apiModule.adminDeleteDeadline(3);
+    expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/deadlines/3");
+  });
+});

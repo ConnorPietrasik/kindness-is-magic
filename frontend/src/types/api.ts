@@ -1,6 +1,7 @@
 /** API request/response wrapper shapes derived from backend/app/schemas.py */
 
 import type {
+  Deadline,
   EmailKind,
   EmailStatus,
   FamilyDetail,
@@ -181,6 +182,11 @@ export interface WishListResponse {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+/** Mirrors DeadlineListResponse — all deadline rows (no pagination; a handful-of-rows settings list). */
+export interface DeadlineListResponse {
+  deadlines: Deadline[];
 }
 
 /** Mirrors EmailListResponse — paginated admin sent-email log. */

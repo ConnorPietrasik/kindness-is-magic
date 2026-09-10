@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -78,7 +78,11 @@ describe("Login post-login redirect", () => {
 
     await fillLoginForm(user, "donor@example.com");
 
-    expect(screen.getByTestId("location")).toHaveTextContent(`${ROUTES.DASHBOARD}|null`);
+    // The submit handler is async (login request → navigate) — wait for the
+    // navigation re-render instead of asserting right after the click.
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(`${ROUTES.DASHBOARD}|null`);
+    });
   });
 
   it("navigates to the pending family's wish list with the claim modal open and consumes the id", async () => {
@@ -90,7 +94,9 @@ describe("Login post-login redirect", () => {
 
     await fillLoginForm(user, "donor@example.com");
 
-    expect(screen.getByTestId("location")).toHaveTextContent('/families/7/wish-list|{"openClaim":true}');
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent('/families/7/wish-list|{"openClaim":true}');
+    });
     expect(getPendingClaimFamilyId()).toBeNull();
   });
 
@@ -103,7 +109,9 @@ describe("Login post-login redirect", () => {
 
     await fillLoginForm(user, "family@example.com");
 
-    expect(screen.getByTestId("location")).toHaveTextContent(`${ROUTES.FAMILY_DASHBOARD}|null`);
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(`${ROUTES.FAMILY_DASHBOARD}|null`);
+    });
     expect(getPendingClaimFamilyId()).toBeNull();
   });
 });

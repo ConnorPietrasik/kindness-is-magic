@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClaimModal } from "../components/ClaimModal";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
 import { PageError } from "../components/PageError";
@@ -18,6 +19,7 @@ import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { wishText } from "../components/WishCell";
 import { useAuth } from "../context/AuthContext";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { getFamilyWishList } from "../lib/api";
 import { familyWishList } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -57,6 +59,8 @@ export default function FamilyWishList() {
     queryFn: () => getFamilyWishList(familyId),
     enabled: !Number.isNaN(familyId),
   });
+
+  const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
 
   if (isLoading) return <PageSpinner />;
 
@@ -172,6 +176,9 @@ export default function FamilyWishList() {
             </TableBody>
           </Table>
         )}
+
+        {/* Gift drop-off deadline (near the sponsor CTA; print views omit it) */}
+        <DeadlineBanner result={giftDropoffDeadline} className="no-print mt-8" />
 
         {/* Claim section */}
         <div className="mt-8">

@@ -92,6 +92,7 @@ const mockClaim: FamilyClaimDetail = {
 function renderClaim(user: typeof mockDonorUser | typeof mockAdminUser, claim: FamilyClaimDetail = mockClaim) {
   vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(user);
   vi.spyOn(api, "donorGetClaim").mockResolvedValue(claim);
+  vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={["/donor/claims/1"]}>

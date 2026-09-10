@@ -9,7 +9,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
 import { formatDateTime } from "../lib/utils";
@@ -55,6 +55,8 @@ export interface WishReviewQueueConfig {
   rejectPlaceholder: string;
   /** RejectReasonModal audience label. */
   rejectAudienceLabel: string;
+  /** Optional banner (e.g. a deadline) rendered below the heading. */
+  banner?: ReactNode;
 }
 
 /* ------------------------------------------------------------------ */
@@ -76,6 +78,7 @@ export function WishReviewQueue({
   viewRoute,
   rejectPlaceholder,
   rejectAudienceLabel,
+  banner,
 }: WishReviewQueueConfig) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -135,6 +138,8 @@ export function WishReviewQueue({
   return (
     <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
       <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">{title}</h2>
+
+      {banner}
 
       {items.length === 0 ? (
         <Card>

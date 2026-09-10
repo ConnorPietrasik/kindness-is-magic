@@ -5,6 +5,7 @@ import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
@@ -16,6 +17,7 @@ import { wishText } from "../components/WishCell";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { type UseColumnOrderResult, useColumnOrder } from "../hooks/useColumnOrder";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
 import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -27,6 +29,8 @@ export default function DonorClaimDetail() {
   const { id } = useParams<{ id: string }>();
   const claimId = id ? parseInt(id, 10) : NaN;
   const { user, isAdmin } = useAuth();
+
+  const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
 
   // User column order for the members & wishes table.
   const columnOrder = useColumnOrder("donorClaimWishes");
@@ -77,6 +81,9 @@ export default function DonorClaimDetail() {
 
           {canAct && <ClaimActionsMenu claim={data} isOwner={isOwner} isAdmin={isAdmin} />}
         </div>
+
+        {/* ── Gift drop-off deadline banner ──────────────────── */}
+        <DeadlineBanner result={giftDropoffDeadline} />
 
         {/* Claim info card */}
         <Card className="mb-6">

@@ -104,6 +104,44 @@ export async function deleteUserViaApi(
 }
 
 /**
+ * Create a deadline row via the admin API.
+ *
+ * Returns the new row's ID.
+ */
+export async function createDeadlineViaApi(
+  request: APIRequestContext,
+  data: { type: string; label: string; dueDate: string | null; mode?: string },
+): Promise<number> {
+  const resp = await request.post("/api/admin/deadlines", {
+    data: {
+      type: data.type,
+      label: data.label,
+      due_date: data.dueDate,
+      mode: data.mode ?? "display",
+    },
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`createDeadlineViaApi: deadline creation failed (${resp.status()}): ${body}`);
+  }
+  const row = (await resp.json()) as { id: number };
+  return row.id;
+}
+
+/**
+ * Hard-delete a deadline row via the admin API (config rows are hard-deleted).
+ */
+export async function deleteDeadlineViaApi(
+  request: APIRequestContext,
+  deadlineId: number,
+): Promise<void> {
+  const resp = await request.delete(`/api/admin/deadlines/${deadlineId}`);
+  if (!resp.ok()) {
+    console.warn(`[api] deleteDeadlineViaApi(${deadlineId}) returned ${resp.status()}`);
+  }
+}
+
+/**
  * List families (admin API) — used to find CSV-seeded family IDs.
  */
 export async function listFamiliesViaApi(

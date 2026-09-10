@@ -4,7 +4,7 @@ import type { EmailStatus, WishLockLevel } from "../types";
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
-const NULLABLE_FIELDS = new Set(["bio", "note", "pickup_window", "referrer_notes"]);
+const NULLABLE_FIELDS = new Set(["bio", "note", "pickup_window", "referrer_notes", "due_date"]);
 
 /** Datetime fields that need canonical comparison in `normalizeUpdatePayload`. */
 const DATETIME_FIELDS = new Set(["pickup_window"]);
@@ -105,6 +105,23 @@ export function formatDateTime(iso: string | null | undefined): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+/**
+ * formatDay — format a plain date (date-only ISO, "YYYY-MM-DD") for display.
+ *
+ * Parses the date's components directly and builds a *local* Date — never
+ * `new Date(str)`, which parses a bare date as UTC midnight and renders the
+ * previous day in western timezones.
+ */
+export function formatDay(date: string | null | undefined): string {
+  if (!date) return "\u2014";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  if (!match) return date;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
 /**

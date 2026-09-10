@@ -765,3 +765,39 @@ export interface DonorWishPurchaseMark {
   purchased_where?: string | null;
   purchaser_note?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend DeadlineType enum. The set of types is defined in code; admins create rows, not types. */
+export type DeadlineType = "family_info" | "referrer_review" | "gift_dropoff";
+
+/** Mirrors backend DeadlineMode enum. */
+export type DeadlineMode = "display" | "remind" | "enforced";
+
+/** Mirrors backend DeadlineItem — one deadline row (shared public/admin shape). */
+export interface Deadline {
+  id: number;
+  type: DeadlineType;
+  label: string;
+  /** Date-only ISO (YYYY-MM-DD), or null for an inert undated row. */
+  due_date: string | null;
+  mode: DeadlineMode;
+  created_at: string;
+}
+
+/** Payload for admin creating a deadline row. Due date may be omitted/null (undated rows are inert). */
+export interface DeadlineCreate {
+  type: DeadlineType;
+  label: string;
+  due_date?: string | null;
+  mode: DeadlineMode;
+}
+
+/** Partial update for a deadline row. Omitted fields are no-ops; `""` clears `due_date`. */
+export interface DeadlineUpdate {
+  label?: string;
+  due_date?: string | null;
+  mode?: DeadlineMode;
+}

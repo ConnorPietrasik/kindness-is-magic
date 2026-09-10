@@ -21,6 +21,10 @@ import type {
   AdminWishesListParams,
   AdminWishUpdate,
   CommitmentType,
+  Deadline,
+  DeadlineCreate,
+  DeadlineListResponse,
+  DeadlineUpdate,
   DeliveryFamilySummary,
   DeliverySlipItem,
   DonorSelfRegisterPayload,
@@ -560,6 +564,30 @@ export function adminBatchMarkPurchased(payload: WishBatchMarkPurchased): Promis
 }
 
 // ---------------------------------------------------------------------------
+// Admin — Deadlines
+// ---------------------------------------------------------------------------
+
+/** Admin: list all deadline rows (no pagination — a handful-of-rows settings list). */
+export function adminListDeadlines(): Promise<DeadlineListResponse> {
+  return apiGet("/api/admin/deadlines");
+}
+
+/** Admin: create a deadline row. Due date may be null (undated rows are inert). */
+export function adminCreateDeadline(data: DeadlineCreate): Promise<Deadline> {
+  return apiPost("/api/admin/deadlines", normalizePayload(data));
+}
+
+/** Admin: partially update a deadline row (omitted fields are no-ops; "" clears the due date). */
+export function adminUpdateDeadline(id: number, data: DeadlineUpdate): Promise<Deadline> {
+  return apiPatch(`/api/admin/deadlines/${id}`, data);
+}
+
+/** Admin: hard-delete a deadline row. */
+export function adminDeleteDeadline(id: number): Promise<void> {
+  return apiDelete(`/api/admin/deadlines/${id}`);
+}
+
+// ---------------------------------------------------------------------------
 // Referrer — Self
 // ---------------------------------------------------------------------------
 export function getReferrerMe(): Promise<ReferrerDetail> {
@@ -675,6 +703,15 @@ export function getFamilyWishList(familyId: number): Promise<FamilyWishListRespo
 /** Claim a family (authenticated claim-capable user). */
 export function claimFamily(familyId: number, commitmentType: CommitmentType): Promise<FamilyClaimSummary> {
   return apiPost(`/api/families/${familyId}/claim`, { commitment_type: commitmentType });
+}
+
+// ---------------------------------------------------------------------------
+// Public — Deadlines
+// ---------------------------------------------------------------------------
+
+/** Public: list all deadline rows (no auth required — feeds the display banners for every role). */
+export function listDeadlines(): Promise<DeadlineListResponse> {
+  return apiGet("/api/deadlines");
 }
 
 // ---------------------------------------------------------------------------

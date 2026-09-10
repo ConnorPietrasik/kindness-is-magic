@@ -54,6 +54,7 @@ function StateProbe() {
 }
 
 const wrap = ({ user = null, state }: WrapOptions = {}) => {
+  vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
   const queryClient = createQueryClient();
   queryClient.setQueryData(auth, user);
   return render(

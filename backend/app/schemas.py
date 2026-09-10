@@ -1,12 +1,14 @@
 """Pydantic request/response schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Optional
 
 from pydantic import BaseModel, BeforeValidator, Field, ValidationInfo, field_validator, model_serializer, model_validator
 
 from app.models import (
     CommitmentType,
+    DeadlineMode,
+    DeadlineType,
     EmailKind,
     EmailStatus,
     FamilyVerificationStatus,
@@ -101,9 +103,6 @@ class ReferrerSelfRegister(BaseModel):
         return v
 
 
-_NOT_PROVIDED = object()
-"""Sentinel: field was not present in the JSON payload."""
-
 _CLEAR = object()
 """Sentinel: field was sent as empty string — clear to NULL."""
 
@@ -169,6 +168,40 @@ def clearable_datetime():
     return Annotated[datetime | None | object, Field(default=None), BeforeValidator(_validate_nullable_datetime)]
 
 
+def _validate_nullable_date(v):
+    """Before-validator for ``date | None | object`` partial-update fields.
+
+    Maps ``''`` to the ``_CLEAR`` sentinel and parses any other string into
+    a ``date``; anything that can't be a valid ISO date is rejected. A
+    ``datetime`` is rejected explicitly (it is a ``date`` subclass and
+    would otherwise be stored truncated).
+    """
+    if v is None:
+        return v
+    if isinstance(v, str):
+        if v == "":
+            return _CLEAR
+        try:
+            return date.fromisoformat(v)
+        except ValueError:
+            raise ValueError("must be an ISO 8601 date (e.g. 2026-12-15)") from None
+    if isinstance(v, datetime):
+        raise ValueError("must be an ISO 8601 date (e.g. 2026-12-15)")
+    if isinstance(v, date):
+        return v
+    raise ValueError("must be an ISO 8601 date (e.g. 2026-12-15)")
+
+
+def clearable_date():
+    """Field type for a clearable partial-update date field.
+
+    Omitted or ``null`` → no-op; ``""`` → :data:`_CLEAR` (clear to NULL);
+    ISO-8601 date strings parse to ``date``; anything else 422s (see
+    :func:`_validate_nullable_date`).
+    """
+    return Annotated[date | None | object, Field(default=None), BeforeValidator(_validate_nullable_date)]
+
+
 def clearable_fk():
     """Field type for a clearable partial-update FK field.
 
@@ -194,13 +227,11 @@ def clearable_fk():
 class UpdateProfile(BaseModel):
     """Update the authenticated user's profile."""
 
-    display_name: str | None | object = Field(default=_NOT_PROVIDED)  # type: ignore[assignment]
+    display_name: str | None = None
 
     @field_validator("display_name")
     @classmethod
-    def clean_display_name(cls, v: str | None | object) -> str | None | object:  # type: ignore[misc]
-        if v is _NOT_PROVIDED:
-            return v
+    def clean_display_name(cls, v: str | None) -> str | None:
         if v is None:
             return v  # null → no-op (handled in to_update_dict)
         if isinstance(v, str) and v == "":
@@ -222,8 +253,8 @@ class UpdateProfile(BaseModel):
         """
         result: dict[str, str | None] = {}
         dn = self.display_name
-        if dn is not _NOT_PROVIDED and dn is not None:
-            result["display_name"] = dn  # type: ignore[assignment]
+        if dn is not None:
+            result["display_name"] = dn
         return result
 
 
@@ -1180,6 +1211,73 @@ class UserListResponse(BaseModel):
     page: int = 1
     page_size: int = 50
     total_pages: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD schemas — Deadlines
+# ---------------------------------------------------------------------------
+
+
+class DeadlineCreate(BaseModel):
+    """Admin: create a deadline row.
+
+    ``type`` is a closed enum (the three deadline types) — admins create
+    rows, not types. ``due_date`` may be omitted (undated rows are inert
+    until a date is set). ``mode`` defaults to ``display``.
+    """
+
+    type: DeadlineType
+    label: str = Field(..., min_length=1, max_length=100)
+    due_date: date | None = None
+    mode: DeadlineMode = DeadlineMode.display
+
+    @field_validator("label")
+    @classmethod
+    def clean_label(cls, v: str) -> str:
+        return sanitize_plain_text(v)
+
+
+class DeadlineUpdate(BaseModel):
+    """Admin: partial update for a deadline row.
+
+    Omitted/null fields are no-ops. ``due_date`` follows the clearable-date
+    convention (``""`` clears to NULL). ``label`` cannot be cleared
+    (non-nullable column — ``""`` is rejected).
+    """
+
+    label: Optional[str] = Field(None, min_length=1, max_length=100)
+    due_date: clearable_date()
+    mode: DeadlineMode | None = None
+
+    @field_validator("label")
+    @classmethod
+    def clean_label(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return sanitize_plain_text(v)
+
+
+class DeadlineItem(BaseModel):
+    """Deadline row — shared by the public and admin list endpoints."""
+
+    id: int
+    type: DeadlineType
+    label: str
+    due_date: date | None = None
+    mode: DeadlineMode
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DeadlineListResponse(BaseModel):
+    """Deadline list response.
+
+    No pagination/columns — a handful-of-rows settings list (a deliberate
+    deviation from the admin list-endpoint convention).
+    """
+
+    deadlines: list[DeadlineItem]
 
 
 # ---------------------------------------------------------------------------

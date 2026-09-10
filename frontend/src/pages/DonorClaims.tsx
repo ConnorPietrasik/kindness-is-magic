@@ -3,12 +3,14 @@ import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useColumnOrder } from "../hooks/useColumnOrder";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { donorListClaims } from "../lib/api";
 import { donorClaims } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -24,6 +26,8 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
 
 export default function DonorClaims() {
   const [statusFilter, setStatusFilter] = useState<string>("");
+
+  const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
 
   // User column order (all registry columns are always visible here).
   const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("donorClaims");
@@ -83,6 +87,9 @@ export default function DonorClaims() {
             </Link>
           </div>
         </div>
+
+        {/* ── Gift drop-off deadline banner ──────────────────── */}
+        <DeadlineBanner result={giftDropoffDeadline} />
 
         {claims.length === 0 ? (
           <Card className="py-12 text-center">

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../lib/api";
 import type { FamilyClaimSummary } from "../types";
 import DonorClaims from "./DonorClaims";
@@ -52,6 +52,10 @@ const wrap = (ui: React.ReactElement) =>
 /* ------------------------------------------------------------------ */
 
 describe("DonorClaims", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
+  });
+
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();

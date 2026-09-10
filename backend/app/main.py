@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import contextvars
 import json
@@ -19,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.auth import get_password_hash
 from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
+from app.deadlines import deadline_checks_loop
 from app.models import User, UserRole, default_display_name_from_email
 
 
@@ -172,7 +174,7 @@ async def log_request_middleware(request: Request, call_next):
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:
-    """Seed bootstrap admin user on startup."""
+    """Seed bootstrap admin user on startup and start the daily deadline-check task."""
     from sqlalchemy.exc import ProgrammingError, OperationalError
 
     db = None
@@ -214,7 +216,24 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
         if db:
             db.close()
 
-    yield
+    # Daily deadline checks — runs once on startup (catching any cutoffs
+    # missed while the app was down), then daily at 09:00 UTC (01:00 Pacific).
+    # Disabled in tests via DISABLE_BACKGROUND_TASKS: the app lifespan runs
+    # per test, and a past-dated enforced row created by a test would let
+    # the task run the batches on the shared test DB mid-suite, racing the
+    # tests' own state assertions.
+    deadline_task: asyncio.Task | None = None
+    if not os.environ.get("DISABLE_BACKGROUND_TASKS"):
+        deadline_task = asyncio.create_task(deadline_checks_loop())
+        logger.info("Daily deadline-check task started.")
+
+    try:
+        yield
+    finally:
+        if deadline_task is not None:
+            deadline_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await deadline_task
 
 
 app = FastAPI(lifespan=lifespan)
@@ -314,6 +333,7 @@ from app.admin_users import csv_admin_router, user_admin_router  # noqa: E402
 from app.admin_invites import invite_admin_router  # noqa: E402
 from app.admin_wishes import admin_wishes_router  # noqa: E402
 from app.admin_emails import email_admin_router  # noqa: E402
+from app.admin_deadlines import deadline_admin_router  # noqa: E402
 
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
@@ -323,6 +343,7 @@ app.include_router(user_admin_router)
 app.include_router(invite_admin_router)
 app.include_router(admin_wishes_router)
 app.include_router(email_admin_router)
+app.include_router(deadline_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)
@@ -341,6 +362,13 @@ app.include_router(people_router)
 from app.families_routes import router as families_router  # noqa: E402
 
 app.include_router(families_router)
+
+# ---------------------------------------------------------------------------
+# Include public deadline routes
+# ---------------------------------------------------------------------------
+from app.deadlines_routes import router as deadlines_router  # noqa: E402
+
+app.include_router(deadlines_router)
 
 # ---------------------------------------------------------------------------
 # Include purchaser self-service routes

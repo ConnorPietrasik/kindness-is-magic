@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth import decode_access_token
 from app.config import APP_BASE_URL, GIFT_CLAIM_CAP
 from app.database import get_db
+from app.deadlines import GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.mail import (
     build_claim_confirmation_email,
     build_admin_email_failure_notice,
@@ -25,6 +26,7 @@ from app.display_ids import compute_display_ids
 from app.permissions import require_claim_capable
 from app.models import (
     CommitmentType,
+    DeadlineType,
     EmailKind,
     Family,
     FamilyVerificationStatus,
@@ -415,6 +417,14 @@ async def claim_family(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This family hasn't been fully approved yet.",
         )
+
+    # 1b. Gift drop-off deadline gate — request-time evaluation (no daily
+    #     task run in between): an armed gift_dropoff deadline blocks new
+    #     gift claims for every claim-capable role, admin included (a
+    #     business rule — gifts can't arrive in time). Cash claims are
+    #     unaffected.
+    if data.commitment_type == CommitmentType.gifts and is_type_armed(db, DeadlineType.gift_dropoff):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=GIFT_CLAIM_BLOCKED_DETAIL)
 
     # 2. Check family is not already actively claimed
     existing_claim = (

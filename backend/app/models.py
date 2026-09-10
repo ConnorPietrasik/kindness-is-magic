@@ -1,8 +1,9 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -469,6 +470,65 @@ class EmailPreference(Base):
 
     email: Mapped[str] = mapped_column(String(120), primary_key=True, index=True)
     unsubscribed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Event deadlines
+# ---------------------------------------------------------------------------
+
+
+class DeadlineType(str, enum.Enum):
+    """Kind of event deadline (stored lowercase, like the other enums).
+
+    The set of types is defined in code; admins create rows, not types.
+    """
+
+    family_info = "family_info"
+    referrer_review = "referrer_review"
+    gift_dropoff = "gift_dropoff"
+
+
+class DeadlineMode(str, enum.Enum):
+    """What a dated deadline row does.
+
+    * ``display`` — banner on that date (visual channel).
+    * ``remind`` — reminder emails for that type on that date (planned
+      follow-up); a remind row is never shown in a banner and triggers
+      nothing for now.
+    * ``enforced`` — banner, plus the type's enforced action once the
+      cutoff (01:00 Pacific the day after the due date) has passed.
+    """
+
+    display = "display"
+    remind = "remind"
+    enforced = "enforced"
+
+
+class Deadline(Base):
+    """Admin-configured event deadline.
+
+    Multiple rows per type are allowed (e.g. a reminder deadline a week
+    before the enforced one). An undated row is inert everywhere. No
+    ``deleted_at`` — deletion is a hard delete: a deadline is a trivially
+    re-creatable config row that nothing references, so the soft-delete
+    convention (domain entities) doesn't apply.
+    """
+
+    __tablename__ = "deadlines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    type: Mapped[DeadlineType] = mapped_column(
+        SAEnum(DeadlineType, name="deadline_type", create_constraint=True),
+        nullable=False,
+    )
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    mode: Mapped[DeadlineMode] = mapped_column(
+        SAEnum(DeadlineMode, name="deadline_mode", create_constraint=True),
+        server_default="display",
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # ---------------------------------------------------------------------------

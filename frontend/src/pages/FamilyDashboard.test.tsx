@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { FamilySelfServiceDetail } from "../types";
+import type { Deadline, FamilySelfServiceDetail } from "../types";
 import FamilyDashboard from "./FamilyDashboard";
 
 /* ------------------------------------------------------------------ */
@@ -32,8 +32,9 @@ const familyBase: FamilySelfServiceDetail = {
   wish_rejection_reason: null,
 };
 
-function renderDashboard(family: FamilySelfServiceDetail) {
+function renderDashboard(family: FamilySelfServiceDetail, deadlines: Deadline[] = []) {
   vi.spyOn(api, "getFamilyMe").mockResolvedValue(family);
+  vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={["/family/dashboard"]}>
@@ -99,5 +100,23 @@ describe("FamilyDashboard", () => {
     // No edit button, and the manage-people card is disabled
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.getByText("Locked — contact your referrer to request changes")).toBeInTheDocument();
+  });
+
+  it("shows the family_info deadline banner when one is configured", async () => {
+    renderDashboard(familyBase, [
+      {
+        id: 1,
+        type: "family_info",
+        label: "Family information",
+        due_date: "2099-12-15",
+        mode: "enforced",
+        created_at: "2025-01-01T00:00:00Z",
+      },
+    ]);
+
+    // The banner text is split across spans (label, "due", date)
+    const label = await screen.findByText("Family information");
+    expect(screen.getByText("Dec 15, 2099")).toBeInTheDocument();
+    expect(label.closest("div")).toHaveClass("bg-blue-50");
   });
 });

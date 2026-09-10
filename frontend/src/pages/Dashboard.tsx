@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { FormField } from "../components/FormField";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { HeaderBar, LogoutButton } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
@@ -12,6 +13,7 @@ import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useDashboardTiles } from "../hooks/useDashboardTiles";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import {
   changePasswordRequest,
   donorListClaims,
@@ -122,6 +124,9 @@ export default function Dashboard() {
         {user?.role === "referrer" && pendingFamilies && pendingFamilies.length > 0 && (
           <QueueAlert count={pendingFamilies.length} label="awaiting your verification" to={ROUTES.REFERRER_FAMILY_INVITES} tone="amber" />
         )}
+
+        {/* Referrer wish review deadline banner */}
+        {user?.role === "referrer" && <ReferrerReviewDeadlineBanner />}
 
         {/* Referrer wish review queue alert */}
         {user?.role === "referrer" && referrerReviewQueueData && referrerReviewQueueData.length > 0 && (
@@ -406,6 +411,17 @@ function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelf
       </div>
     </form>
   );
+}
+
+/**
+ * ReferrerReviewDeadlineBanner — the referrer_review deadline banner on the
+ * referrer dashboard. Mounted only for referrers (via the role check in the
+ * page), so the shared deadlines query is never fetched for other roles.
+ * The queue count next to it comes from the QueueAlert below, so no `extra`.
+ */
+function ReferrerReviewDeadlineBanner() {
+  const result = useDeadlineBanner("referrer_review");
+  return <DeadlineBanner result={result} />;
 }
 
 /**

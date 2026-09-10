@@ -60,6 +60,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       desc: "Approve or reject family wishes",
       visible: true,
     },
+    {
+      key: "deadlines",
+      route: ROUTES.ADMIN_DEADLINES,
+      icon: "📅",
+      label: "Deadlines",
+      desc: "Event deadlines: banners, reminders & enforcement",
+      visible: true,
+    },
     { key: "wishes", route: ROUTES.ADMIN_WISHES, icon: "🎁", label: "Manage Wishes", desc: "Assign & track gift purchases", visible: true },
     {
       key: "assigned-gifts",

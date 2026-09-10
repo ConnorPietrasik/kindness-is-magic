@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { FamilyClaimSummary, FamilyReviewQueueItem, PendingFamilySummary, ReferrerDetail, User } from "../types";
+import type { Deadline, FamilyClaimSummary, FamilyReviewQueueItem, PendingFamilySummary, ReferrerDetail, User } from "../types";
 import { DASHBOARD_TILES } from "../types/tiles";
 import Dashboard from "./Dashboard";
 
@@ -127,6 +127,7 @@ describe("Dashboard", () => {
     vi.spyOn(api, "getReferrerMe").mockResolvedValue(mockReferrerDetail);
     vi.spyOn(api, "listPendingFamilies").mockResolvedValue([mockPendingFamily, { ...mockPendingFamily, id: 7 }]);
     vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([mockQueueItem]);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
 
     renderDashboard(referrerUser);
 
@@ -140,6 +141,7 @@ describe("Dashboard", () => {
     vi.spyOn(api, "getReferrerMe").mockResolvedValue(mockReferrerDetail);
     vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
     vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
 
     renderDashboard(referrerUser);
 
@@ -178,6 +180,37 @@ describe("Dashboard", () => {
     expect(packing).toHaveAttribute("href", "/admin/packing-slips");
     const delivery = screen.getByRole("link", { name: /Delivery Slips/ });
     expect(delivery).toHaveAttribute("href", "/admin/delivery-slips");
+  });
+
+  it("shows the referrer_review deadline banner for referrers only", async () => {
+    const deadline: Deadline = {
+      id: 1,
+      type: "referrer_review",
+      label: "Wish review by Dec 15",
+      due_date: "2099-12-15",
+      mode: "enforced",
+      created_at: "2025-01-01T00:00:00Z",
+    };
+    vi.spyOn(api, "getReferrerMe").mockResolvedValue(mockReferrerDetail);
+    vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
+    vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [deadline] });
+
+    renderDashboard(referrerUser);
+
+    // The banner text is split across spans (label, "due", date)
+    const label = await screen.findByText("Wish review by Dec 15");
+    expect(screen.getByText("Dec 15, 2099")).toBeInTheDocument();
+    expect(label.closest("div")).toHaveClass("bg-blue-50");
+
+    // Non-referrer roles never render the banner (even with a row configured)
+    cleanup();
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    renderDashboard(adminUser);
+    await waitFor(() => {
+      expect(screen.getByText("Welcome back!")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Wish review by Dec 15")).not.toBeInTheDocument();
   });
 
   it("shows the gift-claim progress toward the cap for donors", async () => {

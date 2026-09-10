@@ -27,6 +27,7 @@ export const ROUTES = {
   ADMIN_PEOPLE: "/admin/people",
   ADMIN_CSV_UPLOAD: "/admin/csv-upload",
   ADMIN_WISH_REVIEW: "/admin/wish-review",
+  ADMIN_DEADLINES: "/admin/deadlines",
   ADMIN_PACKING_SLIPS: "/admin/packing-slips",
   ADMIN_DELIVERY_SLIPS: "/admin/delivery-slips",
   ADMIN_WISHES: "/admin/wishes",

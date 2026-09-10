@@ -21,3 +21,16 @@ GIFT_CLAIM_CAP = 5
 # window lets the slower of the two complete its rotation instead of being
 # logged out. Presentations outside the window are treated as replays (401).
 REFRESH_ROTATION_GRACE_SECONDS = 60
+
+# ---------------------------------------------------------------------------
+# Event deadline enforcement timing
+#
+# Pacific is treated as a *fixed* UTC-8 (no DST handling) — up to an hour of
+# drift during PDT is explicitly accepted. An enforced deadline takes effect
+# at 01:00 Pacific on the day AFTER the announced due date — an hour of
+# deliberate slack past midnight for last-minute people (the announced
+# deadline remains midnight). In code the cutoff is due_date + 1 day at
+# 09:00 UTC, i.e. 01:00 at fixed UTC-8.
+# ---------------------------------------------------------------------------
+DEADLINE_PACIFIC_UTC_OFFSET_HOURS = -8
+DEADLINE_ENFORCEMENT_HOUR_PACIFIC = 1
