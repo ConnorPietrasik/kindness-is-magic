@@ -5,8 +5,10 @@
  * asc → desc → clear cycle and renders state via *sortField*); the search
  * input renders per *searchKind* — "text" sends its value as one list param
  * named *field*, "date" sends `<field>_from` / `<field>_to` day params.
- * Columns without a *searchKind* (e.g. sort-only or presentational) get no
- * input.
+ * Date boxes are icon-only while empty (the "date-empty" class hides the
+ * mm/dd/yyyy placeholder text — see index.css) and expand when a day is
+ * picked. Columns without a *searchKind* (e.g. sort-only or presentational)
+ * get no input.
  */
 
 interface ColumnHeaderProps {
@@ -27,6 +29,19 @@ export function ColumnHeader({ label, field, searchKind, sortField, columnSearch
   const arrow = sortField === field ? "↑" : sortField === `-${field}` ? "↓" : "";
   const inputClass =
     "rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20";
+  // From/to day boxes collapse to the calendar icon while empty and expand
+  // to show the date once one is picked (the "date-empty" class hides the
+  // mm/dd/yyyy placeholder text in index.css).
+  const dateInput = (key: string, ariaLabel: string) => (
+    <input
+      type="date"
+      aria-label={ariaLabel}
+      value={columnSearch[key] ?? ""}
+      onChange={(e) => onSearchChange(key, e.target.value)}
+      className={`${(columnSearch[key] ?? "") ? "w-full min-w-0" : "w-8 date-empty"} ${inputClass}`}
+      autoComplete="off"
+    />
+  );
   return (
     <div className="flex flex-col gap-1">
       <button
@@ -51,22 +66,8 @@ export function ColumnHeader({ label, field, searchKind, sortField, columnSearch
       )}
       {searchKind === "date" && (
         <div className="flex items-center gap-1">
-          <input
-            type="date"
-            aria-label={`${label} from`}
-            value={columnSearch[`${field}_from`] ?? ""}
-            onChange={(e) => onSearchChange(`${field}_from`, e.target.value)}
-            className={`w-full min-w-0 ${inputClass}`}
-            autoComplete="off"
-          />
-          <input
-            type="date"
-            aria-label={`${label} to`}
-            value={columnSearch[`${field}_to`] ?? ""}
-            onChange={(e) => onSearchChange(`${field}_to`, e.target.value)}
-            className={`w-full min-w-0 ${inputClass}`}
-            autoComplete="off"
-          />
+          {dateInput(`${field}_from`, `${label} from`)}
+          {dateInput(`${field}_to`, `${label} to`)}
         </div>
       )}
     </div>

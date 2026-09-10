@@ -320,10 +320,17 @@ test.describe.serial("Admin Assigned Gifts", () => {
     await expect(dateRow).toBeVisible({ timeout: 10_000 });
 
     // One-day window on the API-set purchase day: only the dated row stays —
-    // the mark tests bought the others on 2026-02/2026-03 local-time days
+    // the mark tests bought the others on 2026-02/2026-03 local-time days.
+    // The empty from/to boxes collapse to the calendar icon; picking a day
+    // expands the box to show the date.
     const purchasedDay = DATE_PURCHASED_AT.slice(0, 10);
-    await page.getByLabel("Purchased from").fill(purchasedDay);
-    await page.getByLabel("Purchased to").fill(purchasedDay);
+    const fromInput = page.getByLabel("Purchased from");
+    const toInput = page.getByLabel("Purchased to");
+    const emptyWidth = (await fromInput.boundingBox())!.width;
+    expect(emptyWidth).toBeLessThan(48);
+    await fromInput.fill(purchasedDay);
+    expect((await fromInput.boundingBox())!.width).toBeGreaterThan(emptyWidth);
+    await toInput.fill(purchasedDay);
     await expect(dateRow).toBeVisible();
     await expect(ourRow).toBeHidden({ timeout: 10_000 });
     await expect(batchRow).toBeHidden();

@@ -56,6 +56,14 @@ select {
   padding-right: 2.5rem;
 }
 
+/* ── Date filter inputs (ColumnHeader) ─────────────────────────
+   Empty from/to filter boxes collapse to the calendar icon: the placeholder
+   date text is hidden so the input can shrink to it (ColumnHeader adds the
+   "date-empty" class while the input is empty). */
+input[type="date"].date-empty::-webkit-datetime-edit {
+  display: none;
+}
+
 /* ── Table responsive wrapper ────────────────────────────────── */
 .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
