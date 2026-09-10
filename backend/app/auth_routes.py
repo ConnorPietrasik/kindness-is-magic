@@ -79,7 +79,9 @@ def _issue_session(response: Response, user: User, db: Session) -> None:
     /refresh answers 401 "revoked" (the cookie exists but the server has
     no record of the token).
     """
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    # The access log middleware reads ``email`` from the JWT to correlate
+    # log lines with the acting user (see log_request_middleware in main.py).
+    access_token = create_access_token(data={"sub": str(user.id), "email": user.email, "role": user.role})
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
     set_auth_cookies(response, access_token, refresh_token)
 
