@@ -789,6 +789,20 @@ export interface PurchaserWishesListParams extends PaginationParams {
   purchased?: string;
   search?: string;
   wish_type?: string;
+  sort?: string;
+  // Per-column text search (no family_name — purchaser responses carry no
+  // family PII)
+  description?: string;
+  size?: string;
+  color?: string;
+  person_given_name?: string;
+  purchased_where?: string;
+  purchaser_note?: string;
+  // Per-column date ranges (YYYY-MM-DD, inclusive UTC day boundaries)
+  purchased_at_from?: string;
+  purchased_at_to?: string;
+  received_at_from?: string;
+  received_at_to?: string;
 }
 
 /** List wishes assigned to the current purchaser. */

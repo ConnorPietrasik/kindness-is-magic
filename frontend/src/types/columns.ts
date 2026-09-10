@@ -84,6 +84,37 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "received_at", label: "Received At", visible: false },
     { key: "purchaser_note", label: "Purchaser Note", visible: false },
   ],
+  // Assigned-gifts pages — the family column key differs per page (admin:
+  // family_name, purchaser: family_display_id), so each page gets its own
+  // entry rather than sharing adminWishes. Default-visible set = today's
+  // table; the purchase-tracking columns are hidden by default, as is the
+  // purchaser's Family column (a subset of the wish display_id).
+  adminAssignedGifts: [
+    { key: "display_id", label: "ID", visible: true },
+    { key: "person_given_name", label: "Person", visible: true },
+    { key: "family_name", label: "Family", visible: true },
+    { key: "type", label: "Type", visible: true },
+    { key: "description", label: "Description", visible: true },
+    { key: "size", label: "Size", visible: true },
+    { key: "color", label: "Color", visible: true },
+    { key: "purchased_at", label: "Purchased", visible: true },
+    { key: "purchased_where", label: "Purchased Where", visible: false },
+    { key: "received_at", label: "Received At", visible: false },
+    { key: "purchaser_note", label: "Purchaser Note", visible: false },
+  ],
+  purchaserAssignedGifts: [
+    { key: "display_id", label: "ID", visible: true },
+    { key: "person_given_name", label: "Person", visible: true },
+    { key: "family_display_id", label: "Family", visible: false },
+    { key: "type", label: "Type", visible: true },
+    { key: "description", label: "Description", visible: true },
+    { key: "size", label: "Size", visible: true },
+    { key: "color", label: "Color", visible: true },
+    { key: "purchased_at", label: "Purchased", visible: true },
+    { key: "purchased_where", label: "Purchased Where", visible: false },
+    { key: "received_at", label: "Received At", visible: false },
+    { key: "purchaser_note", label: "Purchaser Note", visible: false },
+  ],
   adminInvites: [
     { key: "code", label: "Code", visible: true },
     { key: "family_limit", label: "Family Limit", visible: true },

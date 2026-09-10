@@ -13,6 +13,7 @@
 import { Link } from "react-router-dom";
 import { AssignedGiftsView } from "../components/AssignedGifts";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
+import { useTableWidth } from "../hooks/useTableWidth";
 import {
   purchaserBatchMarkPurchased,
   purchaserGetWish,
@@ -27,11 +28,15 @@ import { ROUTES, route } from "../lib/routes";
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PurchaserAssignedGifts() {
+  // useTableWidth syncs with the view's ColumnToggle via window events — the
+  // view doesn't render <main>, so the width class applies here.
+  const { widthClass } = useTableWidth("purchaserAssignedGifts");
+
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <AssignedGiftsView
           title="Assigned Gifts"
           emptyMessage="No wishes found."
@@ -39,6 +44,8 @@ export default function PurchaserAssignedGifts() {
           detailKey={purchaserWishDetail}
           invalidationKeys={[purchaserWishes]}
           listFn={purchaserListWishes}
+          columnResourceKey="purchaserAssignedGifts"
+          familyColumn={{ key: "family_display_id", sortable: false }}
           detailFn={purchaserGetWish}
           updateFn={purchaserUpdateWish}
           markPurchasedFn={purchaserMarkPurchased}

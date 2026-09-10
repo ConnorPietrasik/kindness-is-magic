@@ -14,6 +14,7 @@ import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useFamiliesDropdown } from "../hooks/useDropdowns";
+import { useTableWidth } from "../hooks/useTableWidth";
 import { adminBatchMarkPurchased, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
 import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -31,12 +32,15 @@ export default function AdminAssignedGifts() {
 
 function AdminAssignedGiftsList({ userId }: { userId: number }) {
   const { familyMap } = useFamiliesDropdown();
+  // useTableWidth syncs with the view's ColumnToggle via window events — the
+  // view doesn't render <main>, so the width class applies here.
+  const { widthClass } = useTableWidth("adminAssignedGifts");
 
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <AssignedGiftsView
           title="My Assigned Gifts"
           emptyMessage="No wishes assigned to you."
@@ -45,6 +49,8 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
           invalidationKeys={[adminWishes, adminPackingSlips]}
           // Annotated param so the view can infer the response type from this arrow's return
           listFn={(params: AssignedGiftsListParams) => adminListWishes({ ...params, assigned_to_id: userId })}
+          columnResourceKey="adminAssignedGifts"
+          familyColumn={{ key: "family_name", sortable: true }}
           detailFn={adminGetWish}
           updateFn={adminUpdateWish}
           markPurchasedFn={adminMarkPurchased}

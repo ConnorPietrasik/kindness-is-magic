@@ -14,6 +14,18 @@ const WIDTH_MODES: { key: TableWidthMode; label: string }[] = [
   { key: "full", label: "Full" },
 ];
 
+/**
+ * Per-resource default width mode — every resource defaults to "compact"
+ * except where overridden here (the gear's Reset restores this default).
+ */
+const DEFAULT_WIDTH_MODES: Record<string, TableWidthMode> = {
+  // The purchaser's family column is hidden by default, so its table has
+  // fewer columns than the other list pages — wide gives it more room.
+  purchaserAssignedGifts: "wide",
+};
+
+const FALLBACK_WIDTH_MODE: TableWidthMode = "compact";
+
 const WIDTH_CLASS_MAP: Record<TableWidthMode, string> = {
   fit: "max-w-fit",
   compact: "max-w-[960px]",
@@ -27,6 +39,7 @@ function getWidthClass(mode: TableWidthMode): string {
 
 export function useTableWidth(resourceKey: string) {
   const storageKey = STORAGE_PREFIX + resourceKey;
+  const defaultMode = DEFAULT_WIDTH_MODES[resourceKey] ?? FALLBACK_WIDTH_MODE;
 
   const [widthMode, setWidthModeState] = useState<TableWidthMode>(() => {
     try {
@@ -37,7 +50,7 @@ export function useTableWidth(resourceKey: string) {
     } catch {
       // ignore malformed data
     }
-    return "compact";
+    return defaultMode;
   });
 
   // Persist to localStorage
@@ -63,5 +76,5 @@ export function useTableWidth(resourceKey: string) {
     setWidthModeState(mode);
   };
 
-  return { widthMode, widthClass: getWidthClass(widthMode), setWidthMode, widthModes: WIDTH_MODES };
+  return { widthMode, widthClass: getWidthClass(widthMode), setWidthMode, widthModes: WIDTH_MODES, defaultMode };
 }

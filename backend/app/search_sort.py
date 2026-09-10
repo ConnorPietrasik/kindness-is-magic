@@ -5,6 +5,8 @@ registries — including the shared table aliases, the owner-family coalesce
 helper, and the correlated aggregate subqueries behind them.
 """
 
+from datetime import date, datetime, timezone
+
 from sqlalchemy import ColumnElement, String, case, func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.util import AliasedClass
@@ -92,6 +94,11 @@ def escape_like(value: str) -> str:
         query = query.filter(Wish.description.ilike(pattern, escape="\\"))
     """
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _utc_day_start(day: date) -> datetime:
+    """Start of a UTC calendar day as a timezone-aware datetime."""
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +214,21 @@ WISH_SORT_FIELDS: dict[str, ColumnElement] = {
     "referrer_name": WISH_REFERRER.name,
     "referrer_phone_number": WISH_REFERRER.phone_number,
     "assigned_to_name": ASSIGNED_USER.display_name,
+}
+
+# Sort fields the purchaser wish list accepts — exactly the columns the
+# purchaser UI can sort: no family/assignee/created fields (the purchaser
+# response carries no family PII and assigned-to is always self).
+PURCHASER_WISH_SORT_FIELDS: dict[str, ColumnElement] = {
+    "type": Wish.type,
+    "description": Wish.description,
+    "size": Wish.size,
+    "color": Wish.color,
+    "person_given_name": Person.given_name,
+    "purchased_at": Wish.purchased_at,
+    "purchased_where": Wish.purchased_where,
+    "received_at": Wish.received_at,
+    "purchaser_note": Wish.purchaser_note,
 }
 
 # Owner-family columns exposed as wish list fields: item field name →

@@ -5,7 +5,7 @@ All endpoints are guarded with ``require_purchaser``.
 
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
@@ -30,7 +30,14 @@ from app.schemas import (
     WishDetail,
     WishPurchaseMark,
 )
-from app.search_sort import escape_like, wish_grouped_order
+from app.search_sort import (
+    PURCHASER_WISH_SORT_FIELDS,
+    WISH_DATE_RANGE_FIELDS,
+    WISH_SEARCH_FIELDS,
+    _utc_day_start,
+    escape_like,
+    wish_grouped_order,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +94,21 @@ def list_wishes(
     purchased: str | None = Query(None),
     search: str | None = Query(None),
     wish_type: WishType | None = Query(None),
+    sort: str | None = Query(None),
+    # Per-column text search: one optional param per text-searchable field
+    # (named after the item field) — substring ILIKE with LIKE wildcards
+    # escaped, ANDed together.
+    description: str | None = Query(None),
+    size: str | None = Query(None),
+    color: str | None = Query(None),
+    person_given_name: str | None = Query(None),
+    purchased_where: str | None = Query(None),
+    purchaser_note: str | None = Query(None),
+    # Per-column date ranges: inclusive day boundaries in UTC.
+    purchased_at_from: date | None = Query(None),
+    purchased_at_to: date | None = Query(None),
+    received_at_from: date | None = Query(None),
+    received_at_to: date | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_purchaser),
 ) -> PurchaserWishListResponse:
@@ -101,6 +123,16 @@ def list_wishes(
     match on wish description or person given name (family names are
     excluded: purchaser responses carry no family PII); and ``wish_type``
     (same values the admin endpoint accepts).
+
+    Each text-searchable field also has its own optional param (named
+    after the item field; substring, case-insensitive, LIKE wildcards
+    escaped) and ``purchased_at`` / ``received_at`` each have
+    ``<field>_from`` / ``<field>_to`` inclusive UTC day-boundary params;
+    all of them AND with the other filters. An explicit ``sort`` naming a
+    ``PURCHASER_WISH_SORT_FIELDS`` column (``-`` prefix for descending)
+    orders by that single column instead, with NULLs last in both
+    directions and an id tie-breaker; unknown or empty values fall back
+    to the grouped default.
     """
     # Phase 1: filter query.  The explicit Person outer-join is needed for
     # the given-name search; the family joins serve the grouped default
@@ -131,11 +163,45 @@ def list_wishes(
                 Person.given_name.ilike(pattern, escape="\\"),
             )
         )
+    # Per-column text search: one optional param per text-searchable field,
+    # ANDed with each other and everything above.
+    for field, value in {
+        "description": description,
+        "size": size,
+        "color": color,
+        "person_given_name": person_given_name,
+        "purchased_where": purchased_where,
+        "purchaser_note": purchaser_note,
+    }.items():
+        if value is None:
+            continue
+        query = query.filter(WISH_SEARCH_FIELDS[field].ilike(f"%{escape_like(value)}%", escape="\\"))
+    # Per-column date ranges: from = start of that UTC day (inclusive),
+    # to = end of that UTC day (exclusive next-midnight bound).
+    for field, (from_day, to_day) in {
+        "purchased_at": (purchased_at_from, purchased_at_to),
+        "received_at": (received_at_from, received_at_to),
+    }.items():
+        if from_day is not None:
+            query = query.filter(WISH_DATE_RANGE_FIELDS[field] >= _utc_day_start(from_day))
+        if to_day is not None:
+            query = query.filter(WISH_DATE_RANGE_FIELDS[field] < _utc_day_start(to_day + timedelta(days=1)))
     if wish_type is not None:
         query = query.filter(Wish.type == wish_type)
 
     total = query.count()
-    order_by = wish_grouped_order(direct_family)
+
+    # An explicit ``sort`` naming a PURCHASER_WISH_SORT_FIELDS column keeps
+    # the single-column order (+ id tie-breaker); unknown or empty values
+    # fall back to the grouped default. NULLs sort last in both directions,
+    # uniformly for every sort field. The two-phase paging below restores
+    # the phase-1 order in Python, so no other changes are needed.
+    field = sort[1:] if sort and sort.startswith("-") else sort
+    if sort and field in PURCHASER_WISH_SORT_FIELDS:
+        column = PURCHASER_WISH_SORT_FIELDS[field]
+        order_by = [(column.desc() if sort.startswith("-") else column.asc()).nullslast(), Wish.id]
+    else:
+        order_by = wish_grouped_order(direct_family)
     wish_ids = [w.id for w in query.order_by(*order_by).offset((page - 1) * page_size).limit(page_size).all()]
 
     # Phase 2: re-query the page's wish IDs with joinedload to build items —

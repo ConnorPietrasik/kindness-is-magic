@@ -7,22 +7,35 @@
  * query (via useCrudManager, update-only), checkbox selection, the
  * mark-purchased and batch-mark-purchased mutations + dialogs, and the
  * inline edit form for the purchase-tracking fields (purchaser note,
- * received at). The page supplies the chrome (HeaderBar, <main>), config
- * (API functions, query keys, heading/copy), and the family cell renderer.
+ * received at). The page supplies the chrome (HeaderBar, <main> — including
+ * the useTableWidth width class, which syncs with the view's ColumnToggle
+ * via window events), config (API functions, query keys, heading/copy, the
+ * column resource key, the family column), and the family cell renderer.
+ *
+ * Spreadsheet columns mirror the admin Manage Wishes pattern: per-column
+ * filter inputs in the headers, click-to-sort (asc → desc → clear),
+ * drag/arrow-key column rearranging with per-user persistence, and the
+ * column-visibility gear. Each page persists under its own resource key.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../context/ToastContext";
+import { useColumnOrder } from "../hooks/useColumnOrder";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { WishBatchMarkPurchased, WishDetail, WishPurchaseMark, WishType } from "../types";
+import type { ColumnDef } from "../types/columns";
 import { BatchMarkPurchasedDialog } from "./BatchMarkPurchasedDialog";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { ColumnHeader } from "./ColumnHeader";
+import { ColumnToggle } from "./ColumnToggle";
 import { DatePicker } from "./DatePicker";
+import { DraggableTh } from "./DraggableTh";
 import { MarkPurchasedDialog, type MarkPurchasedDialogWish } from "./MarkPurchasedDialog";
 import { MutationErrors } from "./MutationErrors";
 import { OptionalLabel } from "./OptionalLabel";
@@ -55,6 +68,20 @@ export interface AssignedGiftsListParams {
   purchased?: string;
   search?: string;
   wish_type?: string;
+  sort?: string;
+  // Per-column text search
+  description?: string;
+  size?: string;
+  color?: string;
+  person_given_name?: string;
+  family_name?: string;
+  purchased_where?: string;
+  purchaser_note?: string;
+  // Per-column date ranges (YYYY-MM-DD, inclusive UTC day boundaries)
+  purchased_at_from?: string;
+  purchased_at_to?: string;
+  received_at_from?: string;
+  received_at_to?: string;
 }
 
 /** Internal form state — only the purchase-tracking fields this view edits. */
@@ -81,6 +108,18 @@ export interface AssignedGiftsViewProps<
    * (e.g. admin: `{ ...params, assigned_to_id: user.id }`).
    */
   listFn: (params: AssignedGiftsListParams) => Promise<ListResponse>;
+  /**
+   * Column registry key for visibility/order/width persistence —
+   * "adminAssignedGifts" or "purchaserAssignedGifts" (separate entries: the
+   * family column key differs per page).
+   */
+  columnResourceKey: "adminAssignedGifts" | "purchaserAssignedGifts";
+  /**
+   * Family column config. Admin: key "family_name", text filter + sort.
+   * Purchaser: key "family_display_id", no filter, no sort (presentational
+   * only — purchaser responses carry no family PII).
+   */
+  familyColumn: { key: string; sortable: boolean };
   /** Fetch a single wish by id (for the inline edit form). */
   detailFn: (id: number) => Promise<WishDetail>;
   /** Update the purchase-tracking fields on a wish. */
@@ -102,8 +141,24 @@ export interface AssignedGiftsViewProps<
 
 const DEFAULT_PAGE_SIZE = 50;
 
-/** Data columns in the table (checkbox + Actions are implicit) — drives the inline edit row's colSpan. */
-const DATA_COLUMNS = ["ID", "Person", "Family", "Type", "Description", "Size", "Color", "Purchased"];
+/**
+ * Per-column search for the assigned-gifts table: column key → input kind.
+ * Keys absent from the map get no search input ("type" is sortable only, the
+ * purchaser family column is presentational only); "display_id" is neither
+ * searchable nor sortable. Text inputs filter via the list-param field of
+ * the same name; date columns send `<field>_from` / `<field>_to`.
+ */
+const ASSIGNED_GIFTS_COLUMN_SEARCH: Record<string, "text" | "date"> = {
+  person_given_name: "text",
+  family_name: "text",
+  description: "text",
+  size: "text",
+  color: "text",
+  purchased_at: "date",
+  purchased_where: "text",
+  received_at: "date",
+  purchaser_note: "text",
+};
 
 export function AssignedGiftsView<
   ListResponse extends { wishes: AssignedGiftRow[]; total: number } = { wishes: AssignedGiftRow[]; total: number },
@@ -114,6 +169,8 @@ export function AssignedGiftsView<
   detailKey,
   invalidationKeys,
   listFn,
+  columnResourceKey,
+  familyColumn,
   detailFn,
   updateFn,
   markPurchasedFn,
@@ -123,6 +180,10 @@ export function AssignedGiftsView<
   const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
   const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<string>("");
+  // Per-column search: one record keyed by list-param field (date inputs use
+  // `<field>_from` / `<field>_to`); empty entries are omitted from list params.
+  const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchMarkOpen, setBatchMarkOpen] = useState(false);
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
@@ -133,16 +194,74 @@ export function AssignedGiftsView<
 
   // Debounce search so the list doesn't refetch on every keystroke
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedColumnSearch = useDebouncedState(columnSearch, 1000, () => pagination.goToPage(1));
+
+  const updateColumnSearch = useCallback((key: string, value: string) => {
+    setColumnSearch((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Sort: clicking a column header cycles asc → desc → clear (grouped-by-family default)
+  const handleSortClick = (field: string) => {
+    setSortField((prev) => {
+      if (prev === field) return `-${field}`;
+      if (prev === `-${field}`) return "";
+      return field;
+    });
+    pagination.goToPage(1);
+  };
+
+  // Column visibility + user column order (each page persists under its own key)
+  const { visibleColumns, defs } = useColumnVisibility(columnResourceKey);
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder(columnResourceKey, visibleColumns);
+
+  // Visible columns in the user's custom order — that order is the sheet
+  // layout, and the body cells render in it too.
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
+  const defByKey = useMemo(() => {
+    const map: Record<string, ColumnDef> = {};
+    for (const d of defs) map[d.key] = d;
+    return map;
+  }, [defs]);
+
+  // Drop filters for columns that are no longer visible, so a hidden column
+  // can't keep filtering the list with no input left to clear it.
+  useEffect(() => {
+    setColumnSearch((prev) => {
+      const visibleKeys = new Set<string>();
+      for (const d of defs) {
+        if (!visibleColumns.includes(d.key)) continue;
+        const kind = ASSIGNED_GIFTS_COLUMN_SEARCH[d.key];
+        if (kind === "text") visibleKeys.add(d.key);
+        else if (kind === "date") {
+          visibleKeys.add(`${d.key}_from`);
+          visibleKeys.add(`${d.key}_to`);
+        }
+      }
+      const kept = Object.fromEntries(Object.entries(prev).filter(([key]) => visibleKeys.has(key)));
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+    });
+  }, [visibleColumns, defs]);
+
+  // Per-column search params — non-empty entries only (empty → omitted)
+  const columnSearchParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(debouncedColumnSearch)) {
+      if (value) params[key] = value;
+    }
+    return params;
+  }, [debouncedColumnSearch]);
 
   // Build list params from filters
   const listParams = useMemo<AssignedGiftsListParams>(
     () => ({
       ...pagination.params,
+      ...columnSearchParams,
       purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
       search: debouncedSearch || undefined,
       wish_type: wishTypeFilter || undefined,
+      sort: sortField || undefined,
     }),
-    [pagination.params, purchasedFilter, debouncedSearch, wishTypeFilter]
+    [pagination.params, columnSearchParams, purchasedFilter, debouncedSearch, wishTypeFilter, sortField]
   );
 
   // CRUD manager — list/detail/update only (no create/delete for wishes)
@@ -243,9 +362,17 @@ export function AssignedGiftsView<
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-bold text-violet-950">{title}</h2>
-        <Button onClick={() => setBatchMarkOpen(true)} disabled={selectedIds.size === 0 || batchMarkMut.isPending}>
-          Mark Purchased ({selectedIds.size})
-        </Button>
+        <div className="flex items-center gap-3">
+          {!isDefaultOrder && (
+            <Button variant="secondary" onClick={resetOrder}>
+              Reset order
+            </Button>
+          )}
+          <ColumnToggle resourceKey={columnResourceKey} />
+          <Button onClick={() => setBatchMarkOpen(true)} disabled={selectedIds.size === 0 || batchMarkMut.isPending}>
+            Mark Purchased ({selectedIds.size})
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -310,38 +437,44 @@ export function AssignedGiftsView<
                 aria-label="Select all wishes on this page"
               />
             </Th>
-            <Th>ID</Th>
-            <Th>Person</Th>
-            <Th>Family</Th>
-            <Th>Type</Th>
-            <Th>Description</Th>
-            <Th>Size</Th>
-            <Th>Color</Th>
-            <Th>Purchased</Th>
+            {displayColumns.map((key) => (
+              <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                {key === "display_id" ? (
+                  <span>ID</span>
+                ) : key === familyColumn.key && !familyColumn.sortable ? (
+                  <span>{defByKey[key]?.label ?? key}</span>
+                ) : (
+                  <ColumnHeader
+                    label={defByKey[key]?.label ?? key}
+                    field={key}
+                    searchKind={ASSIGNED_GIFTS_COLUMN_SEARCH[key]}
+                    sortField={sortField}
+                    columnSearch={columnSearch}
+                    onSort={handleSortClick}
+                    onSearchChange={updateColumnSearch}
+                  />
+                )}
+              </DraggableTh>
+            ))}
             <Th>Actions</Th>
           </TableHead>
           <TableBody>
-            {wishes.map((w) => (
-              <React.Fragment key={w.id}>
-                <Tr>
-                  <Td>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(w.id)}
-                      onChange={() => toggleSelect(w.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
-                      aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
-                    />
-                  </Td>
-                  <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>
-                  <Td>{w.person_given_name ?? "Family"}</Td>
-                  <Td>{renderFamilyCell(w)}</Td>
+            {wishes.map((w) => {
+              // Body cells in the user's column order — the family cell is
+              // keyed per page (admin: family_name, purchaser: family_display_id).
+              const wishCells: Record<string, React.ReactNode> = {
+                display_id: <Td className="whitespace-nowrap font-mono text-xs">{w.display_id ?? "—"}</Td>,
+                person_given_name: <Td>{w.person_given_name ?? "Family"}</Td>,
+                [familyColumn.key]: <Td>{renderFamilyCell(w)}</Td>,
+                type: (
                   <Td>
                     <WishTypeBadge type={w.type} />
                   </Td>
-                  <Td className="max-w-xs truncate">{w.description}</Td>
-                  <Td>{w.size ?? "—"}</Td>
-                  <Td>{w.color ?? "—"}</Td>
+                ),
+                description: <Td className="max-w-xs truncate">{w.description}</Td>,
+                size: <Td>{w.size ?? "—"}</Td>,
+                color: <Td>{w.color ?? "—"}</Td>,
+                purchased_at: (
                   <Td>
                     {w.purchased_at ? (
                       <span className="text-xs text-green-700" title={formatDateTime(w.purchased_at)}>
@@ -351,51 +484,74 @@ export function AssignedGiftsView<
                       <span className="text-xs text-gray-400">—</span>
                     )}
                   </Td>
-                  <Td>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
-                      >
-                        {editingId === w.id ? "Done" : "Edit"}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={() => setMarkPurchasedId(w.id)}
-                        disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                      >
-                        Mark Purchased
-                      </Button>
-                    </div>
-                  </Td>
-                </Tr>
-                {editingId === w.id && (
-                  <Tr key={`${w.id}-edit`}>
-                    <Td colSpan={DATA_COLUMNS.length + 2} className="!py-3">
-                      <div className="rounded-xl bg-gray-50 p-4">
-                        {detailLoading ? (
-                          <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
-                            <Spinner size="sm" />
-                            <span className="text-sm font-medium">Loading…</span>
-                          </div>
-                        ) : detail ? (
-                          <AssignedGiftsEditForm
-                            wish={detail}
-                            onSave={handleUpdateWish}
-                            onCancel={cancelForm}
-                            loading={updateMut.isPending}
-                          />
-                        ) : null}
+                ),
+                purchased_where: <Td className="max-w-xs text-xs truncate">{w.purchased_where || "—"}</Td>,
+                received_at: (
+                  <Td className="text-xs text-gray-500">{w.received_at ? new Date(w.received_at).toLocaleDateString() : "—"}</Td>
+                ),
+                purchaser_note: <Td className="max-w-xs text-xs truncate">{w.purchaser_note || "—"}</Td>,
+              };
+              return (
+                <React.Fragment key={w.id}>
+                  <Tr>
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(w.id)}
+                        onChange={() => toggleSelect(w.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start"
+                        aria-label={`Select wish for ${w.person_given_name ?? "Family"}`}
+                      />
+                    </Td>
+                    {displayColumns.map((key) => (
+                      <React.Fragment key={key}>{wishCells[key]}</React.Fragment>
+                    ))}
+                    <Td>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => (editingId === w.id ? cancelForm() : openEdit(w.id))}
+                        >
+                          {editingId === w.id ? "Done" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1.5 text-xs"
+                          onClick={() => setMarkPurchasedId(w.id)}
+                          disabled={w.purchased_at != null || markPurchasedMut.isPending}
+                        >
+                          Mark Purchased
+                        </Button>
                       </div>
                     </Td>
                   </Tr>
-                )}
-              </React.Fragment>
-            ))}
+                  {editingId === w.id && (
+                    <Tr key={`${w.id}-edit`}>
+                      <Td colSpan={displayColumns.length + 2} className="!py-3">
+                        <div className="rounded-xl bg-gray-50 p-4">
+                          {detailLoading ? (
+                            <div className="flex items-center justify-center gap-3 py-6 text-btn-start">
+                              <Spinner size="sm" />
+                              <span className="text-sm font-medium">Loading…</span>
+                            </div>
+                          ) : detail ? (
+                            <AssignedGiftsEditForm
+                              wish={detail}
+                              onSave={handleUpdateWish}
+                              onCancel={cancelForm}
+                              loading={updateMut.isPending}
+                            />
+                          ) : null}
+                        </div>
+                      </Td>
+                    </Tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       )}

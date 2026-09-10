@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AssignedGiftsListParams } from "../components/AssignedGifts";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
@@ -121,6 +122,7 @@ describe("AdminAssignedGifts", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it("lists wishes scoped to the current admin", async () => {
@@ -292,5 +294,219 @@ describe("AdminAssignedGifts", () => {
     await waitFor(() => {
       expect(updateSpy).toHaveBeenCalledWith(1, expect.objectContaining({ purchaser_note: "Bought with gift card" }));
     });
+  });
+
+  /* ── Spreadsheet columns: per-column filters, sort, reorder, visibility ── */
+
+  const lastListParams = () => {
+    const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+    return calls[calls.length - 1]?.[0] as AssignedGiftsListParams | undefined;
+  };
+
+  const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+
+  const defaultHeaders = ["", "ID", "Person", "Family", "Type", "Description", "Size", "Color", "Purchased", "Actions"];
+
+  it("cycles column sort asc → desc → default on header click and sends sort", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish, familyWish]));
+
+    renderPage();
+
+    await screen.findByText("Coat");
+
+    const sortButton = () => screen.getByRole("button", { name: "Sort by Description" });
+
+    // asc
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("description"));
+    expect(sortButton()).toHaveTextContent("↑");
+
+    // desc
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("-description"));
+    expect(sortButton()).toHaveTextContent("↓");
+
+    // cleared → back to the grouped-by-family default
+    await user.click(sortButton());
+    await waitFor(() => expect(lastListParams()?.sort).toBeUndefined());
+    expect(sortButton()).not.toHaveTextContent(/↑|↓/);
+
+    // The ID header is draggable but not sortable
+    expect(screen.queryByRole("button", { name: "Sort by ID" })).not.toBeInTheDocument();
+  });
+
+  it("renders per-column filter inputs only for visible searchable columns", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish, familyWish]));
+
+    renderPage();
+
+    await screen.findByText("Coat");
+
+    // Text inputs for the visible text-searchable columns
+    expect(screen.getByLabelText("Filter by Person")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Family")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Description")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Size")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Color")).toBeInTheDocument();
+
+    // From/to date pair for the visible Purchased column
+    expect(screen.getByLabelText("Purchased from")).toBeInTheDocument();
+    expect(screen.getByLabelText("Purchased to")).toBeInTheDocument();
+
+    // No input for the non-searchable ID or sort-only Type column, and none
+    // for the columns hidden by default
+    expect(screen.queryByLabelText("Filter by ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Type")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Purchased Where")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Received At from")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Purchaser Note")).not.toBeInTheDocument();
+  });
+
+  it("sends debounced per-column filter values to the list endpoint", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish]));
+
+      renderPage();
+
+      await screen.findByText("Coat");
+
+      await user.type(screen.getByLabelText("Filter by Size"), "S");
+      await user.type(screen.getByLabelText("Filter by Family"), "Johnson");
+
+      // Both non-empty entries are ANDed into the list params
+      await waitFor(() => {
+        expect(api.adminListWishes).toHaveBeenCalledWith(expect.objectContaining({ size: "S", family_name: "Johnson" }));
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drops a column's filter when the column is hidden", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish]));
+
+      renderPage();
+
+      await screen.findByText("Coat");
+
+      await user.type(screen.getByLabelText("Filter by Size"), "S");
+      await waitFor(() => expect(lastListParams()?.size).toBe("S"));
+
+      // Hide the Size column via the ColumnToggle popover
+      await user.click(screen.getByRole("button", { name: "Toggle columns" }));
+      await user.click(screen.getByLabelText("Size"));
+      await user.click(screen.getByRole("button", { name: "Apply" }));
+
+      // The input is gone and the param stops being sent
+      expect(screen.queryByLabelText("Filter by Size")).not.toBeInTheDocument();
+      await waitFor(
+        () => {
+          expect(lastListParams()?.size).toBeUndefined();
+        },
+        { timeout: 3000 }
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drag reorders columns, persists to localStorage, and survives remount", async () => {
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish, familyWish]));
+
+    const view = renderPage();
+    await screen.findByText("Coat");
+    expect(headerOrder()).toEqual(defaultHeaders);
+
+    const color = screen.getByRole("columnheader", { name: "Color" });
+    const size = screen.getByRole("columnheader", { name: "Size" });
+    size.getBoundingClientRect = () => ({ left: 0, width: 200, top: 0, bottom: 0, right: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+    // jsdom drag events carry no clientX; the component treats that as the
+    // left edge, so the column drops before the target.
+    fireEvent.dragStart(color, { dataTransfer: {} });
+    fireEvent.dragOver(size, { dataTransfer: {} });
+    fireEvent.drop(size, { dataTransfer: {} });
+
+    expect(headerOrder()).toEqual(["", "ID", "Person", "Family", "Type", "Description", "Color", "Size", "Purchased", "Actions"]);
+    expect(JSON.parse(localStorage.getItem("kim:columnOrder:adminAssignedGifts")!)).toEqual([
+      "display_id",
+      "person_given_name",
+      "family_name",
+      "type",
+      "description",
+      "color",
+      "size",
+      "purchased_at",
+      "purchased_where",
+      "received_at",
+      "purchaser_note",
+    ]);
+
+    // The order survives remount (same localStorage)
+    view.unmount();
+    cleanup();
+    renderPage();
+    await screen.findByText("Coat");
+    expect(headerOrder()).toEqual(["", "ID", "Person", "Family", "Type", "Description", "Color", "Size", "Purchased", "Actions"]);
+  });
+
+  it("arrow-key reorder moves the focused column and persists", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish]));
+
+    renderPage();
+
+    await screen.findByText("Coat");
+    expect(headerOrder()).toEqual(defaultHeaders);
+
+    // The Purchased header's accessible name is composed from its date
+    // inputs' aria-labels — locate it via the th's visible text instead.
+    const purchased = screen.getAllByRole("columnheader").find((h) => h.textContent?.trim().startsWith("Purchased"));
+    if (!purchased) throw new Error("Purchased column header not found");
+    purchased.focus();
+    await user.keyboard("{ArrowLeft}");
+
+    // Steps one visible column at a time — Purchased lands before Color
+    expect(headerOrder()).toEqual(["", "ID", "Person", "Family", "Type", "Description", "Size", "Purchased", "Color", "Actions"]);
+    expect(JSON.parse(localStorage.getItem("kim:columnOrder:adminAssignedGifts")!)).toEqual([
+      "display_id",
+      "person_given_name",
+      "family_name",
+      "type",
+      "description",
+      "size",
+      "purchased_at",
+      "color",
+      "purchased_where",
+      "received_at",
+      "purchaser_note",
+    ]);
+  });
+
+  it("ColumnToggle hides a column and the edit-row colSpan follows", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(listResponse([personWish]));
+    vi.spyOn(api, "adminGetWish").mockResolvedValue(mockWishDetail);
+
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    const getEditTd = () => document.querySelector("tbody td[colspan]") as HTMLTableCellElement | null;
+    // 8 default visible columns + checkbox + actions
+    await waitFor(() => expect(getEditTd()?.getAttribute("colspan")).toBe("10"));
+
+    // Hide the Color column via the ColumnToggle popover
+    await user.click(screen.getByRole("button", { name: "Toggle columns" }));
+    await user.click(screen.getByLabelText("Color"));
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(getEditTd()?.getAttribute("colspan")).toBe("9"));
   });
 });

@@ -505,6 +505,232 @@ class TestPurchaserListWishes:
 
 
 # ---------------------------------------------------------------------------
+# Sorting tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserSort:
+    """sort= mirrors the admin endpoint: single column, id tie-break, NULLs last."""
+
+    def test_sort_description_asc(self, logged_in_purchaser, purchaser_wish_tree):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?sort=description")
+        assert resp.status_code == 200
+        assert [w["description"] for w in resp.json()["wishes"]] == ["A backpack", "A doll"]
+
+    def test_sort_description_desc(self, logged_in_purchaser, purchaser_wish_tree):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?sort=-description")
+        assert resp.status_code == 200
+        assert [w["description"] for w in resp.json()["wishes"]] == ["A doll", "A backpack"]
+
+    def test_sort_color_nulls_last_both_directions(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Wishes with a NULL color sort last in both directions."""
+        purchaser_wish_tree["wishes"][0].color = "Blue"
+        db.commit()
+        for sort_param in ("color", "-color"):
+            resp = logged_in_purchaser.get(f"/api/purchaser/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            items = resp.json()["wishes"]
+            assert items[0]["color"] == "Blue"
+            assert items[1]["color"] is None
+
+    def test_sort_purchased_at_desc_nulls_last(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """purchased_at desc: the purchased wish leads, unpurchased (NULL) last."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].purchased_at = datetime(2026, 3, 10, 9, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?sort=-purchased_at")
+        assert resp.status_code == 200
+        items = resp.json()["wishes"]
+        assert items[0]["id"] == wishes[0].id
+        assert all(w["purchased_at"] is None for w in items[1:])
+
+    def test_unknown_or_empty_sort_falls_back_to_grouped_default(self, test_client, purchaser_sort_tree):
+        """Unknown or empty sort values keep the grouped-by-family default order."""
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": purchaser_sort_tree["purchaser"].email, "password": "PurchSort123!"},
+        )
+        assert resp.status_code == 200
+        default_ids = [w["id"] for w in test_client.get("/api/purchaser/wishes").json()["wishes"]]
+        for sort_param in ("bogus", ""):
+            resp = test_client.get(f"/api/purchaser/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            assert [w["id"] for w in resp.json()["wishes"]] == default_ids
+
+
+# ---------------------------------------------------------------------------
+# Per-column text search tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserPerColumnSearch:
+    """Per-column text params: substring, case-insensitive, wildcards escaped."""
+
+    def test_description(self, logged_in_purchaser, purchaser_wish_tree):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=backpack")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == purchaser_wish_tree["wishes"][0].id
+
+    def test_size(self, logged_in_purchaser, purchaser_wish_tree):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?size=Medium")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == purchaser_wish_tree["wishes"][0].id
+        # Free text matches as a substring
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?size=edium")
+        assert resp.json()["total"] == 1
+
+    def test_color(self, logged_in_purchaser, purchaser_wish_tree, db):
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].color = "Blue"
+        db.commit()
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?color=Blue")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[0].id
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?color=Red")
+        assert resp.json()["total"] == 0
+
+    def test_person_given_name(self, logged_in_purchaser, purchaser_wish_tree):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?person_given_name=PurchaserChild")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 2
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?person_given_name=NoSuchKid")
+        assert resp.json()["total"] == 0
+
+    def test_purchased_where(self, logged_in_purchaser, purchaser_wish_tree, db):
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[1].purchased_where = "Target"
+        db.commit()
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchased_where=Target")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[1].id
+
+    def test_purchaser_note(self, logged_in_purchaser, purchaser_wish_tree, db):
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].purchaser_note = "Got it on sale"
+        db.commit()
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchaser_note=on+sale")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[0].id
+
+    def test_wildcards_match_literally(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """LIKE wildcards typed by the user match literally, not as pattern syntax."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].description = "Save 50% today"
+        wishes[1].description = "Save 50 dollars"
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=50%25")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["wishes"][0]["id"] == wishes[0].id
+
+    def test_params_anded_together(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Several per-column params at once are ANDed."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].color = "Blue"
+        wishes[1].purchased_where = "Target"
+        db.commit()
+
+        # No single wish has both
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?color=Blue&purchased_where=Target")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+        # Both descriptions start with "A " — the color param narrows to one
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=A&color=Blue")
+        assert resp.json()["total"] == 1
+        assert resp.json()["wishes"][0]["id"] == wishes[0].id
+
+    def test_anded_with_purchased_and_wish_type(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Column params AND with the existing purchased and wish_type filters."""
+        wishes = purchaser_wish_tree["wishes"]
+        wishes[0].purchased_at = datetime(2026, 3, 10, 9, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        # The backpack wish is practical and purchased
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=backpack&purchased=true&wish_type=practical")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+        assert resp.json()["wishes"][0]["id"] == wishes[0].id
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=backpack&purchased=false")
+        assert resp.json()["total"] == 0
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=backpack&wish_type=fun")
+        assert resp.json()["total"] == 0
+
+    def test_scoping_still_holds_with_filters(self, logged_in_purchaser, purchaser_wish_tree, second_purchaser, db):
+        """Column filters and date ranges never match another purchaser's wishes."""
+        other = purchaser_wish_tree["wishes"][1]
+        other.description = "Secret gizmo"
+        other.purchased_at = datetime(2026, 3, 10, 9, 0, 0, tzinfo=timezone.utc)
+        other.assigned_to_id = second_purchaser.id
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?description=gizmo")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchased_at_from=2026-03-10&purchased_at_to=2026-03-10")
+        assert resp.json()["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Date-range search tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserDateRangeSearch:
+    def test_purchased_at_to_boundary(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """to = end of that UTC day: 23:59 on the to-day included, next day excluded."""
+        w1, w2 = purchaser_wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 23, 59, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 11, 0, 0, 1, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchased_at_to=2026-03-10")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w1.id]
+
+    def test_purchased_at_from_boundary(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """from = start of that UTC day: midnight on the from-day included."""
+        w1, w2 = purchaser_wish_tree["wishes"]
+        w1.purchased_at = datetime(2026, 3, 10, 12, 0, 0, tzinfo=timezone.utc)
+        w2.purchased_at = datetime(2026, 3, 11, 0, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchased_at_from=2026-03-11")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w2.id]
+
+    def test_received_at_range(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """received_at from/to day boundaries (same-day selects that day only)."""
+        w1, w2 = purchaser_wish_tree["wishes"]
+        w1.received_at = datetime(2026, 4, 5, 12, 0, 0, tzinfo=timezone.utc)
+        w2.received_at = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?received_at_from=2026-04-05&received_at_to=2026-04-05")
+        assert resp.status_code == 200
+        assert [w["id"] for w in resp.json()["wishes"]] == [w1.id]
+
+    def test_malformed_date_422(self, logged_in_purchaser):
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?purchased_at_from=not-a-date")
+        assert resp.status_code == 422
+        resp = logged_in_purchaser.get("/api/purchaser/wishes?received_at_to=2026-13-45")
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Get endpoint tests
 # ---------------------------------------------------------------------------
 

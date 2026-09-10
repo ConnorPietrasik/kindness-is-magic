@@ -31,6 +31,22 @@ describe("useTableWidth", () => {
     expect(result.current.widthMode).toBe("compact");
   });
 
+  it("defaults to wide for resources with a wide default", () => {
+    const { result } = renderHook(() => useTableWidth("purchaserAssignedGifts"));
+
+    expect(result.current.widthMode).toBe("wide");
+    expect(result.current.widthClass).toBe("max-w-7xl");
+    expect(result.current.defaultMode).toBe("wide");
+  });
+
+  it("falls back to the resource's default for invalid stored values", () => {
+    localStorage.setItem("kim:tableWidth:purchaserAssignedGifts", "invalid");
+
+    const { result } = renderHook(() => useTableWidth("purchaserAssignedGifts"));
+
+    expect(result.current.widthMode).toBe("wide");
+  });
+
   it("setWidthMode updates state, persists and dispatches event", () => {
     const { result } = renderHook(() => useTableWidth("adminReferrers"));
     const handler = vi.fn();

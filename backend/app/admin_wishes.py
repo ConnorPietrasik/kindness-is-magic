@@ -41,6 +41,7 @@ from app.search_sort import (
     WISH_SEARCH_EXACT_FIELDS,
     WISH_SEARCH_FIELDS,
     WISH_SORT_FIELDS,
+    _utc_day_start,
     escape_like,
     wish_global_search_terms,
     wish_grouped_order,
@@ -59,11 +60,6 @@ def _get_valid_wish_types_for_age(age: int) -> set[WishType]:
     if age >= 18:
         return {WishType.adult}
     return {WishType.practical, WishType.fun}
-
-
-def _utc_day_start(day: date) -> datetime:
-    """Start of a UTC calendar day as a timezone-aware datetime."""
-    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
 
 
 @admin_wishes_router.get("", response_model_exclude_unset=True)

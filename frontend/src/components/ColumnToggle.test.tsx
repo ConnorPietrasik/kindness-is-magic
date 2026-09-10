@@ -170,6 +170,20 @@ describe("ColumnToggle", () => {
     expect(localStorage.getItem("kim:tableWidth:adminReferrers")).toBe("wide");
   });
 
+  it("Reset restores the resource's default width mode", async () => {
+    const user = userEvent.setup();
+    // Non-default stored value — Reset must land on the resource's default
+    // (wide for purchaserAssignedGifts, not the global compact fallback)
+    localStorage.setItem("kim:tableWidth:purchaserAssignedGifts", "fit");
+    render(<ColumnToggle resourceKey="purchaserAssignedGifts" />);
+
+    const button = screen.getByLabelText("Toggle columns");
+    await user.click(button);
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    expect(localStorage.getItem("kim:tableWidth:purchaserAssignedGifts")).toBe("wide");
+  });
+
   it("dispatches width change event on Apply", async () => {
     const user = userEvent.setup();
     const handler = vi.fn();

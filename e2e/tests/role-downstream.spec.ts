@@ -322,6 +322,13 @@ test.describe.serial("Role Downstream", () => {
     await page.goto("/purchaser/assigned-gifts");
     await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
 
+    // The Family column is hidden by default (a subset of the wish display_id)
+    // — reveal it via the gear to check the cell's link gating.
+    await page.getByRole("button", { name: "Toggle columns" }).click();
+    await page.getByLabel("Family").check();
+    await page.getByRole("button", { name: "Apply" }).click();
+    await expect(page.getByRole("columnheader", { name: "Family" })).toBeVisible({ timeout: 10_000 });
+
     // Rows are identified by exact person-name cell (family display_id is dynamic)
     const approvedRows = page
       .getByRole("row")
@@ -340,6 +347,122 @@ test.describe.serial("Role Downstream", () => {
     await expect(earlyRows.getByRole("link")).toHaveCount(0);
     // Exactly one cell per row carries the display_id
     await expect(earlyRows.first().getByRole("cell").filter({ hasText: /^\d+(?:-\d+)*$/ })).toHaveCount(1);
+
+    await context.close();
+  });
+
+  test("purchaser per-column filter narrows the table", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_PURCHASER_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/purchaser/assigned-gifts");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    const legoRow = page.getByRole("row").filter({ hasText: "LEGO set" });
+    const coatRow = page.getByRole("row").filter({ hasText: "Warm winter coat" });
+    await expect(legoRow).toBeVisible({ timeout: 10_000 });
+
+    // The Description column's filter input narrows to the matching row
+    // (1s debounce — the hidden assertion waits through it)
+    await page.getByLabel("Filter by Description").fill("LEGO set");
+    await expect(legoRow).toBeVisible();
+    await expect(coatRow).toBeHidden({ timeout: 10_000 });
+
+    // No Family filter on the purchaser page (responses carry no family PII)
+    expect(await page.getByLabel("Filter by Family").count()).toBe(0);
+
+    await context.close();
+  });
+
+  test("purchaser header click cycles sort asc → desc → clear", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_PURCHASER_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/purchaser/assigned-gifts");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    const sortBtn = page.getByRole("button", { name: "Sort by Description" });
+    const yOf = (text: string) =>
+      page
+        .getByRole("row")
+        .filter({ hasText: text })
+        .first()
+        .boundingBox()
+        .then((box) => box!.y);
+
+    // "Early practical wish" sorts before "Warm winter coat"
+    await sortBtn.click();
+    await expect(sortBtn).toContainText("↑");
+    await expect.poll(async () => (await yOf("Early practical wish")) < (await yOf("Warm winter coat"))).toBe(true);
+
+    // Descending reverses the two rows
+    await sortBtn.click();
+    await expect(sortBtn).toContainText("↓");
+    await expect.poll(async () => (await yOf("Warm winter coat")) < (await yOf("Early practical wish"))).toBe(true);
+
+    // Third click clears the sort — arrow goes away, grouped default returns
+    await sortBtn.click();
+    await expect(sortBtn).not.toContainText(/↑|↓/);
+
+    await context.close();
+  });
+
+  test("purchaser drag reorders columns, order persists across reload, reset restores default", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(TEST_PURCHASER_EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/purchaser/assigned-gifts");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    // No storageState here — a fresh context starts with empty localStorage,
+    // so the default layout holds without gear normalization (the Family
+    // column is hidden by default on the purchaser page).
+    const headers = page.locator("thead th[draggable]");
+    await expect(headers).toHaveText(
+      ["ID", "Person", "Type", "Description", "Size", "Color", "Purchased"],
+      { timeout: 10_000 }
+    );
+
+    // Drag "Color" onto the left edge of "Size" → before it. The drag must
+    // start in the cell's padding — starting inside the sort button or
+    // filter input is ignored.
+    await headers.filter({ hasText: /^Color$/ }).dragTo(headers.filter({ hasText: /^Size$/ }), {
+      sourcePosition: { x: 2, y: 2 },
+      targetPosition: { x: 4, y: 8 },
+    });
+
+    await expect(headers).toHaveText(["ID", "Person", "Type", "Description", "Color", "Size", "Purchased"]);
+
+    // The custom order survives a reload (persisted in localStorage).
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(headers).toHaveText(["ID", "Person", "Type", "Description", "Color", "Size", "Purchased"]);
+
+    // "Reset order" appears only when the order is customized, and restores.
+    const resetOrder = page.getByRole("button", { name: "Reset order" });
+    await expect(resetOrder).toBeVisible();
+    await resetOrder.click();
+    await expect(headers).toHaveText(["ID", "Person", "Type", "Description", "Size", "Color", "Purchased"]);
+    await expect(resetOrder).not.toBeVisible();
 
     await context.close();
   });

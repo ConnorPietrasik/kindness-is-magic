@@ -18,7 +18,7 @@ interface ColumnToggleProps {
 export function ColumnToggle({ resourceKey }: ColumnToggleProps) {
   const { visibleColumns, setVisibleColumns, defs } = useColumnVisibility(resourceKey);
   const { resetOrder } = useColumnOrder(resourceKey);
-  const { widthMode, setWidthMode, widthModes } = useTableWidth(resourceKey);
+  const { widthMode, setWidthMode, widthModes, defaultMode } = useTableWidth(resourceKey);
   const [open, setOpen] = useState(false);
   const [pendingColumns, setPendingColumns] = useState(visibleColumns);
   const [pendingWidth, setPendingWidth] = useState(widthMode);
@@ -52,7 +52,7 @@ export function ColumnToggle({ resourceKey }: ColumnToggleProps) {
     const defaults = defs.filter((c) => c.visible).map((c) => c.key);
     setVisibleColumns(defaults);
     resetOrder();
-    setWidthMode("compact");
+    setWidthMode(defaultMode);
     setOpen(false);
   };
 
