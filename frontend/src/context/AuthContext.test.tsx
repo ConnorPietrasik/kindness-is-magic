@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AxiosResponse } from "axios";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ROUTES } from "../lib/routes";
 import type { User } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -334,5 +335,34 @@ describe("AuthContext", () => {
     expect(result.current.user).toEqual(user);
     // Verify the refetch was attempted (at least 2: mount + checkAuth invalidation)
     expect(mockFetchCurrentUser.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /* ── onFailedRefresh ──────────────────────────────────── */
+
+  it("clears the cached user and navigates to /login when onFailedRefresh fires", async () => {
+    const user = makeUser({ role: "admin" });
+    mockFetchCurrentUser.mockResolvedValueOnce(user);
+
+    const { result } = renderHook(() => ({ auth: useAuth(), location: useLocation() }), {
+      wrapper: wrap(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.auth.user).toEqual(user);
+    });
+
+    // Simulate the Axios interceptor's failed silent refresh
+    act(() => {
+      window.dispatchEvent(new CustomEvent("onFailedRefresh"));
+    });
+
+    // The handler clears the cache and navigates synchronously
+    expect(queryClient.getQueryData(AUTH_KEY)).toBeNull();
+    expect(result.current.location.pathname).toBe(ROUTES.LOGIN);
+    // …and the re-render follows with a logged-out user
+    await waitFor(() => {
+      expect(result.current.auth.user).toBeNull();
+    });
+    expect(result.current.auth.isAdmin).toBe(false);
   });
 });
