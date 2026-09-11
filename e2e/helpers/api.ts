@@ -383,11 +383,14 @@ export async function createPersonViaApi(
     note?: string;
   },
 ): Promise<{ personId: number }> {
-  /* Build wishes array from shorthand fields */
+  /* Build wishes array from shorthand fields. The primary wish's type
+     follows the person's age (mirrors the PersonForm behaviour): adults
+     (18+) get one "adult" wish, children get a "practical" wish — and
+     children additionally require a "fun" wish (funWish). */
   const wishes: Array<{ type: string; description: string; size?: string | null; color?: string | null }> = [];
   if (personData.wish) {
     wishes.push({
-      type: "practical",
+      type: personData.age >= 18 ? "adult" : "practical",
       description: personData.wish,
       size: personData.size ?? null,
       color: personData.color ?? null,
@@ -542,6 +545,75 @@ export async function createReferrerWithUserAndCredentials(
   const userData = (await userResp.json()) as { id: number };
 
   return { referrerId, userId: userData.id, email: data.email, password: data.password };
+}
+
+/**
+ * Create a family user (role=family) linked to an existing family via the
+ * admin API. Used when a test needs a family user whose family was created
+ * directly (no invite flow).
+ *
+ * Returns { userId }.
+ */
+export async function createFamilyUserViaApi(
+  request: APIRequestContext,
+  data: { email: string; password: string; familyId: number; displayName?: string },
+): Promise<{ userId: number }> {
+  const userResp = await request.post("/api/admin/users", {
+    data: {
+      email: data.email,
+      password: data.password,
+      role: "family",
+      family_id: data.familyId,
+      display_name: data.displayName,
+    },
+  });
+  if (!userResp.ok()) {
+    const body = await userResp.text();
+    throw new Error(`createFamilyUserViaApi: user creation failed (${userResp.status()}): ${body}`);
+  }
+  const userData = (await userResp.json()) as { id: number };
+  return { userId: userData.id };
+}
+
+/**
+ * Public family self-registration via a referrer's family invite code (KFI).
+ * Creates a pending-verification family + family user.
+ *
+ * Returns { familyId, userId, email, password }.
+ */
+export async function registerFamilyViaInvite(
+  request: APIRequestContext,
+  data: {
+    code: string;
+    familyName: string;
+    familyWish: string;
+    contactName: string;
+    email: string;
+    password: string;
+    address: string;
+    phoneNumber: string;
+    bio?: string;
+  },
+): Promise<{ familyId: number; userId: number; email: string; password: string }> {
+  const resp = await request.post("/api/auth/register-family", {
+    data: {
+      code: data.code,
+      family_name: data.familyName,
+      family_wish: data.familyWish,
+      contact_name: data.contactName,
+      email: data.email,
+      password: data.password,
+      bio: data.bio ?? null,
+      address: data.address,
+      phone_number: data.phoneNumber,
+    },
+  });
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`registerFamilyViaInvite: registration failed (${resp.status()}): ${body}`);
+  }
+  const result = (await resp.json()) as { user: { id: number }; family: { id: number } };
+  return { familyId: result.family.id, userId: result.user.id, email: data.email, password: data.password };
 }
 
 /**
