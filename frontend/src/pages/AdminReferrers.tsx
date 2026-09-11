@@ -426,7 +426,7 @@ export default function AdminReferrers() {
                 Delete referrer <strong>#{deleteConfirm}</strong>?
               </>
             }
-            description="Families will be reassigned to orphan. Linked users will be detached."
+            description="The referrer's user account will also be disabled (they can no longer log in). Families keep their link to this referrer, and both are restored together."
             onConfirm={() => {
               if (deleteConfirm != null) {
                 deleteMut?.mutate(deleteConfirm);
@@ -445,6 +445,7 @@ export default function AdminReferrers() {
                 Restore referrer <strong>#{restoreConfirm}</strong>?
               </>
             }
+            description="Any linked user accounts disabled by the deletion will be re-enabled."
             onConfirm={() => {
               if (restoreConfirm != null) {
                 restoreMut?.mutate(restoreConfirm);

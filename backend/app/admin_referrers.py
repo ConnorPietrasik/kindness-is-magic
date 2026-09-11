@@ -14,7 +14,7 @@ from sqlalchemy import func
 from app.auth import generate_unique_family_invite_code
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
-from app.models import EmailKind, EmailStatus, Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, SentEmail, User
+from app.models import EmailKind, EmailStatus, Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, SentEmail, User, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -205,10 +205,21 @@ def restore_referrer(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
+    """Restore a soft-deleted referrer and its linked user account(s).
+
+    User restore is coarse by design (mirrors ``restore_family_cascade``):
+    any soft-deleted user pointing at this referrer comes back, even one
+    deleted independently while the referrer was deleted. The assignment
+    unassignments made by the delete are not reversed (mirrors
+    ``restore_user`` — they are one-way).
+    """
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     if ref.deleted_at is None:
         raise HTTPException(status_code=400, detail="Referrer is not deleted")
     ref.deleted_at = None
+    db.query(User).filter(User.referrer_id == ref_id, User.deleted_at.isnot(None)).update(
+        {User.deleted_at: None}, synchronize_session=False
+    )
     db.commit()
     db.refresh(ref)
     logger.info("Admin %s restored referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
@@ -221,10 +232,28 @@ def delete_referrer(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> Response:
+    """Soft-delete a referrer and disable its linked user account(s).
+
+    Cascade (mirrors ``delete_user``): the referrer's active user
+    account(s) are soft-deleted so the referrer can no longer log in, and
+    any delivery-family / wish assignments pointing at those users are
+    unassigned so none reference a disabled account. Families keep their
+    ``referrer_id`` (restoring the referrer brings the link back).
+    """
     ref = get_active_or_404(db, Referrer, ref_id, "Referrer not found")
-    ref.deleted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    ref.deleted_at = now
+
+    # Cascade to the referrer's active user account(s) (a referrer can have
+    # several; already-deleted users keep their original deleted_at).
+    user_ids = [uid for (uid,) in db.query(User.id).filter(User.referrer_id == ref_id, User.deleted_at.is_(None)).all()]
+    if user_ids:
+        db.query(User).filter(User.id.in_(user_ids)).update({User.deleted_at: now}, synchronize_session=False)
+        db.query(Family).filter(Family.delivery_user_id.in_(user_ids)).update({Family.delivery_user_id: None}, synchronize_session=False)
+        db.query(Wish).filter(Wish.assigned_to_id.in_(user_ids)).update({Wish.assigned_to_id: None}, synchronize_session=False)
+
     db.commit()
-    logger.info("Admin %s soft-deleted referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    logger.info("Admin %s soft-deleted referrer '%s' (id=%s, users disabled=%d)", _admin.email, ref.name, ref_id, len(user_ids))
     return Response(status_code=204)
 
 

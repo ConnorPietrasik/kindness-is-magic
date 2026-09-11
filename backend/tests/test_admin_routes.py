@@ -210,6 +210,60 @@ class TestAdminDeleteReferrer:
         db.refresh(referrer_user)
         assert referrer_user.referrer_id == ref_id
 
+    def test_soft_delete_disables_referrer_user(self, test_client: TestClient, admin_user, referrer_user, db: Session):
+        # Referrer user can log in before the delete
+        pre = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
+        assert pre.status_code == 200
+
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/referrers/{referrer_user.referrer_id}")
+        assert resp.status_code == 204
+
+        # Linked user is soft-deleted (referrer_id still kept — no nulling)
+        db.refresh(referrer_user)
+        assert referrer_user.deleted_at is not None
+        assert referrer_user.referrer_id is not None
+
+        # Login is now blocked as for any disabled account
+        post = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
+        assert post.status_code == 403
+
+    def test_soft_delete_unassigns_wishes_of_referrer_user(self, test_client: TestClient, admin_user, referrer_user, db: Session):
+        from app.models import Wish, WishType
+
+        # A wish assigned to the referrer user must not outlive the disable
+        fam = make_family(
+            db,
+            "A blanket",
+            family_name="Cascade Fam",
+            contact_name="Cascade",
+            referrer_id=referrer_user.referrer_id,
+        )
+        wish = Wish(family_id=fam.id, type=WishType.practical, description="A coat", assigned_to_id=referrer_user.id)
+        db.add(wish)
+        db.commit()
+        db.refresh(wish)
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/referrers/{referrer_user.referrer_id}")
+        assert resp.status_code == 204
+
+        db.refresh(wish)
+        assert wish.assigned_to_id is None
+
+    def test_restore_reenables_referrer_user(self, test_client: TestClient, admin_user, referrer_user, db: Session):
+        _admin_login(test_client)
+        ref_id = referrer_user.referrer_id
+        assert test_client.delete(f"/api/admin/referrers/{ref_id}").status_code == 204
+
+        resp = test_client.post(f"/api/admin/referrers/{ref_id}/restore")
+        assert resp.status_code == 200
+
+        # Linked user is back and can log in again
+        db.refresh(referrer_user)
+        assert referrer_user.deleted_at is None
+        post = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
+        assert post.status_code == 200
+
     def test_200_restore_soft_deleted_referrer(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         _admin_login(test_client)
         # Soft-delete the referrer
