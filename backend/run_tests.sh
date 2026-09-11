@@ -18,7 +18,7 @@ DB_URL="${DATABASE_URL:-postgresql+psycopg://KindDB:testpassword@localhost:5433/
 # psycopg doesn't understand SQLAlchemy's +psycopg driver suffix, so strip it.
 if ! "$PYBIN" -c "import psycopg, sys; psycopg.connect(sys.argv[1], connect_timeout=3).close()" "${DB_URL/+psycopg/}" 2>/dev/null; then
   echo "ERROR: test DB unreachable at $DB_URL" >&2
-  echo "Start it first: ./run-compose.sh --profile test up test_db (from project root)" >&2
+  echo "Start it first: ./run-compose.sh testdb (from project root)" >&2
   exit 1
 fi
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Wrapper so `sudo docker compose` always runs from the project directory.
 # Usage:
-#   ./run-compose.sh up --build
-#   ./run-compose.sh exec backend alembic upgrade head
-#   ./run-compose.sh prod up -d --build   (production stack)
-#   ./run-compose.sh prod setup           (one-time prod prerequisites)
+#   ./run-compose.sh <compose args>                       dev stack (e.g. up --build, exec backend alembic upgrade head)
+#   ./run-compose.sh clear                                remove all containers, volumes, networks incl. the DB volume (DEBUG=true only)
+#   ./run-compose.sh test                                 one-shot backend tests: test DB + pytest in a container, cleans up after itself
+#   ./run-compose.sh testdb                               start the test DB attached (Ctrl+C tears it down)
+#   ./run-compose.sh prod <compose args>                  production stack (e.g. up -d --build)
+#   ./run-compose.sh prod setup                           one-time prod prerequisites: toolchain/.env checks, acme.json, DNS warnings
+#   ./run-compose.sh prod backup                          dump the production DB to kindness-backup-<timestamp>.sql
+#   ./run-compose.sh prod restore-from-backup <backup.sql>   restore it (DESTRUCTIVE, double-confirmed)
 
 set -euo pipefail
 
@@ -118,11 +122,101 @@ prod_setup() {
   echo "Setup complete. Next: ./run-compose.sh prod up -d --build"
 }
 
+# Dump the production database to kindness-backup-<timestamp>.sql in the repo
+# directory. Usage: ./run-compose.sh prod backup
+prod_backup() {
+  local pg_user pg_pass pg_db backup_file
+  pg_user="$(env_get POSTGRES_USER)"
+  pg_pass="$(env_get POSTGRES_PASSWORD)"
+  pg_db="$(env_get POSTGRES_DB)"
+  if [ -z "$pg_user" ] || [ -z "$pg_pass" ] || [ -z "$pg_db" ]; then
+    echo "Error: POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB must be set in .env." >&2
+    exit 1
+  fi
+  backup_file="kindness-backup-$(date +%Y%m%d-%H%M%S).sql"
+  echo "Dumping ${pg_db} -> ${backup_file} ..."
+  # The client image matches the db service so dumps stay restorable.
+  if ! sudo docker run --rm \
+      --network kindness-is-magic_kindnet \
+      -e PGPASSWORD="$pg_pass" \
+      postgres:15-alpine pg_dump -h db -U "$pg_user" "$pg_db" > "$backup_file"; then
+    rm -f "$backup_file"
+    echo "Error: pg_dump failed (is the prod stack running? ./run-compose.sh prod ps)." >&2
+    exit 1
+  fi
+  echo "Backup written: ${SCRIPT_DIR}/${backup_file}"
+}
+
+# Restore the production database from a backup file.
+# DESTROYS the current database. Usage:
+#   ./run-compose.sh prod restore-from-backup <backup.sql>
+prod_restore() {
+  local file="${1:-}"
+  if [ -z "$file" ]; then
+    echo "Usage: ./run-compose.sh prod restore-from-backup <backup.sql>" >&2
+    echo "Available backups:" >&2
+    (ls -1t kindness-backup-*.sql 2>/dev/null || true) >&2
+    exit 1
+  fi
+  if [ ! -s "$file" ]; then
+    echo "Error: no such (non-empty) backup file: ${file}" >&2
+    exit 1
+  fi
+
+  local pg_user pg_pass pg_db
+  pg_user="$(env_get POSTGRES_USER)"
+  pg_pass="$(env_get POSTGRES_PASSWORD)"
+  pg_db="$(env_get POSTGRES_DB)"
+  if [ -z "$pg_user" ] || [ -z "$pg_pass" ] || [ -z "$pg_db" ]; then
+    echo "Error: POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB must be set in .env." >&2
+    exit 1
+  fi
+
+  # Two confirmations: the live database is erased permanently.
+  local answer
+  echo "This will DESTROY the current production database (${pg_db}) and replace"
+  echo "it with the state captured in: ${file}"
+  read -r -p "Type 'yes' to continue: " answer
+  if [ "$answer" != "yes" ]; then
+    echo "Aborted."
+    exit 1
+  fi
+  read -r -p "FINAL: the current database will be permanently erased. Type the backup filename to proceed: " answer
+  if [ "$answer" != "$file" ]; then
+    echo "Aborted."
+    exit 1
+  fi
+
+  # Stop the stack (no -v: keep traefik_certs so Let's Encrypt state survives
+  # the incident), then drop only the db volume. The kindness-is-magic_ prefix
+  # comes from `name:` in docker-compose.prod.yml.
+  sudo docker compose -f docker-compose.prod.yml down
+  sudo docker volume rm kindness-is-magic_kindness_is_magic 2>/dev/null || true
+  sudo docker compose -f docker-compose.prod.yml up -d --wait db
+  if ! sudo docker compose -f docker-compose.prod.yml exec -T \
+      -e PGPASSWORD="$pg_pass" \
+      db psql -h localhost -v ON_ERROR_STOP=1 -U "$pg_user" "$pg_db" < "$file"; then
+    echo "Error: restore failed — the stack is down and the db is left running" >&2
+    echo "       with partial data for inspection (./run-compose.sh prod logs db)." >&2
+    exit 1
+  fi
+  sudo docker compose -f docker-compose.prod.yml up -d
+  echo "Restore complete."
+}
+
 # Production: same conveniences, but always against docker-compose.prod.yml.
 if [ "$1" = "prod" ]; then
   shift
   if [ "$1" = "setup" ]; then
     prod_setup
+    exit 0
+  fi
+  if [ "$1" = "backup" ]; then
+    prod_backup
+    exit 0
+  fi
+  if [ "$1" = "restore-from-backup" ]; then
+    prod_restore "${2:-}"
     exit 0
   fi
   exec sudo docker compose -f docker-compose.prod.yml "$@"
