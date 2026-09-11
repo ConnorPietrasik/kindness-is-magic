@@ -47,6 +47,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
+        # Real sends always pass from_name (admins fall back to "Kindness Fairy")
         "filename": "02-referrer-invite-locked.html",
         "label": "Referrer Invite (email-locked)",
         "body": build_invite_email(
@@ -129,23 +130,23 @@ EXAMPLES = [
                     "given_name": "Emma",
                     "age": 8,
                     "wishes": [
-                        {"type": "practical", "description": "A winter coat", "size": "Medium"},
-                        {"type": "fun", "description": "A doll", "size": None},
+                        {"type": "practical", "description": "A winter coat", "size": "Medium", "color": "Red"},
+                        {"type": "fun", "description": "A doll", "size": None, "color": None},
                     ],
                 },
                 {
                     "given_name": "Liam",
                     "age": 5,
                     "wishes": [
-                        {"type": "practical", "description": "Warm boots", "size": "Size 14"},
-                        {"type": "fun", "description": "Lego set", "size": None},
+                        {"type": "practical", "description": "Warm boots", "size": "Size 14", "color": None},
+                        {"type": "fun", "description": "Lego set", "size": None, "color": None},
                     ],
                 },
                 {
                     "given_name": "Maria",
                     "age": 34,
                     "wishes": [
-                        {"type": "adult", "description": "Winter jacket", "size": "Large"},
+                        {"type": "adult", "description": "Winter jacket", "size": "Large", "color": "Navy"},
                     ],
                 },
             ],
