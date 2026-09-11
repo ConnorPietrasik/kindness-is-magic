@@ -11,6 +11,7 @@ Run with:
 import os
 import sys
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
@@ -106,11 +107,14 @@ except Exception:  # noqa: BLE001
 
 
 @pytest.fixture(autouse=True)
-def _env_isolation(monkeypatch: pytest.MonkeyPatch):
+def _env_isolation(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Strip env vars that would leak real credentials / production DB."""
     monkeypatch.delenv("ADMIN_EMAIL", raising=False)
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     monkeypatch.setenv("DEBUG", "true")
+    # Unique per-test leader lock: parallel (xdist) lifespans never contend,
+    # and every test's lifespan becomes the leader (pre-lock behavior).
+    monkeypatch.setenv("LIFESPAN_LOCK_PATH", str(tmp_path / "leader.lock"))
     # Tests run the app lifespan per test; without this guard a past-dated
     # enforced deadline row created by a test would let the daily
     # deadline-check task run the batches on the shared test DB mid-suite,

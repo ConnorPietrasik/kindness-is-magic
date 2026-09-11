@@ -1,0 +1,117 @@
+# Production stack (self-contained; see docker-compose.yml for dev).
+#
+# Run with: ./run-compose.sh prod up -d --build
+#
+# Requires in .env: PUBLIC_HOSTNAME, LETSENCRYPT_EMAIL (plus the usual
+# POSTGRES_*, SECRET_KEY, etc.). Before first start: point the domain's DNS
+# A record — and a www CNAME at the apex — at this server's public IP, and
+# forward TCP 80/443 to it. www is 301-redirected to the apex (both names
+# share one Let's Encrypt cert).
+
+name: kindness-is-magic
+
+services:
+  traefik:
+    image: traefik:latest
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirect all HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt via HTTP-01 challenge on the web entrypoint
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:?SET LETSENCRYPT_EMAIL in .env}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
+      - "--log.level=ERROR"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # acme.json must be mode 600 (see deploy notes: create before first up)
+      - "traefik_certs:/etc/traefik"
+    environment:
+      - DOCKER_API_VERSION=1.44
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    networks:
+      - kindnet
+    env_file:
+      - .env
+    volumes:
+      - kindness_is_magic:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.priority=100"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.docker.network=kindnet"
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    expose:
+      - "80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # www -> apex: permanent 301 (no dual-serving — auth cookies are
+      # host-only). Joins the same Let's Encrypt cert (SAN); needs the www
+      # CNAME for issuance and every 90-day renewal.
+      - "traefik.http.routers.frontend-www.rule=Host(`www.${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}`)"
+      - "traefik.http.routers.frontend-www.entrypoints=websecure"
+      - "traefik.http.routers.frontend-www.tls=true"
+      - "traefik.http.routers.frontend-www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-www.middlewares=www-redirect"
+      - "traefik.http.middlewares.www-redirect.redirectHost.domain=${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}"
+      - "traefik.http.middlewares.www-redirect.redirectHost.permanent=true"
+      - "traefik.docker.network=kindnet"
+    restart: unless-stopped
+    networks:
+      - kindnet
+
+volumes:
+  kindness_is_magic:
+  traefik_certs:
+
+networks:
+  kindnet:

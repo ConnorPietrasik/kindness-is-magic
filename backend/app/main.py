@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import contextvars
+import fcntl
 import json
 import logging
 import os
@@ -172,60 +173,90 @@ async def log_request_middleware(request: Request, call_next):
 # ---------------------------------------------------------------------------
 
 
+# With `uvicorn --workers N` the lifespan runs once per worker process, so
+# one-shot side effects (bootstrap seed, daily deadline task) must run in
+# exactly one worker. A non-blocking flock on a container-local file elects a
+# leader; the lock is held for the leader's lifetime (released when its fd
+# closes at shutdown). The path is read at call time so tests can point it
+# at a unique temp file (conftest's _env_isolation does this).
+_LEADER_LOCK_DEFAULT = "/tmp/kism_leader.lock"
+
+
+def _try_acquire_leader_lock() -> int | None:
+    """Return an fd holding the leader lock, or None if another worker holds it."""
+    path = os.environ.get("LIFESPAN_LOCK_PATH") or _LEADER_LOCK_DEFAULT
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        return None
+    return fd
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, None, None]:
-    """Seed bootstrap admin user on startup and start the daily deadline-check task."""
+    """Seed bootstrap admin user on startup and start the daily deadline-check task.
+
+    One-shot side effects run only in the leader worker (see
+    _try_acquire_leader_lock); the other workers skip them.
+    """
     from sqlalchemy.exc import ProgrammingError, OperationalError
 
-    db = None
-    try:
-        db = next(get_db())
-
-        # -----------------------------------------------------------------
-        # Bootstrap admin user (only if env vars are set)
-        # -----------------------------------------------------------------
-        admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
-        admin_password = os.environ.get("ADMIN_PASSWORD")
-        if admin_email and admin_password:
-            existing = db.query(User).filter(User.email == admin_email).first()
-            if not existing:
-                admin = User(
-                    email=admin_email,
-                    hashed_password=get_password_hash(admin_password),
-                    role=UserRole.admin,
-                    display_name=default_display_name_from_email(admin_email),
-                    referrer_id=None,
-                    family_id=None,
-                )
-                db.add(admin)
-                db.commit()
-                logger.info("Bootstrap admin user created.")
-
-    except (ProgrammingError, OperationalError) as exc:
-        logger.warning(
-            "Database error during startup seed — skipping: %s",
-            exc,
-        )
-    except Exception as exc:
-        logger.error(
-            "Unexpected error during startup seed — skipping: %s",
-            exc,
-            exc_info=True,
-        )
-    finally:
-        if db:
-            db.close()
-
-    # Daily deadline checks — runs once on startup (catching any cutoffs
-    # missed while the app was down), then daily at 09:00 UTC (01:00 Pacific).
-    # Disabled in tests via DISABLE_BACKGROUND_TASKS: the app lifespan runs
-    # per test, and a past-dated enforced row created by a test would let
-    # the task run the batches on the shared test DB mid-suite, racing the
-    # tests' own state assertions.
+    leader_fd = _try_acquire_leader_lock()
     deadline_task: asyncio.Task | None = None
-    if not os.environ.get("DISABLE_BACKGROUND_TASKS"):
-        deadline_task = asyncio.create_task(deadline_checks_loop())
-        logger.info("Daily deadline-check task started.")
+
+    if leader_fd is not None:
+        db = None
+        try:
+            db = next(get_db())
+
+            # -------------------------------------------------------------
+            # Bootstrap admin user (only if env vars is set)
+            # -------------------------------------------------------------
+            admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+            admin_password = os.environ.get("ADMIN_PASSWORD")
+            if admin_email and admin_password:
+                existing = db.query(User).filter(User.email == admin_email).first()
+                if not existing:
+                    admin = User(
+                        email=admin_email,
+                        hashed_password=get_password_hash(admin_password),
+                        role=UserRole.admin,
+                        display_name=default_display_name_from_email(admin_email),
+                        referrer_id=None,
+                        family_id=None,
+                    )
+                    db.add(admin)
+                    db.commit()
+                    logger.info("Bootstrap admin user created.")
+
+        except (ProgrammingError, OperationalError) as exc:
+            logger.warning(
+                "Database error during startup seed — skipping: %s",
+                exc,
+            )
+        except Exception as exc:
+            logger.error(
+                "Unexpected error during startup seed — skipping: %s",
+                exc,
+                exc_info=True,
+            )
+        finally:
+            if db:
+                db.close()
+
+        # Daily deadline checks — runs once on startup (catching any cutoffs
+        # missed while the app was down), then daily at 09:00 UTC (01:00 Pacific).
+        # Disabled in tests via DISABLE_BACKGROUND_TASKS: the app lifespan runs
+        # per test, and a past-dated enforced row created by a test would let
+        # the task run the batches on the shared test DB mid-suite, racing the
+        # tests' own state assertions.
+        if not os.environ.get("DISABLE_BACKGROUND_TASKS"):
+            deadline_task = asyncio.create_task(deadline_checks_loop())
+            logger.info("Daily deadline-check task started.")
+    else:
+        logger.info("Not the leader worker — skipping startup seed and background tasks.")
 
     try:
         yield
@@ -234,6 +265,8 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
             deadline_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await deadline_task
+        if leader_fd is not None:
+            os.close(leader_fd)  # releases the flock
 
 
 app = FastAPI(lifespan=lifespan)
