@@ -4,4 +4,7 @@ httpx>=0.28
 httpx2>=2.0
 pytest-asyncio>=0.21
 pytest-xdist>=3.6
-ruff>=0.15.21
+# Pinned exactly: ruff changed its default lint rule set in 0.16 (adds B/I/S/UP
+# families), which fails on code written against 0.15 defaults. Lint results
+# must be bit-identical between the local venv and CI.
+ruff==0.15.21
