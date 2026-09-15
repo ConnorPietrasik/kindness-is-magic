@@ -102,7 +102,7 @@ prod_setup() {
   echo "acme.json ready (mode 600)."
 
   # --- Advisory DNS checks (warnings only, never block) -------------------------
-  local host resolved www_resolved public_ip
+  local host resolved public_ip
   host="$(env_get PUBLIC_HOSTNAME)"
 
   # Compare the IPv4 A record against this box's public IPv4 egress address.
@@ -123,14 +123,6 @@ prod_setup() {
     else
       echo "DNS check OK: '${host}' -> ${resolved} (this box's public IP)."
     fi
-  fi
-
-  www_resolved="$(getent hosts "www.${host}" 2>/dev/null | awk '{print $1; exit}' || true)"
-  if [ -z "$www_resolved" ]; then
-    echo "Warning: DNS — 'www.${host}' does not resolve yet (CNAME at the apex)."
-    echo "         Needed for the www 301 redirect and for cert renewals to keep working."
-  else
-    echo "DNS check OK: 'www.${host}' -> ${www_resolved}."
   fi
 
   echo ""

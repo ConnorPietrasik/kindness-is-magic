@@ -124,9 +124,6 @@ the workstation with `docker-compose.yml` — never on the Pi.
 ### 2. DNS & network (before first start)
 
 - **A record:** `yourdomain.com` → the Pi's public IP
-- **CNAME:** `www.yourdomain.com` → `yourdomain.com`
-  (www is 301-redirected to the apex; both names are in the one Let's Encrypt
-  cert — this record is re-validated at every renewal, keep it alive)
 - **Router:** forward TCP **80** and **443** to the Pi's LAN IP
 - Wait for propagation: `dig +short yourdomain.com` should show your public IP
 
@@ -178,8 +175,8 @@ git pull && ./run-compose.sh prod up -d --build   # redeploy
 ```
 
 - **Cert renewals are automatic** — Traefik re-issues ~30 days before each
-  90-day expiry. No cron, no certbot. Requirements: apex A record + www CNAME
-  still resolve, ports 80/443 still forwarded, Traefik running.
+  90-day expiry. No cron, no certbot. Requirements: apex A record still
+  resolves, ports 80/443 still forwarded, Traefik running.
 - Rate limits (login etc., 5/min per visitor) are effectively 2× looser with
   2 backend workers (per-process storage) — intentional at this scale.
 
@@ -209,7 +206,7 @@ factory reset in Troubleshooting below.)
 - **TLS error on first visit** — DNS or port-forwarding not live yet. Re-run
   `./run-compose.sh prod setup` to see exactly which check warns; verify with
   `dig +short yourdomain.com` from anywhere.
-- **Cert renewal failing** — both A and www records must resolve (see step 2);
+- **Cert renewal failing** — the A record must resolve (see step 2);
   `./run-compose.sh prod logs -f traefik` shows the ACME error.
 - **502s after a deploy** — `prod logs -f backend` (DB not ready / migration
   error / `.env` typo are the usual suspects).
