@@ -7,7 +7,7 @@
 #   ./run-compose.sh testdb                               start the test DB attached (Ctrl+C tears it down)
 #   ./run-compose.sh prod <compose args>                  production stack (e.g. up -d --build)
 #   ./run-compose.sh prod setup                           one-time prod prerequisites: toolchain/.env checks, acme.json, DNS warnings
-#   ./run-compose.sh prod backup                          dump the production DB to kindness-backup-<timestamp>.sql
+#   ./run-compose.sh prod backup                          dump the production DB to backups/kindness-backup-<timestamp>.sql
 #   ./run-compose.sh prod restore-from-backup <backup.sql>   restore it (DESTRUCTIVE, double-confirmed)
 
 set -euo pipefail
@@ -129,8 +129,8 @@ prod_setup() {
   echo "Setup complete. Next: ./run-compose.sh prod up -d --build"
 }
 
-# Dump the production database to kindness-backup-<timestamp>.sql in the repo
-# directory. Usage: ./run-compose.sh prod backup
+# Dump the production database to backups/kindness-backup-<timestamp>.sql.
+# Usage: ./run-compose.sh prod backup
 prod_backup() {
   local pg_user pg_pass pg_db backup_file
   pg_user="$(env_get POSTGRES_USER)"
@@ -140,7 +140,8 @@ prod_backup() {
     echo "Error: POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB must be set in .env." >&2
     exit 1
   fi
-  backup_file="kindness-backup-$(date +%Y%m%d-%H%M%S).sql"
+  mkdir -p backups
+  backup_file="backups/kindness-backup-$(date +%Y%m%d-%H%M%S).sql"
   echo "Dumping ${pg_db} -> ${backup_file} ..."
   # The client image matches the db service so dumps stay restorable.
   if ! sudo docker run --rm \
@@ -162,8 +163,12 @@ prod_restore() {
   if [ -z "$file" ]; then
     echo "Usage: ./run-compose.sh prod restore-from-backup <backup.sql>" >&2
     echo "Available backups:" >&2
-    (ls -1t kindness-backup-*.sql 2>/dev/null || true) >&2
+    (ls -1t backups/kindness-backup-*.sql 2>/dev/null || true) >&2
     exit 1
+  fi
+  # A bare filename is resolved against the backups folder.
+  if [ ! -s "$file" ] && [ -s "backups/${file}" ]; then
+    file="backups/${file}"
   fi
   if [ ! -s "$file" ]; then
     echo "Error: no such (non-empty) backup file: ${file}" >&2
@@ -188,8 +193,10 @@ prod_restore() {
     echo "Aborted."
     exit 1
   fi
+  local backup_base
+  backup_base="$(basename "$file")"
   read -r -p "FINAL: the current database will be permanently erased. Type the backup filename to proceed: " answer
-  if [ "$answer" != "$file" ]; then
+  if [ "$answer" != "$file" ] && [ "$answer" != "$backup_base" ]; then
     echo "Aborted."
     exit 1
   fi

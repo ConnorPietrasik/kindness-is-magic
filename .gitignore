@@ -15,5 +15,8 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 
+# Database backups (written by ./run-compose.sh prod backup)
+backups/
+
 # Design sources (vector master for frontend/public/logo.png; not served, not versioned)
 logo.svg

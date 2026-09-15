@@ -187,7 +187,7 @@ All application data is in the `kindness_is_magic` Postgres volume (the
 not worth backing up). From the repo directory, occasionally:
 
 ```bash
-./run-compose.sh prod backup         # writes kindness-backup-<timestamp>.sql
+./run-compose.sh prod backup         # writes backups/kindness-backup-<timestamp>.sql
 ```
 
 Restore takes the backup file, double-confirms, and **destroys the current
