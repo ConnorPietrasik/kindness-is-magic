@@ -45,11 +45,13 @@ AGENTS.md               Agent instructions (root, backend/, frontend/, e2e/)
    cp .env.example .env
    ```
 
-   Fill in real values: `POSTGRES_*`, `SECRET_KEY` / `REFRESH_SECRET_KEY`
-   (generate with `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`),
-   and `ADMIN_EMAIL` / `ADMIN_PASSWORD` (bootstrap admin, created on first backend
-   start). SMTP settings are only needed if you want real emails — with
-   `DEBUG=true`, sending is suppressed.
+   That's all it takes for local dev: `.env.example` ships with committed test
+   values (marked `[TEST]`) that work out of the box here and in CI. **Replace
+   the marked test values before deploying to production** — for the secrets,
+   generate real ones with
+   `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`. SMTP
+   settings are only needed if you want real emails — with `DEBUG=true`,
+   sending is suppressed.
 
 2. **Start the dev stack**
 
@@ -90,6 +92,15 @@ containers, volumes, and networks, including the database (`DEBUG=true` only).
   cd e2e && npx playwright test
   ```
 
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master` and
+on pull requests, with three parallel jobs: **backend** (ruff check + format,
+pytest against an ephemeral Postgres service container), **frontend**
+(typecheck, lint, Vitest, production build), and **e2e** (the Playwright
+suite). The e2e job spins up its own disposable dev stack at
+`http://localhost` from the repo — nothing to prepare locally.
+
 ## Configuration
 
 Runtime config lives in `.env` (see `.env.example` for documented defaults): JWT secrets and token lifetimes, bootstrap admin, `DEBUG` (insecure cookies + no rate limiting in dev), invite expiry, SMTP mail settings, `APP_BASE_URL` (links in emails), and production-only `PUBLIC_HOSTNAME` / `LETSENCRYPT_EMAIL` for the Traefik/Let's Encrypt setup.
@@ -126,7 +137,10 @@ git clone <repo-url> && cd <repo>
 cp .env.example .env
 ```
 
-Fill in every value.
+`.env.example` ships with committed test values (marked `[TEST]`, e.g.
+`ci-test-*` / `kindness-test*`): replace every one of them.
+`./run-compose.sh prod setup` lists any that are still present and refuses to
+continue until they're replaced.
 
 | Key | Notes |
 |-----|-------|

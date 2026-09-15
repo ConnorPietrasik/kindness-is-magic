@@ -265,7 +265,9 @@ function ProfileCard() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold text-gray-900">{displayName}</span>
-              <span className={badgeClass}>{humanize(user?.role)}</span>
+              <span className={badgeClass} data-testid="role-badge">
+                {humanize(user?.role)}
+              </span>
               <button
                 type="button"
                 onClick={() => setEditing(true)}

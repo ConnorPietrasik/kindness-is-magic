@@ -57,7 +57,9 @@ import { expect } from "@playwright/test";
 
 export async function loginAsAdmin(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.admin);
-  await expect(page.getByText("Admin")).toBeVisible();
+  /* The role badge — not getByText("Admin"), which also matches an admin
+   * whose display name is "Admin" (admin@example.test derives exactly that). */
+  await expect(page.getByTestId("role-badge")).toHaveText("Admin");
 }
 
 export async function loginAsReferrer(page: Page): Promise<void> {

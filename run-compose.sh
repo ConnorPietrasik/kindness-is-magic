@@ -23,6 +23,14 @@ env_get() {
   echo "$value"
 }
 
+# Read a variable from the .env.example file (first match, no quotes)
+example_get() {
+  local key="$1"
+  local value
+  value=$(grep -m1 "^${key}=" .env.example 2>/dev/null | cut -d'=' -f2- | tr -d "'\"")
+  echo "$value"
+}
+
 # One-time production prerequisites before the first `prod up` (idempotent —
 # safe to re-run any time). Usage: ./run-compose.sh prod setup
 prod_setup() {
@@ -51,13 +59,20 @@ prod_setup() {
   fi
 
   local missing=()
-  local var
+  local example_keys=()
+  local var value example_value
   for var in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB \
              SECRET_KEY REFRESH_SECRET_KEY \
              ADMIN_EMAIL ADMIN_PASSWORD \
              PUBLIC_HOSTNAME LETSENCRYPT_EMAIL; do
-    if [ -z "$(env_get "$var")" ]; then
+    value="$(env_get "$var")"
+    if [ -z "$value" ]; then
       missing+=("$var")
+      continue
+    fi
+    example_value="$(example_get "$var")"
+    if [ -n "$example_value" ] && [ "$value" = "$example_value" ]; then
+      example_keys+=("$var")
     fi
   done
   if [ "${#missing[@]}" -gt 0 ]; then
@@ -65,9 +80,9 @@ prod_setup() {
     printf '  - %s\n' "${missing[@]}"
     exit 1
   fi
-
-  if [[ "$(env_get POSTGRES_USER)" == *replace* ]]; then
-    echo "Error: POSTGRES_USER still has the .env.example placeholder — set real Postgres credentials."
+  if [ "${#example_keys[@]}" -gt 0 ]; then
+    echo "Error: .env still has the value from .env.example — replace it for production:"
+    printf '  - %s\n' "${example_keys[@]}"
     exit 1
   fi
 

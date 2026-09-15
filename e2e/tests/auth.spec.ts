@@ -13,7 +13,6 @@ test.describe("Authentication", () => {
   test("login with valid admin credentials redirects to dashboard", async ({ page }) => {
     await loginAsAdmin(page);
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByText("connor@kindnessismagic.love")).toBeVisible();
   });
 
   test("login with valid referrer credentials redirects to dashboard", async ({ page }) => {
@@ -76,7 +75,12 @@ test.describe("Authentication", () => {
     // redirecting to /login. Wait for the settled dashboard content first —
     // the URL can still read /dashboard during boot before a redirect.
     await page.reload();
-    await expect(page.getByText("Admin")).toBeVisible({ timeout: 15_000 });
+    /* The role badge, not the text "Admin": the committed test admin
+     * (admin@example.test) has the display name "Admin", so getByText("Admin")
+     * would match both the profile name and the badge (strict-mode violation). */
+    const roleBadge = page.getByTestId("role-badge");
+    await expect(roleBadge).toBeVisible({ timeout: 15_000 });
+    await expect(roleBadge).toHaveText("Admin");
     await expect(page).toHaveURL(/\/dashboard/);
   });
 

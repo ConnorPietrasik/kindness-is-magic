@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_USER: KindDB
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: kindness_is_magic_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # The health check in `options` makes the runner wait for Postgres to
+        # be healthy before running the job's steps. (There is no "condition:"
+        # key in workflow service definitions — that is docker-compose
+        # `depends_on` syntax and would be rejected by GitHub.)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the backend Dockerfile / compose test service; the local
+          # dev venv is newer and the suite is version-agnostic (pytest.ini).
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements-test.txt
+            backend/requirements.txt
+      - name: Create venv and install test requirements
+        run: |
+          # Root .venv: run_tests.sh hardcodes ../.venv/bin/python (same venv
+          # as the local dev workflow). requirements-test.txt pulls in
+          # requirements.txt + ruff, covering the whole DoD in one install.
+          python -m venv .venv
+          .venv/bin/pip install -r backend/requirements-test.txt
+      - name: Ruff check
+        working-directory: backend
+        run: ../.venv/bin/ruff check .
+      - name: Ruff format check
+        working-directory: backend
+        run: ../.venv/bin/ruff format --check .
+      - name: Pytest suite
+        working-directory: backend
+        # Service Postgres matches run_tests.sh/conftest.py defaults exactly
+        # (localhost:5433, KindDB/testpassword, kindness_is_magic_test), so no
+        # env vars are needed.
+        run: ./run_tests.sh
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Node 20 matches frontend/Dockerfile (node:20-alpine).
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Test
+        working-directory: frontend
+        run: npm run test
+      - name: Build
+        working-directory: frontend
+        # Beyond the DoD on purpose: the e2e stack serves the Vite dev server,
+        # so nothing else in CI compiles the production bundle.
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create .env from committed test values
+        run: cp .env.example .env
+      - name: Start dev stack
+        # -d is mandatory: bare `up` runs in the foreground and never returns.
+        run: ./run-compose.sh up -d --build
+      - name: Wait for stack readiness
+        # Bounded ~5 min: the frontend dev container runs `npm install` at
+        # start, which is slower than Playwright's own 60 s backend poll.
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost/login > /dev/null; then
+              echo "Stack is up."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Stack did not become ready within 5 minutes:" >&2
+          sudo docker compose logs >&2 || true
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: e2e
+        # --with-deps uses the runner's sudo for browser system libs —
+        # Playwright's own installer, not an app dependency.
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright suite
+        working-directory: e2e
+        # GitHub sets CI=true: the config already uses it for forbidOnly and
+        # 2 retries.
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          if-no-files-found: ignore
+      # No teardown: the runner VM is destroyed with its Docker state.

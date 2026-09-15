@@ -1,3 +1,4 @@
+CD
 Donor reminder emails before deadline
 Payment processing - some way to accept credit card payments. Looking like Zeffy
 Donor payment integration - Shopping cart for cash-claimed families, unclaim if not paid within a day. $500 per family for gifts + optional $100 per family for groceries
