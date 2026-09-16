@@ -98,6 +98,53 @@ services:
     networks:
       - kindnet
 
+  # Daily DB backup (README "7. Backups"): installs a crontab at container
+  # start, then idles. At 03:00 Pacific time (TZ=America/Los_Angeles,
+  # DST-aware) the job pg_dumps into ./backups and prunes dumps older than
+  # BACKUP_KEEP_DAYS days (default 7). Unhealthy in `prod ps` if no dump is
+  # fresher than ~25 h.
+  backups:
+    image: postgres:15-alpine
+    # Bypass the postgres entrypoint: this container only provides the pg_dump
+    # client + busybox crond (same image as db, so dumps stay restorable).
+    entrypoint: ["sh", "-c"]
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Los_Angeles
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - kindnet
+    # The heredoc bakes credentials/retention into nightly-backup.sh at
+    # container start; the cron line itself stays free of % and $ so crontab
+    # parsing can't mangle it.
+    command: |
+      cat > /usr/local/bin/nightly-backup.sh <<EOF
+      #!/bin/sh
+      # Nightly DB backup, run by crond at 03:00 America/Los_Angeles.
+      # Credentials and retention are baked in at container start.
+      ts=\$$(date +%Y%m%d-%H%M%S)
+      if PGPASSWORD='$${POSTGRES_PASSWORD}' pg_dump -h db -U '$${POSTGRES_USER}' '$${POSTGRES_DB}' > "/backups/kindness-backup-\$$ts.sql"; then
+        echo "\$$(date): backup OK -> kindness-backup-\$$ts.sql"
+        find /backups -name 'kindness-backup-*.sql' -mtime +$${BACKUP_KEEP_DAYS:-7} -delete
+      else
+        echo "\$$(date): backup FAILED - see pg_dump error above; partial file removed"
+        rm -f "/backups/kindness-backup-\$$ts.sql"
+      fi
+      EOF
+      chmod +x /usr/local/bin/nightly-backup.sh
+      echo "0 3 * * * /usr/local/bin/nightly-backup.sh >> /var/log/backups.log 2>&1" | crontab -
+      crond -f
+    healthcheck:
+      test: ["CMD-SHELL", "[ -n \"$(ls -t /backups/kindness-backup-*.sql 2>/dev/null | head -n1)\" ] && [ $(( $(date +%s) - $(stat -c %Y $(ls -t /backups/kindness-backup-*.sql 2>/dev/null | head -n1)) )) -lt 90000 ]"]
+      interval: 10m
+      timeout: 5s
+      retries: 3
+
 volumes:
   kindness_is_magic:
   traefik_certs:

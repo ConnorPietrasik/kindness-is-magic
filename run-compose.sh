@@ -101,6 +101,14 @@ prod_setup() {
     sh -c 'touch /data/acme.json && chmod 600 /data/acme.json'
   echo "acme.json ready (mode 600)."
 
+  # --- Backup storage ---------------------------------------------------------
+  # The prod stack bind-mounts ./backups (the backups service writes daily
+  # dumps there). Create it before the first `prod up` so it is owned by this
+  # user — otherwise Docker creates the mount source as root, and the manual
+  # `prod backup` can no longer write to it.
+  mkdir -p backups
+  echo "backups/ ready (target of the daily automatic backups)."
+
   # --- Advisory DNS checks (warnings only, never block) -------------------------
   local host resolved public_ip
   host="$(env_get PUBLIC_HOSTNAME)"

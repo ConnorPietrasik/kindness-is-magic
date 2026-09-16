@@ -152,7 +152,7 @@ continue until they're replaced.
 ### 4. Prerequisites & start
 
 ```bash
-./run-compose.sh prod setup        # toolchain + .env checks, seeds acme.json (mode 600), DNS warnings — re-runnable
+./run-compose.sh prod setup        # toolchain + .env checks, seeds acme.json (mode 600) and backups/, DNS warnings — re-runnable
 ./run-compose.sh prod up -d --build
 ```
 
@@ -170,7 +170,7 @@ relying on the first certificate issuance.
 
 ```bash
 git pull && ./run-compose.sh prod up -d --build   # redeploy
-./run-compose.sh prod logs -f [backend|frontend|traefik|db]
+./run-compose.sh prod logs -f [backend|frontend|traefik|db|backups]
 ./run-compose.sh prod ps
 ```
 
@@ -184,7 +184,22 @@ git pull && ./run-compose.sh prod up -d --build   # redeploy
 
 All application data is in the `kindness_is_magic` Postgres volume (the
 `traefik_certs` volume holds Let's Encrypt state and re-issues itself if lost —
-not worth backing up). From the repo directory, occasionally:
+not worth backing up), so a `pg_dump` of the database is the whole backup.
+
+**Automatic.** The `backups` service in the prod stack runs `pg_dump` daily at
+**03:00 Pacific time** (`TZ=America/Los_Angeles`, DST-aware) and writes
+`backups/kindness-backup-<timestamp>.sql`, deleting dumps older than
+`BACKUP_KEEP_DAYS` days (default 7 — set it in `.env`). The time and timezone
+are literals in the `backups` service in `docker-compose.prod.yml`. To check:
+
+- `./run-compose.sh prod ps` — the service goes `(unhealthy)` if no dump is
+  fresher than ~25 h (expected on a fresh deploy, until the first 03:00 run).
+- `ls -lt backups/` — what exists.
+- `./run-compose.sh prod exec backups tail /var/log/backups.log` — a failed
+  run's `pg_dump` error.
+
+**Manual** — any time, e.g. before a risky change (writes the same files, so a
+manual backup also refreshes the automatic health marker):
 
 ```bash
 ./run-compose.sh prod backup         # writes backups/kindness-backup-<timestamp>.sql
