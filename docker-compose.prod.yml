@@ -4,8 +4,9 @@
 #
 # Requires in .env: PUBLIC_HOSTNAME, LETSENCRYPT_EMAIL (plus the usual
 # POSTGRES_*, SECRET_KEY, etc.). Before first start: point the domain's DNS
-# A record (apex only) at this server's public IP, and forward TCP 80/443
-# to it.
+# A record — and a www CNAME at the apex — at this server's public IP, and
+# forward TCP 80/443 to it. www is 301-redirected to the apex (both names
+# share one Let's Encrypt cert).
 
 name: kindness-is-magic
 
@@ -93,6 +94,16 @@ services:
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # www -> apex: permanent 301 (no dual-serving — auth cookies are
+      # host-only). Joins the same Let's Encrypt cert (SAN); needs the www
+      # CNAME for issuance and every 90-day renewal.
+      - "traefik.http.routers.frontend-www.rule=Host(`www.${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}`)"
+      - "traefik.http.routers.frontend-www.entrypoints=websecure"
+      - "traefik.http.routers.frontend-www.tls=true"
+      - "traefik.http.routers.frontend-www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-www.middlewares=www-redirect"
+      - "traefik.http.middlewares.www-redirect.redirectHost.domain=${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}"
+      - "traefik.http.middlewares.www-redirect.redirectHost.permanent=true"
       - "traefik.docker.network=kindnet"
     restart: unless-stopped
     networks:
