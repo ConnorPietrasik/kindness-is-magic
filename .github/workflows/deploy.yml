@@ -1,0 +1,105 @@
+# Continuous deployment to the production server (the Pi).
+#
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# pushes a version tag, which runs the full CI gate on the tagged commit and
+# then deploys it over SSH: the restricted `deploy` key's forced command runs
+# deploy/prod-deploy.sh <tag> on the server (pre-deploy DB backup, build,
+# cutover, image tagging, HTTP smoke check). The script's stdout — backup
+# file, sha, smoke result, backend log tail on failure — is the Actions log.
+#
+# Manual redeploy/rollback: Actions -> Run workflow, enter a tag. A manual
+# run SKIPS the CI gate on purpose: its SHA would be the branch tip, not the
+# tag, so gating would certify the wrong commit (and a red master could block
+# an emergency rollback). The tag's content was already gated when it was
+# pushed; the script's exact-tag checkout is the final authority.
+#
+# Tag contract (enforced by the server wrapper AND deploy script): the tag
+# must match  v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]*)?  — v + semver, e.g.
+# v1.2.3 (optional -prerelease suffix, e.g. v2.0.0-rc.1).
+#
+# One-time server setup: sudo ./deploy/setup-server.sh (see README
+# 'Releases (CD)').
+
+name: Deploy (CD)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to deploy, e.g. v1.2.3 — vMAJOR.MINOR.PATCH with optional -prerelease suffix; enter the previous tag to roll back"
+        required: true
+
+# Deploys queue behind an in-flight one and are never cancelled (the opposite
+# of ci.yml's cancel-in-progress: a deploy must run to completion, and the
+# server-side deploy lock makes a concurrent re-run fail fast anyway).
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # actions: write — the called ci.yml run inherits this job's permissions
+  # (a called workflow can only be downgraded), and its e2e job uploads
+  # failure screenshots/traces via upload-artifact, which needs it.
+  actions: write
+
+# EDIT ONCE: the server's public hostname (no scheme) and the deploy user
+# name. This is public DNS information, not a secret — only DEPLOY_SSH_KEY
+# (a repository secret) is.
+env:
+  DEPLOY_HOST: kindnessismagic.love
+  DEPLOY_USER: deploy
+
+jobs:
+  # Full CI suite on the tagged commit (the called run checks out the
+  # caller's SHA). Runs on tag *creation* only: a tag deletion also fires a
+  # push event (action: deleted) — without the action guard, every tag
+  # cleanup would kick off a full CI run.
+  gate:
+    name: CI gate on tagged commit
+    uses: ./.github/workflows/ci.yml
+    if: github.event_name == 'push' && github.event.action == 'created'
+
+  deploy:
+    name: Deploy to the server
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: gate
+    # always(): a skipped `needs` would otherwise auto-skip this job too.
+    # The two skip cases are separated deliberately:
+    #   - workflow_dispatch: gate skipped -> deploy still runs (ungated by
+    #     design, see header).
+    #   - tag deletion (push, action: deleted): gate skipped -> deploy skips,
+    #     so the run shows skipped jobs instead of a red run.
+    # A failed/timed-out gate still blocks the deploy.
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.gate.result == 'success')
+    env:
+      # The pushed tag name, or the dispatch input.
+      TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+    steps:
+      # No third-party ssh-agent action: the key goes to a 0600 file that
+      # nothing else reads.
+      - name: Write deploy key (0600)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+      - name: Deploy
+        run: |
+          # The restricted key's forced command is /usr/local/bin/kindness-
+          # deploy (see deploy/setup-server.sh), which validates this exact
+          # request shape and execs deploy/prod-deploy.sh <tag> on the
+          # server. The ssh exit code is this job's status.
+          ssh -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -o ServerAliveInterval=30 \
+              -o StrictHostKeyChecking=accept-new \
+              -i ~/.ssh/deploy_key \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" "deploy ${TAG}"

@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   pull_request:
+  # CD gate: deploy.yml calls this suite on tag push. The called run checks
+  # out the caller's SHA (the tagged commit), so what is tested is exactly
+  # what gets deployed. No inputs/secrets are needed: no step reads them or
+  # branches on the event name.
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}

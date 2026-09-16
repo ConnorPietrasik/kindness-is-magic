@@ -32,6 +32,7 @@ e2e/       Playwright end-to-end tests
 .env.example   All runtime configuration (secrets, admin bootstrap, SMTP, ...)
 docker-compose.yml      Dev stack: Traefik + Postgres + backend + frontend
 docker-compose.prod.yml Production stack (nginx + 2-worker backend + Traefik HTTPS)
+deploy/                 Production deploy scripts (CD entrypoint, server setup, SSH wrapper)
 run-compose.sh          Wrapper that always runs docker compose from the repo root
 demo_import.csv         Sample CSV for the admin bulk import page
 AGENTS.md               Agent instructions (root, backend/, frontend/, e2e/)
@@ -99,7 +100,9 @@ on pull requests, with three parallel jobs: **backend** (ruff check + format,
 pytest against an ephemeral Postgres service container), **frontend**
 (typecheck, lint, Vitest, production build), and **e2e** (the Playwright
 suite). The e2e job spins up its own disposable dev stack at
-`http://localhost` from the repo — nothing to prepare locally.
+`http://localhost` from the repo — nothing to prepare locally. The Deploy
+(CD) workflow reuses this suite as its release gate via `workflow_call` —
+see **Releases (CD)** below.
 
 ## Configuration
 
@@ -169,13 +172,88 @@ relying on the first certificate issuance.
   and retry.
 - Log in at `https://yourdomain.com` with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
-### 6. Day-to-day
+### 6. Releases (CD)
+
+Releases are tags: **cut a tag, push it, the server deploys it.**
 
 ```bash
-git pull && ./run-compose.sh prod up -d --build   # redeploy
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+Pushing a `v*` tag runs the **Deploy (CD)** workflow, which does, in order:
+
+1. **CI gate** — the full CI suite (backend, frontend, e2e) runs against the
+   *tagged commit* (`deploy.yml` reuses `ci.yml` via `workflow_call`, whose
+   called run checks out the caller's SHA). A red gate aborts before anything
+   touches the server.
+2. **SSH deploy** — the runner connects to the server as the `deploy` user
+   with a dedicated restricted key (its forced command accepts exactly
+   `deploy <tag> [--dry-run]`; there is no shell to log into) and runs
+   `deploy/prod-deploy.sh <tag>`, which:
+   - takes a **pre-deploy database backup**
+     (`backups/kindness-backup-<timestamp>.sql`, named in the run's log and
+     final summary),
+   - builds and cuts over (`prod up -d --build`) — a brief downtime; a failed
+     build never cuts over (the old stack keeps running),
+   - tags the two freshly built images with the version, so `docker images`
+     shows what is running (`kindness-is-magic-backend:1.2.3`,
+     `kindness-is-magic-frontend:1.2.3`),
+   - smoke-checks the live site: `https://<domain>/` and `/api/health` must
+     both answer 200 three times in a row (~2 min bound).
+
+**Redeploy / rollback** — GitHub Actions → *Deploy (CD)* → *Run workflow*,
+entering the tag. A manual run **skips the CI gate** (its SHA would be the
+branch tip, not the tag, so gating would certify the wrong commit) and
+deploys the exact tag directly — a deliberate override, e.g. an emergency
+rollback to the previous tag. Caveat: migrations are forward-only (no down
+migrations). If the release you are rolling back *from* made non-additive
+schema changes, a code rollback alone may not be safe — restore that
+release's pre-deploy backup instead (see Backups).
+
+**Recovering from a failed deploy job** — re-run the workflow (the gate
+re-runs), or from the server:
+
+```bash
+sudo -u deploy ./deploy/prod-deploy.sh v1.2.3        # add --dry-run to stop after the checkout
+```
+
+The script is self-contained (fetch, checkout, backup, build, cutover,
+smoke), but only `deploy` can write the clone and `backups/`, so the owner
+account's own shell can't run it. The restricted key is the same path from
+any machine: `ssh -i <deploy-key> deploy@<host> "deploy v1.2.3"`.
+
+**One-time CD setup** (on the server, after the first-start above):
+
+```bash
+sudo ./deploy/setup-server.sh
+```
+
+It creates the password-locked `deploy` user (NOPASSWD sudo for the docker
+binary only), makes it own the clone (including `.env`) and `backups/`, pins
+the clone's `origin` to the public HTTPS URL, installs the forced-command
+wrapper at `/usr/local/bin/kindness-deploy`, and prints a **private key
+once**. Then:
+
+1. Add the private key as the repository secret **`DEPLOY_SSH_KEY`**
+   (GitHub → Settings → Secrets and variables → Actions).
+2. Check that **`DEPLOY_HOST`** at the top of `.github/workflows/deploy.yml`
+   is this server's hostname.
+
+The script is idempotent; re-running it **rotates the key** — replace the
+secret with the freshly printed one.
+
+**Day-to-day server access** (owner account — inspection and recovery only):
+
+```bash
 ./run-compose.sh prod logs -f [backend|frontend|traefik|db|backups]
 ./run-compose.sh prod ps
+sudo docker images # running version: kindness-is-magic-{backend,frontend}:<version>
 ```
+
+Note: the old owner-side `git pull && ./run-compose.sh prod up -d --build`
+deploy flow is gone by design — the clone (and `backups/`) is owned by
+`deploy` now, so the owner account can no longer push code to the server.
+Deploys are tags; the owner account remains for logs, backups, and restores.
 
 - **Cert renewals are automatic** — Traefik re-issues ~30 days before each
   90-day expiry. No cron, no certbot. Requirements: apex A record + www CNAME
@@ -202,10 +280,11 @@ are literals in the `backups` service in `docker-compose.prod.yml`. To check:
   run's `pg_dump` error.
 
 **Manual** — any time, e.g. before a risky change (writes the same files, so a
-manual backup also refreshes the automatic health marker):
+manual backup also refreshes the automatic health marker). After CD setup,
+`backups/` is owned by `deploy`, so run it as that user:
 
 ```bash
-./run-compose.sh prod backup         # writes backups/kindness-backup-<timestamp>.sql
+sudo -u deploy ./run-compose.sh prod backup   # writes backups/kindness-backup-<timestamp>.sql
 ```
 
 Restore takes the backup file, double-confirms, and **destroys the current
