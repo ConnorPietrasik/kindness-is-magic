@@ -12,7 +12,7 @@ name: kindness-is-magic
 
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.7
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"

@@ -1,10 +1,10 @@
 # Kindness Is Magic
 
-A web app that connects donors with families: families (referred by case workers) collect a wish list of gifts, donors sponsor the family's wishes, and volunteers purchase and deliver the gifts.
+A web app that connects donors with families: families (referred by referrers) collect a wish list of gifts, donors sponsor the family's wishes, and volunteers purchase and deliver the gifts.
 
 ## How it works
 
-- **Referrers** (case workers) are invited by an admin with a one-time invite code. They refer families and manage the family's members and wish lists.
+- **Referrers** are invited by an admin with a one-time invite code. They refer families and manage the family's members and wish lists.
 - **Families** register via an invite from their referrer and can see who is sponsoring their wishes and the status of each gift.
 - **Donors** (and other claim-capable roles) browse public families and **sponsor** a family — a "claim" in the code — committing to cover its wishes.
 - **Purchasers** are assigned specific wishes and mark them as purchased.
@@ -87,7 +87,7 @@ containers, volumes, and networks, including the database (`DEBUG=true` only).
   cd frontend && npm run test                  # plus: npm run typecheck, npm run lint
   ```
 
-- **E2E** — Playwright against the running dev stack (creates its own data):
+- **E2E** — Playwright against the running dev stack (creates its own data + relies on info from the demo import):
 
   ```bash
   cd e2e && npx playwright test
@@ -129,8 +129,8 @@ the workstation with `docker-compose.yml` — never on the Pi.
 - **A record:** `yourdomain.com` → the Pi's public IP
 - **CNAME:** `www.yourdomain.com` → `yourdomain.com`
   (www is 301-redirected to the apex; both names are in the one Let's Encrypt
-  cert — this record is re-validated at every renewal, keep it alive)
-- **Router:** forward TCP **80** and **443** to the Pi's LAN IP
+  cert)
+- **Router:** forward TCP **80** and **443** to the Pi's LAN IP (along with an SSH port for CD)
 - Wait for propagation: `dig +short yourdomain.com` should show your public IP
 
 ### 3. Repo & `.env`
@@ -205,10 +205,7 @@ Pushing a `v*` tag runs the **Deploy (CD)** workflow, which does, in order:
 entering the tag. A manual run **skips the CI gate** (its SHA would be the
 branch tip, not the tag, so gating would certify the wrong commit) and
 deploys the exact tag directly — a deliberate override, e.g. an emergency
-rollback to the previous tag. Caveat: migrations are forward-only (no down
-migrations). If the release you are rolling back *from* made non-additive
-schema changes, a code rollback alone may not be safe — restore that
-release's pre-deploy backup instead (see Backups).
+rollback to the previous tag.
 
 **Recovering from a failed deploy job** — re-run the workflow (the gate
 re-runs), or from the server:
@@ -249,11 +246,6 @@ secret with the freshly printed one.
 ./run-compose.sh prod ps
 sudo docker images # running version: kindness-is-magic-{backend,frontend}:<version>
 ```
-
-Note: the old owner-side `git pull && ./run-compose.sh prod up -d --build`
-deploy flow is gone by design — the clone (and `backups/`) is owned by
-`deploy` now, so the owner account can no longer push code to the server.
-Deploys are tags; the owner account remains for logs, backups, and restores.
 
 - **Cert renewals are automatic** — Traefik re-issues ~30 days before each
   90-day expiry. No cron, no certbot. Requirements: apex A record + www CNAME
@@ -310,11 +302,6 @@ factory reset in Troubleshooting below.)
 - **429s** — per-visitor rate limit (auth endpoints); not a bug.
 - **Factory reset (destroys all data — back up first):**
   `./run-compose.sh prod down -v` (there is deliberately no `clear` for prod).
-
-### Deployment notes
-
-- `traefik:latest` is unpinned for now — pin a specific version tag when you
-  want upgrade stability.
 
 ## License
 
