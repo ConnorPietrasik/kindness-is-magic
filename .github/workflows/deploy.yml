@@ -46,11 +46,12 @@ permissions:
   # failure screenshots/traces via upload-artifact, which needs it.
   actions: write
 
-# EDIT ONCE: the server's public hostname (no scheme) and the deploy user
-# name. This is public DNS information, not a secret — only DEPLOY_SSH_KEY
-# (a repository secret) is.
+# EDIT ONCE: the server's public hostname (no scheme), its SSH port, and the
+# deploy user name. This is public DNS information, not a secret — only
+# DEPLOY_SSH_KEY (a repository secret) is.
 env:
   DEPLOY_HOST: kindnessismagic.love
+  DEPLOY_SSH_PORT: "2222" # the Pi's sshd port (ssh would otherwise try 22)
   DEPLOY_USER: deploy
 
 jobs:
@@ -102,4 +103,5 @@ jobs:
               -o ServerAliveInterval=30 \
               -o StrictHostKeyChecking=accept-new \
               -i ~/.ssh/deploy_key \
+              -p "${DEPLOY_SSH_PORT}" \
               "${DEPLOY_USER}@${DEPLOY_HOST}" "deploy ${TAG}"

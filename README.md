@@ -236,8 +236,8 @@ once**. Then:
 
 1. Add the private key as the repository secret **`DEPLOY_SSH_KEY`**
    (GitHub → Settings → Secrets and variables → Actions).
-2. Check that **`DEPLOY_HOST`** at the top of `.github/workflows/deploy.yml`
-   is this server's hostname.
+2. Check that **`DEPLOY_HOST`** and **`DEPLOY_SSH_PORT`** at the top of
+   `.github/workflows/deploy.yml` are this server's hostname and SSH port.
 
 The script is idempotent; re-running it **rotates the key** — replace the
 secret with the freshly printed one.
