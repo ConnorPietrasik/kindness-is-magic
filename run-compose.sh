@@ -42,8 +42,8 @@ prod_setup() {
     exit 1
   }
   if ! sudo docker compose version >/dev/null 2>&1; then
-    echo "Error: the 'docker compose' v2 plugin is not available."
-    echo "  Install it for your distro (Debian/Ubuntu: docker-compose-v2, Fedora: docker-compose)."
+    echo "Error: the Docker Compose plugin ('docker compose') is not available."
+    echo "  Install it: https://docs.docker.com/compose/install/"
     exit 1
   fi
   command -v curl >/dev/null 2>&1 || {
@@ -110,26 +110,59 @@ prod_setup() {
   echo "backups/ ready (target of the daily automatic backups)."
 
   # --- Advisory DNS checks (warnings only, never block) -------------------------
-  local host resolved www_resolved public_ip
+  local host dns_out a_record aaaa_record www_resolved box_ip4 box_ip6 problem shown
+  local problems=()
   host="$(env_get PUBLIC_HOSTNAME)"
 
-  # Compare the IPv4 A record against this box's public IPv4 egress address.
+  # Compare A/AAAA records against this box's public egress address, per family.
+  # The box may be IPv4-only, IPv6-only, or dual-stack, and a plain
+  # ifconfig.me call returns whichever family the resolver prefers — so each
+  # record is compared with the box's address in the same family only.
   dns_out="$(getent hosts "$host" 2>/dev/null || true)"
-  resolved="$(printf '%s\n' "$dns_out" | awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $1; exit}')"
+  a_record="$(printf '%s\n' "$dns_out" | awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $1; exit}')"
+  aaaa_record="$(printf '%s\n' "$dns_out" | awk '$1 ~ /:/ {print $1; exit}')"
+  shown="${a_record}"
+  [ -n "$aaaa_record" ] && shown="${shown:+${shown}, }${aaaa_record}"
   if [ -z "$dns_out" ]; then
     echo "Warning: DNS — '${host}' does not resolve yet."
-    echo "         Let's Encrypt (and visitors) will fail until an A record points at this server."
-  elif [ -z "$resolved" ]; then
-    echo "DNS check: '${host}' resolves but has no IPv4 A record — verify the A/AAAA records manually."
+    echo "         Let's Encrypt (and visitors) will fail until an A or AAAA record points at this server."
   else
-    public_ip="$(curl -fsS --max-time 10 ifconfig.me 2>/dev/null || true)"
-    if [ -z "$public_ip" ]; then
-      echo "DNS check: '${host}' -> ${resolved} (could not determine this box's public IP; skipped comparison)."
-    elif [ "$resolved" != "$public_ip" ]; then
-      echo "Warning: DNS — '${host}' resolves to ${resolved}, but this box's public IP is ${public_ip}."
-      echo "         Point the A record at your public IP and forward TCP 80/443 on your router."
+    box_ip4="$(curl -4 -fsS --max-time 10 ifconfig.me 2>/dev/null || true)"
+    box_ip6="$(curl -6 -fsS --max-time 10 ifconfig.me 2>/dev/null || true)"
+    if [ -z "$box_ip4" ] && [ -z "$box_ip6" ]; then
+      echo "DNS check: '${host}' -> ${shown} (could not determine this box's public IP; skipped comparison)."
     else
-      echo "DNS check OK: '${host}' -> ${resolved} (this box's public IP)."
+      if [ -n "$box_ip4" ]; then
+        if [ "$a_record" = "$box_ip4" ]; then
+          :
+        elif [ -z "$a_record" ]; then
+          problems+=("no A record found (this box's public IPv4 is ${box_ip4})")
+        else
+          problems+=("A record is ${a_record}, but this box's public IPv4 is ${box_ip4}")
+        fi
+      elif [ -n "$a_record" ]; then
+        problems+=("A record is ${a_record}, but this box has no public IPv4 — IPv4 visitors will not reach this box")
+      fi
+      if [ -n "$box_ip6" ]; then
+        if [ "$aaaa_record" = "$box_ip6" ]; then
+          :
+        elif [ -z "$aaaa_record" ]; then
+          problems+=("no AAAA record found (this box's public IPv6 is ${box_ip6})")
+        else
+          problems+=("AAAA record is ${aaaa_record}, but this box's public IPv6 is ${box_ip6}")
+        fi
+      elif [ -n "$aaaa_record" ]; then
+        problems+=("AAAA record is ${aaaa_record}, but this box has no public IPv6 — IPv6 visitors will not reach this box")
+      fi
+      if [ "${#problems[@]}" -eq 0 ]; then
+        echo "DNS check OK: '${host}' -> ${shown} (this box's public IP)."
+      else
+        echo "Warning: DNS — '${host}' is not set up to reach this box:"
+        for problem in "${problems[@]}"; do
+          echo "         - ${problem}"
+        done
+        echo "         Point the A/AAAA records at this box's public IP(s) and forward TCP 80/443 on your router."
+      fi
     fi
   fi
 

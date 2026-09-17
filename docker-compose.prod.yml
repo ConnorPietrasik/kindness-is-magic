@@ -4,9 +4,9 @@
 #
 # Requires in .env: PUBLIC_HOSTNAME, LETSENCRYPT_EMAIL (plus the usual
 # POSTGRES_*, SECRET_KEY, etc.). Before first start: point the domain's DNS
-# A record — and a www CNAME at the apex — at this server's public IP, and
-# forward TCP 80/443 to it. www is 301-redirected to the apex (both names
-# share one Let's Encrypt cert).
+# A/AAAA record(s) — and a www CNAME at the apex — at this server's public
+# IP(s), and forward TCP 80/443 to it. www is 301-redirected to the apex
+# (both names share one Let's Encrypt cert).
 
 name: kindness-is-magic
 

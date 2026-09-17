@@ -120,18 +120,20 @@ the workstation with `docker-compose.yml` — never on the Pi.
 ### 1. Hardware & OS
 
 - Raspberry Pi 4B, 4 GB RAM, headless Debian
-- `sudo apt install docker.io docker-compose-v2 git curl`
+- Install Docker (with Docker Compose), `git`, and `curl`
 - Prefer a USB SSD over the SD card for the data volume (`kindness_is_magic`) —
   Postgres on a cheap SD card is a classic long-term failure point.
 
 ### 2. DNS & network (before first start)
 
-- **A record:** `yourdomain.com` → the Pi's public IP
+- **A record:** `yourdomain.com` → the Pi's public IPv4 (omit if you have none)
+- **AAAA record:** `yourdomain.com` → the Pi's public IPv6 (omit if you have none)
+  — at least one of the two is required
 - **CNAME:** `www.yourdomain.com` → `yourdomain.com`
   (www is 301-redirected to the apex; both names are in the one Let's Encrypt
   cert)
 - **Router:** forward TCP **80** and **443** to the Pi's LAN IP (along with an SSH port for CD)
-- Wait for propagation: `dig +short yourdomain.com` should show your public IP
+- Wait for propagation: `dig +short yourdomain.com` / `dig +short AAAA yourdomain.com` should show your public IP(s)
 
 ### 3. Repo & `.env`
 
@@ -248,8 +250,8 @@ sudo docker images # running version: kindness-is-magic-{backend,frontend}:<vers
 ```
 
 - **Cert renewals are automatic** — Traefik re-issues ~30 days before each
-  90-day expiry. No cron, no certbot. Requirements: apex A record + www CNAME
-  still resolve, ports 80/443 still forwarded, Traefik running.
+  90-day expiry. No cron, no certbot. Requirements: apex A/AAAA record(s) +
+  www CNAME still resolve, ports 80/443 still forwarded, Traefik running.
 - Rate limits (login etc., 5/min per visitor) are effectively 2× looser with
   2 backend workers (per-process storage) — intentional at this scale.
 

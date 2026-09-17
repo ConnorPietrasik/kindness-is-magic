@@ -52,7 +52,7 @@ for tool in docker git sudo visudo ssh-keygen; do
 done
 if [ -n "$missing" ]; then
   echo "Error: missing tool(s):$missing" >&2
-  echo "Install them (on Debian: sudo apt install docker.io docker-compose-v2 git sudo openssh-client) and re-run." >&2
+  echo "Install them (Docker: https://docs.docker.com/engine/install/) and re-run." >&2
   exit 1
 fi
 
