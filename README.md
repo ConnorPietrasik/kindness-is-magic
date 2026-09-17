@@ -137,8 +137,16 @@ the workstation with `docker-compose.yml` — never on the Pi.
 
 ### 3. Repo & `.env`
 
+Clone into a neutral location such as `/opt` — **not** under a home
+directory. Once CD is set up (step 6), the password-locked `deploy` user
+owns the clone and works in it on every deploy, so it must live where
+`deploy` can always reach it; a clone under a home dir that `deploy` can't
+traverse makes every deploy fail.
+
 ```bash
-git clone <repo-url> && cd <repo>
+sudo git clone <repo-url> /opt/kindness-is-magic
+sudo chown "$(id -un)" /opt/kindness-is-magic   # you keep working in it until CD setup (step 6)
+cd /opt/kindness-is-magic
 cp .env.example .env
 ```
 
@@ -228,10 +236,12 @@ sudo ./deploy/setup-server.sh
 ```
 
 It creates the password-locked `deploy` user (NOPASSWD sudo for the docker
-binary only), makes it own the clone (including `.env`) and `backups/`, pins
-the clone's `origin` to the public HTTPS URL, installs the forced-command
-wrapper at `/usr/local/bin/kindness-deploy`, and prints a **private key
-once**. Then:
+binary only), makes it own the clone (including `.env`) and `backups/`, and
+verifies that `deploy` can actually reach the clone (a clone under a home
+directory it can't traverse fails here with a message saying to move it),
+pins the clone's `origin` to the public HTTPS URL, installs the
+forced-command wrapper at `/usr/local/bin/kindness-deploy`, and prints a
+**private key once**. Then:
 
 1. Add the private key as the repository secret **`DEPLOY_SSH_KEY`**
    (GitHub → Settings → Secrets and variables → Actions).

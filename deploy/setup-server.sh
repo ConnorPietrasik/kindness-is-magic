@@ -94,6 +94,20 @@ echo "Sudoers drop-in $SUDOERS_FILE: '$DEPLOY_USER' may run '$docker_bin' with N
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$REPO_ROOT"
 echo "Repo clone (including .env) and backups/ are now owned by '$DEPLOY_USER'."
 
+# --- Reachability: the deploy user must be able to reach the clone ------------------
+# Every deploy (the forced command, fetch, checkout, backups) runs as the deploy
+# user, so a clone under a parent dir it can't traverse breaks CD. Check as the
+# owner (before the chown the repo belongs to the human account, and any user's
+# git would be refused by the dubious-ownership check for the wrong reason).
+if ! sudo -u "$DEPLOY_USER" git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Error: '$DEPLOY_USER' cannot access $REPO_ROOT (permission denied on a parent dir?)." >&2
+  echo "The deploy user must reach the clone on every deploy. Move it to a neutral" >&2
+  echo "location (e.g. /opt/kindness-is-magic) or add execute-for-others on each" >&2
+  echo "parent dir (chmod o+x <dir>) and re-run." >&2
+  exit 1
+fi
+echo "'$DEPLOY_USER' can access the clone at $REPO_ROOT."
+
 # --- Pin origin to the public HTTPS URL ----------------------------------------------
 # The deploy user has no SSH key; server-side fetch over HTTPS needs no
 # credentials (public repo). Convert scp-like and ssh:// remotes to https://.
