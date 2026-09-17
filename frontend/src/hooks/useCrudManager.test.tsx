@@ -508,9 +508,11 @@ describe("useCrudManager", () => {
       result.current.openEdit(1);
     });
 
-    // The failure is surfaced as a toast (error message) and the edit row reverts
+    // The failure is surfaced as a toast (error message) and the edit row reverts.
+    // Wait on the hook state: renderHook's result.current updates in a passive effect,
+    // so it can lag the DOM (and the toast) by one flush.
     await screen.findByText("detail failed");
-    expect(result.current.editingId).toBeNull();
+    await waitFor(() => expect(result.current.editingId).toBeNull());
 
     // The poisoned cache entry is removed, so clicking Edit again fetches fresh
     act(() => {
@@ -531,7 +533,7 @@ describe("useCrudManager", () => {
     });
 
     await screen.findByText("Thing not found");
-    expect(result.current.editingId).toBeNull();
+    await waitFor(() => expect(result.current.editingId).toBeNull());
   });
 
   it("toasts when the list fetch fails", async () => {
