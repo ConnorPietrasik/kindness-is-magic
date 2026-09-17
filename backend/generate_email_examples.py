@@ -98,6 +98,7 @@ EXAMPLES = [
         "body": build_family_invite_email(
             code="KFI-JKL34MNO",
             referrer_name="Sarah Johnson",
+            email="family@example.com",
         ),
         "unsubscribe": True,
     },

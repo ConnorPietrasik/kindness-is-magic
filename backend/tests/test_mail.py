@@ -280,7 +280,7 @@ class TestEmailTemplates:
             expires_at=datetime(2026, 12, 25, 12, 0, tzinfo=timezone.utc),
             email="test@example.com",
         )
-        assert "register-referrer?code=KMG-ABC123&email=test@example.com" in html
+        assert "register-referrer?code=KMG-ABC123&email=test%40example.com" in html
 
     def test_invite_email_without_email_param_has_plain_link(self):
         """When email param is not provided, the Get Started link is plain."""
@@ -297,15 +297,22 @@ class TestEmailTemplates:
     def test_family_invite_email_contains_code_and_name(self):
         from app.mail import build_family_invite_email
 
-        html = build_family_invite_email(code="KFI-ABC123", referrer_name="Jane Smith")
+        html = build_family_invite_email(code="KFI-ABC123", referrer_name="Jane Smith", email="family@example.com")
         assert "KFI-ABC123" in html
         assert "Jane Smith" in html
-        assert "register-family?code=KFI-ABC123" in html
+        assert "register-family?code=KFI-ABC123&email=family%40example.com" in html
+
+    def test_family_invite_email_url_encodes_special_chars(self):
+        """A + in the address must stay %2B (raw + would decode to a space)."""
+        from app.mail import build_family_invite_email
+
+        html = build_family_invite_email(code="KFI-ABC123", referrer_name="Jane Smith", email="jane+gift@example.com")
+        assert "email=jane%2Bgift%40example.com" in html
 
     def test_family_invite_email_has_get_started_button(self):
         from app.mail import build_family_invite_email
 
-        html = build_family_invite_email(code="KFI-XYZ789", referrer_name="John Doe")
+        html = build_family_invite_email(code="KFI-XYZ789", referrer_name="John Doe", email="family@example.com")
         assert "Get Started" in html
 
 

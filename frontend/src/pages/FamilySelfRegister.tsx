@@ -45,18 +45,20 @@ export default function FamilySelfRegister() {
   const [searchParams] = useSearchParams();
 
   const urlCode = searchParams.get("code") ?? "";
+  const urlEmail = searchParams.get("email") ?? "";
 
   const [form, setForm] = useState<SelfRegisterForm>({
     ...emptyForm,
     code: urlCode,
+    email: urlEmail,
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Keep form in sync if URL params change
   useEffect(() => {
-    setForm((prev) => ({ ...prev, code: urlCode }));
-  }, [urlCode]);
+    setForm((prev) => ({ ...prev, code: urlCode, email: urlEmail }));
+  }, [urlCode, urlEmail]);
 
   const update = (key: keyof SelfRegisterForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -104,6 +106,7 @@ export default function FamilySelfRegister() {
   };
 
   const isCodeLocked = urlCode.length > 0;
+  const isEmailLocked = urlEmail.length > 0;
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-page-start to-page-end">
@@ -111,6 +114,12 @@ export default function FamilySelfRegister() {
         <Logo className="mx-auto mb-4 h-16 w-16" />
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-dark">Family Registration</h1>
         <p className="mb-6 text-center text-sm text-gray-500">Use your invite code to create an account</p>
+
+        {isEmailLocked && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            This invite is for <strong>{urlEmail}</strong>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField
@@ -172,7 +181,11 @@ export default function FamilySelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value),
               required: true,
               placeholder: "you@example.com",
+              readOnly: isEmailLocked,
               autoComplete: "email",
+              className: isEmailLocked
+                ? "w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-base text-gray-500 outline-none"
+                : undefined,
             }}
           />
 

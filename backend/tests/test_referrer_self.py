@@ -1148,7 +1148,7 @@ class TestSendFamilyInvite:
         assert captured_to["value"] == "target@example.com"
 
     def test_build_family_invite_email_called_with_referrer_data(self, test_client: TestClient, referrer_with_full_tree, db: Session):
-        """build_family_invite_email is called with the referrer's code and name."""
+        """build_family_invite_email is called with the referrer's code, name, and recipient email."""
         from unittest.mock import patch
 
         ref = referrer_with_full_tree["referrer"]
@@ -1171,6 +1171,7 @@ class TestSendFamilyInvite:
         assert resp.status_code == 200
         assert captured_kwargs["value"]["code"] == ref.family_invite_code
         assert captured_kwargs["value"]["referrer_name"] == ref.name
+        assert captured_kwargs["value"]["email"] == "family@example.com"
 
     def test_global_per_recipient_block(self, test_client: TestClient, referrer_with_full_tree, another_referrer):
         """A second referrer cannot send to an address that already received an invite."""

@@ -84,12 +84,47 @@ describe("FamilySelfRegister", () => {
     expect(codeInput).toHaveAttribute("readonly");
   });
 
-  it("leaves code field empty and editable when no URL params", () => {
+  it("pre-fills code and email from URL params and locks both fields", () => {
+    wrap(<FamilySelfRegister />, "/register-family?code=KFI-FAMILY1&email=family@example.com");
+
+    const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
+    expect(codeInput).toHaveValue("KFI-FAMILY1");
+    expect(codeInput).toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("family@example.com");
+    expect(emailInput).toHaveAttribute("readonly");
+  });
+
+  it("shows info message when email is locked from URL", () => {
+    wrap(<FamilySelfRegister />, "/register-family?code=KFI-FAMILY1&email=family@example.com");
+
+    expect(screen.getByText(/This invite is for/)).toBeInTheDocument();
+    expect(screen.getByText(/family@example.com/)).toBeInTheDocument();
+  });
+
+  it("pre-fills code from URL but leaves email editable when no email param", () => {
+    wrap(<FamilySelfRegister />, "/register-family?code=KFI-CODEONLY");
+
+    const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
+    expect(codeInput).toHaveValue("KFI-CODEONLY");
+    expect(codeInput).toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("");
+    expect(emailInput).not.toHaveAttribute("readonly");
+  });
+
+  it("leaves code and email fields empty and editable when no URL params", () => {
     wrap(<FamilySelfRegister />, "/register-family");
 
     const codeInput = screen.getByLabelText("Invite Code");
+    const emailInput = screen.getByLabelText("Email");
+
     expect(codeInput).toHaveValue("");
     expect(codeInput).not.toHaveAttribute("readonly");
+    expect(emailInput).toHaveValue("");
+    expect(emailInput).not.toHaveAttribute("readonly");
   });
 
   it("submits with pre-filled code from URL params", async () => {

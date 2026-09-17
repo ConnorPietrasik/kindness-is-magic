@@ -636,6 +636,7 @@ async def send_family_invite(
     html_body = build_family_invite_email(
         code=ref.family_invite_code,
         referrer_name=ref.name,
+        email=recipient,
     )
     # send_email records the SentEmail log row (sent or failed) itself
     result = await send_email(
