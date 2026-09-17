@@ -102,8 +102,12 @@ services:
       - "traefik.http.routers.frontend-www.tls=true"
       - "traefik.http.routers.frontend-www.tls.certresolver=letsencrypt"
       - "traefik.http.routers.frontend-www.middlewares=www-redirect"
-      - "traefik.http.middlewares.www-redirect.redirectHost.domain=${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}"
-      - "traefik.http.middlewares.www-redirect.redirectHost.permanent=true"
+      # v3 has no redirectHost middleware (removed in v3) — redirectRegex is
+      # the equivalent. Note the doubled backslash/dollar: YAML unescapes \\\\.
+      # to \\., and Compose unescapes $${1} to $1 for Traefik.
+      - "traefik.http.middlewares.www-redirect.redirectRegex.regex=^https?://www\\.${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}(.*)"
+      - "traefik.http.middlewares.www-redirect.redirectRegex.replacement=https://${PUBLIC_HOSTNAME:?SET PUBLIC_HOSTNAME in .env}$${1}"
+      - "traefik.http.middlewares.www-redirect.redirectRegex.permanent=true"
       - "traefik.docker.network=kindnet"
     restart: unless-stopped
     networks:
