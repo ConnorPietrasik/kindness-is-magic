@@ -97,7 +97,9 @@ echo "Repo clone (including .env) and backups/ are now owned by '$DEPLOY_USER'."
 # --- Pin origin to the public HTTPS URL ----------------------------------------------
 # The deploy user has no SSH key; server-side fetch over HTTPS needs no
 # credentials (public repo). Convert scp-like and ssh:// remotes to https://.
-origin_url="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
+# Run git as the deploy user: root reading a deploy-owned clone is refused
+# by git's dubious-ownership check (and would mask a real missing remote).
+origin_url="$(sudo -u "$DEPLOY_USER" git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
 if [ -z "$origin_url" ]; then
   echo "Error: the clone has no 'origin' remote. Set it (git remote add origin <url>) and re-run." >&2
   exit 1
@@ -105,7 +107,7 @@ fi
 https_url="$(printf '%s\n' "$origin_url" \
   | sed -E 's#^git@([^:/]+):#https://\1/#; s#^ssh://git@([^/]+)/#https://\1/#')"
 if [ "$https_url" != "$origin_url" ]; then
-  git -C "$REPO_ROOT" remote set-url origin "$https_url"
+  sudo -u "$DEPLOY_USER" git -C "$REPO_ROOT" remote set-url origin "$https_url"
   echo "Pinned origin to HTTPS: $https_url"
 else
   echo "Origin already HTTPS: $https_url"
