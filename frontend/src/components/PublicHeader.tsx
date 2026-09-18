@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ROUTES } from "../lib/routes";
 import { HeaderBar, LogoutButton } from "./HeaderBar";
@@ -14,15 +14,19 @@ interface PublicHeaderProps {
 /**
  * PublicHeader — the shared header for all public (brochure) pages.
  *
- * The centred title always links to the brochure at /home — for guests and
- * signed-in visitors alike (signed-in users reach the app via the Dashboard
- * link on the right). The right side adapts to the auth state: guests get a
- * "Sign in" link; signed-in users get a "Dashboard" link plus sign-out
- * (clicking sign-out navigates to the login page).
+ * The centred title links to the brochure at /home from any other public
+ * page, and scrolls to the top when already on /home. The left nav anchors
+ * to the /home sections for guests and signed-in visitors alike (signed-in
+ * users reach the app via the Dashboard link on the right). The right side
+ * adapts to the auth state: guests get a "Sign in" link; signed-in users
+ * get a "Dashboard" link plus sign-out (clicking sign-out navigates to the
+ * login page).
  */
 export const PublicHeader = memo(({ left, className }: PublicHeaderProps) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onHome = location.pathname === ROUTES.HOME;
 
   const handleLogout = async () => {
     await logout();
@@ -48,5 +52,27 @@ export const PublicHeader = memo(({ left, className }: PublicHeaderProps) => {
     </Link>
   );
 
-  return <HeaderBar title="Kindness is Magic" titleTo={ROUTES.HOME} left={left} right={right} className={className} />;
+  return (
+    <HeaderBar
+      title="Kindness is Magic"
+      titleTo={ROUTES.HOME}
+      onTitleClick={onHome ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+      left={
+        <>
+          {left}
+          <nav className="hidden items-center gap-3 text-sm font-medium text-white/90 sm:flex">
+            <Link to={`${ROUTES.HOME}#how-it-works`} className="hover:text-white transition-colors">
+              How it works
+            </Link>
+            <span className="text-white/40">•</span>
+            <Link to={`${ROUTES.HOME}#mission`} className="hover:text-white transition-colors">
+              Why it matters
+            </Link>
+          </nav>
+        </>
+      }
+      right={right}
+      className={className}
+    />
+  );
 });

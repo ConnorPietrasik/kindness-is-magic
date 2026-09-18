@@ -6,6 +6,8 @@ import { Logo } from "./Logo";
 interface HeaderBarProps {
   title: string;
   titleTo?: string;
+  /** When set, the centred title is a button that calls this instead of a link (e.g. scroll to top). */
+  onTitleClick?: () => void;
   left?: ReactNode;
   right?: ReactNode;
   /** Extra classes for the <header> element (e.g. "no-print"). */
@@ -15,20 +17,31 @@ interface HeaderBarProps {
 /**
  * HeaderBar — purple gradient top bar with title and optional actions.
  *
- * @param titleTo  Where the centred title links to (default: dashboard).
- *                 Pass a public route on unauthenticated pages.
+ * @param titleTo      Where the centred title links to (default: dashboard).
+ *                     Pass a public route on unauthenticated pages. Ignored when onTitleClick is set.
+ * @param onTitleClick Renders the centred title as a button that calls this handler.
  */
-export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, left, right, className = "" }: HeaderBarProps) => (
+export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, onTitleClick, left, right, className = "" }: HeaderBarProps) => (
   <header
-    className={`relative flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6 ${className}`}
+    className={`relative sticky top-0 z-50 flex items-center justify-between bg-gradient-to-r from-brand-dark to-brand-light px-4 text-white shadow-md h-14 sm:px-6 ${className}`}
   >
     <div className="z-10 flex items-center gap-3">
       <Logo className="h-9 w-9" />
       {left}
     </div>
-    <Link to={titleTo} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
-      {title}
-    </Link>
+    {onTitleClick ? (
+      <button
+        type="button"
+        onClick={onTitleClick}
+        className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline"
+      >
+        {title}
+      </button>
+    ) : (
+      <Link to={titleTo} className="absolute left-1/2 -translate-x-1/2 truncate text-lg font-semibold hover:underline">
+        {title}
+      </Link>
+    )}
     <div className="z-10">{right}</div>
   </header>
 ));

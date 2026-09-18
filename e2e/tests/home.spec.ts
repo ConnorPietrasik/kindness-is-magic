@@ -4,7 +4,10 @@
  * Creates no data, so there is no afterAll cleanup:
  *  - Unauthenticated "/" lands on the brochure at /home.
  *  - "Meet the Families" reaches the public browse page.
- *  - The header title on /families links back to /home.
+ *  - The header title on /families links back to /home; on /home it scrolls
+ *    to the top instead.
+ *  - The header section nav and the hero CTA anchor to the brochure sections;
+ *    the section nav is hidden below the sm breakpoint.
  *  - Footer legal links reach their pages; Donate and social links point at
  *    the exact external URLs (asserted by attribute — never clicked out).
  *  - An authenticated visitor still sees the brochure (no redirect away) with
@@ -55,6 +58,41 @@ test.describe("Home brochure (public)", () => {
     await expect(title).toHaveAttribute("href", "/home");
     await title.click();
     await expect(page).toHaveURL(/\/home$/);
+  });
+
+  test("header title on /home scrolls to the top", async ({ page }) => {
+    await page.goto("/home");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
+    await page.getByRole("button", { name: "Kindness is Magic" }).click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
+  test("section nav anchors the brochure and scrolls to the section", async ({ page }) => {
+    await page.goto("/home");
+    // The hero has a same-named link — scope to the header nav
+    await page.locator("header").getByRole("link", { name: "How it works" }).click();
+    await expect(page).toHaveURL(/\/home#how-it-works/);
+    await expect(page.getByRole("heading", { name: "How it works", level: 2 })).toBeInViewport({ timeout: 5_000 });
+  });
+
+  test("hero How it works button anchors to the section", async ({ page }) => {
+    await page.goto("/home");
+    // The header nav has a same-named link — scope to the hero (first section)
+    await page.locator("section").first().getByRole("link", { name: "How it works" }).click();
+    await expect(page).toHaveURL(/\/home#how-it-works/);
+    await expect(page.getByRole("heading", { name: "How it works", level: 2 })).toBeInViewport({ timeout: 5_000 });
+  });
+
+  test("section nav is hidden on narrow viewports", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto("/home");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
+    // Below the sm breakpoint the nav collapses so the title and auth actions fit
+    await expect(page.locator("header").getByRole("link", { name: "How it works" })).not.toBeVisible();
   });
 
   test("footer legal links lead to their pages", async ({ page }) => {

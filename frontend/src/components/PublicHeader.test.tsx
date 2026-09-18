@@ -26,6 +26,7 @@ const mockUser: User = {
 interface WrapOptions {
   user?: User | null;
   left?: React.ReactNode;
+  path?: string;
 }
 
 /**
@@ -33,11 +34,11 @@ interface WrapOptions {
  * Pre-seeds the auth query cache (staleTime: Infinity) so no /api/auth/me
  * request is made and the auth state is deterministic per test.
  */
-const wrap = ({ user = null, left }: WrapOptions = {}) => {
+const wrap = ({ user = null, left, path = "/home" }: WrapOptions = {}) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(auth, user);
   return render(
-    <MemoryRouter initialEntries={["/home"]}>
+    <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <PublicHeader left={left} />
@@ -54,17 +55,24 @@ const wrap = ({ user = null, left }: WrapOptions = {}) => {
 describe("PublicHeader", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     cleanup();
   });
 
-  it("title links to /home when logged out", () => {
+  it("title is a button that scrolls to the top of the page on /home", async () => {
+    const event = userEvent.setup();
+    const scrollToSpy = vi.fn();
+    vi.stubGlobal("scrollTo", scrollToSpy);
+
     wrap();
 
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
+    await event.click(screen.getByRole("button", { name: "Kindness is Magic" }));
+
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });
 
-  it("title links to /home when logged in", () => {
-    wrap({ user: mockUser });
+  it("title links to /home when not on /home", () => {
+    wrap({ path: "/families" });
 
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
   });

@@ -280,7 +280,7 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     });
-    // Centre title always links to the brochure
+    // Centre title links back to the brochure from other public pages
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
   });
 
@@ -292,8 +292,8 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     });
-    // Centre title always links to the brochure; signed-in users get a Dashboard link
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
+    // Signed-in users get a Dashboard link
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
   });
 

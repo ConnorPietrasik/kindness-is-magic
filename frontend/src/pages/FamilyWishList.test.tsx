@@ -83,7 +83,7 @@ describe("FamilyWishList header", () => {
     cleanup();
   });
 
-  it("title links to /home and shows sign in link when logged out", async () => {
+  it("shows sign in link when logged out", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
     wrap();
@@ -91,13 +91,13 @@ describe("FamilyWishList header", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     });
-    // Title always links to the brochure, even for guests
+    // Title links back to the brochure from the wish list page
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
     // Back link returns to the family list
     expect(screen.getByRole("link", { name: "← Back" })).toHaveAttribute("href", "/families");
   });
 
-  it("title links to /home and shows dashboard link and sign out when logged in", async () => {
+  it("shows dashboard link and sign out when logged in", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
     wrap({ user: mockUser });
