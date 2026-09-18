@@ -12,9 +12,10 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { ClaimModal } from "../components/ClaimModal";
 import { DeadlineBanner } from "../components/DeadlineBanner";
-import { HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
 import { PageError } from "../components/PageError";
+import { PublicHeader } from "../components/PublicHeader";
+import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { wishText } from "../components/WishCell";
@@ -67,21 +68,7 @@ export default function FamilyWishList() {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar
-          className="no-print"
-          title="Kindness is Magic"
-          titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
-          left={<BackToFamilies />}
-          right={
-            user ? (
-              <span className="text-sm text-white/80">{user.display_name}</span>
-            ) : (
-              <Link to={ROUTES.LOGIN} className="text-sm text-white/80 transition-colors hover:text-white">
-                Sign in
-              </Link>
-            )
-          }
-        />
+        <PublicHeader className="no-print" left={<BackToFamilies />} />
         <PageError
           error={error}
           heading="Unable to Load Wish List"
@@ -89,27 +76,14 @@ export default function FamilyWishList() {
           to={ROUTES.ROOT}
           linkLabel="← Back to home"
         />
+        <SiteFooter />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar
-        className="no-print"
-        title="Kindness is Magic"
-        titleTo={user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES}
-        left={<BackToFamilies />}
-        right={
-          user ? (
-            <span className="text-sm text-white/80">{user.display_name}</span>
-          ) : (
-            <Link to={ROUTES.LOGIN} className="text-sm text-white/80 transition-colors hover:text-white">
-              Sign in
-            </Link>
-          )
-        }
-      />
+      <PublicHeader className="no-print" left={<BackToFamilies />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* Branded header — print only */}
@@ -214,6 +188,8 @@ export default function FamilyWishList() {
           )}
         </div>
       </main>
+
+      <SiteFooter />
 
       {/* Claim modal */}
       <ClaimModal familyId={familyId} open={showClaimModal} onClose={closeClaimModal} currentLocation={location} />

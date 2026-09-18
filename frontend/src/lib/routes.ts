@@ -57,6 +57,10 @@ export const ROUTES = {
   DONOR_CLAIM_DETAIL: "/donor/claims/:id",
 
   // ── Public ────────────────────────────────────────────────
+  HOME: "/home",
+  PRIVACY: "/privacy",
+  PRIVACY_CALIFORNIA: "/privacy-california",
+  FINANCIALS: "/financials",
   PUBLIC_FAMILIES: "/families",
   FAMILY_WISH_LIST: "/families/:id/wish-list",
 

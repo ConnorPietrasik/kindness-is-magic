@@ -1,3 +1,4 @@
+Update brochure section - Privacy policy, CA notice, financials, etc.
 Automated failure checks and admin emails
 Donor reminder emails before deadline
 Payment processing - some way to accept credit card payments. Looking like Zeffy
@@ -7,4 +8,3 @@ EVENTUALLY - Email families a week before their pickup window
 EVENTUALLY - Add button for admins to email families directly using their own email account. Requires more google workspace config to avoid having to register each user individually
 EVENTUALLY - fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Email "opened" tracking via a logo?
-EVENTUALLY - Grab the Figma site's stuff and incorporate with fixes as a general brochure page for off-season

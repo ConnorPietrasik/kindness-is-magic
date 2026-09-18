@@ -8,6 +8,15 @@ describe("ROUTES constants", () => {
     expect(ROUTES.RESET_PASSWORD).toBe("/reset-password/:token");
   });
 
+  it("has correct brochure and legal routes", () => {
+    expect(ROUTES.HOME).toBe("/home");
+    expect(ROUTES.PRIVACY).toBe("/privacy");
+    expect(ROUTES.PRIVACY_CALIFORNIA).toBe("/privacy-california");
+    expect(ROUTES.FINANCIALS).toBe("/financials");
+    expect(ROUTES.PUBLIC_FAMILIES).toBe("/families");
+    expect(ROUTES.FAMILY_WISH_LIST).toBe("/families/:id/wish-list");
+  });
+
   it("has correct dashboard route", () => {
     expect(ROUTES.DASHBOARD).toBe("/dashboard");
   });

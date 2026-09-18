@@ -83,7 +83,7 @@ describe("FamilyWishList header", () => {
     cleanup();
   });
 
-  it("title links to /families and shows sign in link when logged out", async () => {
+  it("title links to /home and shows sign in link when logged out", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
     wrap();
@@ -91,21 +91,22 @@ describe("FamilyWishList header", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     });
-    // Guests must not be sent to the protected dashboard via the title
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/families");
+    // Title always links to the brochure, even for guests
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
     // Back link returns to the family list
     expect(screen.getByRole("link", { name: "← Back" })).toHaveAttribute("href", "/families");
   });
 
-  it("title links to /dashboard and shows display name when logged in", async () => {
+  it("title links to /home and shows dashboard link and sign out when logged in", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
     wrap({ user: mockUser });
 
     await waitFor(() => {
-      expect(screen.getByText("Donor")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 });

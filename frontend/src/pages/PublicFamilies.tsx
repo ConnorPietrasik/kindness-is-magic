@@ -2,18 +2,18 @@
  * Public Families Browse Page
  *
  * Lists all fully-approved families as tappable cards for donors.
- * No authentication required. Accessible from root `/` redirect.
+ * No authentication required — the public entry point is the brochure at /home.
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
-import { HeaderBar, LogoutButton } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
+import { PublicHeader } from "../components/PublicHeader";
+import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
-import { useAuth } from "../context/AuthContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
 import { publicFamilies } from "../lib/queryKeys";
@@ -58,8 +58,6 @@ const DEFAULT_FILTERS: FilterState = {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PublicFamilies() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
 
@@ -103,31 +101,12 @@ export default function PublicFamilies() {
     queryFn: () => listPublicFamilies(apiParams),
   });
 
-  const handleLogout = async () => {
-    await logout();
-    navigate(ROUTES.LOGIN);
-  };
-
-  // Header adapts to auth state: title links to the dashboard and the right
-  // action becomes a sign-out button once the user is logged in.
-  const headerTitleTo = user ? ROUTES.DASHBOARD : ROUTES.PUBLIC_FAMILIES;
-  const headerRight = user ? (
-    <LogoutButton onClick={handleLogout} />
-  ) : (
-    <Link
-      to={ROUTES.LOGIN}
-      className="rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
-    >
-      Sign in
-    </Link>
-  );
-
   if (isLoading) return <PageSpinner />;
 
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" titleTo={headerTitleTo} right={headerRight} />
+        <PublicHeader />
         <PageError
           error={error}
           heading="Unable to Load Families"
@@ -135,6 +114,7 @@ export default function PublicFamilies() {
           to={ROUTES.ROOT}
           linkLabel="← Back to home"
         />
+        <SiteFooter />
       </div>
     );
   }
@@ -164,7 +144,7 @@ export default function PublicFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" titleTo={headerTitleTo} right={headerRight} />
+      <PublicHeader />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Page title */}
@@ -277,6 +257,8 @@ export default function PublicFamilies() {
           onPageChange={handlePageChange}
         />
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

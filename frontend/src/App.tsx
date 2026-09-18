@@ -41,6 +41,10 @@ const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
 const DeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliverySlips"));
+const Home: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Home"));
+const PrivacyPolicy: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PrivacyPolicy"));
+const CaliforniaPrivacy: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/CaliforniaPrivacy"));
+const Financials: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Financials"));
 const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
 const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
@@ -76,7 +80,8 @@ function DashboardRedirect() {
     return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
 
-  return <Navigate to={ROUTES.PUBLIC_FAMILIES} replace />;
+  // Guests (and unknown roles) land on the public brochure.
+  return <Navigate to={ROUTES.HOME} replace />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -384,10 +389,14 @@ export default function App() {
         />
 
         {/* ── Public (no auth required) ─────────────────────────── */}
+        <Route path={ROUTES.HOME} element={<Home />} />
+        <Route path={ROUTES.PRIVACY} element={<PrivacyPolicy />} />
+        <Route path={ROUTES.PRIVACY_CALIFORNIA} element={<CaliforniaPrivacy />} />
+        <Route path={ROUTES.FINANCIALS} element={<Financials />} />
         <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
         <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
 
-        {/* ── Catch-all: redirect root to login or dashboard ────── */}
+        {/* ── Root: role dashboards, or the brochure for guests ─── */}
         <Route path={ROUTES.ROOT} element={<DashboardRedirect />} />
         <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
       </Routes>

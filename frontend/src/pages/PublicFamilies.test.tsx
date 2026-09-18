@@ -272,7 +272,7 @@ describe("PublicFamilies", () => {
     expect(screen.getByLabelText("Page 1")).toBeInTheDocument();
   });
 
-  it("header shows sign in link and self link when logged out", async () => {
+  it("header shows sign in link when logged out", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
     wrap(<PublicFamilies />);
@@ -280,11 +280,11 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     });
-    // Centre title links to the page itself for guests
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/families");
+    // Centre title always links to the brochure
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
   });
 
-  it("header shows sign out button and dashboard link when logged in", async () => {
+  it("header shows dashboard link and sign out button when logged in", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
     wrap(<PublicFamilies />, "/families", mockUser);
@@ -292,8 +292,9 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     });
-    // Centre title links to the dashboard for signed-in users
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+    // Centre title always links to the brochure; signed-in users get a Dashboard link
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
   });
 
   it("clicking sign out logs out and navigates to login", async () => {
