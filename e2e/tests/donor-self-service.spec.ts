@@ -196,7 +196,9 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     // Submit the claim
     await page.getByRole("button", { name: "Sponsor Family" }).click();
 
-    // Should navigate to claim detail page
+    // Should show the success view, then land on the claim detail page
+    await expect(page.getByRole("heading", { name: /You made Family .*'s Christmas magical/ })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "View your sponsorship" }).click();
     await page.waitForURL(/\/donor\/claims\/\d+/);
     await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 

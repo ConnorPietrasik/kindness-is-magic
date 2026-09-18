@@ -151,6 +151,9 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
 
     // 6. Complete the claim (gifts is the default commitment)
     await page.getByRole("button", { name: "Sponsor Family" }).click();
+    // Success view appears; click through to the claim detail page
+    await expect(page.getByRole("heading", { name: /You made Family .*'s Christmas magical/ })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "View your sponsorship" }).click();
     await page.waitForURL(/\/donor\/claims\/\d+/);
     await expect(page.getByText("Sponsorship Details")).toBeVisible({ timeout: 10_000 });
 

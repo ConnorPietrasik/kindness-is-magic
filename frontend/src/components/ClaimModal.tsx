@@ -3,12 +3,13 @@ import { useState } from "react";
 import type { Location } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { claimFamily } from "../lib/api";
+import { DONATE_URL } from "../lib/links";
 import { donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import { setPendingClaimFamilyId } from "../lib/utils";
-import type { CommitmentType } from "../types";
+import { formatDay, setPendingClaimFamilyId } from "../lib/utils";
+import type { CommitmentType, FamilyClaimSummary } from "../types";
 import { Button } from "./Button";
 import { MutationErrors } from "./MutationErrors";
 
@@ -94,9 +95,8 @@ function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: num
 
 function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => void }) {
   const [commitmentType, setCommitmentType] = useState<CommitmentType>("gifts");
+  const [claimed, setClaimed] = useState<FamilyClaimSummary | null>(null);
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const toast = useToast();
 
   const claimMut = useMutation({
     mutationFn: () => claimFamily(familyId, commitmentType),
@@ -104,17 +104,13 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
       queryClient.invalidateQueries({ queryKey: donorClaims });
       queryClient.invalidateQueries({ queryKey: publicFamilies });
       queryClient.invalidateQueries({ queryKey: familyWishList(familyId) });
-      onClose();
-      // Navigate to the claim detail page
-      navigate(route.donorClaimDetail(data.id));
-      if (data.email_error) {
-        toast.info(
-          "Sponsorship created! However, we couldn't send your confirmation email. " +
-            "Please contact us if you need a record of your sponsorship."
-        );
-      }
+      setClaimed(data);
     },
   });
+
+  if (claimed) {
+    return <ClaimSuccess claim={claimed} onClose={onClose} />;
+  }
 
   return (
     <>
@@ -162,6 +158,70 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
         </Button>
       </div>
       <MutationErrors mutations={[claimMut]} />
+    </>
+  );
+}
+
+/**
+ * ClaimSuccess — celebratory in-modal view after a successful claim.
+ *
+ * Replaces the form (the modal stays open); the donor chooses the next
+ * step. Backdrop/Escape close behaves as "Keep browsing" — the claim is
+ * already committed, so closing has no side effects.
+ */
+function ClaimSuccess({ claim, onClose }: { claim: FamilyClaimSummary; onClose: () => void }) {
+  const navigate = useNavigate();
+  const dropoff = useDeadlineBanner("gift_dropoff");
+
+  return (
+    <>
+      <div className="rounded-2xl bg-gradient-to-br from-brand-dark to-brand-light px-5 py-6 text-center text-white">
+        <span className="text-3xl" aria-hidden="true">
+          ✨
+        </span>
+        <h3 className="mt-2 text-lg font-bold leading-snug">You made Family {claim.family.display_id}&apos;s Christmas magical</h3>
+        <p className="mt-1 text-sm text-white/85">Thank you for sponsoring this family.</p>
+      </div>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-semibold text-gray-900">What happens next</h4>
+        <ul className="mt-2 space-y-2 text-sm text-gray-600">
+          {claim.commitment_type === "gifts" ? (
+            <>
+              <li>
+                {claim.email_error
+                  ? "We couldn't email you the wish list — you can view it on your sponsorship page."
+                  : "We've emailed you the family's full wish list."}
+              </li>
+              {dropoff && <li>Drop your wrapped gifts off by {formatDay(dropoff.dueDate)}.</li>}
+            </>
+          ) : (
+            <>
+              <li>Our volunteers will purchase the family's wishes with your donation.</li>
+              {/* TODO(payment): this points at the external Zeffy form — replace with the in-app payment flow when one exists. */}
+              <li>
+                <a
+                  href={DONATE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-brand-dark underline underline-offset-2 hover:text-brand-light"
+                >
+                  Complete your donation
+                </a>
+              </li>
+            </>
+          )}
+        </ul>
+      </div>
+
+      <div className="mt-5 flex gap-3">
+        <Button className="flex-1" onClick={() => navigate(route.donorClaimDetail(claim.id))}>
+          View your sponsorship
+        </Button>
+        <Button variant="secondary" className="flex-1" onClick={onClose}>
+          Keep browsing
+        </Button>
+      </div>
     </>
   );
 }

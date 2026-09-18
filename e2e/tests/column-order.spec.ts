@@ -156,6 +156,9 @@ test.describe("Donor claim detail — wish table column order", () => {
     await page.getByRole("button", { name: "Sponsor this family" }).click();
     await expect(page.getByRole("heading", { name: "Sponsor This Family" })).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Sponsor Family" }).click();
+    // Click through the celebratory success view to the claim detail page
+    await expect(page.getByRole("heading", { name: /You made Family .*'s Christmas magical/ })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "View your sponsorship" }).click();
     await page.waitForURL(/\/donor\/claims\/\d+/);
     await expect(page.getByText("Family Members & Wishes")).toBeVisible({ timeout: 10_000 });
 
