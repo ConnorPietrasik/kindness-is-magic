@@ -29,14 +29,14 @@ npx playwright test tests/role-*.spec.ts
 
 ## Architecture
 
-Each test file is self-contained and creates its own data. Tests that need authenticated sessions create their own browser contexts with storageState files — do not rely on project-level storageState. The CSV-seeded auth accounts (admin, referrer, family, purchaser, delivery) exist before any test runs, even with `--grep`.
+Each test file is self-contained and creates its own data. Tests that need authenticated sessions create their own browser contexts with storageState files — do not rely on project-level storageState. The five storageState accounts (admin, referrer, family, purchaser, delivery) exist before any test runs, even with `--grep` — the admin is the bootstrap admin from `.env` (`ADMIN_EMAIL`/`ADMIN_PASSWORD`); the other four are CSV-seeded.
 
-Unlike those five roles, there is no `donor.json` storageState. Donor users are created dynamically per-test via API and log in through the UI.
+Unlike those five, there is no `donor.json` storageState (the CSV does seed a donor account, but tests don't use it). Donor users are created dynamically per-test via API and log in through the UI.
 
 ## Conventions
 
 - **`data-id` on table rows.** Family and people table rows carry `data-id={entity.id}` so tests can extract the raw DB ID for API calls. The visible ID column shows the presentational `display_id` (e.g. `3-2-1`), which must not be parsed as a DB key.
-- **`data-testid="role-badge"` on the dashboard role badge.** Assert the logged-in role through it (e.g. `getByTestId("role-badge").toHaveText("Admin")`), not a bare `getByText("Admin")` — the committed test admin `admin@example.test` derives the display name "Admin", so the bare text matches both the profile name and the badge (strict-mode violation).
+- **`data-testid="role-badge"` on the dashboard role badge.** Assert the logged-in role through it (e.g. `getByTestId("role-badge").toHaveText("Admin")`), not a bare `getByText("Admin")` — display names default to the email local-part capitalized, so with the `.env.example` admin (`admin@example.test`) the profile name is also "Admin" and the bare text matches both (strict-mode violation).
 - Use `{ exact: true }` when text could collide (e.g., "Family" matches "Family ID: N").
 - Reuse helpers from `helpers/auth.ts`, `helpers/assertions.ts`, and `helpers/api.ts`.
 - **Unique test data per run.** Use `Math.random().toString(36).slice(2, 8)` suffixes on names/emails so re-runs without a DB wipe don't collide with stale records from prior runs.

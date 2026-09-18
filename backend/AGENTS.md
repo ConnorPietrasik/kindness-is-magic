@@ -16,7 +16,7 @@
 
 ## Logging
 
-Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware logs every HTTP request with `request_id`, `user_id`, `user_email`, `method`, `path`, `status_code`, `duration_ms` and adds `X-Request-ID` to responses. A `_RequestContextFilter` auto-injects `request_id`/`user_id` into all log records during request handling. Set `LOG_LEVEL` env var to control verbosity (default `INFO`).
+Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware logs every HTTP request with `request_id`, `user_id`, `user_email`, `user_role`, `method`, `path`, `status_code`, `duration_ms` and adds `X-Request-ID` to responses. A `_RequestContextFilter` auto-injects `request_id`/`user_id` into all log records during request handling. Set `LOG_LEVEL` env var to control verbosity (default `INFO`).
 
 ## Key Patterns
 
@@ -56,13 +56,16 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
 | `admin_emails.py` | Admin sent-email log (list/filter) |
+| `admin_deadlines.py` | Admin CRUD for event deadlines (no `columns`/pagination, hard delete) |
 | `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
+| `deadlines.py` | Deadline enforcement (armed checks, batch actions, daily background task) |
 | `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
 | `donor_routes.py` | Donor / claim-capable self-service (family claims — available to admin, referrer, purchaser, donor) |
 | `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
 | `families_routes.py` | Public family resource endpoints |
+| `deadlines_routes.py` | Public read-only deadline endpoints (banner data, no auth) |
 | `people_routes.py` | Shared person endpoints |
 | `csv_import.py` | Bulk CSV import (referrers/families/people/users) |
 | `rate_limit.py` | Rate limiter configuration (`slowapi`) |

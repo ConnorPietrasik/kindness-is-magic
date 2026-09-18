@@ -18,11 +18,11 @@ All remote data goes through React Query. `useState` is only for local UI state 
 - **Exception:** `loginRequest` returns the full `AxiosResponse` so `AuthContext` can destructure `{ data }`. Do not change this.
 - Public endpoints (family browsing, donor registration) use the same Axios instance — no separate unauthenticated client.
 - For create operations, wrap payloads with `normalizePayload()` from `src/lib/utils.ts` to convert empty strings to `null` on nullable fields.
-- For update operations, use `normalizeUpdatePayload(formData, original)` to build minimal patch payloads that omit unchanged fields.
+- For update operations, call `normalizeUpdatePayload(formData, original)` **in the page/component** to build a minimal patch payload (omits unchanged fields), then pass the result to the api update function — `api.ts` update functions do not normalize.
 
 ## Query Keys (`src/lib/queryKeys.ts`)
 
-All query keys are defined here as `as const` arrays. Reference these exports instead of inline string arrays. This ensures mutations can invalidate the right caches.
+All query keys are defined here as `as const` arrays (some as factory functions returning them, e.g. `referrerFamilyDetail(id)`). Reference these exports instead of inline string arrays. This ensures mutations can invalidate the right caches.
 
 ## Authentication
 
@@ -53,7 +53,7 @@ All query keys are defined here as `as const` arrays. Reference these exports in
 - Pages are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
 - `ProtectedRoute` wraps routes with a `roles` array. Unauthenticated users → `/login`; wrong role → `/dashboard`.
 - `PublicRoute` wraps **auth-only** pages (login, registration, password reset). Authenticated users see "Already Logged In" instead of the form.
-- **Truly public pages** (family browse, wish list) have no wrapper — they render for everyone, authenticated or not.
+- **Truly public pages** (Home, privacy, financials, family browse, wish list) have no wrapper — they render for everyone, authenticated or not.
 - Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
 
 ## Styling

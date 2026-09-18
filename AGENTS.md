@@ -2,11 +2,7 @@
 
 ## Environment Constraints
 
-- **You are running inside a minimal Docker container.**
-- **No root/sudo access.** You cannot install system packages or run Docker commands. If you want something that requires root, ask the user.
-- **Basic shell commands work:** `ls`, `grep`, `find`, `sed`, `awk`, etc.
 - **Shell sessions do not persist.** Each `bash` call is a separate invocation — `cd` does not carry over. Always use full paths or prefix commands with `cd /path && ...`.
-- **Git is available for inspection.** You can use `git diff`, `git log`, `git blame`, etc. However, do **not** commit or push changes.
 - If a tool or package would save significant time, ask the user to install it before rolling your own or working around it.
 - **Persistent Python venv at the project root (`.venv`)**
 
@@ -14,7 +10,7 @@
 
 - Follow existing patterns before introducing new abstractions.
 - Prefer modifying existing modules over creating new ones.
-- Do not add dependencies without asking specifically.
+- Do not add dependencies without asking specifically. However, don't be afraid to ask if something would be helpful.
 - When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
 - **No backward compatibility needed.** The app is not yet deployed. 
 - **Do not consider existing users.** The database is wiped regularly.
