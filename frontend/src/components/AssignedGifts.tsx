@@ -370,7 +370,7 @@ export function AssignedGiftsView<
           )}
           <ColumnToggle resourceKey={columnResourceKey} />
           <Button onClick={() => setBatchMarkOpen(true)} disabled={selectedIds.size === 0 || batchMarkMut.isPending}>
-            Mark Purchased ({selectedIds.size})
+            Mark purchased ({selectedIds.size})
           </Button>
         </div>
       </div>
@@ -523,7 +523,7 @@ export function AssignedGiftsView<
                           onClick={() => setMarkPurchasedId(w.id)}
                           disabled={w.purchased_at != null || markPurchasedMut.isPending}
                         >
-                          Mark Purchased
+                          Mark purchased
                         </Button>
                       </div>
                     </Td>

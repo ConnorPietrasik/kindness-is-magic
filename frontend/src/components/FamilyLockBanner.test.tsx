@@ -103,17 +103,17 @@ describe("FamilyLockBanner", () => {
     expect(screen.getByText("Awaiting referrer review")).toBeInTheDocument();
   });
 
-  it("shows 'Cancel Request' button when awaiting review", () => {
+  it("shows 'Cancel request' button when awaiting review", () => {
     render(<FamilyLockBanner {...defaultProps} lockLevel="family" requestedAt="2025-01-01T00:00:00Z" rejectionReason={null} />);
 
-    expect(screen.getByRole("button", { name: "Cancel Request" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
   });
 
-  it("calls onCancelReview when Cancel Request is clicked", async () => {
+  it("calls onCancelReview when Cancel request is clicked", async () => {
     const user = userEvent.setup();
     render(<FamilyLockBanner {...defaultProps} lockLevel="family" requestedAt="2025-01-01T00:00:00Z" rejectionReason={null} />);
 
-    await user.click(screen.getByRole("button", { name: "Cancel Request" }));
+    await user.click(screen.getByRole("button", { name: "Cancel request" }));
     expect(defaultProps.onCancelReview).toHaveBeenCalledTimes(1);
   });
 
@@ -142,7 +142,7 @@ describe("FamilyLockBanner", () => {
     render(<FamilyLockBanner {...defaultProps} lockLevel="referrer" requestedAt={null} rejectionReason="Wishes too vague" />);
 
     expect(screen.queryByRole("button", { name: "DONE" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel Request" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel request" })).not.toBeInTheDocument();
   });
 
   /* ── Referrer reviewed (referrer, no rejection) ─────────── */

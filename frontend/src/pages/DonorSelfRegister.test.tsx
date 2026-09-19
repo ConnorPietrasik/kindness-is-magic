@@ -75,7 +75,7 @@ describe("DonorSelfRegister", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
   });
 
   it("shows error when passwords do not match", async () => {
@@ -86,7 +86,7 @@ describe("DonorSelfRegister", () => {
     await fillForm(user);
     await user.clear(screen.getByLabelText("Confirm Password"));
     await user.type(screen.getByLabelText("Confirm Password"), "different1");
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
   });
@@ -98,7 +98,7 @@ describe("DonorSelfRegister", () => {
     wrap();
 
     await fillForm(user);
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await screen.findByText("dashboard-page");
     expect(api.registerDonor).toHaveBeenCalledWith({
@@ -117,7 +117,7 @@ describe("DonorSelfRegister", () => {
     wrap();
 
     await fillForm(user);
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await screen.findByText("wish-list-page");
     expect(screen.getByTestId("location")).toHaveTextContent('/families/7/wish-list|{"openClaim":true}');

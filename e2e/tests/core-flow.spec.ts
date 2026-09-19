@@ -81,7 +81,7 @@ test.describe("Core Flow", () => {
       await adminPage.goto("/admin/invite-codes");
       await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
 
-      await adminPage.getByRole("button", { name: "+ Generate New" }).click();
+      await adminPage.getByRole("button", { name: "+ Generate new" }).click();
       await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
       await adminPage.getByLabel("Family Limit").fill("5");
@@ -108,7 +108,7 @@ test.describe("Core Flow", () => {
       await guestPage.getByLabel("Phone Number").fill("555-000-9999");
       await guestPage.getByRole("textbox", { name: "Password", exact: true }).fill(PASSWORD);
       await guestPage.getByLabel("Confirm Password").fill(PASSWORD);
-      await guestPage.getByRole("button", { name: "Create Account" }).click();
+      await guestPage.getByRole("button", { name: "Create account" }).click();
 
       /* Auto-login → dashboard */
       await expect(guestPage).toHaveURL(/\/dashboard/, { timeout: 10_000 });
@@ -179,7 +179,7 @@ test.describe("Core Flow", () => {
       await familyGuestPage.getByLabel("Confirm Password").fill(PASSWORD);
       await familyGuestPage.getByLabel("Address").fill("none");
       await familyGuestPage.getByLabel("Phone Number").fill("555-111-2222");
-      await familyGuestPage.getByRole("button", { name: "Create Account" }).click();
+      await familyGuestPage.getByRole("button", { name: "Create account" }).click();
 
       /* Auto-login → family dashboard */
       await expect(familyGuestPage).toHaveURL(/\/family\/dashboard/, { timeout: 10_000 });
@@ -246,7 +246,7 @@ test.describe("Core Flow", () => {
       });
 
       /* Click Add Person */
-      await familyPage.getByRole("button", { name: "+ Add Person" }).click();
+      await familyPage.getByRole("button", { name: "+ Add person" }).click();
 
       /* Fill the form — age must be entered first to reveal wish fields */
       await familyPage.getByLabel("Given Name").fill(TEST_CHILD_NAME);

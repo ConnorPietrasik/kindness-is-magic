@@ -308,7 +308,7 @@ export default function AdminFamilies() {
               </Button>
             )}
             {!isDeletedView && <ColumnToggle resourceKey="adminFamilies" />}
-            {!isDeletedView && <Button onClick={openCreate}>+ Add Family</Button>}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add family</Button>}
           </div>
         </div>
 

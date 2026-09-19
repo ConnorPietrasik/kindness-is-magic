@@ -250,7 +250,7 @@ export default function FamilySelfRegister() {
           <PhoneInput value={form.phone_number} onChange={(val) => update("phone_number", val)} />
 
           <Button type="submit" loading={loading} className="mt-2 w-full">
-            {loading ? "Creating account…" : "Create Account"}
+            {loading ? "Creating account…" : "Create account"}
           </Button>
         </form>
 

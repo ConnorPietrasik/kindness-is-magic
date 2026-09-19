@@ -260,9 +260,9 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     // Wait for our person's wish to appear
     await expect(page.getByRole("table")).toContainText(MUTATION_PERSON_NAME, { timeout: 10_000 });
 
-    // Find the Mark Purchased button on our person's row
+    // Find the Mark purchased button on our person's row
     const ourRow = page.getByRole("row").filter({ hasText: MUTATION_PERSON_NAME }).first();
-    const markBtn = ourRow.getByRole("button", { name: "Mark Purchased" });
+    const markBtn = ourRow.getByRole("button", { name: "Mark purchased" });
 
     if (await markBtn.count() > 0) {
       await markBtn.click();
@@ -274,7 +274,7 @@ test.describe.serial("Admin Wish Management — mutations", () => {
       // "Filter by Purchased Where" input also matches the substring)
       const dialog = page.getByRole("dialog");
       await dialog.getByLabel("Purchased Where").fill("E2E Test Store");
-      await dialog.getByRole("button", { name: "Mark Purchased" }).click();
+      await dialog.getByRole("button", { name: "Mark purchased" }).click();
 
       // Success toast appears
       await expect(page.getByText("Wish marked as purchased")).toBeVisible({ timeout: 10_000 });
@@ -310,18 +310,18 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     const firstRowCheckbox = page.getByRole("row").nth(1).getByRole("checkbox");
     await firstRowCheckbox.click();
 
-    // Batch Assign button should show count
-    await expect(page.getByRole("button", { name: "Batch Assign (1)" })).toBeVisible();
+    // Batch assign button should show count
+    await expect(page.getByRole("button", { name: "Batch assign (1)" })).toBeVisible();
 
     // Open batch assign dialog
-    await page.getByRole("button", { name: "Batch Assign (1)" }).click();
+    await page.getByRole("button", { name: "Batch assign (1)" }).click();
     // Dialog header contains "1 wish" inside <strong>
     await expect(page.getByText("1 wish")).toBeVisible({ timeout: 10_000 });
 
     // Select a user from the dropdown (first non-placeholder option)
     await page.locator("label", { hasText: "Assign to" }).locator("..").locator("select").selectOption({ index: 1 });
 
-    // Submit — use exact match to avoid matching "Batch Assign"
+    // Submit — use exact match to avoid matching "Batch assign"
     await page.getByRole("button", { name: "Assign", exact: true }).click();
 
     // Success toast

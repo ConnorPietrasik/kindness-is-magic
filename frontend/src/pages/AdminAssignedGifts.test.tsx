@@ -178,11 +178,11 @@ describe("AdminAssignedGifts", () => {
 
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Mark Purchased" }));
+    await user.click(await screen.findByRole("button", { name: "Mark purchased" }));
 
     await user.type(await screen.findByLabelText("Purchased Where"), "Amazon");
     // Dialog confirm shares the label — it is the last matching button
-    const buttons = screen.getAllByRole("button", { name: "Mark Purchased" });
+    const buttons = screen.getAllByRole("button", { name: "Mark purchased" });
     const confirmButton = buttons[buttons.length - 1];
     if (!confirmButton) throw new Error("confirm button not found");
     await user.click(confirmButton);
@@ -201,11 +201,11 @@ describe("AdminAssignedGifts", () => {
 
     // Select both rows, then open the batch dialog from the header button
     await user.click(await screen.findByLabelText("Select all wishes on this page"));
-    await user.click(await screen.findByRole("button", { name: "Mark Purchased (2)" }));
+    await user.click(await screen.findByRole("button", { name: "Mark purchased (2)" }));
 
     await user.type(await screen.findByLabelText("Purchased Where"), "Amazon");
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     await waitFor(() => {
       expect(batchSpy).toHaveBeenCalledWith(expect.objectContaining({ wish_ids: [1, 2], purchased_where: "Amazon", received_at: "" }));
@@ -213,7 +213,7 @@ describe("AdminAssignedGifts", () => {
     // Success toast + selection cleared
     await waitFor(() => {
       expect(screen.getByText("2 wishes marked as purchased")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Mark Purchased (0)" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Mark purchased (0)" })).toBeDisabled();
     });
   });
 
@@ -242,12 +242,12 @@ describe("AdminAssignedGifts", () => {
 
     await screen.findByText("Coat");
     await user.click(screen.getByLabelText("Select all wishes on this page"));
-    expect(screen.getByRole("button", { name: "Mark Purchased (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark purchased (2)" })).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Purchased filter"), "true");
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Mark Purchased (0)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark purchased (0)" })).toBeInTheDocument();
     });
   });
 

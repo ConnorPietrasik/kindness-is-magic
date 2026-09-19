@@ -279,7 +279,7 @@ export default function AdminWishes() {
             )}
             <ColumnToggle resourceKey="adminWishes" />
             <Button onClick={() => setBatchAssignOpen(true)} disabled={selectedIds.size === 0 || batchAssignMut.isPending}>
-              Batch Assign ({selectedIds.size})
+              Batch assign ({selectedIds.size})
             </Button>
           </div>
         </div>
@@ -482,7 +482,7 @@ export default function AdminWishes() {
                             onClick={() => setMarkPurchasedId(w.id)}
                             disabled={w.purchased_at != null || markPurchasedMut.isPending}
                           >
-                            Mark Purchased
+                            Mark purchased
                           </Button>
                           <ActionsDropdown
                             items={[

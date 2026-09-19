@@ -341,7 +341,7 @@ describe("AdminWishes", () => {
     expect(screen.getByText(/✓/)).toBeInTheDocument();
   });
 
-  it("disables Mark Purchased button for already purchased wishes", async () => {
+  it("disables Mark purchased button for already purchased wishes", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
@@ -351,7 +351,7 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Bob")).toBeInTheDocument();
     });
 
-    const markPurchasedButtons = screen.getAllByText("Mark Purchased");
+    const markPurchasedButtons = screen.getAllByText("Mark purchased");
     // Bob's wish is already purchased — button should be disabled
     // Alice's wish is not purchased — button should be enabled
     expect(markPurchasedButtons.length).toBeGreaterThanOrEqual(1);
@@ -407,8 +407,8 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    // Click Mark Purchased button — use getAllByText and pick the first one
-    const markPurchasedButtons = screen.getAllByText("Mark Purchased");
+    // Click Mark purchased button — use getAllByText and pick the first one
+    const markPurchasedButtons = screen.getAllByText("Mark purchased");
     // Alice's wish (first row) is unpurchased — its button should be enabled
     expect(markPurchasedButtons.length).toBeGreaterThanOrEqual(1);
     await user.click(markPurchasedButtons[0]!);
@@ -447,7 +447,7 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    const markPurchasedButtons = screen.getAllByText("Mark Purchased");
+    const markPurchasedButtons = screen.getAllByText("Mark purchased");
     await user.click(markPurchasedButtons[0]!);
 
     // The dialog stays open and shows the fetch failure instead of the form
@@ -479,8 +479,8 @@ describe("AdminWishes", () => {
     }
 
     // Batch assign button should show count
-    expect(screen.getByRole("button", { name: "Batch Assign (1)" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Batch Assign (1)" }));
+    expect(screen.getByRole("button", { name: "Batch assign (1)" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Batch assign (1)" }));
 
     // Dialog should open — text is "Assign <strong>1 wish</strong>" so match the strong text
     await waitFor(() => {
@@ -504,11 +504,11 @@ describe("AdminWishes", () => {
     await user.click(selectAllCheckbox);
 
     // Batch assign should show count of all wishes
-    expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
+    expect(screen.getByText("Batch assign (2)")).toBeInTheDocument();
 
     // Click again to deselect all
     await user.click(selectAllCheckbox);
-    expect(screen.getByText("Batch Assign (0)")).toBeInTheDocument();
+    expect(screen.getByText("Batch assign (0)")).toBeInTheDocument();
   });
 
   it("renders mutation errors", async () => {
@@ -558,7 +558,7 @@ describe("AdminWishes", () => {
     // Select all wishes
     const selectAllCheckbox = screen.getByLabelText("Select all wishes on this page");
     await user.click(selectAllCheckbox);
-    expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
+    expect(screen.getByText("Batch assign (2)")).toBeInTheDocument();
 
     // Change the assigned-to filter — list re-requests, selection resets
     const assignedSelect = screen.getByText("All assignees").closest("select");
@@ -569,7 +569,7 @@ describe("AdminWishes", () => {
 
     // Selection should be cleared after filter change
     await waitFor(() => {
-      expect(screen.getByText("Batch Assign (0)")).toBeInTheDocument();
+      expect(screen.getByText("Batch assign (0)")).toBeInTheDocument();
     });
   });
 
@@ -592,7 +592,7 @@ describe("AdminWishes", () => {
       // Select all wishes
       const selectAllCheckbox = screen.getByLabelText("Select all wishes on this page");
       await user.click(selectAllCheckbox);
-      expect(screen.getByText("Batch Assign (2)")).toBeInTheDocument();
+      expect(screen.getByText("Batch assign (2)")).toBeInTheDocument();
 
       // Change search — debounce fires after 1000ms (accelerated by shouldAdvanceTime)
       const searchInput = screen.getByPlaceholderText("Search everything…");
@@ -600,7 +600,7 @@ describe("AdminWishes", () => {
 
       // Wait for debounce + refetch to settle
       await waitFor(() => {
-        expect(screen.getByText("Batch Assign (0)")).toBeInTheDocument();
+        expect(screen.getByText("Batch assign (0)")).toBeInTheDocument();
       });
     } finally {
       vi.useRealTimers();
@@ -745,7 +745,7 @@ describe("AdminWishes", () => {
     });
 
     // Open mark-purchased dialog
-    const markPurchasedButtons = screen.getAllByText("Mark Purchased");
+    const markPurchasedButtons = screen.getAllByText("Mark purchased");
     await user.click(markPurchasedButtons[0]!);
 
     await waitFor(() => {
@@ -767,7 +767,7 @@ describe("AdminWishes", () => {
     const dialog = document.querySelector(".fixed.inset-0.z-50");
     expect(dialog).not.toBeNull();
     const buttons = Array.from(dialog!.querySelectorAll("button"));
-    const submitBtn = buttons.find((b) => b.textContent?.includes("Mark Purchased"));
+    const submitBtn = buttons.find((b) => b.textContent?.includes("Mark purchased"));
     expect(submitBtn).not.toBeNull();
     await user.click(submitBtn!);
 

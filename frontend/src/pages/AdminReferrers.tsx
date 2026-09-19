@@ -175,14 +175,14 @@ export default function AdminReferrers() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
-            <Button onClick={() => navigate(route.adminInviteCodes(true))}>Invite Referrers</Button>
+            <Button onClick={() => navigate(route.adminInviteCodes(true))}>Invite referrers</Button>
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
               </Button>
             )}
             {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
-            {!isDeletedView && <Button onClick={openCreate}>+ Add Referrer</Button>}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add referrer</Button>}
           </div>
         </div>
 
@@ -359,7 +359,7 @@ export default function AdminReferrers() {
                                         ]
                                       : []),
                                     {
-                                      label: "Reset Sent Emails",
+                                      label: "Reset sent emails",
                                       onClick: () => setResetSentEmailsConfirm(r.id),
                                     },
                                     {

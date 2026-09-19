@@ -16,7 +16,7 @@ test.describe("Password reset", () => {
 
     /* Submit with a known email (CSV-seeded family user) */
     await page.getByLabel("Email").fill("emily.williams@example.com");
-    await page.getByRole("button", { name: "Send Reset Link" }).click();
+    await page.getByRole("button", { name: "Send reset link" }).click();
 
     /* Should show confirmation message */
     await expect(page.getByRole("heading", { name: "Check Your Email" })).toBeVisible({
@@ -32,7 +32,7 @@ test.describe("Password reset", () => {
     /* Fill the form with an invalid token */
     await page.getByLabel("New Password").fill("NewPassword123!");
     await page.getByLabel("Confirm Password").fill("NewPassword123!");
-    await page.getByRole("button", { name: "Set Password" }).click();
+    await page.getByRole("button", { name: "Set password" }).click();
 
     /* Should show error */
     await expect(page.getByText("Invalid or expired reset token")).toBeVisible({
@@ -46,7 +46,7 @@ test.describe("Password reset", () => {
 
     await page.getByLabel("New Password").fill("Password123!");
     await page.getByLabel("Confirm Password").fill("Different123!");
-    await page.getByRole("button", { name: "Set Password" }).click();
+    await page.getByRole("button", { name: "Set password" }).click();
 
     /* Client-side validation should catch mismatch */
     await expect(page.getByText("Passwords do not match.")).toBeVisible();

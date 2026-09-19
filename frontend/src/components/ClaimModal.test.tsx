@@ -167,11 +167,11 @@ function renderStatefulClaim(claim: FamilyClaimSummary, onClose: () => void) {
 
 /** Waits for the claim form, optionally picks cash, submits, and waits for the success heading. */
 async function submitClaim(user: ReturnType<typeof userEvent.setup>, commitment: "gifts" | "cash" = "gifts") {
-  await screen.findByRole("button", { name: "Sponsor Family" });
+  await screen.findByRole("button", { name: "Sponsor family" });
   if (commitment === "cash") {
     await user.click(screen.getByRole("radio", { name: /monetary support/ }));
   }
-  await user.click(screen.getByRole("button", { name: "Sponsor Family" }));
+  await user.click(screen.getByRole("button", { name: "Sponsor family" }));
   await screen.findByRole("heading", { name: /You made Family 12-3/ });
 }
 

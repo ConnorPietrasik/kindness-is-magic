@@ -124,40 +124,40 @@ describe("FamilyTableRow", () => {
     expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/admin/families/1/people?from=referrer");
   });
 
-  it("family-locked row: Fully Approve shown, Reset Lock hidden, no packing slip by default", async () => {
+  it("family-locked row: Fully approve shown, Reset lock hidden, no packing slip by default", async () => {
     const { user } = renderRow();
 
     const menu = await openMenu(user);
-    expect(within(menu).getByRole("menuitem", { name: "Fully Approve" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Reset Lock" })).not.toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "View Packing Slip" })).not.toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "View Delivery Slip" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Fully approve" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Reset lock" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "View packing slip" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "View delivery slip" })).not.toBeInTheDocument();
   });
 
-  it("admin-locked row: Reset Lock shown, Fully Approve hidden, wish-list link present", async () => {
+  it("admin-locked row: Reset lock shown, Fully approve hidden, wish-list link present", async () => {
     const { user } = renderRow({ family: makeFamily({ wish_lock_level: "admin" }) });
 
-    expect(screen.getByRole("link", { name: "Wish List" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View wish list" })).toBeInTheDocument();
 
     const menu = await openMenu(user);
-    expect(within(menu).getByRole("menuitem", { name: "Reset Lock" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Fully Approve" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Reset lock" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Fully approve" })).not.toBeInTheDocument();
   });
 
-  it("shows View Packing Slip and calls the callback when enabled", async () => {
+  it("shows View packing slip and calls the callback when enabled", async () => {
     const { user, callbacks } = renderRow({ showPackingSlipAction: true });
 
     const menu = await openMenu(user);
-    await user.click(within(menu).getByRole("menuitem", { name: "View Packing Slip" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "View packing slip" }));
 
     expect(callbacks.onViewPackingSlip).toHaveBeenCalledWith(1);
   });
 
-  it("shows View Delivery Slip and calls the callback when enabled", async () => {
+  it("shows View delivery slip and calls the callback when enabled", async () => {
     const { user, callbacks } = renderRow({ showDeliverySlipAction: true });
 
     const menu = await openMenu(user);
-    await user.click(within(menu).getByRole("menuitem", { name: "View Delivery Slip" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "View delivery slip" }));
 
     expect(callbacks.onViewDeliverySlip).toHaveBeenCalledWith(1);
   });
@@ -166,12 +166,12 @@ describe("FamilyTableRow", () => {
     const { user, callbacks } = renderRow({ family: makeFamily({ wish_lock_level: "referrer" }) });
 
     const menu = await openMenu(user);
-    await user.click(within(menu).getByRole("menuitem", { name: "Fully Approve" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "Fully approve" }));
     expect(callbacks.onFullyApprove).toHaveBeenCalledWith(1);
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const menu2 = screen.getByRole("menu");
-    await user.click(within(menu2).getByRole("menuitem", { name: "Reset Lock" }));
+    await user.click(within(menu2).getByRole("menuitem", { name: "Reset lock" }));
     expect(callbacks.onResetLock).toHaveBeenCalledWith(1);
 
     await user.click(screen.getByRole("button", { name: "More actions" }));

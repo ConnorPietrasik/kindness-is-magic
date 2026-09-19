@@ -26,7 +26,7 @@ describe("ForgotPassword", () => {
     wrap(<ForgotPassword />);
 
     await user.type(screen.getByLabelText(/Email/), "alice@example.com");
-    await user.click(screen.getByRole("button", { name: "Send Reset Link" }));
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
     expect(await screen.findByText("Check Your Email")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
@@ -42,10 +42,10 @@ describe("ForgotPassword", () => {
     wrap(<ForgotPassword />);
 
     await user.type(screen.getByLabelText(/Email/), "nobody@example.com");
-    await user.click(screen.getByRole("button", { name: "Send Reset Link" }));
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
     expect(await screen.findByText("No account with that email.")).toBeInTheDocument();
     // Still on the form
-    expect(screen.getByRole("button", { name: "Send Reset Link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send reset link" })).toBeInTheDocument();
   });
 });

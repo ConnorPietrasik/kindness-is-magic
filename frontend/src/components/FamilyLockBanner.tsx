@@ -138,7 +138,7 @@ export function FamilyLockBanner({
           onClick={() => onCancelReview()}
           loading={cancelMutPending}
         >
-          {cancelMutPending ? "Cancelling…" : "Cancel Request"}
+          {cancelMutPending ? "Cancelling…" : "Cancel request"}
         </Button>
       </div>
     );

@@ -21,9 +21,9 @@ export interface FamilyTableRowProps {
   referrerMap?: Record<number, string>;
   /** Link Manage to the people page with ?from=referrer (referrer-scoped view). */
   fromReferrer?: boolean;
-  /** Show "View Packing Slip" in the actions menu (admin families page). */
+  /** Show "View packing slip" in the actions menu (admin families page). */
   showPackingSlipAction?: boolean;
-  /** Show "View Delivery Slip" in the actions menu (admin families page). */
+  /** Show "View delivery slip" in the actions menu (admin families page). */
   showDeliverySlipAction?: boolean;
   /** Toggles the row's inline edit form (open if closed, close if open). */
   onEdit: (id: number) => void;
@@ -90,9 +90,9 @@ export function FamilyTableRow({
             to={route.familyWishList(f.id)}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Wish List"
+            aria-label="View wish list"
             className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-            title="Wish List"
+            title="View wish list"
           >
             📄
           </Link>
@@ -173,7 +173,7 @@ export function FamilyTableRow({
                   ...(showPackingSlipAction && onViewPackingSlip
                     ? [
                         {
-                          label: "View Packing Slip",
+                          label: "View packing slip",
                           onClick: () => onViewPackingSlip(f.id),
                         },
                       ]
@@ -181,7 +181,7 @@ export function FamilyTableRow({
                   ...(showDeliverySlipAction && onViewDeliverySlip
                     ? [
                         {
-                          label: "View Delivery Slip",
+                          label: "View delivery slip",
                           onClick: () => onViewDeliverySlip(f.id),
                         },
                       ]
@@ -189,7 +189,7 @@ export function FamilyTableRow({
                   ...(f.wish_lock_level !== "family"
                     ? [
                         {
-                          label: "Reset Lock",
+                          label: "Reset lock",
                           variant: "secondary" as const,
                           onClick: () => onResetLock(f.id),
                         },
@@ -198,7 +198,7 @@ export function FamilyTableRow({
                   ...(f.wish_lock_level !== "admin"
                     ? [
                         {
-                          label: "Fully Approve",
+                          label: "Fully approve",
                           onClick: () => onFullyApprove(f.id),
                         },
                       ]

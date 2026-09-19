@@ -51,11 +51,11 @@ export default function DeliveryDashboard() {
         {/* Slip shortcuts */}
         <div className="mb-6 flex flex-col gap-2 sm:flex-row">
           <Link to={ROUTES.DELIVERY_PACKING_SLIPS}>
-            <Button className="w-full sm:w-auto">📦 View Packing Slips</Button>
+            <Button className="w-full sm:w-auto">📦 View packing slips</Button>
           </Link>
           <Link to={ROUTES.DELIVERY_SLIPS}>
             <Button variant="secondary" className="w-full sm:w-auto">
-              🚚 View Delivery Slips
+              🚚 View delivery slips
             </Button>
           </Link>
         </div>

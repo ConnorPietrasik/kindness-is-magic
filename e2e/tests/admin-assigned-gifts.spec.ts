@@ -205,13 +205,13 @@ test.describe.serial("Admin Assigned Gifts", () => {
 
     // Mark it purchased through the dialog — with a custom purchase date
     // (the picker defaults to now; fill overrides it)
-    await ourRow.getByRole("button", { name: "Mark Purchased" }).click();
+    await ourRow.getByRole("button", { name: "Mark purchased" }).click();
     await expect(page.getByText(/Mark wish for/)).toBeVisible({ timeout: 10_000 });
     const dialog = page.getByRole("dialog");
     // exact — "Purchased" is a substring of "Purchased filter" / "Purchased Where"
     await dialog.getByLabel("Purchased", { exact: true }).fill(SINGLE_MARK_DATE);
     await dialog.getByLabel("Purchased Where").fill("E2E Admin Store");
-    await dialog.getByRole("button", { name: "Mark Purchased" }).click();
+    await dialog.getByRole("button", { name: "Mark purchased" }).click();
 
     // Success toast, then the row shows the purchased checkmark with the
     // chosen date
@@ -248,13 +248,13 @@ test.describe.serial("Admin Assigned Gifts", () => {
     await batchRow.getByRole("checkbox").check();
 
     // Batch mark with a shared location and a shared custom date
-    await page.getByRole("button", { name: "Mark Purchased (2)" }).click();
+    await page.getByRole("button", { name: "Mark purchased (2)" }).click();
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
     const batchDialog = page.getByRole("dialog");
     // exact — "Purchased" is a substring of "Purchased filter" / "Purchased Where"
     await batchDialog.getByLabel("Purchased", { exact: true }).fill(BATCH_MARK_DATE);
     await batchDialog.getByLabel("Purchased Where").fill("E2E Batch Store");
-    await batchDialog.getByRole("button", { name: "Mark Purchased" }).click();
+    await batchDialog.getByRole("button", { name: "Mark purchased" }).click();
 
     // Success toast
     await expect(page.getByText("2 wishes marked as purchased")).toBeVisible({ timeout: 10_000 });

@@ -63,7 +63,7 @@ describe("ReferrerSelfRegister", () => {
     expect(screen.getByLabelText("Phone Number")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
   });
 
   it("shows error when passwords do not match", async () => {
@@ -77,7 +77,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "different1");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
   });
@@ -93,7 +93,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "short");
     await user.type(screen.getByLabelText("Confirm Password"), "short");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(screen.getByText("Password must be at least 8 characters.")).toBeInTheDocument();
   });
@@ -111,7 +111,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(api.registerReferrerViaInvite).toHaveBeenCalledWith({
@@ -139,7 +139,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(screen.getByText("Invalid or already-used invite code")).toBeInTheDocument();
@@ -161,7 +161,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(screen.getByText("Invite code has expired")).toBeInTheDocument();
@@ -183,7 +183,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(screen.getByText("Email already registered")).toBeInTheDocument();
@@ -208,7 +208,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(screen.getByText("Creating account…")).toBeInTheDocument();
 
@@ -278,7 +278,7 @@ describe("ReferrerSelfRegister", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.type(screen.getByLabelText("Confirm Password"), "password123");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(api.registerReferrerViaInvite).toHaveBeenCalledWith({

@@ -29,7 +29,7 @@ describe("ResetPassword", () => {
 
     await user.type(screen.getByLabelText(/New Password/), "password123");
     await user.type(screen.getByLabelText(/Confirm Password/), "different456");
-    await user.click(screen.getByRole("button", { name: "Set Password" }));
+    await user.click(screen.getByRole("button", { name: "Set password" }));
 
     expect(await screen.findByText("Passwords do not match.")).toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
@@ -43,7 +43,7 @@ describe("ResetPassword", () => {
 
     await user.type(screen.getByLabelText(/New Password/), "password123");
     await user.type(screen.getByLabelText(/Confirm Password/), "password123");
-    await user.click(screen.getByRole("button", { name: "Set Password" }));
+    await user.click(screen.getByRole("button", { name: "Set password" }));
 
     expect(await screen.findByText(/Password Set!/)).toBeInTheDocument();
     expect(spy).toHaveBeenCalledWith("abc-token", "password123");
@@ -59,7 +59,7 @@ describe("ResetPassword", () => {
 
     await user.type(screen.getByLabelText(/New Password/), "password123");
     await user.type(screen.getByLabelText(/Confirm Password/), "password123");
-    await user.click(screen.getByRole("button", { name: "Set Password" }));
+    await user.click(screen.getByRole("button", { name: "Set password" }));
 
     expect(await screen.findByText("Token expired.")).toBeInTheDocument();
   });

@@ -44,7 +44,7 @@ test.describe("Admin Users", () => {
     await page.goto("/admin/users");
     await expect(page.getByRole("heading", { name: "Manage Users" })).toBeVisible();
 
-    await page.getByRole("button", { name: "+ Add User" }).click();
+    await page.getByRole("button", { name: "+ Add user" }).click();
     await expect(page.getByRole("heading", { name: "Add User" })).toBeVisible();
 
     /* Fill in the SAME email to trigger duplicate error */

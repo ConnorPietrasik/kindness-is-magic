@@ -30,10 +30,10 @@ export default function AlreadyLoggedIn() {
 
         <div className="flex flex-col gap-3">
           <Link to={dashboardPath}>
-            <Button className="w-full">Go to Dashboard</Button>
+            <Button className="w-full">Go to dashboard</Button>
           </Link>
           <Button variant="secondary" className="w-full" onClick={logout}>
-            Log Out
+            Log out
           </Button>
         </div>
       </Card>

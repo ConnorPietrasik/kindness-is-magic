@@ -139,7 +139,7 @@ export default function AdminReferrerFamilies() {
               />
             ),
             title: "Families",
-            createButtonLabel: "+ Add Family",
+            createButtonLabel: "+ Add family",
             invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies, adminWishes],
             entityName: "Family",
           }}

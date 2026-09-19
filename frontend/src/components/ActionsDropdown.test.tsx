@@ -162,11 +162,11 @@ describe("ActionsDropdown", () => {
 
   it("applies danger styling to danger variant items", async () => {
     const user = userEvent.setup();
-    render(<ActionsDropdown items={[{ label: "Danger Action", variant: "danger", onClick: vi.fn() }]} />);
+    render(<ActionsDropdown items={[{ label: "Danger action", variant: "danger", onClick: vi.fn() }]} />);
 
     await user.click(getTrigger());
     const menu = getMenu();
-    const dangerItem = within(menu).getByText("Danger Action").closest("button");
+    const dangerItem = within(menu).getByText("Danger action").closest("button");
     expect(dangerItem).toHaveClass("text-red-600");
   });
 });

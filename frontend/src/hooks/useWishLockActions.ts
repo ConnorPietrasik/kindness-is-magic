@@ -4,9 +4,9 @@
  * Both admin family pages (flat list + referrer-scoped) offer the same two
  * row actions, so the mutations and their invalidation sets live here:
  *
- *  - "Reset Lock" (adminResetWishState) — sends the family's wishes back to
+ *  - "Reset lock" (adminResetWishState) — sends the family's wishes back to
  *    family-editable state, clearing any referrer/admin lock.
- *  - "Fully Approve" (adminApproveWishes) — skips referrer review and makes
+ *  - "Fully approve" (adminApproveWishes) — skips referrer review and makes
  *    the family visible to donors immediately.
  *
  * Both invalidate the family lists, the wish review queue, packing slips,

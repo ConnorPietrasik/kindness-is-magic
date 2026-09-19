@@ -1,7 +1,7 @@
 /**
  * Referrer Family Invites
  *
- * Shows the referrer's family invite code with a "Send Invite" button,
+ * Shows the referrer's family invite code with a "Send invite" button,
  * plus the verification queue below — families that self-registered via invite
  * and are awaiting the referrer's confirmation.
  */
@@ -114,7 +114,7 @@ function InviteSection() {
             <div className="text-2xl font-mono font-bold tracking-wider text-brand-dark">{code ?? ""}</div>
           </div>
           <Button onClick={handleOpenDialog} disabled={!code || !isApproved || limitReached}>
-            Send Invite
+            Send invite
           </Button>
         </div>
 
@@ -158,7 +158,7 @@ function InviteSection() {
               />
               <div className="flex gap-3 pt-1">
                 <Button type="submit" loading={sendInviteMut.isPending} className="flex-1">
-                  {sendInviteMut.isPending ? "Sending…" : "Send Invite"}
+                  {sendInviteMut.isPending ? "Sending…" : "Send invite"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCloseDialog} className="flex-1">
                   Cancel

@@ -172,7 +172,7 @@ describe("AdminUsers", () => {
       expect(screen.getByText("admin@example.org")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add User" }));
+    await user.click(screen.getByRole("button", { name: "+ Add user" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add User")).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe("AdminUsers", () => {
       expect(screen.getByText("admin@example.org")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add User" }));
+    await user.click(screen.getByRole("button", { name: "+ Add user" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add User")).toBeInTheDocument();
@@ -265,7 +265,7 @@ describe("AdminUsers", () => {
       expect(screen.getByText("admin@example.org")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add User" }));
+    await user.click(screen.getByRole("button", { name: "+ Add user" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add User")).toBeInTheDocument();
@@ -370,7 +370,7 @@ describe("AdminUsers", () => {
     // Open the row dropdown (row 1 = user 2)
     const triggers = screen.getAllByRole("button", { name: "More actions" });
     await user.click(triggers[1]!);
-    await user.click(screen.getByRole("menuitem", { name: "Reset Pw" }));
+    await user.click(screen.getByRole("menuitem", { name: "Reset password" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Reset password for user/)).toBeInTheDocument();
@@ -378,7 +378,7 @@ describe("AdminUsers", () => {
 
     await user.type(screen.getByLabelText("New password"), "newpass123");
     await user.type(screen.getByLabelText("Confirm password"), "mismatch123");
-    await user.click(screen.getByRole("button", { name: "Set Password" }));
+    await user.click(screen.getByRole("button", { name: "Set password" }));
 
     expect(screen.getByText("Passwords do not match")).toBeInTheDocument();
     expect(resetSpy).not.toHaveBeenCalled();
@@ -386,7 +386,7 @@ describe("AdminUsers", () => {
     // Fix the confirm field and submit again
     await user.clear(screen.getByLabelText("Confirm password"));
     await user.type(screen.getByLabelText("Confirm password"), "newpass123");
-    await user.click(screen.getByRole("button", { name: "Set Password" }));
+    await user.click(screen.getByRole("button", { name: "Set password" }));
 
     await waitFor(() => {
       expect(resetSpy).toHaveBeenCalledWith(2, { password: "newpass123" });

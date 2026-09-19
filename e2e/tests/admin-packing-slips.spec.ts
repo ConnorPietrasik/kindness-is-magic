@@ -2,7 +2,7 @@
  * Admin Packing Slips — /admin/packing-slips (the admin twin of the delivery
  * packing slips covered in role-downstream.spec.ts).
  *
- *  - The family-row "View Packing Slip" action opens the page filtered to
+ *  - The family-row "View packing slip" action opens the page filtered to
  *    that one family (family_ids param).
  *  - The unfiltered page lists all fully-approved families; slips show
  *    display IDs and wishes, never family PII.
@@ -108,7 +108,7 @@ test.describe.serial("Admin Packing Slips", () => {
     const row = page.getByRole("row").filter({ hasText: testData.familyName! });
     await expect(row.first()).toBeVisible({ timeout: 15_000 });
     await row.first().getByRole("button", { name: "More actions" }).click();
-    await row.first().getByRole("menuitem", { name: "View Packing Slip" }).click();
+    await row.first().getByRole("menuitem", { name: "View packing slip" }).click();
 
     await page.waitForURL(/\/admin\/packing-slips\?family_ids=\d+/, { timeout: 10_000 });
 

@@ -182,7 +182,7 @@ export default function AdminFamilyPeople() {
               />
             ),
             title: "People",
-            createButtonLabel: "+ Add Person",
+            createButtonLabel: "+ Add person",
             invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips, adminWishes],
             entityName: "Person",
           }}
@@ -283,7 +283,7 @@ function FamilyCard(
               rel="noopener noreferrer"
               className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
-              Wish List
+              View wish list
             </Link>
           )}
           {data && lockLevel !== "admin" && (
@@ -293,7 +293,7 @@ function FamilyCard(
               onClick={() => setApproveConfirm(true)}
               disabled={fullyApproveMut.isPending}
             >
-              Fully Approve
+              Fully approve
             </Button>
           )}
           <Button variant="secondary" className="h-8 px-3 text-xs" onClick={onToggleEdit}>

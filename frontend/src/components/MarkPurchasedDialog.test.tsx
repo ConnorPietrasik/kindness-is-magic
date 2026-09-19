@@ -22,7 +22,7 @@ const defaultProps = {
 
 function submitViaDialog(user: ReturnType<typeof userEvent.setup>) {
   const dialog = within(screen.getByRole("dialog"));
-  return user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+  return user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 }
 
 describe("MarkPurchasedDialog", () => {

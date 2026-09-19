@@ -1,4 +1,5 @@
 Update brochure section - Privacy policy, CA notice, financials, etc.
+Add wish guidelines
 Automated failure checks and admin emails
 Donor reminder emails before deadline
 Payment processing - some way to accept credit card payments. Looking like Zeffy

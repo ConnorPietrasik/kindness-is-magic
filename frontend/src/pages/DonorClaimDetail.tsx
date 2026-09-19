@@ -22,7 +22,15 @@ import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurcha
 import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
-import type { CommitmentType, DonorWishPurchaseMark, FamilyClaimDetail, FamilyClaimUpdate, PersonRole, WishSummary } from "../types";
+import type {
+  CommitmentType,
+  DonorWishPurchaseMark,
+  FamilyClaimDetail,
+  FamilyClaimUpdate,
+  PersonRole,
+  WishSummary,
+  WishType,
+} from "../types";
 import { getClaimStatus, personRoleLabel } from "../types";
 
 export default function DonorClaimDetail() {
@@ -234,8 +242,18 @@ function WishTable({
 }
 
 /* ------------------------------------------------------------------ */
-/* Mark Purchased Button + Dialog                                      */
+/* Mark purchased Button + Dialog                                      */
 /* ------------------------------------------------------------------ */
+
+/** Button labels by wish category. A child's row can hold one fun + one
+ * practical wish, so those need the category; adult wishes are unique per row
+ * and use the generic label. */
+const WISH_MARK_LABELS: Record<WishType, string> = {
+  adult: "Mark gift purchased",
+  family: "Mark family gift purchased",
+  fun: "Mark fun gift purchased",
+  practical: "Mark practical gift purchased",
+};
 
 function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary; claimId: number; personName: string }) {
   const [open, setOpen] = useState(false);
@@ -270,7 +288,7 @@ function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary;
         onClick={() => setOpen(true)}
         className="inline-flex items-center rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-700"
       >
-        Mark purchased
+        {WISH_MARK_LABELS[wish.type]}
       </button>
 
       {open && (
@@ -323,7 +341,7 @@ function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary;
                 }
                 loading={markMut.isPending}
               >
-                {markMut.isPending ? "Marking…" : "Mark Purchased"}
+                {markMut.isPending ? "Marking…" : "Mark purchased"}
               </Button>
               <Button variant="secondary" className="flex-1" onClick={() => setOpen(false)}>
                 Cancel
@@ -386,7 +404,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
           ...(isOwner
             ? ([
                 {
-                  label: "Edit Details",
+                  label: "Edit details",
                   onClick: () => {
                     setNotesValue(claim.notes ?? "");
                     setCommitmentValue(claim.commitment_type);
@@ -394,7 +412,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
                   },
                 },
                 {
-                  label: "Cancel Sponsorship",
+                  label: "Cancel sponsorship",
                   variant: "danger" as const,
                   onClick: () => setShowCancelConfirm(true),
                 },
@@ -403,11 +421,11 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
           ...(isAdmin && !isOwner
             ? ([
                 {
-                  label: "Mark Fulfilled",
+                  label: "Mark fulfilled",
                   onClick: () => setShowFulfillConfirm(true),
                 },
                 {
-                  label: "Cancel Sponsorship",
+                  label: "Cancel sponsorship",
                   variant: "danger" as const,
                   onClick: () => setShowCancelConfirm(true),
                 },

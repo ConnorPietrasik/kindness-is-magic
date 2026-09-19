@@ -301,9 +301,9 @@ test.describe.serial("Role Downstream — purchaser assigned gifts", () => {
     await statusSelect.selectOption({ label: "Unpurchased" });
     await expect(page.getByRole("table")).toBeVisible();
 
-    // Click Mark Purchased on the first unpurchased wish (exact — the header
+    // Click Mark purchased on the first unpurchased wish (exact — the header
     // batch button's name starts with the same text)
-    const markBtn = page.getByRole("button", { name: "Mark Purchased", exact: true });
+    const markBtn = page.getByRole("button", { name: "Mark purchased", exact: true });
     if (await markBtn.count() > 0) {
       await markBtn.first().click();
 
@@ -313,7 +313,7 @@ test.describe.serial("Role Downstream — purchaser assigned gifts", () => {
       // Fill purchased where and submit
       await page.getByLabel("Purchased Where").fill("E2E Test Store");
       const dialog = page.getByRole("dialog");
-      await dialog.getByRole("button", { name: "Mark Purchased" }).click();
+      await dialog.getByRole("button", { name: "Mark purchased" }).click();
 
       // Success toast appears
       await expect(page.getByText("Wish marked as purchased")).toBeVisible({ timeout: 10_000 });
@@ -347,10 +347,10 @@ test.describe.serial("Role Downstream — purchaser assigned gifts", () => {
     await earlyRow.getByRole("checkbox").check();
 
     // Batch mark with a shared location
-    await page.getByRole("button", { name: "Mark Purchased (2)" }).click();
+    await page.getByRole("button", { name: "Mark purchased (2)" }).click();
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Purchased Where").fill("E2E Batch Store");
-    await page.getByRole("dialog").getByRole("button", { name: "Mark Purchased" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Mark purchased" }).click();
 
     // Success toast
     await expect(page.getByText("2 wishes marked as purchased")).toBeVisible({ timeout: 10_000 });
@@ -681,7 +681,7 @@ test.describe.serial("Role Downstream — delivery", () => {
     const row = page.getByRole("row").filter({ hasText: DELIVERY.familyName });
     await expect(row.first()).toBeVisible({ timeout: 15_000 });
     await row.first().getByRole("button", { name: "More actions" }).click();
-    await row.first().getByRole("menuitem", { name: "View Delivery Slip" }).click();
+    await row.first().getByRole("menuitem", { name: "View delivery slip" }).click();
 
     await page.waitForURL(/\/admin\/delivery-slips\?family_ids=\d+/, { timeout: 10_000 });
     const card = page.locator(".delivery-slip-card").filter({ hasText: DELIVERY.familyName });

@@ -21,7 +21,7 @@ interface ActionsDropdownProps {
  * Kebab-menu dropdown for secondary row actions.
  *
  * Keeps the most common actions (Edit, Manage) as visible buttons and
- * tucks less-frequent actions (Delete, Reset Lock, Restore) behind a
+ * tucks less-frequent actions (Delete, Reset lock, Restore) behind a
  * three-dot menu.
  */
 export function ActionsDropdown({ items, disabled: propDisabled, triggerTitle = "More actions", children }: ActionsDropdownProps) {

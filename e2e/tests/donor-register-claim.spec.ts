@@ -143,14 +143,14 @@ test.describe.serial("Guest claim from wish list → direct claim", () => {
     await page.getByLabel("Email").fill(REG_DONOR_EMAIL);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("Confirm Password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Create Account" }).click();
+    await page.getByRole("button", { name: "Create account" }).click();
 
     // 5. Lands back on the same family's wish list with the claim modal open
     await page.waitForURL(new RegExp(`/families/${testData.familyId}/wish-list`));
     await expect(page.getByRole("heading", { name: "Sponsor This Family" })).toBeVisible({ timeout: 10_000 });
 
     // 6. Complete the claim (gifts is the default commitment)
-    await page.getByRole("button", { name: "Sponsor Family" }).click();
+    await page.getByRole("button", { name: "Sponsor family" }).click();
     // Success view appears; click through to the claim detail page
     await expect(page.getByRole("heading", { name: /You made Family .*'s Christmas magical/ })).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "View your sponsorship" }).click();

@@ -138,7 +138,7 @@ export default function CsvUpload() {
             <p className="mt-1 text-sm text-gray-500">Bulk-import referrers, families, people, and users from a single CSV file.</p>
           </div>
           <Button variant={showTemplate ? "secondary" : "primary"} onClick={fetchTemplate} loading={fetchingTemplate && !template}>
-            {showTemplate ? "Hide Template" : "\u{1F4C4} Show Template"}
+            {showTemplate ? "Hide template" : "\u{1F4C4} Show template"}
           </Button>
         </div>
 

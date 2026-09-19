@@ -343,7 +343,7 @@ describe("AdminPeople", () => {
       expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Person" }));
+    await user.click(screen.getByRole("button", { name: "+ Add person" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add Person")).toBeInTheDocument();
@@ -397,7 +397,7 @@ describe("AdminPeople", () => {
       expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Person" }));
+    await user.click(screen.getByRole("button", { name: "+ Add person" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add Person")).toBeInTheDocument();

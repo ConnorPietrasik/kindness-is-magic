@@ -123,7 +123,7 @@ export default function AdminInviteCodes() {
               </Button>
             )}
             <ColumnToggle resourceKey="adminInvites" />
-            <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide Generator" : "+ Generate New"}</Button>
+            <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide generator" : "+ Generate new"}</Button>
           </div>
         </div>
 

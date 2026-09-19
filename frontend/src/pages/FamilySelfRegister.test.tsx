@@ -71,7 +71,7 @@ describe("FamilySelfRegister", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
     expect(screen.getByLabelText("Address")).toBeRequired();
     expect(screen.getByText("If no address, write 'none'")).toBeInTheDocument();
   });
@@ -143,7 +143,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(api.registerFamilyViaInvite).toHaveBeenCalledWith({
@@ -174,7 +174,7 @@ describe("FamilySelfRegister", () => {
     await user.type(screen.getByLabelText("Address"), "none");
     await user.type(screen.getByLabelText("Phone Number"), "5551234567");
 
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
   });

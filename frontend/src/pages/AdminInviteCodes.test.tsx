@@ -47,7 +47,7 @@ describe("AdminInviteCodes", () => {
     });
 
     expect(screen.queryByText("Generate Invite Code")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Generate New" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Generate new" })).toBeInTheDocument();
   });
 
   it("opens the generator when navigated with ?generate=1", async () => {
@@ -59,7 +59,7 @@ describe("AdminInviteCodes", () => {
       expect(screen.getByText("Generate Invite Code")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Hide Generator" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide generator" })).toBeInTheDocument();
   });
 
   it("opens the generator when ?generate=1 appears on an already-mounted page", async () => {

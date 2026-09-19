@@ -158,7 +158,7 @@ describe("FamilyWishList claim modal auto-open", () => {
 
     // Modal content for an authenticated claim-capable user
     await screen.findByRole("heading", { name: "Sponsor This Family" });
-    expect(screen.getByRole("button", { name: "Sponsor Family" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sponsor family" })).toBeInTheDocument();
   });
 
   it("does not open the claim modal when logged out, even with openClaim state", async () => {

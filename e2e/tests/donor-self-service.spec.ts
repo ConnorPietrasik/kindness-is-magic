@@ -194,7 +194,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByLabel("I'll purchase the items on their wish list")).toBeChecked();
 
     // Submit the claim
-    await page.getByRole("button", { name: "Sponsor Family" }).click();
+    await page.getByRole("button", { name: "Sponsor family" }).click();
 
     // Should show the success view, then land on the claim detail page
     await expect(page.getByRole("heading", { name: /You made Family .*'s Christmas magical/ })).toBeVisible({ timeout: 10_000 });
@@ -279,12 +279,12 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByText("Family Wish", { exact: true })).toBeVisible();
     await expect(page.getByText("A warm blanket for everyone")).toBeVisible();
 
-    // For gifts claims, "Mark purchased" buttons should be visible
-    const markPurchasedBtn = page.getByRole("button", { name: "Mark purchased" });
+    // For gifts claims, per-wish "… gift purchased" buttons should be visible
+    const markPurchasedBtn = page.getByRole("button", { name: "gift purchased" });
     const count = await markPurchasedBtn.count();
     expect(count).toBeGreaterThan(0);
 
-    // Click the first "Mark purchased" button
+    // Click the first mark button
     await markPurchasedBtn.first().click();
 
     // Mark purchased dialog should appear
@@ -297,7 +297,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByLabel("Note").fill("Got a great deal");
 
     // Submit
-    await page.getByRole("button", { name: "Mark Purchased", exact: true }).click();
+    await page.getByRole("button", { name: "Mark purchased", exact: true }).click();
 
     // Should show success toast and "Purchased" indicator
     await expect(page.getByText("✓ Purchased")).toBeVisible({ timeout: 10_000 });
@@ -340,7 +340,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await page.getByRole("button", { name: "More actions" }).click();
 
     // Click "Cancel Claim"
-    await page.getByText("Cancel Sponsorship").click();
+    await page.getByText("Cancel sponsorship").click();
 
     // Confirmation dialog should appear
     await expect(page.getByRole("button", { name: "Yes, cancel" })).toBeVisible({

@@ -152,7 +152,7 @@ describe("DonorClaimDetail", () => {
     });
 
     await openActionsMenu(user);
-    await user.click(await screen.findByRole("menuitem", { name: "Cancel Sponsorship" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Cancel sponsorship" }));
     await user.click(await screen.findByRole("button", { name: "Yes, cancel" }));
 
     await waitFor(() => {
@@ -161,7 +161,7 @@ describe("DonorClaimDetail", () => {
     expect(await screen.findByText("Sponsorship cancelled")).toBeInTheDocument();
   });
 
-  it("offers Mark Fulfilled to admins instead of Edit Details", async () => {
+  it("offers Mark fulfilled to admins instead of Edit details", async () => {
     const user = userEvent.setup();
     const fulfillSpy = vi.spyOn(api, "donorFulfillClaim").mockResolvedValue(mockClaim);
     renderClaim(mockAdminUser);
@@ -174,8 +174,8 @@ describe("DonorClaimDetail", () => {
     expect(screen.getByText("Donor")).toBeInTheDocument();
 
     await openActionsMenu(user);
-    expect(screen.queryByRole("menuitem", { name: "Edit Details" })).not.toBeInTheDocument();
-    await user.click(await screen.findByRole("menuitem", { name: "Mark Fulfilled" }));
+    expect(screen.queryByRole("menuitem", { name: "Edit details" })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("menuitem", { name: "Mark fulfilled" }));
     await user.click(await screen.findByRole("button", { name: "Yes, fulfill" }));
 
     await waitFor(() => {
@@ -188,20 +188,37 @@ describe("DonorClaimDetail", () => {
     const markSpy = vi
       .spyOn(api, "donorMarkWishPurchased")
       .mockResolvedValue({ ...mockClaim.family_wish!, purchased_at: "2025-12-01T00:00:00Z" });
-    renderClaim(mockDonorUser);
+    // Add a sibling with both wish types so her row has two mark buttons
+    const samWish = mockClaim.people[0]!.wishes[0]!;
+    const riley = {
+      given_name: "Riley",
+      role: "daughter" as const,
+      age: 11,
+      note: null,
+      wishes: [
+        { ...samWish, id: 12, type: "practical" as const, description: "Backpack" },
+        { ...samWish, id: 13, type: "fun" as const, description: "LEGO set" },
+      ],
+    };
+    renderClaim(mockDonorUser, { ...mockClaim, people: [...mockClaim.people, riley] });
 
     await waitFor(() => {
       expect(screen.getByText("Family outing")).toBeInTheDocument();
     });
 
-    // One button per active wish (family wish first, then members')
-    const markButtons = screen.getAllByRole("button", { name: "Mark purchased" });
+    // One button per active wish (family wish first, then members'), labeled
+    // by wish category so a child's fun and practical buttons are distinct
+    const markButtons = screen.getAllByRole("button", { name: /gift purchased/ });
+    expect(markButtons[0]).toHaveTextContent("Mark family gift purchased");
+    expect(markButtons[1]).toHaveTextContent("Mark practical gift purchased");
+    expect(markButtons[2]).toHaveTextContent("Mark practical gift purchased");
+    expect(markButtons[3]).toHaveTextContent("Mark fun gift purchased");
     const firstMarkButton = markButtons[0];
     if (!firstMarkButton) throw new Error("mark purchased button not found");
     await user.click(firstMarkButton);
     await user.type(await screen.findByLabelText("Purchased at"), "Target");
     await user.type(screen.getByLabelText("Note"), "Gift card inside");
-    await user.click(screen.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(screen.getByRole("button", { name: "Mark purchased" }));
 
     await waitFor(() => {
       expect(markSpy).toHaveBeenCalledWith(1, 10, { purchased_where: "Target", purchaser_note: "Gift card inside" });

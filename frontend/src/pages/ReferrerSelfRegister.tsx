@@ -185,7 +185,7 @@ export default function ReferrerSelfRegister() {
           />
 
           <Button type="submit" loading={loading} className="mt-2 w-full">
-            {loading ? "Creating account…" : "Create Account"}
+            {loading ? "Creating account…" : "Create account"}
           </Button>
         </form>
 

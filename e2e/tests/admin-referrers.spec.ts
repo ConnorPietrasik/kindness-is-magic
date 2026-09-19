@@ -45,7 +45,7 @@ test.describe("Admin Referrers", () => {
     await expect(page.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
     /* Click Add Referrer */
-    await page.getByRole("button", { name: "+ Add Referrer" }).click();
+    await page.getByRole("button", { name: "+ Add referrer" }).click();
 
     /* Fill the form */
     await page.getByLabel("Name", { exact: true }).fill(TEST_REFERRER);

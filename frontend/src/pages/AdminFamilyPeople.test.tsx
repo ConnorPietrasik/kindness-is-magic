@@ -106,19 +106,19 @@ describe("AdminFamilyPeople", () => {
     expect(screen.queryByText("Likes blue")).not.toBeInTheDocument();
   });
 
-  it("shows the Fully Approve button for non-admin-locked families", async () => {
+  it("shows the Fully approve button for non-admin-locked families", async () => {
     renderPage();
 
     await screen.findAllByText("The Johnsons");
-    expect(screen.getByRole("button", { name: "Fully Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fully approve" })).toBeInTheDocument();
   });
 
-  it("hides Fully Approve and shows Wish List for admin-locked families", async () => {
+  it("hides Fully approve and shows View wish list for admin-locked families", async () => {
     renderPage({ wish_lock_level: "admin" });
 
     await screen.findAllByText("The Johnsons");
-    expect(screen.queryByRole("button", { name: "Fully Approve" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Wish List" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fully approve" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View wish list" })).toBeInTheDocument();
   });
 
   it("fully approve flow confirms and calls API", async () => {
@@ -126,7 +126,7 @@ describe("AdminFamilyPeople", () => {
     vi.spyOn(api, "adminApproveWishes").mockResolvedValue({ ...mockFamily, wish_lock_level: "admin" });
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Fully Approve" }));
+    await user.click(await screen.findByRole("button", { name: "Fully approve" }));
     await user.click(await screen.findByRole("button", { name: "Yes, fully approve" }));
 
     await waitFor(() => {

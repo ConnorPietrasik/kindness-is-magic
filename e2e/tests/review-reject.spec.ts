@@ -129,7 +129,7 @@ test.describe.serial("Review reject loops", () => {
     await expect(page.getByText("Awaiting referrer review")).toBeVisible({ timeout: 10_000 });
 
     /* Cancel the request — no confirm dialog, straight to the editable banner */
-    await page.getByRole("button", { name: "Cancel Request" }).click();
+    await page.getByRole("button", { name: "Cancel request" }).click();
     await expect(page.getByText("Review request cancelled")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Add everyone in your family, then click DONE.")).toBeVisible({
       timeout: 10_000,
@@ -223,7 +223,7 @@ test.describe.serial("Review reject loops", () => {
     await expect(refPage.getByText(REASON_ADMIN)).toBeVisible();
 
     /* Re-submit → confirm → back in the admin queue */
-    await refPage.getByRole("button", { name: "Re-submit for Admin Review" }).click();
+    await refPage.getByRole("button", { name: "Re-submit for admin review" }).click();
     await expect(refPage.getByRole("button", { name: "Yes, submit" })).toBeVisible({ timeout: 10_000 });
     await refPage.getByRole("button", { name: "Yes, submit" }).click();
     await expect(refPage.getByText("Wishes submitted for admin review")).toBeVisible({ timeout: 10_000 });
@@ -260,7 +260,7 @@ test.describe.serial("Review reject loops", () => {
     ).toBeVisible();
 
     /* No create/edit/delete controls */
-    await expect(page.getByRole("button", { name: "+ Add Person" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "+ Add person" })).toHaveCount(0);
 
     /* Person is still listed, but the row shows "Locked" instead of actions */
     const personRow = page.getByRole("row").filter({ hasText: PERSON_NAME });

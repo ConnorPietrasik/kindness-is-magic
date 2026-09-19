@@ -216,7 +216,7 @@ export default function AdminUsers() {
               </Button>
             )}
             {!isDeletedView && <ColumnToggle resourceKey="adminUsers" />}
-            {!isDeletedView && <Button onClick={openCreate}>+ Add User</Button>}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add user</Button>}
           </div>
         </div>
 
@@ -357,7 +357,7 @@ export default function AdminUsers() {
                                 <ActionsDropdown
                                   items={[
                                     {
-                                      label: "Reset Pw",
+                                      label: "Reset password",
                                       variant: "secondary" as const,
                                       onClick: () => {
                                         setResetPasswordId(u.id);
@@ -768,7 +768,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
           {passwordError && <ErrorBox message={passwordError} />}
           <div className="flex gap-3 pt-1">
             <Button type="submit" className="flex-1" loading={loading}>
-              {loading ? "Resetting\u2026" : "Set Password"}
+              {loading ? "Resetting\u2026" : "Set password"}
             </Button>
             <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
               Cancel

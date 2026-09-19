@@ -462,7 +462,7 @@ export async function approveWishChain(
 
 /**
  * Fully approve a family via the admin API (skip referrer review).
- * Equivalent to the "Fully Approve" action in the admin UI.
+ * Equivalent to the "Fully approve" action in the admin UI.
  */
 export async function fullyApproveFamilyViaApi(
   request: APIRequestContext,

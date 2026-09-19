@@ -42,7 +42,7 @@ test.describe("Invite and self-registration", () => {
     await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
 
     /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
+    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit and generate */
@@ -76,7 +76,7 @@ test.describe("Invite and self-registration", () => {
     await guestPage.getByRole("textbox", { name: "Password", exact: true }).fill("Password123!");
     await guestPage.getByLabel("Confirm Password").fill("Password123!");
 
-    await guestPage.getByRole("button", { name: "Create Account" }).click();
+    await guestPage.getByRole("button", { name: "Create account" }).click();
 
     /* Should auto-login and redirect to main dashboard */
     await expect(guestPage).toHaveURL(/\/dashboard/, { timeout: 10_000 });
@@ -97,7 +97,7 @@ test.describe("Invite and self-registration", () => {
     await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
 
     /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
+    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit, email, and generate */
@@ -127,7 +127,7 @@ test.describe("Invite and self-registration", () => {
     await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
 
     /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate New" }).click();
+    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     await adminPage.getByLabel("Family Limit").fill("3");
@@ -148,7 +148,7 @@ test.describe("Invite and self-registration", () => {
     await page1.getByLabel("Phone Number").fill("555-000-5001");
     await page1.getByRole("textbox", { name: "Password", exact: true }).fill("Password123!");
     await page1.getByLabel("Confirm Password").fill("Password123!");
-    await page1.getByRole("button", { name: "Create Account" }).click();
+    await page1.getByRole("button", { name: "Create account" }).click();
 
     /* Should succeed — auto-login redirects to main dashboard */
     await expect(page1).toHaveURL(/\/dashboard/, { timeout: 10_000 });
@@ -164,7 +164,7 @@ test.describe("Invite and self-registration", () => {
     await page2.getByLabel("Phone Number").fill("555-000-5002");
     await page2.getByRole("textbox", { name: "Password", exact: true }).fill("Password123!");
     await page2.getByLabel("Confirm Password").fill("Password123!");
-    await page2.getByRole("button", { name: "Create Account" }).click();
+    await page2.getByRole("button", { name: "Create account" }).click();
 
     /* Should show error */
     await expect(page2.getByText("Invalid or already-used invite code")).toBeVisible({
@@ -220,11 +220,11 @@ test.describe.serial("Referrer family invites + sent email log", () => {
     await expect(referrerPage.getByText("0 of 10 invites used")).toBeVisible();
 
     /* Send an invite through the dialog (the only form on the page) */
-    await referrerPage.getByRole("button", { name: "Send Invite" }).click();
+    await referrerPage.getByRole("button", { name: "Send invite" }).click();
     await expect(referrerPage.getByText("Send Family Invite")).toBeVisible();
     const dialogForm = referrerPage.locator("form");
     await dialogForm.getByLabel("Email").fill(inviteeEmail);
-    await dialogForm.getByRole("button", { name: "Send Invite" }).click();
+    await dialogForm.getByRole("button", { name: "Send invite" }).click();
 
     /* Row appears in the Sent Invites table with "Sent" status; cap increments */
     const sentRow = referrerPage.getByRole("row").filter({ hasText: inviteeEmail });
@@ -265,7 +265,7 @@ test.describe.serial("Referrer family invites + sent email log", () => {
 
     const sarahRow = adminPage.getByRole("row").filter({ hasText: "Sarah Chen" });
     await sarahRow.getByRole("button", { name: "More actions" }).click();
-    await adminPage.getByRole("menuitem", { name: "Reset Sent Emails" }).click();
+    await adminPage.getByRole("menuitem", { name: "Reset sent emails" }).click();
 
     await expect(adminPage.getByText("Reset sent emails for referrer")).toBeVisible();
     const resetResponse = adminPage.waitForResponse(
@@ -286,18 +286,18 @@ test.describe.serial("Referrer family invites + sent email log", () => {
 
     /* Cap cleared, invite button enabled again */
     await expect(referrerPage.getByText("0 of 10 invites used")).toBeVisible();
-    await expect(referrerPage.getByRole("button", { name: "Send Invite" })).toBeEnabled();
+    await expect(referrerPage.getByRole("button", { name: "Send invite" })).toBeEnabled();
 
     /* Row is kept in the history, now marked reset (no longer counted) */
     const resetRow = referrerPage.getByRole("row").filter({ hasText: inviteeEmail });
     await expect(resetRow).toContainText("Reset (not counted)");
 
     /* The referrer can send again after the reset */
-    await referrerPage.getByRole("button", { name: "Send Invite" }).click();
+    await referrerPage.getByRole("button", { name: "Send invite" }).click();
     await expect(referrerPage.getByText("Send Family Invite")).toBeVisible();
     const dialogForm = referrerPage.locator("form");
     await dialogForm.getByLabel("Email").fill(secondInviteeEmail);
-    await dialogForm.getByRole("button", { name: "Send Invite" }).click();
+    await dialogForm.getByRole("button", { name: "Send invite" }).click();
     const newSentRow = referrerPage.getByRole("row").filter({ hasText: secondInviteeEmail });
     await expect(newSentRow).toBeVisible({ timeout: 10_000 });
     await expect(newSentRow).toContainText("Sent");

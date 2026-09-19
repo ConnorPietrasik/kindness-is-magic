@@ -42,7 +42,7 @@ test.describe.serial("Admin Family Lifecycle — delete/restore", () => {
     await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Active", exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "+ Add Family" }).click();
+    await page.getByRole("button", { name: "+ Add family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
     await page.getByLabel("Family Name", { exact: true }).fill(DELETE_RESTORE_FAMILY);
@@ -122,7 +122,7 @@ test.describe.serial("Admin Family Lifecycle — cascade delete", () => {
     await page.goto("/admin/families");
     await page.getByRole("tab", { name: "Active", exact: true }).click();
 
-    await page.getByRole("button", { name: "+ Add Family" }).click();
+    await page.getByRole("button", { name: "+ Add family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
     await page.getByLabel("Family Name", { exact: true }).fill(familyName);
@@ -145,7 +145,7 @@ test.describe.serial("Admin Family Lifecycle — cascade delete", () => {
       timeout: 10_000,
     });
 
-    await page.getByRole("button", { name: "+ Add Person" }).click();
+    await page.getByRole("button", { name: "+ Add person" }).click();
     await page.getByLabel("Given Name").fill(personName);
     await page.getByLabel("Age").fill("5");
     await page.getByLabel("Role").selectOption("son");
@@ -234,7 +234,7 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     await page.goto("/admin/families");
     await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
 
-    await page.getByRole("button", { name: "+ Add Family" }).click();
+    await page.getByRole("button", { name: "+ Add family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
     await page.getByLabel("Family Name", { exact: true }).fill(FULLY_APPROVE_FAMILY);
@@ -251,13 +251,13 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     const rawId = await row.getAttribute("data-id");
     if (rawId) faFamilyId = parseInt(rawId, 10);
 
-    /* Verify "Fully Approve" is in the kebab menu */
+    /* Verify "Fully approve" is in the kebab menu */
     await row.getByRole("button", { name: "More actions" }).click();
-    await expect(row.getByRole("menuitem", { name: "Fully Approve" })).toBeVisible();
+    await expect(row.getByRole("menuitem", { name: "Fully approve" })).toBeVisible();
     await page.keyboard.press("Escape");
 
-    /* Click "Fully Approve" */
-    await clickAction(row, "Fully Approve");
+    /* Click "Fully approve" */
+    await clickAction(row, "Fully approve");
 
     /* Confirm in the dialog */
     await expect(page.getByText("Fully approve family")).toBeVisible();
@@ -273,11 +273,11 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     const approvedRow = (await findRowInTable(page, FULLY_APPROVE_FAMILY))!;
     await expect(approvedRow as Locator).toHaveAttribute("class", /bg-emerald-50/);
 
-    /* Verify "Fully Approve" is no longer in the menu (already at admin lock) */
+    /* Verify "Fully approve" is no longer in the menu (already at admin lock) */
     await approvedRow.getByRole("button", { name: "More actions" }).click();
-    await expect(approvedRow.getByRole("menuitem", { name: "Fully Approve" })).not.toBeVisible();
-    /* "Reset Lock" should appear instead (lock !== family) */
-    await expect(approvedRow.getByRole("menuitem", { name: "Reset Lock" })).toBeVisible();
+    await expect(approvedRow.getByRole("menuitem", { name: "Fully approve" })).not.toBeVisible();
+    /* "Reset lock" should appear instead (lock !== family) */
+    await expect(approvedRow.getByRole("menuitem", { name: "Reset lock" })).toBeVisible();
     await page.keyboard.press("Escape");
 
     await context.close();
@@ -292,7 +292,7 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     await page.goto("/admin/families");
     await expect(page.getByRole("heading", { name: "Manage Families" })).toBeVisible();
 
-    await page.getByRole("button", { name: "+ Add Family" }).click();
+    await page.getByRole("button", { name: "+ Add family" }).click();
     await expect(page.getByLabel("Referrer")).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Referrer").selectOption({ index: 1 });
     await page.getByLabel("Family Name", { exact: true }).fill(familyName);
@@ -310,8 +310,8 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     await row.getByRole("link", { name: "Manage" }).click();
     await expect(page.getByRole("heading", { name: "Family & People" })).toBeVisible();
 
-    /* Fully Approve button appears in the family card header */
-    const approveButton = page.getByRole("button", { name: "Fully Approve" });
+    /* Fully approve button appears in the family card header */
+    const approveButton = page.getByRole("button", { name: "Fully approve" });
     await expect(approveButton).toBeVisible({ timeout: 10_000 });
     await approveButton.click();
 
@@ -324,9 +324,9 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
       timeout: 10_000,
     });
 
-    /* After approval the button is gone and the Wish List link appears */
+    /* After approval the button is gone and the View wish list link appears */
     await expect(approveButton).toBeHidden();
-    await expect(page.getByRole("link", { name: "Wish List" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "View wish list" })).toBeVisible();
 
     await context.close();
   });

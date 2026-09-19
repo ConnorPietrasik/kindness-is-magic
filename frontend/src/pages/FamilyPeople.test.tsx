@@ -121,7 +121,7 @@ describe("FamilyPeople", () => {
     renderPage();
 
     expect(await screen.findByText("Manage People")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Add Person" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add person" })).toBeInTheDocument();
 
     // Child row — practical and fun wishes in separate columns
     expect(screen.getByText("Sam")).toBeInTheDocument();
@@ -141,14 +141,14 @@ describe("FamilyPeople", () => {
     renderPage({ people: [] });
 
     expect(await screen.findByText("No people yet. Add one to get started.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Add Person" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add person" })).toBeInTheDocument();
   });
 
   it("create flow calls createFamilyPerson with the form payload", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "+ Add Person" }));
+    await user.click(await screen.findByRole("button", { name: "+ Add person" }));
 
     await user.type(screen.getByLabelText("Given Name"), "Jo");
     await user.type(screen.getByLabelText("Age"), "5");
@@ -235,7 +235,7 @@ describe("FamilyPeople", () => {
       renderPage({ family: { wish_lock_level: "admin" } });
 
       await screen.findByText("Manage People");
-      expect(screen.queryByRole("button", { name: "+ Add Person" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Add person" })).not.toBeInTheDocument();
       expect(screen.getByText("Editing is currently locked.")).toBeInTheDocument();
       expect(
         screen.getByText("Your family profile is fully approved and visible to donors. Contact your referrer if changes are needed.")
@@ -250,7 +250,7 @@ describe("FamilyPeople", () => {
       renderPage({ family: { wish_review_requested_at: "2025-11-02T00:00:00Z" } });
 
       await screen.findByText("Manage People");
-      expect(screen.queryByRole("button", { name: "+ Add Person" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Add person" })).not.toBeInTheDocument();
       expect(screen.getByText("Your profile is awaiting referrer review. You'll be able to edit again after review.")).toBeInTheDocument();
     });
 
@@ -258,7 +258,7 @@ describe("FamilyPeople", () => {
       renderPage({ family: { wish_lock_level: "referrer", wish_rejection_reason: "Wishes need more specificity" } });
 
       await screen.findByText("Manage People");
-      expect(screen.queryByRole("button", { name: "+ Add Person" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Add person" })).not.toBeInTheDocument();
       expect(screen.getByText("Contact your referrer to request changes.")).toBeInTheDocument();
     });
   });

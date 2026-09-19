@@ -123,7 +123,7 @@ describe("CsvUpload", () => {
 
     wrap(<CsvUpload />);
 
-    await user.click(await screen.findByRole("button", { name: /Show Template/ }));
+    await user.click(await screen.findByRole("button", { name: /Show template/ }));
 
     expect(await screen.findByText(/CSV Template/)).toBeInTheDocument();
     expect(sampleSpy).toHaveBeenCalledTimes(1);

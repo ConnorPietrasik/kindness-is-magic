@@ -117,7 +117,7 @@ function renderPage(families: FamilyDetail[] = allFamilies) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("ReferrerFamilies — Submit for Admin Review", () => {
+describe("ReferrerFamilies — Submit for admin review", () => {
   beforeEach(() => {
     vi.spyOn(api, "getReferrerMe").mockClear();
     vi.spyOn(api, "listPendingFamilies").mockClear();

@@ -212,7 +212,7 @@ describe("ReferrerFamilyDetail — Internal Notes", () => {
   });
 });
 
-describe("ReferrerFamilyDetail — Submit for Admin Review", () => {
+describe("ReferrerFamilyDetail — Submit for admin review", () => {
   beforeEach(() => {
     vi.spyOn(api, "getReferrerFamily").mockClear();
     vi.spyOn(api, "listReferrerFamilyPeople").mockClear();
@@ -225,21 +225,21 @@ describe("ReferrerFamilyDetail — Submit for Admin Review", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows 'Submit for Admin Review' at family lock", async () => {
+  it("shows 'Submit for admin review' at family lock", async () => {
     renderPage(mockFamily);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Submit for Admin Review" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Submit for admin review" })).toBeInTheDocument();
     });
   });
 
-  it("shows 'Re-submit for Admin Review' after admin rejection", async () => {
+  it("shows 'Re-submit for admin review' after admin rejection", async () => {
     renderPage(mockFamilyRejectedByAdmin);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Re-submit for Admin Review" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Re-submit for admin review" })).toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: "Submit for Admin Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit for admin review" })).not.toBeInTheDocument();
   });
 
   it("shows no submit button while awaiting admin review", async () => {
@@ -264,7 +264,7 @@ describe("ReferrerFamilyDetail — Submit for Admin Review", () => {
     const user = userEvent.setup();
     renderPage(mockFamily);
 
-    await user.click(await screen.findByRole("button", { name: "Submit for Admin Review" }));
+    await user.click(await screen.findByRole("button", { name: "Submit for admin review" }));
 
     // Warning must be visible in the confirm dialog
     await expect(screen.getByText(/only an admin can unlock/)).toBeInTheDocument();
@@ -281,7 +281,7 @@ describe("ReferrerFamilyDetail — Submit for Admin Review", () => {
     const user = userEvent.setup();
     renderPage(mockFamily);
 
-    await user.click(await screen.findByRole("button", { name: "Submit for Admin Review" }));
+    await user.click(await screen.findByRole("button", { name: "Submit for admin review" }));
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
     expect(api.referrerApproveWishes).not.toHaveBeenCalled();

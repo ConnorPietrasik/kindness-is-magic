@@ -79,8 +79,8 @@ describe("DeliveryDashboard", () => {
       expect(screen.getByText("Welcome, Dan Delivery!")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("link", { name: "📦 View Packing Slips" })).toHaveAttribute("href", "/delivery/packing-slips");
-    expect(screen.getByRole("link", { name: "🚚 View Delivery Slips" })).toHaveAttribute("href", "/delivery/delivery-slips");
+    expect(screen.getByRole("link", { name: "📦 View packing slips" })).toHaveAttribute("href", "/delivery/packing-slips");
+    expect(screen.getByRole("link", { name: "🚚 View delivery slips" })).toHaveAttribute("href", "/delivery/delivery-slips");
   });
 
   it("shows the empty state when no families are assigned", async () => {

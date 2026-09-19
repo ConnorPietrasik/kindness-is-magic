@@ -102,7 +102,7 @@ export default function ResetPassword() {
             disabled={loading}
             className="mt-2 w-full rounded-lg bg-gradient-to-r from-btn-start to-btn-end py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Setting…" : "Set Password"}
+            {loading ? "Setting…" : "Set password"}
           </button>
         </form>
 

@@ -83,7 +83,7 @@ export default function DonorClaims() {
               to={ROUTES.PUBLIC_FAMILIES}
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-btn-start to-btn-end px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
-              + Browse Families
+              + Browse families
             </Link>
           </div>
         </div>

@@ -146,7 +146,7 @@ describe("AdminReferrers", () => {
       expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Invite Referrers" }));
+    await user.click(screen.getByRole("button", { name: "Invite referrers" }));
 
     expect(currentLocation).toBe("/admin/invite-codes?generate=1");
   });
@@ -238,7 +238,7 @@ describe("AdminReferrers", () => {
 
     const triggers = screen.getAllByRole("button", { name: "More actions" });
     await user.click(triggers[0]!);
-    await user.click(screen.getByRole("menuitem", { name: "Reset Sent Emails" }));
+    await user.click(screen.getByRole("menuitem", { name: "Reset sent emails" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Reset sent emails for referrer/)).toBeInTheDocument();
@@ -370,7 +370,7 @@ describe("AdminReferrers", () => {
       expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Referrer" }));
+    await user.click(screen.getByRole("button", { name: "+ Add referrer" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add Referrer")).toBeInTheDocument();

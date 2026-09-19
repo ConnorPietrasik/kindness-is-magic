@@ -151,7 +151,7 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
 
       <div className="flex gap-3">
         <Button className="flex-1" onClick={() => claimMut.mutate()} loading={claimMut.isPending}>
-          {claimMut.isPending ? "Sponsoring…" : "Sponsor Family"}
+          {claimMut.isPending ? "Sponsoring…" : "Sponsor family"}
         </Button>
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel

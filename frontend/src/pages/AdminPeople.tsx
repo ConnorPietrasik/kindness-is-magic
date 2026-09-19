@@ -297,7 +297,7 @@ export default function AdminPeople() {
               </Button>
             )}
             {!isDeletedView && <ColumnToggle resourceKey="adminPeople" />}
-            {!isDeletedView && <Button onClick={openCreate}>+ Add Person</Button>}
+            {!isDeletedView && <Button onClick={openCreate}>+ Add person</Button>}
           </div>
         </div>
 

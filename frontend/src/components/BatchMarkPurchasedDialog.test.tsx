@@ -43,7 +43,7 @@ describe("BatchMarkPurchasedDialog", () => {
     render(<BatchMarkPurchasedDialog {...defaultProps} onSubmit={onSubmit} />);
 
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const payload = onSubmit.mock.calls[0]![0];
@@ -68,7 +68,7 @@ describe("BatchMarkPurchasedDialog", () => {
     await user.type(purchasedInput, "2026-02-25T09:30");
 
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     // Local input value converted to the same instant in UTC
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ purchased_at: fromDatetimeLocalValue("2026-02-25T09:30") }));
@@ -82,7 +82,7 @@ describe("BatchMarkPurchasedDialog", () => {
     await user.clear(screen.getByLabelText("Purchased"));
 
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ purchased_at: "" }));
   });
@@ -94,7 +94,7 @@ describe("BatchMarkPurchasedDialog", () => {
 
     await user.type(screen.getByLabelText("Purchased Where"), "Amazon");
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ wish_ids: [1, 2], purchased_where: "Amazon", received_at: "", purchased_at: expect.any(String) })
@@ -107,7 +107,7 @@ describe("BatchMarkPurchasedDialog", () => {
     render(<BatchMarkPurchasedDialog {...defaultProps} onSubmit={onSubmit} />);
 
     const dialog = within(screen.getByRole("dialog"));
-    await user.click(dialog.getByRole("button", { name: "Mark Purchased" }));
+    await user.click(dialog.getByRole("button", { name: "Mark purchased" }));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ wish_ids: [1, 2], purchased_where: null, received_at: "", purchased_at: expect.any(String) })

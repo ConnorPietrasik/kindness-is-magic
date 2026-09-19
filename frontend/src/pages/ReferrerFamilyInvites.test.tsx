@@ -101,7 +101,7 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
       expect(screen.getByText("2 of 5 invites used")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Send Invite" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Send invite" })).toBeEnabled();
     expect(screen.queryByText(/reached your limit of 5 invite emails/)).not.toBeInTheDocument();
   });
 
@@ -112,7 +112,7 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
       expect(screen.getByText("5 of 5 invites used")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Send Invite" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send invite" })).toBeDisabled();
   });
 
   it("shows the limit note and does not open the dialog when the limit is reached", async () => {
@@ -126,8 +126,8 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
       screen.getByText(/only up to 3 families can be accepted under your referral\. An admin can reset your sent invites\./)
     ).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Send Invite" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Send Invite" }));
+    expect(screen.getByRole("button", { name: "Send invite" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Send invite" }));
     expect(screen.queryByText("Send Family Invite")).not.toBeInTheDocument();
   });
 
@@ -139,7 +139,7 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
       expect(screen.getByText("4 of 5 invites used")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Send Invite" }));
+    await user.click(screen.getByRole("button", { name: "Send invite" }));
 
     await waitFor(() => {
       expect(screen.getByText("Send Family Invite")).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe("ReferrerFamilyInvites — invite email limit", () => {
       expect(screen.getByText("2 of 5 invites used")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Send Invite" }));
+    await user.click(screen.getByRole("button", { name: "Send invite" }));
     await waitFor(() => {
       expect(screen.getByText("Send Family Invite")).toBeInTheDocument();
     });
@@ -242,7 +242,7 @@ describe("ReferrerFamilyInvites — sent invites history", () => {
       expect(screen.getByText("old@example.com")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Send Invite" }));
+    await user.click(screen.getByRole("button", { name: "Send invite" }));
     await waitFor(() => {
       expect(screen.getByText("Send Family Invite")).toBeInTheDocument();
     });

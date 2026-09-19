@@ -139,7 +139,7 @@ export default function ReferrerFamilies() {
               {familyCount} / {familyLimit}
             </span>
           </div>
-          {familyCount < familyLimit && <Button onClick={openCreate}>+ Add Family</Button>}
+          {familyCount < familyLimit && <Button onClick={openCreate}>+ Add family</Button>}
         </div>
 
         {showForm && (
@@ -190,9 +190,9 @@ export default function ReferrerFamilies() {
                               to={route.familyWishList(f.id)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              aria-label="Wish List"
+                              aria-label="View wish list"
                               className="ml-1 text-xs text-gray-400 transition-colors hover:text-violet-600"
-                              title="Wish List"
+                              title="View wish list"
                             >
                               📄
                             </Link>

@@ -45,7 +45,7 @@ function makeFamily(overrides: Partial<FamilyDetail>): FamilyDetail {
   };
 }
 
-// Family-locked: "Reset Lock" hidden, "Fully Approve" shown, edit without confirmation
+// Family-locked: "Reset lock" hidden, "Fully approve" shown, edit without confirmation
 const mockFamily1 = makeFamily({
   id: 1,
   display_id: "F-101",
@@ -55,7 +55,7 @@ const mockFamily1 = makeFamily({
   phone_number: "5551234567",
 });
 
-// Admin-locked: "Fully Approve" hidden, "Reset Lock" shown, edit requires confirmation
+// Admin-locked: "Fully approve" hidden, "Reset lock" shown, edit requires confirmation
 const mockFamily2 = makeFamily({
   id: 2,
   display_id: "F-102",
@@ -188,7 +188,7 @@ describe("AdminFamilies", () => {
     expect(screen.getByText("The Gones")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
     // Create button is hidden in the deleted view
-    expect(screen.queryByRole("button", { name: "+ Add Family" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add family" })).not.toBeInTheDocument();
   });
 
   it("restore flow confirms, calls API, and shows toast", async () => {
@@ -376,19 +376,19 @@ describe("AdminFamilies", () => {
       expect(screen.getByText("The Johnsons")).toBeInTheDocument();
     });
 
-    // Row 0 — family lock: "Reset Lock" hidden, "Fully Approve" shown
+    // Row 0 — family lock: "Reset lock" hidden, "Fully approve" shown
     let menu = await openRowMenu(user, 0);
-    expect(within(menu).queryByRole("menuitem", { name: "Reset Lock" })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Fully Approve" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Reset lock" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Fully approve" })).toBeInTheDocument();
 
     const triggers = screen.getAllByRole("button", { name: "More actions" });
     await user.click(triggers[0]!); // close
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
-    // Row 1 — admin lock: "Reset Lock" shown, "Fully Approve" hidden
+    // Row 1 — admin lock: "Reset lock" shown, "Fully approve" hidden
     menu = await openRowMenu(user, 1);
-    expect(within(menu).getByRole("menuitem", { name: "Reset Lock" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Fully Approve" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Reset lock" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Fully approve" })).not.toBeInTheDocument();
   });
 
   it("fully approve flow confirms and calls API", async () => {
@@ -403,7 +403,7 @@ describe("AdminFamilies", () => {
     });
 
     const menu = await openRowMenu(user, 0);
-    await user.click(within(menu).getByRole("menuitem", { name: "Fully Approve" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "Fully approve" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Fully approve family/)).toBeInTheDocument();
@@ -431,7 +431,7 @@ describe("AdminFamilies", () => {
     });
 
     const menu = await openRowMenu(user, 1);
-    await user.click(within(menu).getByRole("menuitem", { name: "Reset Lock" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "Reset lock" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Reset wish lock/)).toBeInTheDocument();
@@ -490,7 +490,7 @@ describe("AdminFamilies", () => {
       expect(screen.getByText("The Johnsons")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Family" }));
+    await user.click(screen.getByRole("button", { name: "+ Add family" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add Family")).toBeInTheDocument();

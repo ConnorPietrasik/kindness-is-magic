@@ -80,7 +80,7 @@ export function BatchMarkPurchasedDialog({ open, wishIds, onSubmit, onCancel, lo
 
           <div className="flex gap-3 pt-1">
             <Button type="submit" className="flex-1" loading={loading}>
-              {loading ? "Marking…" : "Mark Purchased"}
+              {loading ? "Marking…" : "Mark purchased"}
             </Button>
             <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
               Cancel

@@ -74,7 +74,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     });
 
     /* Click Add Person */
-    await page.getByRole("button", { name: "+ Add Person" }).click();
+    await page.getByRole("button", { name: "+ Add person" }).click();
 
     /* Fill the form */
     await page.getByLabel("Given Name").fill(TEST_FAMILY_CHILD);
@@ -185,7 +185,7 @@ test.describe.serial("Role Self-Service — family & referrer CRUD", () => {
     });
 
     /* Click Add Person */
-    await page.getByRole("button", { name: "+ Add Person" }).click();
+    await page.getByRole("button", { name: "+ Add person" }).click();
 
     /* Fill the form */
     await page.getByLabel("Given Name").fill(TEST_REFERRER_CHILD);

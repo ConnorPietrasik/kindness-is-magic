@@ -56,7 +56,7 @@ test.describe.serial("Admin Person Lifecycle", () => {
     await expect(page.getByRole("table")).toContainText("Liam");
 
     /* Add a new person */
-    await page.getByRole("button", { name: "+ Add Person" }).click();
+    await page.getByRole("button", { name: "+ Add person" }).click();
 
     /* Fill the person form */
     await page.getByLabel("Given Name").fill(TEST_PERSON);

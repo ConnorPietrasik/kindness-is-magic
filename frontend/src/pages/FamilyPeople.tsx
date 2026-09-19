@@ -84,7 +84,7 @@ export default function FamilyPeople() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Manage People</h2>
-          {!isLocked && <Button onClick={openCreate}>+ Add Person</Button>}
+          {!isLocked && <Button onClick={openCreate}>+ Add person</Button>}
         </div>
 
         {/* Lock banner */}

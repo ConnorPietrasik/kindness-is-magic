@@ -6,8 +6,8 @@
  *
  * Wish lock features:
  * - Show current wish lock state
- * - "Submit for Admin Review" when lock_level = "family"
- * - "Re-submit for Admin Review" when lock_level = "referrer" + rejection_reason
+ * - "Submit for admin review" when lock_level = "family"
+ * - "Re-submit for admin review" when lock_level = "referrer" + rejection_reason
  * - Show rejection reason banner if present
  * - Disable family/people edit controls when lock_level = "admin"
  */
@@ -96,7 +96,7 @@ export default function ReferrerFamilyDetail() {
               />
             ),
             title: "People",
-            createButtonLabel: "+ Add Person",
+            createButtonLabel: "+ Add person",
             invalidationKeys: [peopleKey, familyKey],
             entityName: "Person",
             isReadonly: false,
@@ -179,7 +179,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
           {data && <WishLockBadge level={lockLevel} />}
         </div>
         <div className="flex items-center gap-2">
-          {/* Wish List link (only when locked) */}
+          {/* View wish list link (only when locked) */}
           {lockLevel === "admin" && (
             <Link
               to={route.familyWishList(famId)}
@@ -187,7 +187,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
               rel="noopener noreferrer"
               className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
-              Wish List
+              View wish list
             </Link>
           )}
           {/* Submit / Re-submit button */}
@@ -198,7 +198,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
               onClick={() => setShowSubmitConfirm(true)}
               loading={submitForReviewMut.isPending}
             >
-              {submitForReviewMut.isPending ? "Submitting…" : "Submit for Admin Review"}
+              {submitForReviewMut.isPending ? "Submitting…" : "Submit for admin review"}
             </Button>
           )}
           {showResubmitButton && (
@@ -208,7 +208,7 @@ function FamilyCard(props: HierarchicalManageParentRenderProps<FamilyDetail> & {
               onClick={() => setShowSubmitConfirm(true)}
               loading={submitForReviewMut.isPending}
             >
-              {submitForReviewMut.isPending ? "Submitting…" : "Re-submit for Admin Review"}
+              {submitForReviewMut.isPending ? "Submitting…" : "Re-submit for admin review"}
             </Button>
           )}
           {!isLockedByAdmin && (
