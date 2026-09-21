@@ -137,23 +137,28 @@ services:
     # The heredoc bakes credentials/retention into nightly-backup.sh at
     # container start; the cron line itself stays free of % and $ so crontab
     # parsing can't mangle it.
-    command: |
-      cat > /usr/local/bin/nightly-backup.sh <<EOF
-      #!/bin/sh
-      # Nightly DB backup, run by crond at 03:00 America/Los_Angeles.
-      # Credentials and retention are baked in at container start.
-      ts=\$$(date +%Y%m%d-%H%M%S)
-      if PGPASSWORD='$${POSTGRES_PASSWORD}' pg_dump -h db -U '$${POSTGRES_USER}' '$${POSTGRES_DB}' > "/backups/kindness-backup-\$$ts.sql"; then
-        echo "\$$(date): backup OK -> kindness-backup-\$$ts.sql"
-        find /backups -name 'kindness-backup-*.sql' -mtime +$${BACKUP_KEEP_DAYS:-7} -delete
-      else
-        echo "\$$(date): backup FAILED - see pg_dump error above; partial file removed"
-        rm -f "/backups/kindness-backup-\$$ts.sql"
-      fi
-      EOF
-      chmod +x /usr/local/bin/nightly-backup.sh
-      echo "0 3 * * * /usr/local/bin/nightly-backup.sh >> /var/log/backups.log 2>&1" | crontab -
-      crond -f
+    # List form is deliberate: a plain-string command is shell-tokenized by
+    # Compose and only the first simple command is kept — the string form of
+    # this script silently collapsed to `cat` (container exited 0 forever).
+    # A one-element list passes the script verbatim to `sh -c` (entrypoint).
+    command:
+      - |
+        cat > /usr/local/bin/nightly-backup.sh <<EOF
+        #!/bin/sh
+        # Nightly DB backup, run by crond at 03:00 America/Los_Angeles.
+        # Credentials and retention are baked in at container start.
+        ts=\$$(date +%Y%m%d-%H%M%S)
+        if PGPASSWORD='$${POSTGRES_PASSWORD}' pg_dump -h db -U '$${POSTGRES_USER}' '$${POSTGRES_DB}' > "/backups/kindness-backup-\$$ts.sql"; then
+          echo "\$$(date): backup OK -> kindness-backup-\$$ts.sql"
+          find /backups -name 'kindness-backup-*.sql' -mtime +$${BACKUP_KEEP_DAYS:-7} -delete
+        else
+          echo "\$$(date): backup FAILED - see pg_dump error above; partial file removed"
+          rm -f "/backups/kindness-backup-\$$ts.sql"
+        fi
+        EOF
+        chmod +x /usr/local/bin/nightly-backup.sh
+        echo "0 3 * * * /usr/local/bin/nightly-backup.sh >> /var/log/backups.log 2>&1" | crontab -
+        crond -f
     healthcheck:
       test: ["CMD-SHELL", "[ -n \"$(ls -t /backups/kindness-backup-*.sql 2>/dev/null | head -n1)\" ] && [ $(( $(date +%s) - $(stat -c %Y $(ls -t /backups/kindness-backup-*.sql 2>/dev/null | head -n1)) )) -lt 90000 ]"]
       interval: 10m
