@@ -15,7 +15,8 @@ interface PublicHeaderProps {
  * PublicHeader — the shared header for all public (brochure) pages.
  *
  * The centred title links to the brochure at /home from any other public
- * page, and scrolls to the top when already on /home. The left nav anchors
+ * page, and when already on /home scrolls to the top and clears the section
+ * anchor from the URL. The left nav anchors
  * to the /home sections for guests and signed-in visitors alike (signed-in
  * users reach the app via the Dashboard link on the right). The right side
  * adapts to the auth state: guests get a "Sign in" link; signed-in users
@@ -31,6 +32,12 @@ export const PublicHeader = memo(({ left, className }: PublicHeaderProps) => {
   const handleLogout = async () => {
     await logout();
     navigate(ROUTES.LOGIN);
+  };
+
+  /** Title on /home: scroll to top and clear the section anchor (replace — no history entry). */
+  const handleTitleClick = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate(ROUTES.HOME, { replace: true });
   };
 
   const right = user ? (
@@ -56,7 +63,7 @@ export const PublicHeader = memo(({ left, className }: PublicHeaderProps) => {
     <HeaderBar
       title="Kindness is Magic"
       titleTo={ROUTES.HOME}
-      onTitleClick={onHome ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+      onTitleClick={onHome ? handleTitleClick : undefined}
       left={
         <>
           {left}
@@ -66,7 +73,7 @@ export const PublicHeader = memo(({ left, className }: PublicHeaderProps) => {
             </Link>
             <span className="text-white/40">•</span>
             <Link to={`${ROUTES.HOME}#mission`} className="hover:text-white transition-colors">
-              Why it matters
+              Our mission
             </Link>
           </nav>
         </>

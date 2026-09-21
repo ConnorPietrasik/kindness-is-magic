@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import { CONTACT_EMAIL, DONATE_URL, FACEBOOK_URL, INSTAGRAM_URL } from "../lib/links";
@@ -24,7 +24,17 @@ const mockUser: User = {
 };
 
 /**
- * Renders the page inside router + query + auth providers.
+ * Exposes the current router hash for assertions — MemoryRouter never
+ * touches window.location, so the URL bar can't be read from outside.
+ */
+function HashProbe() {
+  const location = useLocation();
+  return <div data-testid="hash-probe" data-hash={location.hash} />;
+}
+
+/**
+ * Renders the page inside router + query + auth providers, with a HashProbe
+ * alongside for asserting the current router hash.
  * Pre-seeds the auth query cache (staleTime: Infinity) so no /api/auth/me
  * request is made and the auth state is deterministic per test.
  */
@@ -36,6 +46,7 @@ const wrap = (user: User | null = null, path = "/home") => {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Home />
+          <HashProbe />
         </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>
@@ -73,11 +84,12 @@ describe("Home", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
-  it("renders how-it-works and mission sections", () => {
+  it("renders how-it-works, founder, and mission sections", () => {
     wrap();
 
     expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Why it matters" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meet the founder" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Our mission" })).toBeInTheDocument();
   });
 
   it("Meet the Families links to the browse page", () => {
@@ -134,7 +146,7 @@ describe("Home", () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it("re-scrolls when the same section link is clicked again", async () => {
+  it("re-scrolls when the same section link is clicked again (same URL)", async () => {
     const event = userEvent.setup();
     const scrollIntoView = stubScrollIntoView();
     vi.stubGlobal("scrollTo", vi.fn());
@@ -142,13 +154,28 @@ describe("Home", () => {
     wrap(null, "/home#how-it-works");
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
-    // Scroll away via the title button (hash stays in the URL), then re-click
-    // the same section link in the header nav.
-    await event.click(screen.getByRole("button", { name: "Kindness is Magic" }));
+    // Re-clicking the same section link in the header nav navigates to the
+    // same URL; the location object still gets a new identity, so the
+    // hash-scroll effect re-runs.
     const header = within(screen.getByRole("banner"));
     await event.click(header.getByRole("link", { name: "How it works" }));
 
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the section hash and scrolls to top when the title is clicked on /home", async () => {
+    const event = userEvent.setup();
+    stubScrollIntoView();
+    const scrollToSpy = vi.fn();
+    vi.stubGlobal("scrollTo", scrollToSpy);
+
+    wrap(null, "/home#mission");
+    expect(screen.getByTestId("hash-probe")).toHaveAttribute("data-hash", "#mission");
+
+    await event.click(screen.getByRole("button", { name: "Kindness is Magic" }));
+
+    expect(screen.getByTestId("hash-probe")).toHaveAttribute("data-hash", "");
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });
 
   it("shows a back-to-top button once scrolled past the threshold, and clicking it scrolls to the top", async () => {

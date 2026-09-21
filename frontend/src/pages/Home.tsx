@@ -1,7 +1,7 @@
 /**
  * Home — public brochure/landing page at /home.
  *
- * A single-scroll brochure: hero, how it works, mission, closing CTA.
+ * A single-scroll brochure: hero, how it works, founder, mission, closing CTA.
  * Truly public (no auth wrapper) — renders for guests and signed-in users
  * alike. Copy is polished from the founder-provided org info.
  */
@@ -9,12 +9,16 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import baggingPhoto from "../assets/home-bagging.jpg";
+import deliveryPhoto from "../assets/home-delivery.jpg";
 import founderPhoto from "../assets/home-founder.jpg";
+import giftTablesPhoto from "../assets/home-gift-tables.jpg";
 import heroPhoto from "../assets/home-hero.jpg";
 import howItWorksPhoto from "../assets/home-how-it-works.jpg";
 import { Card } from "../components/Card";
 import { Logo } from "../components/Logo";
 import { PublicHeader } from "../components/PublicHeader";
+import { Reveal } from "../components/Reveal";
 import { SiteFooter } from "../components/SiteFooter";
 import { DONATE_URL } from "../lib/links";
 import { ROUTES } from "../lib/routes";
@@ -74,7 +78,7 @@ export default function Home() {
           </div>
           <img
             src={heroPhoto}
-            alt="A smiling family of four opening Christmas presents together on the living room floor beside a decorated tree"
+            alt="Two smiling volunteers holding wrapped Christmas presents in front of a table full of gifts at the Elves Workshop"
             className="mt-12 aspect-[16/9] w-full max-w-2xl rounded-2xl object-cover"
             loading="eager"
             fetchPriority="high"
@@ -85,14 +89,16 @@ export default function Home() {
       {/* ── How it works ──────────────────────────────────────────── */}
       <section id="how-it-works" className="scroll-mt-14 bg-white px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">How it works</h2>
-          <img
-            src={howItWorksPhoto}
-            alt="A mother and her three children wrapping a Christmas present together on the living room floor"
-            className="mx-auto mt-8 aspect-[16/9] w-full max-w-3xl rounded-2xl object-cover"
-            loading="lazy"
-          />
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <Reveal>
+            <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">How it works</h2>
+            <img
+              src={howItWorksPhoto}
+              alt="Two smiling volunteers wrapping a Christmas present together at the gift wrapping station"
+              className="mx-auto mt-8 aspect-[16/9] w-full max-w-3xl rounded-2xl object-cover"
+              loading="lazy"
+            />
+          </Reveal>
+          <Reveal className="mt-10 grid gap-6 md:grid-cols-3">
             <StepCard number={1} title="Families share their wishes">
               Our partners identify local families in need. Each person shares their wishes: one for the entire family, one for every adult,
               and two for every child. Children receive one practical gift like clothes or bedding and one fun gift like a toy or board
@@ -103,41 +109,79 @@ export default function Home() {
               our volunteers to handle the shopping.
             </StepCard>
             <StepCard number={3} title="We deliver the magic">
-              Volunteers handle any remaining shopping, then sort and wrap every gift. We then coordinate pickup or delivery in time for a
-              magical Christmas.
+              Volunteers handle any remaining shopping, then check, sort, and wrap every gift. We then coordinate pickup or delivery in time
+              for a magical Christmas.
             </StepCard>
-          </div>
+          </Reveal>
+
+          {/* Photo band: the gift pipeline, left to right — sorted, bagged, loaded */}
+          <Reveal className="mt-12 grid gap-6 sm:grid-cols-3">
+            <figure>
+              <img
+                src={giftTablesPhoto}
+                alt="Long tables of wrapped Christmas presents, sorted and labeled by family"
+                className="aspect-[4/3] w-full rounded-2xl object-cover"
+                loading="lazy"
+              />
+              <figcaption className="mt-2 text-center text-sm text-gray-600">Sorted and labeled by family</figcaption>
+            </figure>
+            <figure>
+              <img
+                src={baggingPhoto}
+                alt="A smiling volunteer bagging wrapped Christmas gifts in clear plastic at the Elves Workshop"
+                className="aspect-[4/3] w-full rounded-2xl object-cover"
+                loading="lazy"
+              />
+              <figcaption className="mt-2 text-center text-sm text-gray-600">Bagged and ready to go</figcaption>
+            </figure>
+            <figure>
+              <img
+                src={deliveryPhoto}
+                alt="Two volunteers standing in a truck loaded with gifts and blankets, ready for delivery"
+                className="aspect-[4/3] w-full rounded-2xl object-cover"
+                loading="lazy"
+              />
+              <figcaption className="mt-2 text-center text-sm text-gray-600">Loading up for delivery</figcaption>
+            </figure>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── Mission ───────────────────────────────────────────────── */}
-      <section id="mission" className="scroll-mt-14 bg-slate-50 px-4 py-16 sm:px-6 sm:py-20">
-        <div className="mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-2">
+      {/* ── Founder ───────────────────────────────────────────────── */}
+      <section id="founder" className="scroll-mt-14 bg-slate-50 px-4 py-16 sm:px-6 sm:py-20">
+        <Reveal className="mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Why it matters</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Meet the founder</h2>
             <p className="mt-4 leading-relaxed text-gray-700">
               Jennifer Pietrasik founded Kindness is Magic after leading the Family Giving Tree for 35 years, where she helped more than 2.3
               million children. In retirement, Jennifer continues her commitment to kindness, empathy, caring, and volunteerism by providing
               families with items they truly need and want.
             </p>
-            <p className="mt-4 leading-relaxed text-gray-700">
-              We envision a world of stability, dignity, and hope where every parent can meet their family's basic needs, and no child's
-              future is limited by poverty. By bringing neighbors together to serve with intention, we strengthen our community and prove
-              that kindness is transformative.
-            </p>
           </div>
           <img
             src={founderPhoto}
-            alt="Jennifer Pietrasik, founder of Kindness is Magic, in her Queen Elf costume at a Family Giving Tree event"
+            alt="Jennifer Pietrasik, founder of Kindness is Magic, seated in her Queen Elf costume at the Elves Workshop"
             className="aspect-[4/3] w-full rounded-2xl object-cover"
             loading="lazy"
           />
-        </div>
+        </Reveal>
+      </section>
+
+      {/* ── Mission ───────────────────────────────────────────────── */}
+      <section id="mission" className="scroll-mt-14 bg-white px-4 py-16 sm:px-6 sm:py-20">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">Our mission</h2>
+          <p className="mt-4 text-xl leading-relaxed text-gray-700">
+            We envision a world of stability, dignity, and hope where every parent can meet their family's basic needs, and no child's
+            future is limited by poverty. By bringing neighbors together to serve with intention, we strengthen our community and prove that
+            kindness is transformative.
+          </p>
+        </Reveal>
       </section>
 
       {/* ── Closing CTA ───────────────────────────────────────────── */}
       <section className="bg-gradient-to-r from-brand-dark to-brand-light px-4 py-16 text-white sm:px-6">
-        <div className="mx-auto max-w-3xl text-center">
+        <Reveal className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold tracking-tight">Ready to make a holiday magical?</h2>
           <p className="mt-3 text-lg text-white/85">Browse family wish lists today or donate to help us keep the kindness going.</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -156,7 +200,7 @@ export default function Home() {
               Donate
             </a>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <SiteFooter />
