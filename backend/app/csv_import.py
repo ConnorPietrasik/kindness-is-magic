@@ -6,7 +6,7 @@ The file is divided into *sections*, each introduced by a comment line
 starting with ``#``.  Recognised section names (case-insensitive) are:
 
 - **referrers**  — name, family_limit, phone_number
-- **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number
+- **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number, fully_approved
 - **people**     — family_name, given_name, age, wish, size, color, fun_wish, role, note
 - **users**      — email, password, role, referrer_name_or_id, family_name_or_id
 
@@ -20,6 +20,12 @@ For ``families``, ``people``, and ``users`` the lookup column
 (``referrer_name``, ``family_name``, etc.) matches against already-imported
 records first, then falls back to existing DB records.  If nothing matches
 the row is recorded as an error.
+
+For ``families`` the optional ``fully_approved`` column marks a family as
+fully approved (admin wish lock, donor-visible) at creation: ``yes``/``true``/``1``
+(case-insensitive) approve it, ``no``/``false``/``0``/empty leave it at the
+default ``family`` lock level, and any other value errors the row.  Existing
+families are skipped and never modified by the import.
 
 Blank lines and lines starting with ``#`` (outside of a section header) are
 skipped.
@@ -48,6 +54,7 @@ from app.models import (
     User,
     UserRole,
     Wish,
+    WishLockLevel,
     WishType,
     default_display_name_from_email,
 )
@@ -60,6 +67,10 @@ from app.user_validation import (
 
 # Case-insensitive lookup for the people section's required `role` column.
 _PERSON_ROLE_BY_VALUE: dict[str, PersonRole] = {role.value.lower(): role for role in PersonRole}
+
+# Accepted values for the families section's optional `fully_approved` column.
+_FULLY_APPROVED_TRUE = {"yes", "true", "1"}
+_FULLY_APPROVED_FALSE = {"no", "false", "0"}
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +440,25 @@ def _process_families(
             summary.families_errors += 1
             continue
 
+        # fully_approved (optional — yes/true/1 → admin lock, no/false/0/empty → family lock)
+        fully_approved_raw = rec.get("fully_approved", "").strip()
+        fully_approved = False
+        if fully_approved_raw:
+            value = fully_approved_raw.lower()
+            if value in _FULLY_APPROVED_TRUE:
+                fully_approved = True
+            elif value not in _FULLY_APPROVED_FALSE:
+                summary.rows.append(
+                    RowResult(
+                        row_num,
+                        "family",
+                        "error",
+                        f"Invalid fully_approved: {fully_approved_raw} (use yes/no, true/false, or 1/0)",
+                    )
+                )
+                summary.families_errors += 1
+                continue
+
         # Skip if already exists
         existing = _find_family(db, family_name)
         if existing:
@@ -451,6 +481,7 @@ def _process_families(
             address=address,
             phone_number=phone_number,
             verification_status=FamilyVerificationStatus.verified,
+            wish_lock_level=WishLockLevel.admin if fully_approved else WishLockLevel.family,
         )
         db.add(family)
         # Family wish is a wish row, created in the same transaction
@@ -462,7 +493,8 @@ def _process_families(
                 row_num,
                 "family",
                 "created" if not dry_run else "would_create",
-                f"Family '{family_name}' {'created' if not dry_run else 'would be created'} (id={family.id})",
+                f"Family '{family_name}' {'created' if not dry_run else 'would be created'} (id={family.id})"
+                + (" — fully approved" if fully_approved else ""),
                 family.id,
             )
         )

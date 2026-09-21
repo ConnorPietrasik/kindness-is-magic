@@ -1,4 +1,12 @@
-Update brochure section - Privacy policy, CA notice, financials, etc.
+Add financials
+Remove age filters for donor family view and change wording to "Min family members" instead of just "min members"
+Remove the "show sponsored families" checkbox from public view; maybe add a "Fully sponsored family count" that only shows at 5 or above instead?
+Change the public family list to say "Family #ID" and use database ID instead of display_id (and make sure the admin views have a column to show the database ID)
+Add wish card generator so that nice wish cards can be easily printed for each wish; include a link in the donor gift-claim email so they can print too
+Split purchased fields into having donors get a different field / automatically separate them in the purchaser / admin fields to avoid admins being confused and thinking that a gift was really confirmed if the donor ends up flaking
+Gift-claims should have a "$100 gift card for Christmas dinner" optional
+/home updates: "Choose families to sponsor directly" (or better-worded) + "Donate" buttons top and bottom. The "Donate" button replaces "How it works" since they can just scroll down
+Add a note to the public family list that it costs $500 to sponsor a family directly and include standard donate link with a "100% of your donation goes to gifts" message
 Add wish guidelines
 Automated failure checks and admin emails
 Donor reminder emails before deadline

@@ -291,6 +291,108 @@ Color Fam,ColorBaby,3,Bottles,0,,Blocks,mother,
 
 
 # =========================================================================
+#  CSV import - fully approved families
+# =========================================================================
+
+
+class TestCsvImportFullyApproved:
+    """The optional families column ``fully_approved`` marks a family as fully
+    approved (admin wish lock, donor-visible) at creation time."""
+
+    def _csv(self, values: list[str]) -> str:
+        rows = "\n".join(f"FA Ref,FA Fam {i},Wish {i},Contact,,{i} FA St,555-000-7{i:03d},{v}" for i, v in enumerate(values))
+        return f"""# referrers
+name,family_limit,phone_number
+FA Ref,5,555-000-7000
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number,fully_approved
+{rows}
+"""
+
+    def test_truthy_values_mark_fully_approved(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family, WishLockLevel
+
+        _admin_login(test_client)
+        resp = _post_csv(test_client, self._csv(["yes", "TRUE", "1"]))
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["families"]["created"] == 3
+
+        db.expire_all()
+        for i in range(3):
+            fam = db.query(Family).filter(Family.family_name == f"FA Fam {i}").first()
+            assert fam is not None
+            assert fam.wish_lock_level == WishLockLevel.admin
+
+        # Row message notes the approval
+        rows = resp.json()["rows"]
+        assert all("fully approved" in r["message"] for r in rows if r["entity_type"] == "family")
+
+    def test_falsy_values_default_to_family_lock(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family, WishLockLevel
+
+        _admin_login(test_client)
+        resp = _post_csv(test_client, self._csv(["no", "false", "0", ""]))
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["families"]["created"] == 4
+
+        db.expire_all()
+        for i in range(4):
+            fam = db.query(Family).filter(Family.family_name == f"FA Fam {i}").first()
+            assert fam is not None
+            assert fam.wish_lock_level == WishLockLevel.family
+
+    def test_missing_column_defaults_to_family_lock(self, test_client: TestClient, admin_user, db: Session):
+        """CSVs without the column keep working — families stay at the family lock."""
+        from app.models import Family, WishLockLevel
+
+        _admin_login(test_client)
+        resp = _post_csv(test_client, CSV_MINIMAL)
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["families"]["created"] == 1
+
+        db.expire_all()
+        fam = db.query(Family).filter(Family.family_name == "Test Fam").first()
+        assert fam is not None
+        assert fam.wish_lock_level == WishLockLevel.family
+
+    def test_invalid_value_errors_row(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import Family
+
+        _admin_login(test_client)
+        resp = _post_csv(test_client, self._csv(["maybe"]))
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["families"]["errors"] == 1
+        assert body["summary"]["families"]["created"] == 0
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "family" and r["action"] == "error"]
+        assert len(error_rows) == 1
+        assert "fully_approved" in error_rows[0]["message"]
+
+        db.expire_all()
+        assert db.query(Family).filter(Family.family_name == "FA Fam 0").first() is None
+
+    def test_existing_family_skipped_not_modified(self, test_client: TestClient, admin_user, db: Session):
+        """Re-importing a family with fully_approved=yes skips it without changing its lock."""
+        from app.models import Family, WishLockLevel
+
+        _admin_login(test_client)
+        first = self._csv([""])
+        assert _post_csv(test_client, first).status_code == 200
+
+        resp = _post_csv(test_client, self._csv(["yes"]))
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["families"]["skipped"] == 1
+        assert body["summary"]["families"]["created"] == 0
+
+        db.expire_all()
+        fam = db.query(Family).filter(Family.family_name == "FA Fam 0").first()
+        assert fam is not None
+        assert fam.wish_lock_level == WishLockLevel.family
+
+
+# =========================================================================
 #  CSV import - users by ID reference
 # =========================================================================
 

@@ -53,9 +53,9 @@ John Smith,10,555-0001
 Jane Doe,15,555-0002
 
 # families
-referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
-John Smith,The Johnsons,A fleece blanket,Mom Johnson,Family of four,123 Oak St,555-1111
-Jane Doe,The Smiths,A coffee maker,Dad Smith,Young family,456 Main St,555-2222
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number,fully_approved
+John Smith,The Johnsons,A fleece blanket,Mom Johnson,Family of four,123 Oak St,555-1111,yes
+Jane Doe,The Smiths,A coffee maker,Dad Smith,Young family,456 Main St,555-2222,
 
 # people
 family_name,given_name,age,wish,size,color,fun_wish,role,note

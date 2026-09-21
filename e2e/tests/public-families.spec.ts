@@ -53,6 +53,12 @@ async function cardIndex(page: Page, bio: string): Promise<number> {
   return texts.findIndex((t) => t.includes(bio));
 }
 
+/** A filter/sort change re-fetches and briefly renders a full-page spinner,
+    so re-wait for the heading (list loaded) before asserting on cards. */
+async function waitListLoaded(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+}
+
 test.describe.serial("Public Families Browse", () => {
   test.beforeAll(async ({ request: req }) => {
     const api = await loginViaApi(req);
@@ -156,6 +162,12 @@ test.describe.serial("Public Families Browse", () => {
       timeout: 10_000,
     });
 
+    /* The demo CSV has more fully-approved families than fit on one browse
+       page (page size 12), so narrow to ≤3-member families: our A (3) and B (1)
+       then share page 1 with at most a handful of demo families. */
+    await page.getByLabel("Max Members").fill("3");
+    await waitListLoaded(page);
+
     /* Approved families appear as cards with member count + age range */
     const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
     await expect(cardA).toBeVisible({ timeout: 10_000 });
@@ -175,32 +187,46 @@ test.describe.serial("Public Families Browse", () => {
     await page.goto("/families");
     const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
     const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
+
+    /* Start from a narrowed list (demo CSV has more approved families than
+       one page holds) so both scenario cards are on page 1. */
+    await page.getByLabel("Max Members").fill("3");
+    await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
 
-    /* Min Members = 3 → only the 3-member family */
+    /* Min Members = 3 → only 3-member families: A stays, B (1 member) drops */
     await page.getByLabel("Min Members").fill("3");
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toHaveCount(0);
 
-    /* Clear restores both, then Max Members = 1 → only the 1-member family */
-    await page.getByRole("button", { name: "Clear" }).click();
+    /* Clearing just the min restores B (Max Members = 3 still applies) */
+    await page.getByLabel("Min Members").fill("");
+    await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
 
+    /* Max Members = 1 → only the 1-member family B */
     await page.getByLabel("Max Members").fill("1");
     await expect(cardB).toBeVisible({ timeout: 10_000 });
     await expect(cardA).toHaveCount(0);
 
+    /* Clear resets the filter inputs */
     await page.getByRole("button", { name: "Clear" }).click();
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toBeVisible();
+    await waitListLoaded(page);
+    expect(await page.getByLabel("Min Members").inputValue()).toBe("");
+    expect(await page.getByLabel("Max Members").inputValue()).toBe("");
   });
 
   test("age filters narrow the card list", async ({ page }) => {
     await page.goto("/families");
     const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
     const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
+
+    /* Start from a narrowed list (demo CSV has more approved families than
+       one page holds) so both scenario cards are on page 1. */
+    await page.getByLabel("Max Members").fill("3");
+    await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
 
@@ -209,14 +235,23 @@ test.describe.serial("Public Families Browse", () => {
     await expect(cardB).toBeVisible({ timeout: 10_000 });
     await expect(cardA).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Clear" }).click();
+    /* Clearing just the min age restores A (Max Members = 3 still applies) */
+    await page.getByLabel("Min Age").fill("");
+    await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
   });
 
   test("sort button cycles options and persists the choice in the URL", async ({ page }) => {
     await page.goto("/families");
+    /* Start from a narrowed list so A and B share page 1 under every sort
+       (demo CSV has more approved families than one page holds). */
+    await page.getByLabel("Max Members").fill("3");
+    await waitListLoaded(page);
     await expect(page.getByRole("button", { name: "Sort: Default" })).toBeVisible({ timeout: 10_000 });
+
+    const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
+    const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
 
     /* Family Size ↑ — 1-member B before 3-member A */
     await page.getByRole("button", { name: "Sort: Default" }).click();
@@ -224,24 +259,32 @@ test.describe.serial("Public Families Browse", () => {
       timeout: 10_000,
     });
     await expect(page).toHaveURL(/sort=person_count/);
+    await expect(cardA).toBeVisible();
+    await expect(cardB).toBeVisible();
     expect(await cardIndex(page, BIO_B)).toBeLessThan(await cardIndex(page, BIO_A));
 
     /* Family Size ↓ — A first */
     await page.getByRole("button", { name: "Sort: Family Size ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Family Size ↓" })).toBeVisible();
     await expect(page).toHaveURL(/sort=-person_count/);
+    await expect(cardA).toBeVisible();
+    await expect(cardB).toBeVisible();
     expect(await cardIndex(page, BIO_A)).toBeLessThan(await cardIndex(page, BIO_B));
 
     /* Youngest ↑ — A (youngest 3) before B (25) */
     await page.getByRole("button", { name: "Sort: Family Size ↓" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↑" })).toBeVisible();
     await expect(page).toHaveURL(/sort=min_age/);
+    await expect(cardA).toBeVisible();
+    await expect(cardB).toBeVisible();
     expect(await cardIndex(page, BIO_A)).toBeLessThan(await cardIndex(page, BIO_B));
 
     /* Youngest ↓ — B first */
     await page.getByRole("button", { name: "Sort: Youngest ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↓" })).toBeVisible();
     await expect(page).toHaveURL(/sort=-min_age/);
+    await expect(cardA).toBeVisible();
+    await expect(cardB).toBeVisible();
     expect(await cardIndex(page, BIO_B)).toBeLessThan(await cardIndex(page, BIO_A));
 
     /* Back to Default — sort param removed from the URL */

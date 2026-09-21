@@ -120,6 +120,13 @@ test.describe.serial("Sponsored visibility", () => {
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await expect(card).toHaveCount(0);
 
+    /* Our family has exactly one member (no demo family does), so narrowing to
+       1-member families keeps it on page 1 even though the demo CSV has more
+       fully-approved families than one browse page holds. */
+    await page.getByLabel("Max Members").fill("1");
+    await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+    await expect(card).toHaveCount(0);
+
     await page.getByLabel("Show sponsored families").check();
     await expect(page).toHaveURL(/show_sponsored=true/);
     await expect(card).toBeVisible({ timeout: 10_000 });
@@ -139,6 +146,10 @@ test.describe.serial("Sponsored visibility", () => {
       await loginAs(page, { email: testData.donorEmail!, password: PASSWORD });
       await page.goto("/families?show_sponsored=true");
       const card = page.locator("div.grid > a").filter({ hasText: BIO_A });
+      await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+      /* 1-member narrowing — same rationale as the first test in this file */
+      await page.getByLabel("Max Members").fill("1");
+      await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
       await expect(card).toBeVisible({ timeout: 10_000 });
       await expect(card).toContainText("Your Sponsorship");
 
