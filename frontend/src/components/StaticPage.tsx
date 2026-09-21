@@ -12,7 +12,7 @@ interface StaticPageProps {
 
 /**
  * StaticPage — shared layout for the static public content pages (privacy
- * policy, CA privacy notice, financials): PublicHeader with a back link to
+ * policy, financials): PublicHeader with a back link to
  * the brochure, a centred prose column, and the SiteFooter.
  */
 export const StaticPage = ({ title, children }: StaticPageProps) => (

@@ -95,7 +95,6 @@ describe("Home", () => {
     const footer = screen.getByRole("contentinfo");
 
     expect(within(footer).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
-    expect(within(footer).getByRole("link", { name: "CA Privacy Notice" })).toHaveAttribute("href", "/privacy-california");
     expect(within(footer).getByRole("link", { name: "Financials" })).toHaveAttribute("href", "/financials");
 
     const donate = within(footer).getByRole("link", { name: "Donate" });

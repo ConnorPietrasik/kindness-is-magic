@@ -32,7 +32,6 @@ const FACEBOOK_URL = "https://www.facebook.com/people/Kindness-is-Magic/61580617
 
 const LEGAL_PAGES = [
   { link: "Privacy Policy", path: "/privacy", heading: "Privacy Policy" },
-  { link: "CA Privacy Notice", path: "/privacy-california", heading: "California Privacy Notice" },
   { link: "Financials", path: "/financials", heading: "Financials" },
 ] as const;
 

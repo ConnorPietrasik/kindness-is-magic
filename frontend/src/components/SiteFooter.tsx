@@ -15,9 +15,6 @@ export const SiteFooter = memo(() => (
         <Link to={ROUTES.PRIVACY} className="hover:text-white hover:underline">
           Privacy Policy
         </Link>
-        <Link to={ROUTES.PRIVACY_CALIFORNIA} className="hover:text-white hover:underline">
-          CA Privacy Notice
-        </Link>
         <Link to={ROUTES.FINANCIALS} className="hover:text-white hover:underline">
           Financials
         </Link>

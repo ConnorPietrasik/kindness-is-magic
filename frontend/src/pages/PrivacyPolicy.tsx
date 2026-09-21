@@ -8,10 +8,8 @@
  * wish lists, transactional emails, and first-party session cookies only.
  */
 
-import { Link } from "react-router-dom";
 import { StaticPage } from "../components/StaticPage";
 import { CONTACT_EMAIL, ZEFFY_PRIVACY_URL } from "../lib/links";
-import { ROUTES } from "../lib/routes";
 
 export default function PrivacyPolicy() {
   return (
@@ -120,7 +118,7 @@ export default function PrivacyPolicy() {
         <li>
           <strong>California privacy rights.</strong> California 501(c)(3) nonprofit organizations are exempt from the California Consumer
           Privacy Act (CCPA) as amended by the CPRA, but we voluntarily honor reasonable requests to access, correct, or delete personal
-          information. See our <Link to={ROUTES.PRIVACY_CALIFORNIA}>California Privacy Notice</Link> for more.
+          information.
         </li>
       </ul>
 
