@@ -57,12 +57,13 @@ env:
 jobs:
   # Full CI suite on the tagged commit (the called run checks out the
   # caller's SHA). Runs on tag *creation* only: a tag deletion also fires a
-  # push event (action: deleted) — without the action guard, every tag
-  # cleanup would kick off a full CI run.
+  # push event (deleted: true) — without the created guard, every tag
+  # cleanup would kick off a full CI run. (Push events have no `action`
+  # field; created/deleted are booleans on the payload.)
   gate:
     name: CI gate on tagged commit
     uses: ./.github/workflows/ci.yml
-    if: github.event_name == 'push' && github.event.action == 'created'
+    if: github.event_name == 'push' && github.event.created
 
   deploy:
     name: Deploy to the server
@@ -73,7 +74,7 @@ jobs:
     # The two skip cases are separated deliberately:
     #   - workflow_dispatch: gate skipped -> deploy still runs (ungated by
     #     design, see header).
-    #   - tag deletion (push, action: deleted): gate skipped -> deploy skips,
+    #   - tag deletion (push, deleted: true): gate skipped -> deploy skips,
     #     so the run shows skipped jobs instead of a red run.
     # A failed/timed-out gate still blocks the deploy.
     if: always() && (github.event_name == 'workflow_dispatch' || needs.gate.result == 'success')
