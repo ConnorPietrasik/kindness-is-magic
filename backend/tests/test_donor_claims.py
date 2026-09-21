@@ -945,7 +945,8 @@ class TestFulfill:
 
 class TestPublicFamiliesClaimedFlag:
     def test_browse_as_donor_claimed_true(self, test_client: TestClient, db: Session):
-        """Browse families as donor → claimed_by_current_user is true for own claims."""
+        """Browse families as donor (show_sponsored) → claimed_by_current_user is
+        true for own claims. Sponsored families are hidden from the default list."""
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
@@ -955,11 +956,16 @@ class TestPublicFamiliesClaimedFlag:
             json={"commitment_type": "gifts"},
         )
 
-        resp = test_client.get("/api/families")
+        # Default list hides the donor's own (now-sponsored) family
+        families = test_client.get("/api/families").json()["families"]
+        assert not any(f["id"] == fam.id for f in families)
+
+        resp = test_client.get("/api/families?show_sponsored=true")
         assert resp.status_code == 200
         families = resp.json()["families"]
         claimed = [f for f in families if f["id"] == fam.id]
         assert len(claimed) == 1
+        assert claimed[0]["sponsored"] is True
         assert claimed[0]["claimed_by_current_user"] is True
 
     def test_browse_unauthenticated_claimed_false(self, test_client: TestClient, db: Session):

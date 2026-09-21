@@ -9,6 +9,9 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import founderPhoto from "../assets/home-founder.jpg";
+import heroPhoto from "../assets/home-hero.jpg";
+import howItWorksPhoto from "../assets/home-how-it-works.jpg";
 import { Card } from "../components/Card";
 import { Logo } from "../components/Logo";
 import { PublicHeader } from "../components/PublicHeader";
@@ -69,7 +72,13 @@ export default function Home() {
               How it works
             </Link>
           </div>
-          <ImageSlot label="Hero photo" className="mt-12 aspect-[16/9] w-full max-w-2xl" />
+          <img
+            src={heroPhoto}
+            alt="A smiling family of four opening Christmas presents together on the living room floor beside a decorated tree"
+            className="mt-12 aspect-[16/9] w-full max-w-2xl rounded-2xl object-cover"
+            loading="eager"
+            fetchPriority="high"
+          />
         </div>
       </section>
 
@@ -77,7 +86,12 @@ export default function Home() {
       <section id="how-it-works" className="scroll-mt-14 bg-white px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">How it works</h2>
-          <ImageSlot label="How it works photo" className="mx-auto mt-8 aspect-[16/9] w-full max-w-3xl" />
+          <img
+            src={howItWorksPhoto}
+            alt="A mother and her three children wrapping a Christmas present together on the living room floor"
+            className="mx-auto mt-8 aspect-[16/9] w-full max-w-3xl rounded-2xl object-cover"
+            loading="lazy"
+          />
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             <StepCard number={1} title="Families share their wishes">
               Our partners identify local families in need. Each person shares their wishes: one for the entire family, one for every adult,
@@ -112,7 +126,12 @@ export default function Home() {
               that kindness is transformative.
             </p>
           </div>
-          <ImageSlot label="Founder photo" className="aspect-[4/3] w-full" />
+          <img
+            src={founderPhoto}
+            alt="Jennifer Pietrasik, founder of Kindness is Magic, in her Queen Elf costume at a Family Giving Tree event"
+            className="aspect-[4/3] w-full rounded-2xl object-cover"
+            loading="lazy"
+          />
         </div>
       </section>
 
@@ -175,28 +194,5 @@ function StepCard({ number, title, children }: StepCardProps) {
       <h3 className="mt-4 text-lg font-semibold text-gray-900">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-gray-600">{children}</p>
     </Card>
-  );
-}
-
-interface ImageSlotProps {
-  /** Describes the intended photo — becomes the real <img alt> once the photo lands. */
-  label: string;
-  className?: string;
-}
-
-/**
- * ImageSlot — styled brand-gradient placeholder for a page photo.
- * To swap in a real photo: import it from src/assets/ and render
- * <img src={photo} alt={label} loading="lazy" ... /> in its place.
- */
-function ImageSlot({ label, className = "" }: ImageSlotProps) {
-  return (
-    <div
-      role="img"
-      aria-label={label}
-      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-dark to-brand-light text-sm font-medium text-white/70 transition-all duration-500 hover:brightness-110 hover:scale-[1.02] ${className}`}
-    >
-      {label}
-    </div>
   );
 }

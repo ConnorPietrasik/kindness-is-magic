@@ -21,6 +21,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 4,
     min_age: 5,
     max_age: 14,
+    sponsored: false,
     claimed_by_current_user: false,
   },
   {
@@ -30,6 +31,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 30,
     max_age: 35,
+    sponsored: false,
     claimed_by_current_user: false,
   },
   {
@@ -39,6 +41,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 8,
     max_age: 8,
+    sponsored: false,
     claimed_by_current_user: false,
   },
 ];
@@ -142,6 +145,7 @@ describe("PublicFamilies", () => {
       person_count: 1,
       min_age: 5,
       max_age: 14,
+      sponsored: false,
       claimed_by_current_user: false,
     };
     const singleMemberResponse = {
@@ -227,6 +231,79 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Sort:/i })).toBeInTheDocument();
     });
+  });
+
+  /* Sponsored visibility */
+
+  it("shows a Sponsored badge on sponsored families (not the current user's)", async () => {
+    const sponsoredFamily: PublicFamilySummary = {
+      id: 4,
+      display_id: "0-4",
+      bio: null,
+      person_count: 3,
+      min_age: 5,
+      max_age: 10,
+      sponsored: true,
+      claimed_by_current_user: false,
+    };
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: [...mockFamilies, sponsoredFamily] });
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0-4")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Sponsored")).toBeInTheDocument();
+  });
+
+  it("shows a Your Sponsorship badge on the current user's claim", async () => {
+    const myClaim: PublicFamilySummary = {
+      id: 5,
+      display_id: "0-5",
+      bio: null,
+      person_count: 2,
+      min_age: 4,
+      max_age: 9,
+      sponsored: true,
+      claimed_by_current_user: true,
+    };
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: [myClaim] });
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0-5")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Your Sponsorship")).toBeInTheDocument();
+    // No plain "Sponsored" badge for the current user's claim
+    expect(screen.queryByText("Sponsored")).not.toBeInTheDocument();
+  });
+
+  it("renders the show-sponsored checkbox, unchecked by default", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("toggling show-sponsored refetches with show_sponsored=true", async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
+    await user.click(checkbox);
+
+    // Debounced 300ms — wait for the refetch with the new param
+    await waitFor(
+      () => {
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ show_sponsored: true }));
+      },
+      { timeout: 2000 }
+    );
   });
 
   it("shows empty state when no families", async () => {

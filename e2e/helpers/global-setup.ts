@@ -11,7 +11,7 @@
 import type { FullConfig } from "@playwright/test";
 import { chromium, request } from "@playwright/test";
 import { seedDatabaseViaApi } from "./api";
-import { getAdminEmail, getAdminPassword, isSuppressSend } from "./env";
+import { getAdminEmail, getAdminPassword, getBaseUrl, isSuppressSend } from "./env";
 
 async function globalSetup(_config: FullConfig): Promise<void> {
   /* Guard: refuse to run if DEBUG is not true or SUPPRESS_SEND is 0 */
@@ -23,14 +23,14 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   }
 
   const browser = await chromium.launch();
-  const apiContext = await request.newContext({ baseURL: "http://localhost" });
+  const apiContext = await request.newContext({ baseURL: getBaseUrl() });
 
   try {
     /* 1. Wait for the backend to be ready */
     console.log("[globalSetup] Waiting for backend to be healthy…");
     for (let i = 0; i < 30; i++) {
       try {
-        const resp = await apiContext.get("http://localhost/api/auth/me", {
+        const resp = await apiContext.get(`${getBaseUrl()}/api/auth/me`, {
           maxRedirects: 0,
           maxRetries: 0,
         });
@@ -92,7 +92,7 @@ async function saveStorageState(
   const page = await context.newPage();
 
   /* Navigate to login page */
-  await page.goto("http://localhost/login");
+  await page.goto(`${getBaseUrl()}/login`);
 
   /* Fill credentials and submit */
   await page.getByLabel("Email").fill(creds.email);

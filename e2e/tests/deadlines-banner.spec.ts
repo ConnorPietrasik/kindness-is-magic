@@ -18,6 +18,7 @@
  * here would race other tests' claims and queues, so it stays out of e2e.
  */
 import { expect, test, request } from "@playwright/test";
+import { getBaseUrl } from "../helpers/env";
 import { createDeadlineViaApi, deleteDeadlineViaApi, loginViaApi } from "../helpers/api";
 
 /* Unique label so re-runs without a DB wipe don't collide */
@@ -44,7 +45,7 @@ test.describe("Referrer review deadline banner", () => {
     /* ═══════════════════════════════════════════════════════════
      * Setup — deadline row via the admin API
      * ═══════════════════════════════════════════════════════════ */
-    const adminApi = await request.newContext({ baseURL: "http://localhost" });
+    const adminApi = await request.newContext({ baseURL: getBaseUrl() });
     await loginViaApi(adminApi);
     deadlineId = await createDeadlineViaApi(adminApi, {
       type: "referrer_review",

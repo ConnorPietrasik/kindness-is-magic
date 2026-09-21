@@ -3,6 +3,9 @@
 Self endpoints use ``require_referrer``. Family-scoped endpoints use
 ``require_family_owner`` which authenticates the referrer and verifies
 ownership of the target family in a single dependency.
+
+Donor anonymity: family responses here always pass ``include_claim=False``
+— referrers never see sponsor/claim data (including the donor's name).
 """
 
 import logging
@@ -125,7 +128,8 @@ def list_families(
         .all()
     )
 
-    ctx = load_family_list_context(db, families, scope=user.referrer_id, include_claim=True)
+    # include_claim stays False (default) — referrers must not see sponsor/claim data
+    ctx = load_family_list_context(db, families, scope=user.referrer_id)
 
     return FamilyListResponse(families=[FamilyDetail(**build_family_list_item(f, ctx)) for f in families])
 
@@ -136,7 +140,7 @@ def get_family(
     owner: FamilyOwner = Depends(require_family_owner),
     db: Session = Depends(get_db),
 ) -> FamilyDetail:
-    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True, include_claim=False))
 
 
 @router.post("/families", status_code=201)
@@ -181,7 +185,7 @@ def create_family(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s created family '%s' (id=%s)", user.email, fam.family_name, fam.id)
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
 @router.patch("/families/{fam_id}")
@@ -210,7 +214,7 @@ def update_family(
     db.commit()
     db.refresh(owner.family)
     logger.info("Referrer %s updated family (id=%s)", owner.user.email, fam_id)
-    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True, include_claim=False))
 
 
 @router.delete("/families/{fam_id}", status_code=204)
@@ -319,7 +323,7 @@ async def verify_family(
         referrer_display_name=owner.user.display_name,
     )
 
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
 @router.post("/families/{fam_id}/reject", status_code=200)
@@ -350,7 +354,7 @@ async def reject_family(
         referrer_display_name=owner.user.display_name,
     )
 
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +436,7 @@ def referrer_approve_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s approved wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
 @router.post("/families/{fam_id}/reject-wishes")
@@ -462,7 +466,7 @@ def referrer_reject_wishes(
     db.commit()
     db.refresh(fam)
     logger.info("Referrer %s rejected wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
 async def _send_family_rejected_email(

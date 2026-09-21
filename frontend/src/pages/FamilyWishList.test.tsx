@@ -142,6 +142,59 @@ describe("FamilyWishList error state", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Tests — sponsored status (visible to all visitors)                  */
+/* ------------------------------------------------------------------ */
+
+describe("FamilyWishList sponsored status", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("tells an anonymous visitor the family is already sponsored (no CTA)", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({ ...mockWishList, claim_status: "active" });
+
+    wrap();
+
+    await screen.findByText("This family is already sponsored");
+    expect(screen.queryByRole("button", { name: "Sponsor this family" })).not.toBeInTheDocument();
+  });
+
+  it("tells an anonymous visitor a fulfilled sponsorship", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({ ...mockWishList, claim_status: "fulfilled" });
+
+    wrap();
+
+    await screen.findByText("This family's sponsorship has been fulfilled");
+    expect(screen.queryByRole("button", { name: "Sponsor this family" })).not.toBeInTheDocument();
+  });
+
+  it("shows the claimer their own status with a link to the claim detail", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({
+      ...mockWishList,
+      claim_status: "active",
+      claim_id: 42,
+      claimed_by_current_user: true,
+    });
+
+    wrap({ user: mockUser });
+
+    await screen.findByText("You are sponsoring this family");
+    expect(screen.getByRole("link", { name: "View sponsorship details →" })).toHaveAttribute("href", "/donor/claims/42");
+    expect(screen.queryByRole("button", { name: "Sponsor this family" })).not.toBeInTheDocument();
+  });
+
+  it("shows the sponsor CTA to an anonymous visitor when there is no claim", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap();
+
+    await screen.findByRole("button", { name: "Sponsor this family" });
+    expect(screen.queryByText("This family is already sponsored")).not.toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* Tests — claim modal auto-open (post-registration redirect)          */
 /* ------------------------------------------------------------------ */
 

@@ -5,7 +5,7 @@ A web app that connects donors with families: families (referred by referrers) c
 ## How it works
 
 - **Referrers** are invited by an admin with a one-time invite code. They refer families and manage the family's members and wish lists.
-- **Families** register via an invite from their referrer and can see who is sponsoring their wishes and the status of each gift.
+- **Families** register via an invite from their referrer and manage the family's members and wish list. Sponsorship is anonymous in the app — neither family nor referrer views show the donor's identity.
 - **Donors** (and other claim-capable roles) browse public families and **sponsor** a family — a "claim" in the code — committing to cover its wishes.
 - **Purchasers** are assigned specific wishes and mark them as purchased.
 - **Delivery** people are assigned families and use packing slips and delivery slips to ship the gifts.

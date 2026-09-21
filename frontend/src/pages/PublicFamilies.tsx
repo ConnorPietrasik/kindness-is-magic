@@ -44,6 +44,7 @@ interface FilterState {
   minAge: string;
   maxAge: string;
   sort: SortValue;
+  showSponsored: boolean;
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -52,6 +53,7 @@ const DEFAULT_FILTERS: FilterState = {
   minAge: "",
   maxAge: "",
   sort: null,
+  showSponsored: false,
 };
 
 /* ------------------------------------------------------------------ */
@@ -61,14 +63,19 @@ export default function PublicFamilies() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
 
-  // Sort is persisted in URL so it survives refresh
+  // Sort and the sponsored toggle are persisted in URL so they survive refresh
   const urlSort = searchParams.get("sort");
   const initialSort: SortValue = SORT_CYCLE.includes(urlSort as SortValue) ? (urlSort as SortValue) : null;
+  const initialShowSponsored = searchParams.get("show_sponsored") === "true";
 
-  // Local filter inputs (sort starts from URL)
-  const [filters, setFilters] = useState<FilterState>(() => ({ ...DEFAULT_FILTERS, sort: initialSort }));
+  // Local filter inputs (sort + sponsored toggle start from URL)
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    sort: initialSort,
+    showSponsored: initialShowSponsored,
+  }));
 
-  // Debounced filter values (300ms) — writes sort to URL, resets page
+  // Debounced filter values (300ms) — writes sort + sponsored toggle to URL, resets page
   // Use functional updater so we always read the current URL, not a stale closure.
   const debouncedFilters = useDebouncedState(filters, 300, () => {
     setSearchParams((prev) => {
@@ -78,6 +85,11 @@ export default function PublicFamilies() {
         params.set("sort", filters.sort);
       } else {
         params.delete("sort");
+      }
+      if (filters.showSponsored) {
+        params.set("show_sponsored", "true");
+      } else {
+        params.delete("show_sponsored");
       }
       return params;
     });
@@ -95,6 +107,7 @@ export default function PublicFamilies() {
   if (debouncedFilters.minAge) apiParams.min_age = parseInt(debouncedFilters.minAge, 10);
   if (debouncedFilters.maxAge) apiParams.max_age = parseInt(debouncedFilters.maxAge, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
+  if (debouncedFilters.showSponsored) apiParams.show_sponsored = true;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [...publicFamilies, apiParams],
@@ -121,6 +134,10 @@ export default function PublicFamilies() {
 
   const handleFilterChange = (key: keyof FilterState, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleShowSponsoredChange = (checked: boolean) => {
+    setFilters((prev) => ({ ...prev, showSponsored: checked }));
   };
 
   const cycleSort = () => {
@@ -224,7 +241,23 @@ export default function PublicFamilies() {
             Sort: {sortLabel}
           </button>
 
-          {(filters.minPersonCount || filters.maxPersonCount || filters.minAge || filters.maxAge || filters.sort) && (
+          <label htmlFor="show-sponsored" className="flex cursor-pointer items-center gap-2 pb-1.5 text-sm font-medium text-gray-700">
+            <input
+              id="show-sponsored"
+              type="checkbox"
+              checked={filters.showSponsored}
+              onChange={(e) => handleShowSponsoredChange(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Show sponsored families
+          </label>
+
+          {(filters.minPersonCount ||
+            filters.maxPersonCount ||
+            filters.minAge ||
+            filters.maxAge ||
+            filters.sort ||
+            filters.showSponsored) && (
             <button
               type="button"
               onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -273,11 +306,15 @@ function FamilyCard({ family }: { family: PublicFamilySummary }) {
       <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="mb-2 flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-gray-900">{family.display_id}</span>
-          {family.claimed_by_current_user && (
+          {family.claimed_by_current_user ? (
             <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+              Your Sponsorship
+            </span>
+          ) : family.sponsored ? (
+            <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
               Sponsored
             </span>
-          )}
+          ) : null}
         </div>
 
         {family.bio && <p className="mb-3 line-clamp-2 text-sm text-gray-600">{family.bio}</p>}

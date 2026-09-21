@@ -1575,3 +1575,68 @@ class TestReferrerInviteEmails:
         assert len(items) == 1
         assert items[0]["recipient_email"] == "justsent@example.com"
         assert items[0]["status"] == "sent"
+
+
+# =========================================================================
+# Referrer — Sponsor anonymity
+# =========================================================================
+
+
+class TestReferrerClaimAnonymity:
+    """Referrers must not see sponsor/claim data — the donor's identity is
+    only visible to the donor and admins, never to the referring referrer."""
+
+    def _sponsor_family(self, client: TestClient, db: Session, fam) -> None:
+        """Register a donor and have them sponsor (claim) the family."""
+        from app.models import WishLockLevel
+
+        # Public claim endpoints require a fully reviewed family
+        fam.wish_lock_level = WishLockLevel.admin
+        db.commit()
+
+        resp = client.post(
+            "/api/auth/register-donor",
+            json={
+                "display_name": "Secret Donor",
+                "email": "secretdonor@test.com",
+                "password": "DonorPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+
+        resp = client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "gifts"})
+        assert resp.status_code == 201
+
+    def test_family_list_hides_claim_data(self, test_client: TestClient, db: Session, referrer_with_full_tree):
+        # Sponsoring first: donor registration auto-logs in and would
+        # clobber the referrer's session cookie in the shared client.
+        self._sponsor_family(test_client, db, referrer_with_full_tree["family"])
+        _tree_referrer_login(test_client)
+
+        resp = test_client.get("/api/referrer/families")
+        assert resp.status_code == 200
+        for item in resp.json()["families"]:
+            assert item["claim_status"] is None
+            assert item["claim_commitment_type"] is None
+            assert item["claim_donor_name"] is None
+            assert item["claim_id"] is None
+
+    def test_family_detail_hides_claim_data(self, test_client: TestClient, db: Session, referrer_with_full_tree):
+        fam = referrer_with_full_tree["family"]
+        # Sponsoring first: donor registration auto-logs in and would
+        # clobber the referrer's session cookie in the shared client.
+        self._sponsor_family(test_client, db, fam)
+
+        # Sanity: the donor (currently logged in) sees their own sponsorship
+        resp = test_client.get("/api/donor/claims")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+
+        _tree_referrer_login(test_client)
+        resp = test_client.get(f"/api/referrer/families/{fam.id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["claim_status"] is None
+        assert body["claim_commitment_type"] is None
+        assert body["claim_donor_name"] is None
+        assert body["claim_id"] is None

@@ -156,26 +156,33 @@ export default function FamilyWishList() {
 
         {/* Claim section */}
         <div className="mt-8">
-          {user && isClaimCapable ? (
-            data.claimed_by_current_user ? (
-              // Already claimed — show status + link to detail
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-emerald-800 capitalize">{data.claim_status ?? "active"} Sponsorship</span>
-                  {data.claim_id != null && (
-                    <Link to={route.donorClaimDetail(data.claim_id)} className="text-sm font-medium text-emerald-700 hover:underline">
-                      View sponsorship details →
-                    </Link>
-                  )}
-                </div>
+          {data.claim_status ? (
+            // Already sponsored (or fulfilled) — shown to ALL visitors so no
+            // one is surprised by the "already sponsored" 409 when claiming
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-emerald-800">
+                  {data.claimed_by_current_user
+                    ? data.claim_status === "active"
+                      ? "You are sponsoring this family"
+                      : "Your sponsorship of this family is fulfilled"
+                    : data.claim_status === "active"
+                      ? "This family is already sponsored"
+                      : "This family's sponsorship has been fulfilled"}
+                </span>
+                {data.claimed_by_current_user && data.claim_id != null && (
+                  <Link to={route.donorClaimDetail(data.claim_id)} className="text-sm font-medium text-emerald-700 hover:underline">
+                    View sponsorship details →
+                  </Link>
+                )}
               </div>
-            ) : (
-              // Claim-capable, not yet claimed
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="mb-3 text-sm text-gray-600">Would you like to sponsor this family and help fulfill their wishes?</p>
-                <Button onClick={() => setShowClaimModal(true)}>Sponsor this family</Button>
-              </div>
-            )
+            </div>
+          ) : user && isClaimCapable ? (
+            // Claim-capable, not yet claimed
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <p className="mb-3 text-sm text-gray-600">Would you like to sponsor this family and help fulfill their wishes?</p>
+              <Button onClick={() => setShowClaimModal(true)}>Sponsor this family</Button>
+            </div>
           ) : user ? // Authenticated but not claim-capable (family role) — no UI
           null : (
             // Not authenticated — show sign in / register prompt

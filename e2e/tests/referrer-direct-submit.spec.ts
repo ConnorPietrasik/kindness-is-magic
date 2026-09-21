@@ -16,6 +16,7 @@
  */
 import { test, expect, request } from "@playwright/test";
 import { loginAs, loginAsAdmin } from "../helpers/auth";
+import { getBaseUrl } from "../helpers/env";
 import {
   createIsolatedFamilyScenario,
   deleteFamilyViaApi,
@@ -62,7 +63,7 @@ test.describe("Referrer Direct Submit", () => {
     /* ═══════════════════════════════════════════════════════════
      * Setup — isolated referrer + family + person via API
      * ═══════════════════════════════════════════════════════════ */
-    const adminApi = await request.newContext({ baseURL: "http://localhost" });
+    const adminApi = await request.newContext({ baseURL: getBaseUrl() });
     await loginViaApi(adminApi);
 
     const scenario = await createIsolatedFamilyScenario(adminApi, SUFFIX, { familyWish: FAMILY_WISH });

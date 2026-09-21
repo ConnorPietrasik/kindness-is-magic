@@ -87,6 +87,16 @@ export function isDebug(): boolean {
 }
 
 /**
+ * Base URL of the e2e stack under test (default: http://localhost).
+ * Machine-specific: set E2E_BASE_URL in the environment or in the project
+ * .env when the stack runs elsewhere (e.g. the host PC — see e2e/AGENTS.md).
+ */
+export function getBaseUrl(): string {
+  const env = readProjectEnv();
+  return process.env.E2E_BASE_URL ?? env.get("E2E_BASE_URL") ?? "http://localhost";
+}
+
+/**
  * Check whether SUPPRESS_SEND is explicitly disabled (set to 0) in .env.
  * Returns true if SUPPRESS_SEND is 0 (bad for e2e), false otherwise.
  */

@@ -17,7 +17,7 @@
  * Uses unique names per run so re-runs without a DB wipe don't collide.
  */
 import { test, expect, request } from "@playwright/test";
-import { getAdminEmail, getAdminPassword } from "../helpers/env";
+import { getAdminEmail, getAdminPassword, getBaseUrl } from "../helpers/env";
 import { findRowInTable } from "../helpers/assertions";
 import { deleteUserViaApi, listUsersViaApi } from "../helpers/api";
 
@@ -66,7 +66,7 @@ test.describe("Core Flow", () => {
 
   test("full core flow: invite → register → approve → review → public wish list", async ({ browser }) => {
     /* Shared admin API context for lookups and cleanup */
-    const adminApi = await request.newContext({ baseURL: "http://localhost" });
+    const adminApi = await request.newContext({ baseURL: getBaseUrl() });
     await adminApi.post("/api/auth/login", {
       data: { email: getAdminEmail(), password: getAdminPassword() },
     });

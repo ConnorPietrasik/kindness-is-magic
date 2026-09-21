@@ -768,3 +768,148 @@ def test_list_families_family_with_no_people(db, test_client: TestClient, family
     assert data["families"][0]["person_count"] == 0
     assert data["families"][0]["min_age"] is None
     assert data["families"][0]["max_age"] is None
+
+
+# ---------------------------------------------------------------------------
+# Sponsored visibility (hide sponsored families by default)
+# ---------------------------------------------------------------------------
+
+
+def _make_donor_user(db, email: str, password: str = "DonorPass1234!") -> int:
+    """Create a donor user directly in the DB. Returns the user id."""
+    from app.auth import get_password_hash
+    from app.models import User, UserRole
+
+    donor = User(email=email, hashed_password=get_password_hash(password), role=UserRole.donor, display_name=None)
+    db.add(donor)
+    db.flush()
+    return donor.id
+
+
+def _make_claim(db, donor_user_id: int, family_id: int, *, fulfilled: bool = False, deleted: bool = False) -> None:
+    """Create a FamilyClaim row directly in the DB."""
+    from app.models import CommitmentType, FamilyClaim
+
+    claim = FamilyClaim(
+        donor_user_id=donor_user_id,
+        family_id=family_id,
+        commitment_type=CommitmentType.gifts,
+        fulfilled_at=datetime.now(timezone.utc) if fulfilled else None,
+        deleted_at=datetime.now(timezone.utc) if deleted else None,
+    )
+    db.add(claim)
+    db.commit()
+
+
+def _eligible_family(db, family_name: str):
+    """Create a verified, admin-locked family (public-list eligible)."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+
+    fam = make_family(
+        db,
+        family_name=family_name,
+        family_wish="Warm clothes",
+        contact_name="Contact",
+        phone_number="555-000-0001",
+        verification_status=FamilyVerificationStatus.verified,
+        wish_lock_level=WishLockLevel.admin,
+    )
+    db.add(fam)
+    db.commit()
+    return fam
+
+
+def test_list_families_hides_sponsored_by_default(db, test_client: TestClient, family_record):
+    """A family with an active claim is hidden from the default list but
+    included (flagged sponsored) with show_sponsored=true."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+
+    family_record.verification_status = FamilyVerificationStatus.verified
+    family_record.wish_lock_level = WishLockLevel.admin
+    db.commit()
+    donor_id = _make_donor_user(db, "sponsor@test.com")
+    _make_claim(db, donor_id, family_record.id)
+
+    resp = test_client.get("/api/families")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+
+    resp = test_client.get("/api/families?show_sponsored=true")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["families"][0]["id"] == family_record.id
+    assert data["families"][0]["sponsored"] is True
+    assert data["families"][0]["claimed_by_current_user"] is False
+
+
+def test_list_families_hides_fulfilled_claims_by_default(db, test_client: TestClient, family_record):
+    """A fulfilled (non-deleted) claim also hides the family by default."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+
+    family_record.verification_status = FamilyVerificationStatus.verified
+    family_record.wish_lock_level = WishLockLevel.admin
+    db.commit()
+    donor_id = _make_donor_user(db, "sponsor@test.com")
+    _make_claim(db, donor_id, family_record.id, fulfilled=True)
+
+    assert test_client.get("/api/families").json()["total"] == 0
+
+    data = test_client.get("/api/families?show_sponsored=true").json()
+    assert data["total"] == 1
+    assert data["families"][0]["sponsored"] is True
+
+
+def test_list_families_soft_deleted_claim_keeps_family_visible(db, test_client: TestClient, family_record):
+    """A soft-deleted claim frees the family: visible by default, not sponsored."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+
+    family_record.verification_status = FamilyVerificationStatus.verified
+    family_record.wish_lock_level = WishLockLevel.admin
+    db.commit()
+    donor_id = _make_donor_user(db, "sponsor@test.com")
+    _make_claim(db, donor_id, family_record.id, deleted=True)
+
+    data = test_client.get("/api/families").json()
+    assert data["total"] == 1
+    assert data["families"][0]["sponsored"] is False
+
+
+def test_list_families_sponsored_flags_mixed(db, test_client: TestClient, family_record):
+    """Unauthenticated: sponsored flag distinguishes claimed vs open families."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+
+    open_fam = _eligible_family(db, "Open Family")
+    claimed_fam = _eligible_family(db, "Claimed Family")
+    family_record.verification_status = FamilyVerificationStatus.verified
+    family_record.wish_lock_level = WishLockLevel.admin
+    db.commit()
+    donor_id = _make_donor_user(db, "sponsor@test.com")
+    _make_claim(db, donor_id, claimed_fam.id)
+
+    data = test_client.get("/api/families?show_sponsored=true").json()
+    by_id = {fam["id"]: fam for fam in data["families"]}
+    assert data["total"] == 3
+    assert by_id[claimed_fam.id]["sponsored"] is True
+    assert by_id[open_fam.id]["sponsored"] is False
+    assert by_id[family_record.id]["sponsored"] is False
+    # No one is logged in — nobody's claim belongs to the current user
+    assert all(fam["claimed_by_current_user"] is False for fam in data["families"])
+
+
+def test_list_families_claimed_by_current_user_flag(db, test_client: TestClient, family_record):
+    """A logged-in donor sees claimed_by_current_user on their own claim."""
+    from app.models import FamilyVerificationStatus, WishLockLevel
+    from tests.conftest import login_as
+
+    family_record.verification_status = FamilyVerificationStatus.verified
+    family_record.wish_lock_level = WishLockLevel.admin
+    db.commit()
+    donor_id = _make_donor_user(db, "sponsor@test.com")
+    _make_claim(db, donor_id, family_record.id)
+
+    login_as(test_client, "sponsor@test.com", "DonorPass1234!")
+    data = test_client.get("/api/families?show_sponsored=true").json()
+    assert data["total"] == 1
+    assert data["families"][0]["sponsored"] is True
+    assert data["families"][0]["claimed_by_current_user"] is True

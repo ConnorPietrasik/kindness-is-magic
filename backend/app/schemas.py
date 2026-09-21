@@ -1298,6 +1298,7 @@ class PublicFamilySummary(BaseModel):
     person_count: int
     min_age: int | None = None
     max_age: int | None = None
+    sponsored: bool = False
     claimed_by_current_user: bool = False
 
     model_config = {"from_attributes": True}

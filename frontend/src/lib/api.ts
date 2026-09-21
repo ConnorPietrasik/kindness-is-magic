@@ -684,6 +684,8 @@ export interface PublicFamiliesListParams {
   min_age?: number;
   max_age?: number;
   sort?: string;
+  /** Include families that already have a sponsor (default: hide them). */
+  show_sponsored?: boolean;
 }
 
 /** Public: list all fully-approved families for donor browsing (no auth required). */

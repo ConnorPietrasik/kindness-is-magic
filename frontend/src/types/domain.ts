@@ -542,6 +542,8 @@ export interface PublicFamilySummary {
   person_count: number;
   min_age: number | null;
   max_age: number | null;
+  /** Family has a sponsor (active or fulfilled claim); hidden by default. */
+  sponsored: boolean;
   claimed_by_current_user: boolean;
 }
 

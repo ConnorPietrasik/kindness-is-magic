@@ -1,10 +1,12 @@
 import os from "node:os";
 import { defineConfig, devices } from "@playwright/test";
+import { getBaseUrl } from "./helpers/env";
 
 /**
  * Playwright configuration for end-to-end tests.
  *
- * Tests run against the Docker Compose stack (Traefik proxy at localhost:80).
+ * Tests run against the Docker Compose stack (Traefik proxy; base URL from
+ * E2E_BASE_URL, default http://localhost — see helpers/env.ts).
  * Chromium only — sufficient for e2e validation.
  *
  * Single project with full parallelism. Each test file is self-contained and
@@ -33,7 +35,7 @@ export default defineConfig({
   globalSetup: "./helpers/global-setup",
 
   use: {
-    baseURL: "http://localhost",
+    baseURL: getBaseUrl(),
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

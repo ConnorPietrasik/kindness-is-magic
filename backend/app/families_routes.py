@@ -9,7 +9,7 @@ import logging
 import math
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import decode_access_token
@@ -72,6 +72,7 @@ def list_public_families(
     min_age: int | None = Query(None, ge=0),
     max_age: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
+    show_sponsored: bool = Query(False),
     access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(get_db),
 ) -> PublicFamilyListResponse:
@@ -80,9 +81,11 @@ def list_public_families(
     * No authentication required.
     * Only returns families that are: verified, not soft-deleted, and
       wish_lock_level == admin (fully reviewed).
+    * Families that already have a sponsor (active or fulfilled claim) are
+      hidden by default; pass ``show_sponsored=true`` to include them.
     * Supports pagination, filtering by person count / age range, and sorting.
-    * If authenticated, sets ``claimed_by_current_user`` on families the
-      current user has an active claim for.
+    * Sets ``sponsored`` on families with a non-deleted claim, and
+      ``claimed_by_current_user`` on families the current user claimed.
     """
     # Extract current user id from access token (no DB lookup)
     current_user_id: int | None = None
@@ -99,6 +102,12 @@ def list_public_families(
         Family.verification_status == FamilyVerificationStatus.verified,
         Family.wish_lock_level == WishLockLevel.admin,
     )
+
+    # Hide already-sponsored families (active or fulfilled claim) by default.
+    # A soft-deleted claim does not count — the family is available again.
+    if not show_sponsored:
+        claimed_families = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
+        query = query.filter(Family.id.notin_(claimed_families))
 
     # Build filter conditions using correlated subqueries
     filters = []
@@ -147,21 +156,24 @@ def list_public_families(
     # Compute flat-format display IDs (unscoped)
     display_id_map = compute_display_ids(db, "family", families, scope=None)
 
-    # Build set of family IDs claimed by the current user
+    # Claim status for the families on this page: who has a sponsor, and
+    # which of those are the current user's own claim (badge distinction).
+    sponsored_family_ids: set[int] = set()
     claimed_family_ids: set[int] = set()
-    if current_user_id is not None and families:
+    if families:
         family_ids = [f.id for f in families]
-        claimed = (
-            db.query(FamilyClaim.family_id)
+        claims = (
+            db.query(FamilyClaim.family_id, FamilyClaim.donor_user_id)
             .filter(
-                FamilyClaim.donor_user_id == current_user_id,
                 FamilyClaim.family_id.in_(family_ids),
                 FamilyClaim.deleted_at.is_(None),
-                FamilyClaim.fulfilled_at.is_(None),
             )
             .all()
         )
-        claimed_family_ids = {row[0] for row in claimed}
+        for fam_id, donor_id in claims:
+            sponsored_family_ids.add(fam_id)
+            if donor_id == current_user_id:
+                claimed_family_ids.add(fam_id)
 
     # Build response items from the single query result
     result_families = []
@@ -174,6 +186,7 @@ def list_public_families(
                 person_count=pc if pc else 0,
                 min_age=ma,
                 max_age=xa,
+                sponsored=fam.id in sponsored_family_ids,
                 claimed_by_current_user=fam.id in claimed_family_ids,
             )
         )
@@ -207,7 +220,9 @@ def get_family_wish_list(
     * Families that haven't been fully reviewed (wish_lock_level != admin)
       return 403.
     * Soft-deleted people are excluded from the people list.
-    * If authenticated, includes claim status info.
+    * ``claim_status`` (active/fulfilled) is public to every visitor so the
+      page can show the sponsored state; ``claimed_by_current_user`` and the
+      claim detail link only apply to the claiming donor.
     """
     fam = get_active_or_404(db, Family, family_id, "Family not found")
 

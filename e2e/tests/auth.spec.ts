@@ -6,7 +6,7 @@
  */
 import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { loginAsAdmin, loginAsReferrer, loginAsFamily, logout } from "../helpers/auth";
-import { getAdminEmail, getAdminPassword, getSecretKey } from "../helpers/env";
+import { getAdminEmail, getAdminPassword, getBaseUrl, getSecretKey } from "../helpers/env";
 import { makeExpiredAccessToken } from "../helpers/jwt";
 
 test.describe("Authentication", () => {
@@ -63,7 +63,7 @@ test.describe("Authentication", () => {
       {
         name: "access_token",
         value: expiredToken,
-        domain: "localhost",
+        domain: new URL(getBaseUrl()).hostname,
         path: "/",
         httpOnly: true,
         sameSite: "Lax",
@@ -144,7 +144,7 @@ test.describe("Authentication", () => {
      * tokens just expired both fire /refresh with the same pre-rotation
      * refresh token. Without the grace window, the loser of the race gets
      * 401 "revoked" and is logged out. Both must succeed. */
-    const loginCtx = await playwrightRequest.newContext({ baseURL: "http://localhost" });
+    const loginCtx = await playwrightRequest.newContext({ baseURL: getBaseUrl() });
     const login = await loginCtx.post("/api/auth/login", {
       data: { email: getAdminEmail(), password: getAdminPassword() },
     });
@@ -158,8 +158,8 @@ test.describe("Authentication", () => {
      * APIRequestContext has no cookie-jar API. */
     const cookieHeader = { Cookie: `refresh_token=${sharedToken}` };
     const [ctxA, ctxB] = await Promise.all([
-      playwrightRequest.newContext({ baseURL: "http://localhost" }),
-      playwrightRequest.newContext({ baseURL: "http://localhost" }),
+      playwrightRequest.newContext({ baseURL: getBaseUrl() }),
+      playwrightRequest.newContext({ baseURL: getBaseUrl() }),
     ]);
 
     const results = await Promise.all(

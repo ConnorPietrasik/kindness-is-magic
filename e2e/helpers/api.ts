@@ -3,7 +3,7 @@ import { request as playwrightRequest } from "@playwright/test";
 import fs from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAdminEmail, getAdminPassword } from "./env";
+import { getAdminEmail, getAdminPassword, getBaseUrl } from "./env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -100,6 +100,19 @@ export async function deleteUserViaApi(
   const resp = await request.delete(`/api/admin/users/${userId}`);
   if (!resp.ok()) {
     console.warn(`[api] deleteUserViaApi(${userId}) returned ${resp.status()}`);
+  }
+}
+
+/**
+ * Cancel (soft-delete) a claim via the donor API (owner or admin).
+ */
+export async function deleteClaimViaApi(
+  request: APIRequestContext,
+  claimId: number,
+): Promise<void> {
+  const resp = await request.delete(`/api/donor/claims/${claimId}`);
+  if (!resp.ok()) {
+    console.warn(`[api] deleteClaimViaApi(${claimId}) returned ${resp.status()}`);
   }
 }
 
@@ -432,7 +445,7 @@ export async function approveWishChain(
   referrerPassword?: string,
 ): Promise<void> {
   // 1. Referrer approves (family → referrer lock)
-  const referrerApi = await playwrightRequest.newContext({ baseURL: "http://localhost" });
+  const referrerApi = await playwrightRequest.newContext({ baseURL: getBaseUrl() });
   await referrerApi.post("/api/auth/login", {
     data: {
       email: referrerEmail ?? "sarah.chen@example.com",
