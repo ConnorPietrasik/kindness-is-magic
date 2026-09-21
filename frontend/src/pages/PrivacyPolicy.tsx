@@ -49,9 +49,8 @@ export default function PrivacyPolicy() {
       <p>
         <strong>When a family takes part in the program.</strong> With the family’s consent, we collect the family name, a short family
         introduction, a contact name, a phone number, and an address (families without one write “none”) for coordinating gift pickup or
-        delivery, plus one wish for the whole family and, if the family chooses, a preferred pickup window. For each family member —
-        including pets — we collect a first name, relationship to the family, age, and a short note about what they love, along with each
-        person’s wish details (item, size, and color preferences).
+        delivery, plus one wish for the whole family. For each family member — including pets — we collect a first name, family role, age,
+        and a short note about what they love, along with each person’s wish details (item, size, and color preferences).
       </p>
       <p>
         <strong>When referrers and volunteers help.</strong> Referrers who refer families provide a name, a phone number, and account
@@ -69,10 +68,10 @@ export default function PrivacyPolicy() {
         To protect family privacy, each family appears under an anonymous code (for example, “1-2”) rather than its real name.
       </p>
       <p>
-        What is public: the family introduction, the family wish, each member’s first name, relationship to the family, age, and short note,
-        the wish details, the family size and age range, and whether the family has a sponsor (on the browse page, already-sponsored
-        families are hidden by default but can be shown with a filter). What is never public: the family name, contact name, address, or
-        phone number; the identity or contact information of donor sponsors; and internal program notes.
+        What is public: the family introduction, the family wish, each member’s first name, family role, age, and short note, the wish
+        details, the family size and age range, and whether the family has a sponsor (on the browse page, already-sponsored families are
+        hidden by default but can be shown with a filter). What is never public: the family name, contact name, address, or phone number;
+        the identity or contact information of donor sponsors; and internal program notes.
       </p>
 
       <h2>How We Use and Share Information</h2>
@@ -101,7 +100,7 @@ export default function PrivacyPolicy() {
       </ul>
       <p>
         Because we do not disclose personal information to third parties for their direct marketing, California’s “Shine the Light” law
-        (Civil Code § 1798.84) does not apply to us.
+        (Civil Code § 1798.83) does not apply to us.
       </p>
 
       <h2>Your Choices</h2>
@@ -148,9 +147,9 @@ export default function PrivacyPolicy() {
       <h2>Children’s Privacy</h2>
       <p>
         Our website is not directed to children under 13, and we do not knowingly collect personal information directly from children.
-        Because our program serves families with children, the limited information we hold about children (first name, age, and wish
-        details) is provided by a parent or guardian, or by the program partner who referred the family. Parents and guardians may contact
-        us at any time to review or request deletion of information provided about their children.
+        Because our program serves families with children, the limited information we hold about children (first name, family role, age, and
+        wish details) is provided by a parent or guardian, or by the program partner who referred the family. Parents and guardians may
+        contact us at any time to review or request deletion of information provided about their children.
       </p>
 
       <h2>Changes to This Policy</h2>
