@@ -227,10 +227,8 @@ describe("PublicFamilies", () => {
     wrap(<PublicFamilies />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Min Members")).toBeInTheDocument();
-      expect(screen.getByLabelText("Max Members")).toBeInTheDocument();
-      expect(screen.getByLabelText("Min Age")).toBeInTheDocument();
-      expect(screen.getByLabelText("Max Age")).toBeInTheDocument();
+      expect(screen.getByLabelText("Min Family Members")).toBeInTheDocument();
+      expect(screen.getByLabelText("Max Family Members")).toBeInTheDocument();
     });
   });
 

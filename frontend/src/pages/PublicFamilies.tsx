@@ -49,8 +49,6 @@ type SortValue = (typeof SORT_CYCLE)[number];
 interface FilterState {
   minPersonCount: string;
   maxPersonCount: string;
-  minAge: string;
-  maxAge: string;
   sort: SortValue;
   showSponsored: boolean;
 }
@@ -58,8 +56,6 @@ interface FilterState {
 const DEFAULT_FILTERS: FilterState = {
   minPersonCount: "",
   maxPersonCount: "",
-  minAge: "",
-  maxAge: "",
   sort: null,
   showSponsored: false,
 };
@@ -115,8 +111,6 @@ export default function PublicFamilies() {
   };
   if (debouncedFilters.minPersonCount) apiParams.min_person_count = parseInt(debouncedFilters.minPersonCount, 10);
   if (debouncedFilters.maxPersonCount) apiParams.max_person_count = parseInt(debouncedFilters.maxPersonCount, 10);
-  if (debouncedFilters.minAge) apiParams.min_age = parseInt(debouncedFilters.minAge, 10);
-  if (debouncedFilters.maxAge) apiParams.max_age = parseInt(debouncedFilters.maxAge, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
   if (isAdmin && debouncedFilters.showSponsored) apiParams.show_sponsored = true;
 
@@ -195,7 +189,7 @@ export default function PublicFamilies() {
         <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-1">
             <label htmlFor="min-person-count" className="text-xs font-medium text-gray-500">
-              Min Members
+              Min Family Members
             </label>
             <input
               id="min-person-count"
@@ -210,7 +204,7 @@ export default function PublicFamilies() {
 
           <div className="flex flex-col gap-1">
             <label htmlFor="max-person-count" className="text-xs font-medium text-gray-500">
-              Max Members
+              Max Family Members
             </label>
             <input
               id="max-person-count"
@@ -218,36 +212,6 @@ export default function PublicFamilies() {
               min={1}
               value={filters.maxPersonCount}
               onChange={(e) => handleFilterChange("maxPersonCount", e.target.value)}
-              className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-btn-start focus:outline-none focus:ring-1 focus:ring-btn-start/50"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="min-age" className="text-xs font-medium text-gray-500">
-              Min Age
-            </label>
-            <input
-              id="min-age"
-              type="number"
-              min={0}
-              value={filters.minAge}
-              onChange={(e) => handleFilterChange("minAge", e.target.value)}
-              className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-btn-start focus:outline-none focus:ring-1 focus:ring-btn-start/50"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="max-age" className="text-xs font-medium text-gray-500">
-              Max Age
-            </label>
-            <input
-              id="max-age"
-              type="number"
-              min={0}
-              value={filters.maxAge}
-              onChange={(e) => handleFilterChange("maxAge", e.target.value)}
               className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-btn-start focus:outline-none focus:ring-1 focus:ring-btn-start/50"
               autoComplete="off"
             />
@@ -275,12 +239,7 @@ export default function PublicFamilies() {
             </label>
           )}
 
-          {(filters.minPersonCount ||
-            filters.maxPersonCount ||
-            filters.minAge ||
-            filters.maxAge ||
-            filters.sort ||
-            filters.showSponsored) && (
+          {(filters.minPersonCount || filters.maxPersonCount || filters.sort || filters.showSponsored) && (
             <button
               type="button"
               onClick={() => setFilters(DEFAULT_FILTERS)}

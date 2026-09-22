@@ -3,7 +3,7 @@
  * covers the per-family wish list, not the browse page itself).
  *
  *  - Cards show fully-approved families only; unapproved families are hidden.
- *  - Member-count and age-range filters narrow the card list.
+ *  - The member-count filters narrow the card list.
  *  - The sort button cycles family size / youngest age (both directions) and
  *    persists the choice in the URL.
  *
@@ -165,7 +165,7 @@ test.describe.serial("Public Families Browse", () => {
     /* The demo CSV has more fully-approved families than fit on one browse
        page (page size 12), so narrow to ≤3-member families: our A (3) and B (1)
        then share page 1 with at most a handful of demo families. */
-    await page.getByLabel("Max Members").fill("3");
+    await page.getByLabel("Max Family Members").fill("3");
     await waitListLoaded(page);
 
     /* Approved families appear as cards with member count + age range */
@@ -190,63 +190,39 @@ test.describe.serial("Public Families Browse", () => {
 
     /* Start from a narrowed list (demo CSV has more approved families than
        one page holds) so both scenario cards are on page 1. */
-    await page.getByLabel("Max Members").fill("3");
+    await page.getByLabel("Max Family Members").fill("3");
     await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
 
-    /* Min Members = 3 → only 3-member families: A stays, B (1 member) drops */
-    await page.getByLabel("Min Members").fill("3");
+    /* Min Family Members = 3 → only 3-member families: A stays, B (1 member) drops */
+    await page.getByLabel("Min Family Members").fill("3");
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toHaveCount(0);
 
-    /* Clearing just the min restores B (Max Members = 3 still applies) */
-    await page.getByLabel("Min Members").fill("");
+    /* Clearing just the min restores B (Max Family Members = 3 still applies) */
+    await page.getByLabel("Min Family Members").fill("");
     await waitListLoaded(page);
     await expect(cardA).toBeVisible({ timeout: 10_000 });
     await expect(cardB).toBeVisible();
 
-    /* Max Members = 1 → only the 1-member family B */
-    await page.getByLabel("Max Members").fill("1");
+    /* Max Family Members = 1 → only the 1-member family B */
+    await page.getByLabel("Max Family Members").fill("1");
     await expect(cardB).toBeVisible({ timeout: 10_000 });
     await expect(cardA).toHaveCount(0);
 
     /* Clear resets the filter inputs */
     await page.getByRole("button", { name: "Clear" }).click();
     await waitListLoaded(page);
-    expect(await page.getByLabel("Min Members").inputValue()).toBe("");
-    expect(await page.getByLabel("Max Members").inputValue()).toBe("");
-  });
-
-  test("age filters narrow the card list", async ({ page }) => {
-    await page.goto("/families");
-    const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
-    const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
-
-    /* Start from a narrowed list (demo CSV has more approved families than
-       one page holds) so both scenario cards are on page 1. */
-    await page.getByLabel("Max Members").fill("3");
-    await waitListLoaded(page);
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toBeVisible();
-
-    /* Min Age = 20 → youngest-in-family ≥ 20: excludes A (youngest 3), keeps B (25) */
-    await page.getByLabel("Min Age").fill("20");
-    await expect(cardB).toBeVisible({ timeout: 10_000 });
-    await expect(cardA).toHaveCount(0);
-
-    /* Clearing just the min age restores A (Max Members = 3 still applies) */
-    await page.getByLabel("Min Age").fill("");
-    await waitListLoaded(page);
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toBeVisible();
+    expect(await page.getByLabel("Min Family Members").inputValue()).toBe("");
+    expect(await page.getByLabel("Max Family Members").inputValue()).toBe("");
   });
 
   test("sort button cycles options and persists the choice in the URL", async ({ page }) => {
     await page.goto("/families");
     /* Start from a narrowed list so A and B share page 1 under every sort
        (demo CSV has more approved families than one page holds). */
-    await page.getByLabel("Max Members").fill("3");
+    await page.getByLabel("Max Family Members").fill("3");
     await waitListLoaded(page);
     await expect(page.getByRole("button", { name: "Sort: Default" })).toBeVisible({ timeout: 10_000 });
 

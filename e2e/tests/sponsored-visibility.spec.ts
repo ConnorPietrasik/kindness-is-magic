@@ -132,7 +132,7 @@ test.describe.serial("Sponsored visibility", () => {
        ?show_sponsored=true URL param must not reveal it to anonymous visitors. */
     await page.goto("/families?show_sponsored=true");
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel("Max Members").fill("1");
+    await page.getByLabel("Max Family Members").fill("1");
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await expect(card).toHaveCount(0);
   });
@@ -147,7 +147,7 @@ test.describe.serial("Sponsored visibility", () => {
     await page.getByLabel("Show sponsored families").check();
     await expect(page).toHaveURL(/show_sponsored=true/);
     /* 1-member narrowing — same rationale as the anonymous test in this file */
-    await page.getByLabel("Max Members").fill("1");
+    await page.getByLabel("Max Family Members").fill("1");
     await expect(card).toBeVisible({ timeout: 10_000 });
     await expect(card).toContainText("Sponsored");
   });
@@ -169,7 +169,7 @@ test.describe.serial("Sponsored visibility", () => {
       const card = page.locator("div.grid > a").filter({ hasText: BIO_A });
       await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
       /* 1-member narrowing — same rationale as the anonymous test in this file */
-      await page.getByLabel("Max Members").fill("1");
+      await page.getByLabel("Max Family Members").fill("1");
       /* The donor's OWN claim stays visible without the admin toggle */
       await expect(card).toBeVisible({ timeout: 10_000 });
       await expect(card).toContainText("Your Sponsorship");
