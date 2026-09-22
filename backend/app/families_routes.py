@@ -33,6 +33,7 @@ from app.models import (
     FamilyClaim,
     Person,
     User,
+    UserRole,
     WishLockLevel,
 )
 from app.response_builders import (
@@ -82,19 +83,32 @@ def list_public_families(
     * Only returns families that are: verified, not soft-deleted, and
       wish_lock_level == admin (fully reviewed).
     * Families that already have a sponsor (active or fulfilled claim) are
-      hidden by default; pass ``show_sponsored=true`` to include them.
+      hidden by default — except the logged-in user's own claim, which stays
+      visible with the ``claimed_by_current_user`` badge. Pass
+      ``show_sponsored=true`` to include every claim (admin-only; the
+      param is ignored for anonymous visitors and non-admins).
     * Supports pagination, filtering by person count / age range, and sorting.
     * Sets ``sponsored`` on families with a non-deleted claim, and
       ``claimed_by_current_user`` on families the current user claimed.
+    * ``fulfilled_count`` is the global count of families whose sponsorship
+      was completed (non-deleted fulfilled claim on a non-deleted family);
+      it is not affected by the list filters.
     """
-    # Extract current user id from access token (no DB lookup)
+    # Extract current user id + role from access token (no DB lookup)
     current_user_id: int | None = None
+    is_admin = False
     if access_token:
         try:
             payload = decode_access_token(access_token)
             current_user_id = int(payload.get("sub"))
+            is_admin = payload.get("role") == UserRole.admin
         except Exception:
             pass
+
+    # ``show_sponsored`` is an admin-only convenience — ignore it for
+    # anonymous visitors and non-admins.
+    if not is_admin:
+        show_sponsored = False
 
     # Base query: active, verified, admin-locked families
     query = db.query(Family).filter(
@@ -104,10 +118,17 @@ def list_public_families(
     )
 
     # Hide already-sponsored families (active or fulfilled claim) by default.
-    # A soft-deleted claim does not count — the family is available again.
+    # The logged-in user keeps seeing their own claim; a soft-deleted claim
+    # does not count — the family is available again.
     if not show_sponsored:
-        claimed_families = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
-        query = query.filter(Family.id.notin_(claimed_families))
+        if current_user_id is not None:
+            other_claims = select(FamilyClaim.family_id).where(
+                FamilyClaim.deleted_at.is_(None),
+                FamilyClaim.donor_user_id != current_user_id,
+            )
+        else:
+            other_claims = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
+        query = query.filter(Family.id.notin_(other_claims))
 
     # Build filter conditions using correlated subqueries
     filters = []
@@ -193,12 +214,28 @@ def list_public_families(
 
     total_pages = math.ceil(total / page_size) if total else 0
 
+    # Global milestone count: families whose sponsorship is fulfilled. The
+    # family join excludes soft-deleted families (deletion doesn't cascade to
+    # claims). One non-deleted claim per family is enforced by the partial
+    # unique index, so counting claims == counting families.
+    fulfilled_count = (
+        db.query(func.count(FamilyClaim.id))
+        .join(Family, Family.id == FamilyClaim.family_id)
+        .filter(
+            FamilyClaim.deleted_at.is_(None),
+            FamilyClaim.fulfilled_at.isnot(None),
+            Family.deleted_at.is_(None),
+        )
+        .scalar()
+    )
+
     return PublicFamilyListResponse(
         families=result_families,
         total=total,
         page=page,
         page_size=page_size,
         total_pages=total_pages,
+        fulfilled_count=fulfilled_count,
     )
 
 

@@ -14,11 +14,19 @@ import { Pagination } from "../components/Pagination";
 import { PublicHeader } from "../components/PublicHeader";
 import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
+import { useAuth } from "../context/AuthContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
 import { publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import type { PublicFamilySummary } from "../types";
+
+/* ------------------------------------------------------------------ */
+/* Constants                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Show the milestone banner once this many families are fully sponsored. */
+const FULLY_SPONSORED_MILESTONE = 5;
 
 /* ------------------------------------------------------------------ */
 /* Sort options                                                        */
@@ -60,13 +68,16 @@ const DEFAULT_FILTERS: FilterState = {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PublicFamilies() {
+  const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
 
-  // Sort and the sponsored toggle are persisted in URL so they survive refresh
+  // Sort is persisted in URL so it survives refresh. The sponsored toggle is
+  // admin-only — an admin's shared ?show_sponsored=true link must not reveal
+  // sponsored families to non-admins.
   const urlSort = searchParams.get("sort");
   const initialSort: SortValue = SORT_CYCLE.includes(urlSort as SortValue) ? (urlSort as SortValue) : null;
-  const initialShowSponsored = searchParams.get("show_sponsored") === "true";
+  const initialShowSponsored = isAdmin && searchParams.get("show_sponsored") === "true";
 
   // Local filter inputs (sort + sponsored toggle start from URL)
   const [filters, setFilters] = useState<FilterState>(() => ({
@@ -86,7 +97,7 @@ export default function PublicFamilies() {
       } else {
         params.delete("sort");
       }
-      if (filters.showSponsored) {
+      if (isAdmin && filters.showSponsored) {
         params.set("show_sponsored", "true");
       } else {
         params.delete("show_sponsored");
@@ -107,7 +118,7 @@ export default function PublicFamilies() {
   if (debouncedFilters.minAge) apiParams.min_age = parseInt(debouncedFilters.minAge, 10);
   if (debouncedFilters.maxAge) apiParams.max_age = parseInt(debouncedFilters.maxAge, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
-  if (debouncedFilters.showSponsored) apiParams.show_sponsored = true;
+  if (isAdmin && debouncedFilters.showSponsored) apiParams.show_sponsored = true;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [...publicFamilies, apiParams],
@@ -169,6 +180,16 @@ export default function PublicFamilies() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Families Needing Gifts</h1>
           <p className="mt-1 text-sm text-gray-500">Browse families and view their wish lists to help this holiday season.</p>
         </div>
+
+        {/* Milestone banner — shown once enough families are fully sponsored */}
+        {data.fulfilled_count >= FULLY_SPONSORED_MILESTONE && (
+          <div
+            role="status"
+            className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+          >
+            🎉 {data.fulfilled_count} families fully sponsored so far
+          </div>
+        )}
 
         {/* Filter bar */}
         <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -241,16 +262,18 @@ export default function PublicFamilies() {
             Sort: {sortLabel}
           </button>
 
-          <label htmlFor="show-sponsored" className="flex cursor-pointer items-center gap-2 pb-1.5 text-sm font-medium text-gray-700">
-            <input
-              id="show-sponsored"
-              type="checkbox"
-              checked={filters.showSponsored}
-              onChange={(e) => handleShowSponsoredChange(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Show sponsored families
-          </label>
+          {isAdmin && (
+            <label htmlFor="show-sponsored" className="flex cursor-pointer items-center gap-2 pb-1.5 text-sm font-medium text-gray-700">
+              <input
+                id="show-sponsored"
+                type="checkbox"
+                checked={filters.showSponsored}
+                onChange={(e) => handleShowSponsoredChange(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Show sponsored families
+            </label>
+          )}
 
           {(filters.minPersonCount ||
             filters.maxPersonCount ||

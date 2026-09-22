@@ -52,6 +52,7 @@ const mockResponse = {
   page: 1,
   page_size: 12,
   total_pages: 1,
+  fulfilled_count: 0,
 };
 
 const mockUser: User = {
@@ -59,6 +60,16 @@ const mockUser: User = {
   email: "donor@example.com",
   role: "donor",
   display_name: "Donor",
+  referrer_id: null,
+  family_id: null,
+  created_at: "2025-01-14T12:00:00Z",
+};
+
+const mockAdmin: User = {
+  id: 1,
+  email: "admin@example.com",
+  role: "admin",
+  display_name: "Admin",
   referrer_id: null,
   family_id: null,
   created_at: "2025-01-14T12:00:00Z",
@@ -279,20 +290,38 @@ describe("PublicFamilies", () => {
     expect(screen.queryByText("Sponsored")).not.toBeInTheDocument();
   });
 
-  it("renders the show-sponsored checkbox, unchecked by default", async () => {
+  it("hides the show-sponsored checkbox from anonymous visitors", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
     wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByLabelText("Show sponsored families")).not.toBeInTheDocument();
+  });
+
+  it("hides the show-sponsored checkbox from non-admin logged-in users", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />, "/families", mockUser);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByLabelText("Show sponsored families")).not.toBeInTheDocument();
+  });
+
+  it("shows the show-sponsored checkbox to admins, unchecked by default", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />, "/families", mockAdmin);
 
     const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
     expect(checkbox).not.toBeChecked();
   });
 
-  it("toggling show-sponsored refetches with show_sponsored=true", async () => {
+  it("toggling show-sponsored as admin refetches with show_sponsored=true", async () => {
     const user = userEvent.setup();
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
-    wrap(<PublicFamilies />);
+    wrap(<PublicFamilies />, "/families", mockAdmin);
 
     const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
     await user.click(checkbox);
@@ -306,6 +335,47 @@ describe("PublicFamilies", () => {
     );
   });
 
+  it("ignores a ?show_sponsored=true URL param for non-admins", async () => {
+    const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    // A donor pasting an admin's shareable link must not get sponsored families
+    wrap(<PublicFamilies />, "/families?show_sponsored=true", mockUser);
+
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const params = spy.mock.calls[0]?.[0];
+    expect(params?.show_sponsored).toBeUndefined();
+    expect(screen.queryByLabelText("Show sponsored families")).not.toBeInTheDocument();
+  });
+
+  it("restores the show-sponsored checkbox from the URL for admins", async () => {
+    const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />, "/families?show_sponsored=true", mockAdmin);
+
+    const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
+    expect(checkbox).toBeChecked();
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.objectContaining({ show_sponsored: true })));
+  });
+
+  /* Fully-sponsored milestone banner */
+
+  it("shows the milestone banner at 5+ fulfilled families", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, fulfilled_count: 7 });
+
+    wrap(<PublicFamilies />);
+
+    expect(await screen.findByText(/7 families fully sponsored so far/)).toBeInTheDocument();
+  });
+
+  it("hides the milestone banner below 5 fulfilled families", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, fulfilled_count: 4 });
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByText(/families fully sponsored so far/)).not.toBeInTheDocument();
+  });
+
   it("shows empty state when no families", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue({
       families: [],
@@ -313,6 +383,7 @@ describe("PublicFamilies", () => {
       page: 1,
       page_size: 12,
       total_pages: 0,
+      fulfilled_count: 0,
     });
 
     wrap(<PublicFamilies />);

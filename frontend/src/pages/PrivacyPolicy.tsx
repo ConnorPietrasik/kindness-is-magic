@@ -70,8 +70,8 @@ export default function PrivacyPolicy() {
       <p>
         What is public: the family introduction, the family wish, each member’s first name, family role, age, and short note, the wish
         details, the family size and age range, and whether the family has a sponsor (on the browse page, already-sponsored families are
-        hidden by default but can be shown with a filter). What is never public: the family name, contact name, address, or phone number;
-        the identity or contact information of donor sponsors; and internal program notes.
+        hidden, except a donor’s own family; administrators can reveal all of them). What is never public: the family name, contact name,
+        address, or phone number; the identity or contact information of donor sponsors; and internal program notes.
       </p>
 
       <h2>How We Use and Share Information</h2>

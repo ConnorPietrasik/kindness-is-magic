@@ -554,6 +554,8 @@ export interface PublicFamilyListResponse {
   page: number;
   page_size: number;
   total_pages: number;
+  /** Number of families whose sponsorship is fulfilled (global, filter-independent). */
+  fulfilled_count: number;
 }
 
 // ---------------------------------------------------------------------------

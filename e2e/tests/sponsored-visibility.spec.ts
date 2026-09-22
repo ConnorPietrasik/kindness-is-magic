@@ -1,13 +1,15 @@
 /**
  * Sponsored visibility — sponsored families and their status.
  *
- *  - /families hides families that already have a sponsor by default;
- *    the "Show sponsored families" toggle (URL-persisted) reveals them
- *    with a "Sponsored" badge.
+ *  - /families hides families that other people sponsor from every visitor
+ *    (anonymous or logged-in). The donor's OWN sponsored family stays visible
+ *    with a "Your Sponsorship" badge.
+ *  - The "Show sponsored families" toggle (URL-persisted) is admin-only and
+ *    reveals all sponsored families with a "Sponsored" badge. Non-admins are
+ *    unaffected even with ?show_sponsored=true in the URL (admin share link).
  *  - The public wish list tells EVERY visitor the sponsorship status
  *    (no "Sponsor this family" CTA) so nobody is surprised by the 409.
- *  - The claiming donor sees "Your Sponsorship" on the browse card and
- *    their own status + claim-detail link on the wish list.
+ *  - The claiming donor sees their own status + claim-detail link on the wish list.
  *
  * Setup: referrer → fully-approved family A → donor claims A via API.
  * All data is API-created and cleaned up in afterAll.
@@ -27,7 +29,7 @@ import {
   deleteClaimViaApi,
   loginViaApi,
 } from "../helpers/api";
-import { loginAs } from "../helpers/auth";
+import { loginAs, loginAsAdmin } from "../helpers/auth";
 import { getBaseUrl } from "../helpers/env";
 
 const SUFFIX = Math.random().toString(36).slice(2, 8);
@@ -111,7 +113,9 @@ test.describe.serial("Sponsored visibility", () => {
     await admin.dispose();
   });
 
-  test("browse page hides sponsored families by default and the toggle reveals them", async ({ page }) => {
+  test("browse page hides sponsored families from anonymous visitors (toggle hidden, URL param ignored)", async ({
+    page,
+  }) => {
     await page.goto("/families");
     const card = page.locator("div.grid > a").filter({ hasText: BIO_A });
     /* While the list is in flight the whole page is a spinner, so a visible
@@ -119,16 +123,31 @@ test.describe.serial("Sponsored visibility", () => {
        below cannot race the fetch. */
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await expect(card).toHaveCount(0);
+    /* The toggle is admin-only — anonymous visitors never see it */
+    await expect(page.getByLabel("Show sponsored families")).toHaveCount(0);
 
     /* Our family has exactly one member (no demo family does), so narrowing to
        1-member families keeps it on page 1 even though the demo CSV has more
-       fully-approved families than one browse page holds. */
+       fully-approved families than one browse page holds. The admin-only
+       ?show_sponsored=true URL param must not reveal it to anonymous visitors. */
+    await page.goto("/families?show_sponsored=true");
+    await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await page.getByLabel("Max Members").fill("1");
+    await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+    await expect(card).toHaveCount(0);
+  });
+
+  test("admin sees the show-sponsored toggle and it reveals sponsored families", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto("/families");
+    const card = page.locator("div.grid > a").filter({ hasText: BIO_A });
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await expect(card).toHaveCount(0);
 
     await page.getByLabel("Show sponsored families").check();
     await expect(page).toHaveURL(/show_sponsored=true/);
+    /* 1-member narrowing — same rationale as the anonymous test in this file */
+    await page.getByLabel("Max Members").fill("1");
     await expect(card).toBeVisible({ timeout: 10_000 });
     await expect(card).toContainText("Sponsored");
   });
@@ -139,19 +158,22 @@ test.describe.serial("Sponsored visibility", () => {
     await expect(page.getByRole("button", { name: "Sponsor this family" })).toHaveCount(0);
   });
 
-  test("claiming donor sees own-sponsorship badge and status with details link", async ({ browser }) => {
+  test("claiming donor sees own sponsored family (badge, no toggle) and status with details link", async ({
+    browser,
+  }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
       await loginAs(page, { email: testData.donorEmail!, password: PASSWORD });
-      await page.goto("/families?show_sponsored=true");
+      await page.goto("/families");
       const card = page.locator("div.grid > a").filter({ hasText: BIO_A });
       await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
-      /* 1-member narrowing — same rationale as the first test in this file */
+      /* 1-member narrowing — same rationale as the anonymous test in this file */
       await page.getByLabel("Max Members").fill("1");
-      await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+      /* The donor's OWN claim stays visible without the admin toggle */
       await expect(card).toBeVisible({ timeout: 10_000 });
       await expect(card).toContainText("Your Sponsorship");
+      await expect(page.getByLabel("Show sponsored families")).toHaveCount(0);
 
       await page.goto(`/families/${testData.familyId}/wish-list`);
       await expect(page.getByText("You are sponsoring this family")).toBeVisible({ timeout: 10_000 });

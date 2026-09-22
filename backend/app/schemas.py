@@ -1312,6 +1312,8 @@ class PublicFamilyListResponse(BaseModel):
     page: int = 1
     page_size: int = 12
     total_pages: int = 0
+    # Number of families whose sponsorship is fulfilled (global, filter-independent)
+    fulfilled_count: int = 0
 
 
 # ---------------------------------------------------------------------------

@@ -945,8 +945,9 @@ class TestFulfill:
 
 class TestPublicFamiliesClaimedFlag:
     def test_browse_as_donor_claimed_true(self, test_client: TestClient, db: Session):
-        """Browse families as donor (show_sponsored) → claimed_by_current_user is
-        true for own claims. Sponsored families are hidden from the default list."""
+        """Browse families as donor → claimed_by_current_user is true for own
+        claims. The donor's own sponsored family stays in the default list;
+        show_sponsored is admin-only, so a donor gets the same list with it."""
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
@@ -956,10 +957,14 @@ class TestPublicFamiliesClaimedFlag:
             json={"commitment_type": "gifts"},
         )
 
-        # Default list hides the donor's own (now-sponsored) family
+        # Default list keeps the donor's own (now-sponsored) family, badged
         families = test_client.get("/api/families").json()["families"]
-        assert not any(f["id"] == fam.id for f in families)
+        claimed = [f for f in families if f["id"] == fam.id]
+        assert len(claimed) == 1
+        assert claimed[0]["sponsored"] is True
+        assert claimed[0]["claimed_by_current_user"] is True
 
+        # show_sponsored is ignored for non-admins — the donor sees the same list
         resp = test_client.get("/api/families?show_sponsored=true")
         assert resp.status_code == 200
         families = resp.json()["families"]
