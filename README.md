@@ -110,12 +110,49 @@ Runtime config lives in `.env` (see `.env.example` for documented defaults): JWT
 
 Business-logic constants — per-family person limit, gift claim cap, refresh-token rotation grace window, and event-deadline enforcement timing — live in `backend/app/config.py` and are changed there in code, not via `.env` (only `APP_BASE_URL` in that file is env-sourced).
 
+## Zeffy (cash sponsorships)
+
+Cash sponsorships are paid on a Zeffy donation form: checkout sends the donor to the org's dedicated sponsorship form, where they enter the cart total by hand (Zeffy can't pre-fill the amount via URL). The app reconciles the payment back to the donor's pending cart by storing the Zeffy payment id on the claim.
+
+A payment can be applied by three paths, all idempotent:
+
+1. **Webhook (primary, automatic)** — when payment lands, Zeffy POSTs `payment.completed` to the app, which verifies the signature and applies the payment to the donor's cart.
+2. **Donor-initiated confirm** — "I completed my payment" on the cart page; the backend queries the Zeffy API for an exact match (same buyer email, amount, USD, paid after the cart's oldest pending claim).
+3. **Admin backstop** — the admin Zeffy payments page lists unmatched campaign payments for manual match / unmatch.
+
+### Setup (Zeffy dashboard)
+
+1. **Create a dedicated donation form** for sponsorships.
+2. **Generate an API key** — Settings → Integrations → API key → `ZEFFY_API_KEY`. The API is rate-limited per *organization* (100 req/min shared across all of its keys), so the client throttles outbound calls to a ~3 s minimum interval by default.
+3. **Note the form's campaign ID** (the dashboard, or one `GET /api/v1/campaigns` call) → `ZEFFY_CAMPAIGN_ID`. Payments on any other campaign are ignored.
+4. **Copy the form's public URL** → `ZEFFY_FORM_URL` (where checkout sends donors).
+5. **Register the webhook** — Settings → Integrations → Webhook:
+   - URL: `https://yourdomain.com/api/zeffy/webhook` (Traefik routes `/api` to the backend; `http://localhost/api/zeffy/webhook` while testing on the dev stack)
+   - Subscribe to the payment-completed event (`payment.completed`)
+   - Copy the `whsec_...` signing secret → `ZEFFY_WEBHOOK_SECRET`
+
+   The app verifies each delivery's `Zeffy-Signature` header (HMAC-SHA256 of `{t}.{rawBody}` under the secret, 5-minute replay window) and 2xx-acks every processed delivery; Zeffy retries non-2xx up to 5 times, and duplicate deliveries are no-ops. While `ZEFFY_WEBHOOK_SECRET` is empty the endpoint returns 503 — the donor-confirm and admin paths keep working, so the site can run before the webhook is wired, but payments won't auto-apply. Rotating the secret in Zeffy kills the old one — re-copy it after any rotation.
+
+### Configuration
+
+| Key | Notes |
+|-----|-------|
+| `ZEFFY_API_KEY` | Org API key (Settings → Integrations); checkout/confirm return 503 without it |
+| `ZEFFY_FORM_URL` | Public URL of the dedicated sponsorship form |
+| `ZEFFY_CAMPAIGN_ID` | UUID of that form's campaign; other campaigns' payments are ignored |
+| `ZEFFY_WEBHOOK_SECRET` | `whsec_...` from the webhook registration; empty = webhook disabled (503) |
+| `ZEFFY_API_BASE` | Local `zeffy-mock` only — remove for real deployments (defaults to `https://api.zeffy.com`) |
+| `ZEFFY_MIN_INTERVAL_SECONDS` | Min spacing between outbound Zeffy calls (default 3; 0 disables — mock only) |
+| `SEND_PAYMENT_CONFIRMED_EMAIL` | `false` (default) — Zeffy already emails the donor a receipt; `true` sends the app's own "payment confirmed" email on top |
+
+`.env.example` ships with the bundled **zeffy-mock** values (a mock API + donation-form page served by the dev stack at `http://localhost:8931/form` — if the dev stack runs on another machine, point `ZEFFY_FORM_URL` at that machine's host instead), so the full cash-sponsorship flow works out of the box for local dev and CI without touching the real API. For live use, replace the keys above with the real ones and remove `ZEFFY_API_BASE` / `ZEFFY_MIN_INTERVAL_SECONDS`. The backend reads these at container start — after editing, (re)start the stack (`./run-compose.sh up -d`, or `prod up -d --build` on the server).
+
 ## Production deployment
 
 The production target is a Raspberry Pi running the **prod stack only**
 (`docker-compose.prod.yml`): Traefik (HTTPS + Let's Encrypt) → nginx (static
 frontend) + FastAPI backend (2 workers) → Postgres. Development happens on
-the workstation with `docker-compose.yml` — never on the Pi.
+the workstation with `docker-compose.yml`.
 
 ### 1. Hardware & OS
 
