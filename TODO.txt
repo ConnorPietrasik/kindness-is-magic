@@ -1,5 +1,4 @@
 Add user guides for each role
-Add real financials
 Change the public family list to say "Family #ID" and use database ID instead of display_id (and make sure the admin views have a column to show the database ID)
 Add wish card generator so that nice wish cards can be easily printed for each wish; include a link in the donor gift-claim email so they can print too
 Split purchased fields into having donors get a different field / automatically separate them in the purchaser / admin fields to avoid admins being confused and thinking that a gift was really confirmed if the donor ends up flaking
