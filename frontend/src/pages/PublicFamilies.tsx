@@ -6,8 +6,8 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
@@ -16,10 +16,10 @@ import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
-import { publicFamilies } from "../lib/queryKeys";
+import { donorListClaims, listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
+import { donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
-import type { PublicFamilySummary } from "../types";
+import { type FamilyClaimSummary, isPendingCash, type PublicFamilySummary } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -64,16 +64,26 @@ const DEFAULT_FILTERS: FilterState = {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PublicFamilies() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isClaimCapable } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
 
-  // Sort is persisted in URL so it survives refresh. The sponsored toggle is
-  // admin-only — an admin's shared ?show_sponsored=true link must not reveal
-  // sponsored families to non-admins.
+  // Sort is persisted in URL so it survives refresh. The show-claimed toggle
+  // is admin-only — an admin's shared ?include_claimed=true link must not
+  // reveal claimed families to non-admins.
   const urlSort = searchParams.get("sort");
   const initialSort: SortValue = SORT_CYCLE.includes(urlSort as SortValue) ? (urlSort as SortValue) : null;
-  const initialShowSponsored = isAdmin && searchParams.get("show_sponsored") === "true";
+  const initialShowSponsored = isAdmin && searchParams.get("include_claimed") === "true";
+
+  // "Sponsored by me" section — the claimant's own claims, visible regardless
+  // of the show-claimed toggle. One card per claim; the grid dedupes these
+  // families out when claimed families are revealed.
+  const { data: myClaims } = useQuery({
+    queryKey: donorClaims,
+    queryFn: () => donorListClaims(),
+    enabled: isClaimCapable,
+  });
+  const myClaimFamilyIds = useMemo(() => new Set((myClaims ?? []).map((c) => c.family.id)), [myClaims]);
 
   // Local filter inputs (sort + sponsored toggle start from URL)
   const [filters, setFilters] = useState<FilterState>(() => ({
@@ -94,9 +104,9 @@ export default function PublicFamilies() {
         params.delete("sort");
       }
       if (isAdmin && filters.showSponsored) {
-        params.set("show_sponsored", "true");
+        params.set("include_claimed", "true");
       } else {
-        params.delete("show_sponsored");
+        params.delete("include_claimed");
       }
       return params;
     });
@@ -112,7 +122,7 @@ export default function PublicFamilies() {
   if (debouncedFilters.minPersonCount) apiParams.min_person_count = parseInt(debouncedFilters.minPersonCount, 10);
   if (debouncedFilters.maxPersonCount) apiParams.max_person_count = parseInt(debouncedFilters.maxPersonCount, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
-  if (isAdmin && debouncedFilters.showSponsored) apiParams.show_sponsored = true;
+  if (isAdmin && debouncedFilters.showSponsored) apiParams.include_claimed = true;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [...publicFamilies, apiParams],
@@ -175,6 +185,18 @@ export default function PublicFamilies() {
           <p className="mt-1 text-sm text-gray-500">Browse families and view their wish lists to help this holiday season.</p>
         </div>
 
+        {/* Sponsored by me — the claimant's own claims, above the grid */}
+        {myClaims && myClaims.length > 0 && (
+          <section aria-label="Sponsored by me" className="mb-6">
+            <h2 className="mb-3 text-lg font-bold text-gray-900">Sponsored by me</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {myClaims.map((claim) => (
+                <SponsoredClaimCard key={claim.id} claim={claim} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Milestone banner — shown once enough families are fully sponsored */}
         {data.fulfilled_count >= FULLY_SPONSORED_MILESTONE && (
           <div
@@ -227,9 +249,9 @@ export default function PublicFamilies() {
           </button>
 
           {isAdmin && (
-            <label htmlFor="show-sponsored" className="flex cursor-pointer items-center gap-2 pb-1.5 text-sm font-medium text-gray-700">
+            <label htmlFor="show-claimed" className="flex cursor-pointer items-center gap-2 pb-1.5 text-sm font-medium text-gray-700">
               <input
-                id="show-sponsored"
+                id="show-claimed"
                 type="checkbox"
                 checked={filters.showSponsored}
                 onChange={(e) => handleShowSponsoredChange(e.target.checked)}
@@ -250,16 +272,19 @@ export default function PublicFamilies() {
           )}
         </div>
 
-        {/* Card grid */}
-        {data.families.length === 0 ? (
+        {/* Card grid — the claimant's own claimed families are deduped out
+            (they appear in the "Sponsored by me" section instead) */}
+        {data.families.filter((family) => !myClaimFamilyIds.has(family.id)).length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white py-16 text-center shadow-sm">
             <p className="text-gray-500">No families available yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.families.map((family) => (
-              <FamilyCard key={family.id} family={family} />
-            ))}
+            {data.families
+              .filter((family) => !myClaimFamilyIds.has(family.id))
+              .map((family) => (
+                <FamilyCard key={family.id} family={family} />
+              ))}
           </div>
         )}
 
@@ -282,21 +307,26 @@ export default function PublicFamilies() {
 /* Family Card                                                         */
 /* ------------------------------------------------------------------ */
 
+/** Claim chip on a revealed (include_claimed) family card. */
+const CLAIM_CHIP: Record<string, { label: string; cls: string }> = {
+  pending: { label: "Awaiting payment", cls: "bg-amber-100 text-amber-800" },
+  active: { label: "Sponsored", cls: "bg-emerald-100 text-emerald-800" },
+  fulfilled: { label: "Fulfilled", cls: "bg-slate-200 text-slate-600" },
+};
+
 function FamilyCard({ family }: { family: PublicFamilySummary }) {
+  const chip = family.claim_status != null ? CLAIM_CHIP[family.claim_status] : null;
+
   return (
     <Link to={route.familyWishList(family.id)}>
       <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="mb-2 flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-gray-900">{family.display_id}</span>
-          {family.claimed_by_current_user ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
-              Your Sponsorship
+          {chip && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${chip.cls}`}>
+              {chip.label}
             </span>
-          ) : family.sponsored ? (
-            <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
-              Sponsored
-            </span>
-          ) : null}
+          )}
         </div>
 
         {family.bio && <p className="mb-3 line-clamp-2 text-sm text-gray-600">{family.bio}</p>}
@@ -318,4 +348,58 @@ function formatAgeRange(minAge: number, maxAge: number | null): string {
     return String(minAge);
   }
   return `${minAge}–${maxAge}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sponsored-by-me card                                                */
+/* ------------------------------------------------------------------ */
+
+/** Per-claim chip: pending cash → amber, other active → green, fulfilled → grey. */
+function sponsoredClaimChip(claim: FamilyClaimSummary): { label: string; cls: string } {
+  if (claim.fulfilled_at != null) return CLAIM_CHIP.fulfilled!;
+  if (isPendingCash(claim)) return CLAIM_CHIP.pending!;
+  return CLAIM_CHIP.active!;
+}
+
+function SponsoredClaimCard({ claim }: { claim: FamilyClaimSummary }) {
+  const navigate = useNavigate();
+  const chip = sponsoredClaimChip(claim);
+  const pending = isPendingCash(claim);
+
+  return (
+    <Link to={route.familyWishList(claim.family.id)}>
+      <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-xl font-bold tracking-tight text-gray-900">{claim.family.display_id}</span>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${chip.cls}`}>
+            {chip.label}
+          </span>
+        </div>
+
+        {claim.family.bio && <p className="mb-3 line-clamp-2 text-sm text-gray-600">{claim.family.bio}</p>}
+
+        <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+          <span className="font-medium">
+            {claim.family.person_count} {claim.family.person_count === 1 ? "member" : "members"}
+          </span>
+          {claim.family.min_age != null && <span>Ages {formatAgeRange(claim.family.min_age, claim.family.max_age)}</span>}
+        </div>
+
+        {pending && (
+          <button
+            type="button"
+            onClick={(e) => {
+              // Go to the cart without following the card's wish-list link.
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(ROUTES.DONOR_CART);
+            }}
+            className="mt-3 inline-block text-xs font-medium text-btn-start hover:underline"
+          >
+            Go to cart →
+          </button>
+        )}
+      </Card>
+    </Link>
+  );
 }

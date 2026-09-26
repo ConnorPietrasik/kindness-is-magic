@@ -12,11 +12,12 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { donorListClaims } from "../lib/api";
+import { PAYMENT_REASSURANCE_COPY } from "../lib/constants";
 import { donorClaims } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
 import type { FamilyClaimSummary } from "../types";
-import { getClaimStatus } from "../types";
+import { getClaimStatus, isPendingCash } from "../types";
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "All" },
@@ -91,6 +92,13 @@ export default function DonorClaims() {
         {/* ── Gift drop-off deadline banner ──────────────────── */}
         <DeadlineBanner result={giftDropoffDeadline} />
 
+        {/* ── Cash payment reassurance (while any claim awaits payment) ── */}
+        {claims.some(isPendingCash) && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {PAYMENT_REASSURANCE_COPY}
+          </div>
+        )}
+
         {claims.length === 0 ? (
           <Card className="py-12 text-center">
             <p className="text-gray-500">You haven't sponsored any families yet.</p>
@@ -139,12 +147,35 @@ function ClaimRow({ claim, displayColumns }: { claim: FamilyClaimSummary; displa
     ),
     status: (
       <Td>
-        <StatusBadge status={getClaimStatus(claim.fulfilled_at)} />
+        {isPendingCash(claim) ? (
+          <div>
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              Awaiting payment
+            </span>
+            {claim.payment_expires_at != null && (
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                {new Date(claim.payment_expires_at).getTime() < Date.now()
+                  ? "Payment window closed"
+                  : `Pay by ${formatDateTime(claim.payment_expires_at)}`}
+              </p>
+            )}
+          </div>
+        ) : (
+          <StatusBadge status={getClaimStatus(claim.fulfilled_at)} />
+        )}
       </Td>
     ),
     commitment: (
       <Td>
-        <CommitmentBadge type={claim.commitment_type} />
+        <div>
+          <CommitmentBadge type={claim.commitment_type} />
+          {claim.commitment_type === "cash" && claim.paid_at != null && (
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              Paid {formatDateTime(claim.paid_at)}
+              {claim.includes_groceries ? " · incl. groceries" : ""}
+            </p>
+          )}
+        </div>
       </Td>
     ),
     created: <Td className="text-xs text-gray-500">{formatDateTime(claim.created_at)}</Td>,
@@ -156,12 +187,22 @@ function ClaimRow({ claim, displayColumns }: { claim: FamilyClaimSummary; displa
         <Fragment key={key}>{cells[key]}</Fragment>
       ))}
       <Td>
-        <Link
-          to={route.donorClaimDetail(claim.id)}
-          className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          View
-        </Link>
+        <div className="flex flex-wrap gap-1.5">
+          {isPendingCash(claim) && (
+            <Link
+              to={ROUTES.DONOR_CART}
+              className="inline-flex items-center rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+            >
+              Go to checkout
+            </Link>
+          )}
+          <Link
+            to={route.donorClaimDetail(claim.id)}
+            className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            View
+          </Link>
+        </div>
       </Td>
     </Tr>
   );

@@ -102,6 +102,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "zeffy-payments",
+      route: ROUTES.ADMIN_ZEFFY_PAYMENTS,
+      icon: "💳",
+      label: "Zeffy Payments",
+      desc: "Review and match unmatched Zeffy donations",
+      visible: true,
+    },
+    {
       key: "browse-families",
       route: ROUTES.PUBLIC_FAMILIES,
       icon: "🎯",

@@ -2,6 +2,7 @@ import enum
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -416,6 +417,12 @@ class EmailKind(str, enum.Enum):
     referrer_rejected = "referrer_rejected"
     claim_confirmation = "claim_confirmation"
     admin_failure_notice = "admin_failure_notice"
+    # Cash sponsorship payment flow (Zeffy): "please pay" nudge at checkout /
+    # gifts→cash toggle, confirmation when a payment is applied, and the
+    # expiry notice when an unpaid claim is swept.
+    payment_request = "payment_request"
+    payment_confirmed = "payment_confirmed"
+    payment_expired = "payment_expired"
 
 
 class EmailStatus(str, enum.Enum):
@@ -543,6 +550,19 @@ class CommitmentType(str, enum.Enum):
     cash = "cash"
 
 
+class ClaimPaymentStatus(str, enum.Enum):
+    """Payment state of a cash claim (gift claims carry no payment step).
+
+    * ``pending`` — cash claim awaiting its payment (Zeffy auto-match, manual
+      confirm, webhook, or offline admin record). Expires at
+      ``created_at + CASH_CLAIM_PAYMENT_HOURS`` (derived, not stored).
+    * ``paid`` — payment received; also the state of every gift claim.
+    """
+
+    pending = "pending"
+    paid = "paid"
+
+
 class FamilyClaim(Base):
     """A donor's claim on a family (gift promise or cash commitment).
 
@@ -570,6 +590,21 @@ class FamilyClaim(Base):
         SAEnum(CommitmentType, name="commitment_type", create_constraint=True),
         nullable=False,
     )
+    # Payment state — cash claims start ``pending`` at checkout and flip to
+    # ``paid`` when the payment is applied; gift claims are always ``paid``
+    # (existing rows migrate to ``paid`` via the server default).
+    payment_status: Mapped[ClaimPaymentStatus] = mapped_column(
+        SAEnum(ClaimPaymentStatus, name="claim_payment_status", create_constraint=True),
+        server_default="paid",
+        nullable=False,
+    )
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    # Zeffy payment covering this claim — indexed but NOT unique: one payment
+    # covers every claim in the cart at once.
+    zeffy_payment_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Groceries add-on ($100) on top of the flat cash amount. Donor-toggled in
+    # the cart (local items) and via the cart item toggle (committed items).
+    includes_groceries: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -87,6 +87,11 @@ const claimBase = {
   family: { id: 5, display_id: "2-1", bio: null, person_count: 3, min_age: null, max_age: null },
   notes: null,
   created_at: "2025-11-01T00:00:00Z",
+  payment_status: "paid" as const,
+  paid_at: null,
+  payment_expires_at: null,
+  zeffy_payment_id: null,
+  includes_groceries: false,
 };
 
 const mockActiveGiftClaim: FamilyClaimSummary = {

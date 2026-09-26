@@ -126,6 +126,14 @@ export interface AdminEmailsListParams extends AdminListParams {
   status?: EmailStatus;
 }
 
+/** Query params for the admin Zeffy payment list (cursor-based Zeffy pagination, not page-based). */
+export interface AdminZeffyPaymentsParams {
+  /** Cursor from the previous page's next_cursor. */
+  starting_after?: string;
+  limit?: number;
+  columns?: string[]; // resolved backend field names (sent as comma-separated)
+}
+
 // ---------------------------------------------------------------------------
 // Paginated list responses
 // ---------------------------------------------------------------------------

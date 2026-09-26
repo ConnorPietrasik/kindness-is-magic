@@ -13,21 +13,16 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import decode_access_token
-from app.config import APP_BASE_URL, GIFT_CLAIM_CAP
+from app.config import GIFT_CLAIM_CAP
 from app.database import get_db
 from app.deadlines import GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
-from app.mail import (
-    build_claim_confirmation_email,
-    build_admin_email_failure_notice,
-    send_email,
-    send_admin_notification,
-)
+from app.mail import send_claim_confirmation
 from app.display_ids import compute_display_ids
 from app.permissions import require_claim_capable
 from app.models import (
+    ClaimPaymentStatus,
     CommitmentType,
     DeadlineType,
-    EmailKind,
     Family,
     FamilyVerificationStatus,
     FamilyClaim,
@@ -41,6 +36,7 @@ from app.response_builders import (
     batch_load_person_wishes,
     build_claim_summary,
     build_family_info,
+    claim_status_for,
     get_active_or_404,
 )
 from app.schemas import (
@@ -73,7 +69,7 @@ def list_public_families(
     min_age: int | None = Query(None, ge=0),
     max_age: int | None = Query(None, ge=0),
     sort: str | None = Query(None),
-    show_sponsored: bool = Query(False),
+    include_claimed: bool = Query(False),
     access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(get_db),
 ) -> PublicFamilyListResponse:
@@ -82,19 +78,20 @@ def list_public_families(
     * No authentication required.
     * Only returns families that are: verified, not soft-deleted, and
       wish_lock_level == admin (fully reviewed).
-    * Families that already have a sponsor (active or fulfilled claim) are
-      hidden by default — except the logged-in user's own claim, which stays
-      visible with the ``claimed_by_current_user`` badge. Pass
-      ``show_sponsored=true`` to include every claim (admin-only; the
-      param is ignored for anonymous visitors and non-admins).
+    * Families with any non-deleted claim (gifts or cash, pending, paid, or
+      fulfilled — exactly what the reservation index blocks) are hidden by
+      default. ``include_claimed=true`` reveals claimed families to admins
+      (all of them) and to the claiming owner (their own only); any other
+      visitor — including anonymous — gets the default hidden list. Revealed
+      items carry ``claim_status`` ("active" / "pending" / "fulfilled" —
+      "pending" = cash, unpaid, not expired).
     * Supports pagination, filtering by person count / age range, and sorting.
-    * Sets ``sponsored`` on families with a non-deleted claim, and
-      ``claimed_by_current_user`` on families the current user claimed.
     * ``fulfilled_count`` is the global count of families whose sponsorship
       was completed (non-deleted fulfilled claim on a non-deleted family);
       it is not affected by the list filters.
     """
-    # Extract current user id + role from access token (no DB lookup)
+    # Extract current user id + role from access token (no DB lookup) —
+    # scopes include_claimed to admin (all claimed) / owner (own claimed).
     current_user_id: int | None = None
     is_admin = False
     if access_token:
@@ -105,11 +102,6 @@ def list_public_families(
         except Exception:
             pass
 
-    # ``show_sponsored`` is an admin-only convenience — ignore it for
-    # anonymous visitors and non-admins.
-    if not is_admin:
-        show_sponsored = False
-
     # Base query: active, verified, admin-locked families
     query = db.query(Family).filter(
         Family.deleted_at.is_(None),
@@ -117,18 +109,25 @@ def list_public_families(
         Family.wish_lock_level == WishLockLevel.admin,
     )
 
-    # Hide already-sponsored families (active or fulfilled claim) by default.
-    # The logged-in user keeps seeing their own claim; a soft-deleted claim
-    # does not count — the family is available again.
-    if not show_sponsored:
+    # Hide families with any active claim by default. The subquery matches
+    # the reservation index (non-deleted claims only), so a family frees the
+    # moment its claim soft-deletes.
+    if not include_claimed:
+        claimed_family_ids = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
+        query = query.filter(Family.id.notin_(claimed_family_ids))
+    elif not is_admin:
+        # include_claimed is gated: an owner passes it and sees their own
+        # claimed families (the browse page's "Sponsored by me" section is
+        # served by GET /api/donor/claims instead); anonymous visitors get
+        # the default fully-hidden list.
         if current_user_id is not None:
-            other_claims = select(FamilyClaim.family_id).where(
+            others_claims = select(FamilyClaim.family_id).where(
                 FamilyClaim.deleted_at.is_(None),
                 FamilyClaim.donor_user_id != current_user_id,
             )
         else:
-            other_claims = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
-        query = query.filter(Family.id.notin_(other_claims))
+            others_claims = select(FamilyClaim.family_id).where(FamilyClaim.deleted_at.is_(None))
+        query = query.filter(Family.id.notin_(others_claims))
 
     # Build filter conditions using correlated subqueries
     filters = []
@@ -177,28 +176,21 @@ def list_public_families(
     # Compute flat-format display IDs (unscoped)
     display_id_map = compute_display_ids(db, "family", families, scope=None)
 
-    # Claim status for the families on this page: who has a sponsor, and
-    # which of those are the current user's own claim (badge distinction).
-    sponsored_family_ids: set[int] = set()
-    claimed_family_ids: set[int] = set()
-    if families:
-        family_ids = [f.id for f in families]
-        claims = (
-            db.query(FamilyClaim.family_id, FamilyClaim.donor_user_id)
-            .filter(
-                FamilyClaim.family_id.in_(family_ids),
+    # Claim status for the revealed (include_claimed) families on this page.
+    claims_by_family: dict[int, FamilyClaim] = {}
+    if include_claimed and families:
+        claims_by_family = {
+            c.family_id: c
+            for c in db.query(FamilyClaim).filter(
+                FamilyClaim.family_id.in_([f.id for f in families]),
                 FamilyClaim.deleted_at.is_(None),
             )
-            .all()
-        )
-        for fam_id, donor_id in claims:
-            sponsored_family_ids.add(fam_id)
-            if donor_id == current_user_id:
-                claimed_family_ids.add(fam_id)
+        }
 
     # Build response items from the single query result
     result_families = []
     for fam, pc, ma, xa in results or []:
+        claim = claims_by_family.get(fam.id)
         result_families.append(
             PublicFamilySummary(
                 id=fam.id,
@@ -207,8 +199,7 @@ def list_public_families(
                 person_count=pc if pc else 0,
                 min_age=ma,
                 max_age=xa,
-                sponsored=fam.id in sponsored_family_ids,
-                claimed_by_current_user=fam.id in claimed_family_ids,
+                claim_status=claim_status_for(claim) if claim is not None else None,
             )
         )
 
@@ -257,9 +248,11 @@ def get_family_wish_list(
     * Families that haven't been fully reviewed (wish_lock_level != admin)
       return 403.
     * Soft-deleted people are excluded from the people list.
-    * ``claim_status`` (active/fulfilled) is public to every visitor so the
-      page can show the sponsored state; ``claimed_by_current_user`` and the
-      claim detail link only apply to the claiming donor.
+    * ``claim_status`` is public to every visitor so the page can show the
+      sponsored state: "active" to non-owners, "pending" only to the owner
+      of an unpaid, not-yet-expired cash claim, "fulfilled" when done;
+      ``claimed_by_current_user`` and the claim detail link only apply to
+      the claiming donor.
     """
     fam = get_active_or_404(db, Family, family_id, "Family not found")
 
@@ -295,7 +288,6 @@ def get_family_wish_list(
     claim_status: str | None = None
     claim_id: int | None = None
     if active_claim:
-        claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
         claim_id = active_claim.id
         # Check if current user is the claim owner
         current_user_id: int | None = None
@@ -307,6 +299,15 @@ def get_family_wish_list(
                 pass
         if current_user_id is not None and active_claim.donor_user_id == current_user_id:
             claimed_by_current_user = True
+        # "pending" is owner-only visibility: other viewers of an unpaid
+        # cash claim see "active" (their discovery path is the 409 at claim
+        # time), while the owner sees the payment-pending state.
+        if active_claim.fulfilled_at is not None:
+            claim_status = "fulfilled"
+        elif claimed_by_current_user and claim_status_for(active_claim) == "pending":
+            claim_status = "pending"
+        else:
+            claim_status = "active"
 
     # Family wish is a wish row — single lookup for this family
     family_wish = batch_load_family_wishes(db, [fam.id]).get(fam.id, "")
@@ -336,116 +337,6 @@ def get_family_wish_list(
 # ---------------------------------------------------------------------------
 
 
-async def _send_claim_confirmation(
-    claim: FamilyClaim,
-    fam: Family,
-    user: User,
-    db: Session,
-) -> str | None:
-    """Send a claim confirmation email for gift commitments.
-
-    Returns an error message string if the email failed, or None on success.
-    """
-    # Build display_id early so the except block can reference it
-    display_id = compute_display_ids(db, "family", [fam], scope=None).get(fam.id, "0")
-
-    try:
-        # Load people + wishes for the email body
-        people = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).order_by(Person.id).all()
-        person_ids = [p.id for p in people]
-        wishes_by_person = batch_load_person_wishes(db, person_ids)
-
-        # Build people data for the template
-        people_data = [
-            {
-                "given_name": p.given_name,
-                "age": p.age,
-                "wishes": [
-                    {"type": w.type.value, "description": w.description, "size": w.size, "color": w.color}
-                    for w in wishes_by_person.get(p.id, [])
-                ],
-            }
-            for p in people
-        ]
-
-        base = APP_BASE_URL
-        claim_detail_url = f"{base}/donor/claims/{claim.id}"
-
-        body = build_claim_confirmation_email(
-            donor_name=user.display_name,
-            family_display_id=display_id,
-            family_wish=batch_load_family_wishes(db, [fam.id]).get(fam.id, ""),
-            family_bio=fam.bio,
-            people=people_data,
-            claim_detail_url=claim_detail_url,
-        )
-
-        result = await send_email(
-            to=user.email,
-            subject=f"Sponsorship Confirmation — Family {display_id}",
-            html_body=body,
-            db=db,
-            kind=EmailKind.claim_confirmation,
-            user_id=user.id,
-        )
-
-        if result["sent"]:
-            return None
-        if result.get("reason") == "unsubscribed":
-            # Unsubscribe suppression is not an error
-            return None
-
-        # SMTP failure or other send failure
-        logger.error(
-            "Claim confirmation email failed: claim_id=%s donor_email=%s family_display_id=%s reason=%s",
-            claim.id,
-            user.email,
-            display_id,
-            result.get("reason"),
-        )
-
-        # Attempt admin notification (non-blocking)
-        try:
-            admin_body = build_admin_email_failure_notice(
-                donor_email=user.email,
-                family_display_id=display_id,
-                claim_id=claim.id,
-                error_summary=result.get("reason", "unknown"),
-            )
-            await send_admin_notification(
-                subject="Sponsorship Confirmation Email Failed",
-                body_html=admin_body,
-                db=db,
-                kind=EmailKind.admin_failure_notice,
-                user_id=user.id,
-            )
-        except Exception:  # noqa: BLE001
-            logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
-
-        return "Confirmation email failed to send"
-
-    except Exception:  # noqa: BLE001
-        # Safety net for template rendering or other unexpected errors
-        logger.error("Unexpected error sending claim confirmation for claim %s", claim.id, exc_info=True)
-        try:
-            admin_body = build_admin_email_failure_notice(
-                donor_email=user.email,
-                family_display_id=display_id,
-                claim_id=claim.id,
-                error_summary="unexpected error",
-            )
-            await send_admin_notification(
-                subject="Sponsorship Confirmation Email Failed",
-                body_html=admin_body,
-                db=db,
-                kind=EmailKind.admin_failure_notice,
-                user_id=user.id,
-            )
-        except Exception:  # noqa: BLE001
-            logger.error("Admin notification also failed for claim %s", claim.id, exc_info=True)
-        return "Confirmation email failed to send"
-
-
 @router.post("/{family_id}/claim", response_model=FamilyClaimSummary, status_code=status.HTTP_201_CREATED)
 async def claim_family(
     family_id: int,
@@ -461,7 +352,24 @@ async def claim_family(
     * If commitment_type == "gifts", user must have < 5 active gift claims.
     * Cash claims have no limit.
     * For gift claims, a confirmation email is sent to the donor.
+
+    Cash is the **admin/referrer recovery path only** (e.g. a donor paid the
+    dedicated form directly with no cart: the admin cash-claims the intended
+    family, then matches the payment). Donors and purchasers create cash
+    claims via the cart checkout — this endpoint 403s their cash requests.
+    Recovery cash claims are created ``pending`` and email-silent (the donor
+    already paid in that flow; the confirmation at match is their email).
     """
+    # 0. Cash door: donors and purchasers use the cart checkout, not this
+    #    endpoint (an open donor cash POST would let anyone hide families
+    #    unpaid — claimed families are hidden by default, and cash has no cap
+    #    like gifts' GIFT_CLAIM_CAP).
+    if data.commitment_type == CommitmentType.cash and user.role not in (UserRole.admin, UserRole.referrer):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cash sponsorships are created at checkout — add the family to your cart and pay.",
+        )
+
     # 1. Validate family exists, is active, and is fully reviewed
     fam = get_active_or_404(db, Family, family_id, "Family not found")
     if fam.wish_lock_level != WishLockLevel.admin:
@@ -511,11 +419,14 @@ async def claim_family(
                 detail=f"Gift sponsorship limit of {GIFT_CLAIM_CAP} reached",
             )
 
-    # 4. Create the claim
+    # 4. Create the claim — cash enters the payment flow as pending (no
+    #    nudge email: the recovery flow's donor already paid; the
+    #    confirmation at match is their email). Gifts are always "paid".
     claim = FamilyClaim(
         donor_user_id=user.id,
         family_id=family_id,
         commitment_type=data.commitment_type,
+        payment_status=ClaimPaymentStatus.pending if data.commitment_type == CommitmentType.cash else ClaimPaymentStatus.paid,
     )
     db.add(claim)
     db.commit()
@@ -523,9 +434,10 @@ async def claim_family(
 
     logger.info("User %s claimed family %s (commitment=%s)", user.id, family_id, data.commitment_type.value)
 
-    # 5. Send confirmation email for gift claims
+    # 5. Send confirmation email for gift claims (cash recovery claims are
+    #    email-silent until the payment is matched)
     email_error: str | None = None
     if data.commitment_type == CommitmentType.gifts:
-        email_error = await _send_claim_confirmation(claim, fam, user, db)
+        email_error = await send_claim_confirmation(claim, fam, user, db)
 
     return build_claim_summary(claim, build_family_info(fam, db), email_error=email_error)

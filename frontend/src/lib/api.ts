@@ -20,6 +20,10 @@ import type {
   AdminUserUpdate,
   AdminWishesListParams,
   AdminWishUpdate,
+  AdminZeffyPaymentsParams,
+  CartCheckoutItem,
+  CartCheckoutResult,
+  CartConfirmResult,
   CommitmentType,
   Deadline,
   DeadlineCreate,
@@ -27,6 +31,8 @@ import type {
   DeadlineUpdate,
   DeliveryFamilySummary,
   DeliverySlipItem,
+  DonorCart,
+  DonorCartItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishPurchaseMark,
@@ -77,6 +83,10 @@ import type {
   WishListResponse,
   WishPurchaseMark,
   WishSummary,
+  ZeffyMatchResult,
+  ZeffyPaymentsResponse,
+  ZeffyPendingClaimsResponse,
+  ZeffyUnmatchResult,
 } from "../types";
 import { normalizePayload } from "./utils";
 
@@ -685,7 +695,7 @@ export interface PublicFamiliesListParams {
   max_age?: number;
   sort?: string;
   /** Include families that already have a sponsor (default: hide them). */
-  show_sponsored?: boolean;
+  include_claimed?: boolean;
 }
 
 /** Public: list all fully-approved families for donor browsing (no auth required). */
@@ -770,6 +780,55 @@ export function donorMarkWishPurchased(claimId: number, wishId: number, payload:
 /** Admin: fulfill a claim. */
 export function donorFulfillClaim(claimId: number): Promise<FamilyClaimSummary> {
   return apiPost(`/api/donor/claims/${claimId}/fulfill`);
+}
+
+// ---------------------------------------------------------------------------
+// Donor — Cart (cash sponsorship checkout)
+// ---------------------------------------------------------------------------
+
+/** Get the donor's committed (in-progress) pending cash claims — the server half of the cart page. */
+export function donorGetCart(): Promise<DonorCart> {
+  return apiGet("/api/donor/cart");
+}
+
+/** Toggle the groceries add-on on the donor's own pending cash claim. */
+export function donorToggleCartGroceries(claimId: number, includesGroceries: boolean): Promise<DonorCartItem> {
+  return apiPatch(`/api/donor/cart/items/${claimId}`, { includes_groceries: includesGroceries });
+}
+
+/** Commit the uncommitted cart items and get the Zeffy checkout URL for the whole-cart total. */
+export function donorCartCheckout(items: CartCheckoutItem[]): Promise<CartCheckoutResult> {
+  return apiPost("/api/donor/cart/checkout", { items });
+}
+
+/** Manual "I completed my payment" — runs reconciliation against Zeffy (rate-limited server-side). */
+export function donorCartConfirm(): Promise<CartConfirmResult> {
+  return apiPost("/api/donor/cart/confirm");
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Zeffy Payments (unmatched-payment reconciliation)
+// ---------------------------------------------------------------------------
+
+/** List the dedicated campaign's succeeded payments (cursor-based Zeffy pagination). */
+export function adminListZeffyPayments(params?: AdminZeffyPaymentsParams): Promise<ZeffyPaymentsResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/zeffy/payments", p);
+}
+
+/** Every active unpaid cash claim grouped by donor (match-modal data; works unconfigured). */
+export function adminListZeffyPendingClaims(): Promise<ZeffyPendingClaimsResponse> {
+  return apiGet("/api/admin/zeffy/pending-claims");
+}
+
+/** Manually match a payment to the chosen unpaid cash claims. */
+export function adminMatchZeffyPayment(paymentId: string, claimIds: number[]): Promise<ZeffyMatchResult> {
+  return apiPost(`/api/admin/zeffy/payments/${paymentId}/match`, { claim_ids: claimIds });
+}
+
+/** Unmatch a payment — reverts its claims to pending with a fresh payment window (correction path). */
+export function adminUnmatchZeffyPayment(paymentId: string): Promise<ZeffyUnmatchResult> {
+  return apiPost(`/api/admin/zeffy/payments/${paymentId}/unmatch`);
 }
 
 // ---------------------------------------------------------------------------

@@ -36,6 +36,7 @@ const AdminDeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() 
 const AdminWishes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishes"));
 const AdminAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminAssignedGifts"));
 const AdminEmails: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmails"));
+const AdminZeffyPayments: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminZeffyPayments"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
@@ -48,6 +49,7 @@ const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => i
 const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
 const DonorClaimDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaimDetail"));
+const DonorCart: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorCart"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -225,6 +227,14 @@ export default function App() {
           }
         />
         <Route
+          path={ROUTES.ADMIN_ZEFFY_PAYMENTS}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminZeffyPayments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path={ROUTES.ADMIN_REFERRERS}
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
@@ -383,6 +393,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
               <DonorClaimDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DONOR_CART}
+          element={
+            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+              <DonorCart />
             </ProtectedRoute>
           }
         />

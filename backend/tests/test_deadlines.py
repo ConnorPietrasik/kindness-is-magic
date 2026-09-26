@@ -587,11 +587,17 @@ class TestGiftClaimGate:
         _admin_login(test_client)
         fam = _create_claimable_family(db)
         _create_deadline(test_client, type="gift_dropoff", label="Gift drop-off", due_date=PAST_DUE, mode="enforced")
-        _create_user(test_client, "cashdonor@test.com", "donor")
-        login_as(test_client, "cashdonor@test.com", ROLE_PASSWORD)
 
+        # Cash is the admin/referrer recovery path (donors use the cart
+        # checkout) and is unaffected by the gift gate — the admin's cash
+        # claim succeeds while gifts are blocked.
         resp = test_client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "cash"})
         assert resp.status_code == 201
+
+        # ...whereas a gift claim on the same armed deadline is still 400
+        fam2 = _create_claimable_family(db)
+        resp = test_client.post(f"/api/families/{fam2.id}/claim", json={"commitment_type": "gifts"})
+        assert resp.status_code == 400
 
     def test_deleting_the_row_unblocks_the_claim(self, test_client: TestClient, db: Session, admin_user):
         _admin_login(test_client)

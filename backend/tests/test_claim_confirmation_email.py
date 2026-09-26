@@ -481,7 +481,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append({"to": to, "subject": subject, "body": html_body})
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -494,9 +494,12 @@ class TestClaimConfirmationEmailOnCreation:
         assert sent_emails[0]["to"] == DONOR_EMAIL
         assert "Sponsorship Confirmation" in sent_emails[0]["subject"]
 
-    def test_cash_claim_does_not_send_email(self, test_client: TestClient, db: Session):
-        """Cash claim → no email sent."""
-        _create_donor(test_client)
+    def test_cash_claim_does_not_send_email(self, test_client: TestClient, db: Session, admin_user):
+        """Admin cash claim (recovery path) → no email sent — the donor in
+        that flow already paid; the confirmation at match is their email."""
+        from tests.conftest import login_as
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
         data = _create_claimed_family(db)
         fam = data["family"]
 
@@ -506,7 +509,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append({"to": to})
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "cash"},
@@ -532,8 +535,8 @@ class TestClaimConfirmationEmailOnCreation:
             admin_notifications.append({"subject": subject, "body": body_html})
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_fail_send):
-            with patch("app.families_routes.send_admin_notification", new=_capture_admin):
+        with patch("app.mail.send_email", new=_fail_send):
+            with patch("app.mail.send_admin_notification", new=_capture_admin):
                 resp = test_client.post(
                     f"/api/families/{fam.id}/claim",
                     json={"commitment_type": "gifts"},
@@ -558,7 +561,7 @@ class TestClaimConfirmationEmailOnCreation:
         async def _unsubscribed_send(to, subject, html_body, db=None, **kwargs):
             return {"sent": False, "reason": "unsubscribed"}
 
-        with patch("app.families_routes.send_email", new=_unsubscribed_send):
+        with patch("app.mail.send_email", new=_unsubscribed_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -580,7 +583,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append(html_body)
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -609,7 +612,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append(html_body)
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -634,7 +637,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append(html_body)
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -660,7 +663,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append(html_body)
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -682,7 +685,7 @@ class TestClaimConfirmationEmailOnCreation:
             sent_emails.append(html_body)
             return {"sent": True, "reason": None}
 
-        with patch("app.families_routes.send_email", new=_capture_send):
+        with patch("app.mail.send_email", new=_capture_send):
             resp = test_client.post(
                 f"/api/families/{fam.id}/claim",
                 json={"commitment_type": "gifts"},
@@ -704,8 +707,8 @@ class TestClaimConfirmationEmailOnCreation:
         async def _fail_admin(subject, body_html, db=None, **kwargs):
             raise Exception("Admin SMTP also broken")
 
-        with patch("app.families_routes.send_email", new=_fail_send):
-            with patch("app.families_routes.send_admin_notification", new=_fail_admin):
+        with patch("app.mail.send_email", new=_fail_send):
+            with patch("app.mail.send_admin_notification", new=_fail_admin):
                 resp = test_client.post(
                     f"/api/families/{fam.id}/claim",
                     json={"commitment_type": "gifts"},

@@ -289,6 +289,18 @@ export function clearPendingClaimFamilyId(): void {
 }
 
 /**
+ * parseCheckoutConflictFamilyId — extract the family id from a cart-checkout
+ * 409 detail. The backend names the family in a fixed, parseable phrasing
+ * ("Family 3-2-1 (id 42) was just sponsored — …" / "… is already in your cart")
+ * so the frontend can drop exactly that local cart item by id. Returns null
+ * for the rare race-fallback 409 that carries no id.
+ */
+export function parseCheckoutConflictFamilyId(detail: string): number | null {
+  const match = /\(id (\d+)\)/.exec(detail);
+  return match ? Number(match[1]) : null;
+}
+
+/**
  * formatApiError — extract a user-facing error string from an axios error.
  *
  * Tries these sources in order:

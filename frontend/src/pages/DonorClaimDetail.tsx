@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -19,7 +19,8 @@ import { useToast } from "../context/ToastContext";
 import { type UseColumnOrderResult, useColumnOrder } from "../hooks/useColumnOrder";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
-import { donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
+import { PAYMENT_REASSURANCE_COPY } from "../lib/constants";
+import { donorCart, donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
 import type {
@@ -31,12 +32,13 @@ import type {
   WishSummary,
   WishType,
 } from "../types";
-import { getClaimStatus, personRoleLabel } from "../types";
+import { getClaimStatus, isPendingCash, personRoleLabel } from "../types";
 
 export default function DonorClaimDetail() {
   const { id } = useParams<{ id: string }>();
   const claimId = id ? parseInt(id, 10) : NaN;
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
 
@@ -93,14 +95,49 @@ export default function DonorClaimDetail() {
         {/* ── Gift drop-off deadline banner ──────────────────── */}
         <DeadlineBanner result={giftDropoffDeadline} />
 
+        {/* Cash payment state — awaiting payment / paid */}
+        {isPendingCash(data) && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm text-amber-800">{PAYMENT_REASSURANCE_COPY}</p>
+            {isOwner && (
+              <Button className="mt-3" onClick={() => navigate(ROUTES.DONOR_CART)}>
+                Go to cart & checkout
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Claim info card */}
         <Card className="mb-6">
           <h3 className="mb-3 text-base font-semibold text-gray-900">Sponsorship Details</h3>
           <div className="grid gap-2 sm:grid-cols-2">
-            <InfoRow label="Status" value={<StatusBadge status={getClaimStatus(data.fulfilled_at)} />} />
+            <InfoRow
+              label="Status"
+              value={
+                isPendingCash(data) ? (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    Awaiting payment
+                  </span>
+                ) : (
+                  <StatusBadge status={getClaimStatus(data.fulfilled_at)} />
+                )
+              }
+            />
             <InfoRow label="Commitment" value={<CommitmentBadge type={data.commitment_type} />} />
             <InfoRow label="Created" value={formatDateTime(data.created_at)} />
             <InfoRow label="Fulfilled" value={data.fulfilled_at ? formatDateTime(data.fulfilled_at) : "—"} />
+            {isPendingCash(data) && data.payment_expires_at != null && (
+              <InfoRow
+                label="Payment expires"
+                value={`${formatDateTime(data.payment_expires_at)}${new Date(data.payment_expires_at).getTime() < Date.now() ? " (window closed)" : ""}`}
+              />
+            )}
+            {data.commitment_type === "cash" && data.paid_at != null && (
+              <InfoRow label="Paid" value={`${formatDateTime(data.paid_at)}${data.includes_groceries ? " · incl. groceries" : ""}`} />
+            )}
+            {data.commitment_type === "cash" && data.paid_at == null && data.includes_groceries && (
+              <InfoRow label="Groceries" value="Included" />
+            )}
             {data.notes && <InfoRow label="Notes" value={data.notes} />}
             {!isOwner && <InfoRow label="Donor" value={data.donor_display_name} />}
           </div>
@@ -392,6 +429,9 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: donorClaim(claim.id) });
       queryClient.invalidateQueries({ queryKey: donorClaims });
+      // A commitment toggle changes the committed cart (gifts→cash enters the
+      // payment flow, cash→gifts leaves it)
+      queryClient.invalidateQueries({ queryKey: donorCart });
       setShowEditNotes(false);
       toast.success("Sponsorship updated");
     },
@@ -473,20 +513,27 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
             <h3 className="mb-3 text-base font-semibold text-gray-900">Edit Sponsorship Details</h3>
 
-            <div className="mb-3">
-              <label htmlFor="commitment-type" className="mb-1 block text-sm font-medium text-gray-700">
-                Commitment Type
-              </label>
-              <select
-                id="commitment-type"
-                value={commitmentValue}
-                onChange={(e) => setCommitmentValue(e.target.value as CommitmentType)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-              >
-                <option value="gifts">Gifts</option>
-                <option value="cash">Cash</option>
-              </select>
-            </div>
+            {claim.paid_at == null ? (
+              <div className="mb-3">
+                <label htmlFor="commitment-type" className="mb-1 block text-sm font-medium text-gray-700">
+                  Commitment Type
+                </label>
+                <select
+                  id="commitment-type"
+                  value={commitmentValue}
+                  onChange={(e) => setCommitmentValue(e.target.value as CommitmentType)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+                >
+                  <option value="gifts">Gifts</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Commitment Type</span>
+                <p className="text-sm text-gray-500">{commitmentValue} — locked once the claim is paid.</p>
+              </div>
+            )}
 
             <div className="mb-4">
               <label htmlFor="claim-notes" className="mb-1 block text-sm font-medium text-gray-700">
@@ -506,10 +553,10 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
               <Button
                 className="flex-1"
                 onClick={() =>
-                  updateMut.mutate({
-                    commitment_type: commitmentValue,
-                    notes: notesValue || null,
-                  })
+                  updateMut.mutate(
+                    // Paid claims can't change type (backend 400s) — send notes only
+                    claim.paid_at == null ? { commitment_type: commitmentValue, notes: notesValue || null } : { notes: notesValue || null }
+                  )
                 }
                 loading={updateMut.isPending}
               >

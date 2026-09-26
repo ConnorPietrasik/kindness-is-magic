@@ -86,6 +86,25 @@ services:
     networks:
       - kindnet
 
+  # Local mock of the Zeffy API + donation form (e2e/mock/zeffy_mock.py) so
+  # the cash-sponsorship checkout flow is fully testable without touching the
+  # real, org-rate-limited Zeffy API. The dev/e2e .env points ZEFFY_API_BASE
+  # here; real deployments leave it unset. Payments are in-memory only.
+  zeffy-mock:
+    image: python:3.11-slim
+    working_dir: /mock
+    command: python zeffy_mock.py
+    volumes:
+      - ./e2e/mock:/mock:ro
+    environment:
+      - MOCK_CAMPAIGN_ID=${ZEFFY_CAMPAIGN_ID}
+      - MOCK_API_KEY=${ZEFFY_API_KEY}
+    ports:
+      - "8931:8931" # form page + test control, reachable from the host/LAN
+    restart: unless-stopped
+    networks:
+      - kindnet
+
   test_db:
     profiles:
       - test

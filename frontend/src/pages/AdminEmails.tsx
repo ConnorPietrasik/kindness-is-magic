@@ -39,6 +39,9 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   referrer_rejected: "Referrer Rejected",
   claim_confirmation: "Sponsorship Confirmation",
   admin_failure_notice: "Admin Failure Notice",
+  payment_request: "Payment Request",
+  payment_confirmed: "Payment Confirmation",
+  payment_expired: "Payment Expired",
 };
 
 const STATUS_OPTIONS: EmailStatus[] = ["sent", "failed", "reset"];

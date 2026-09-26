@@ -5,9 +5,9 @@ import { useState } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { CartProvider } from "../context/CartContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import { DONATE_URL } from "../lib/links";
 import { getPendingClaimFamilyId } from "../lib/utils";
 import type { Deadline, FamilyClaimSummary } from "../types";
 import { ClaimModal } from "./ClaimModal";
@@ -37,8 +37,10 @@ const wrap = () => {
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
           <AuthProvider>
-            <LocationProbe />
-            <Host />
+            <CartProvider>
+              <LocationProbe />
+              <Host />
+            </CartProvider>
           </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
@@ -107,9 +109,14 @@ const giftsClaim: FamilyClaimSummary = {
   id: 77,
   family: { id: 5, display_id: "12-3", bio: null, person_count: 4, min_age: 2, max_age: 39 },
   commitment_type: "gifts",
+  payment_status: "paid",
   notes: null,
   created_at: "2025-12-01T00:00:00Z",
   fulfilled_at: null,
+  paid_at: null,
+  payment_expires_at: null,
+  zeffy_payment_id: null,
+  includes_groceries: false,
 };
 
 function renderAuthedClaim(claim: FamilyClaimSummary, deadlines: Deadline[] = []) {
@@ -122,8 +129,10 @@ function renderAuthedClaim(claim: FamilyClaimSummary, deadlines: Deadline[] = []
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
           <AuthProvider>
-            <LocationProbe />
-            <ClaimModal familyId={5} open onClose={() => {}} />
+            <CartProvider>
+              <LocationProbe />
+              <ClaimModal familyId={5} open onClose={() => {}} />
+            </CartProvider>
           </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
@@ -156,8 +165,10 @@ function renderStatefulClaim(claim: FamilyClaimSummary, onClose: () => void) {
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
           <AuthProvider>
-            <LocationProbe />
-            <StatefulHost onClose={onClose} />
+            <CartProvider>
+              <LocationProbe />
+              <StatefulHost onClose={onClose} />
+            </CartProvider>
           </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
@@ -171,13 +182,14 @@ async function submitClaim(user: ReturnType<typeof userEvent.setup>, commitment:
   if (commitment === "cash") {
     await user.click(screen.getByRole("radio", { name: /monetary support/ }));
   }
-  await user.click(screen.getByRole("button", { name: "Sponsor family" }));
-  await screen.findByRole("heading", { name: /You made Family 12-3/ });
+  await user.click(screen.getByRole("button", { name: commitment === "cash" ? "Add to cart" : "Sponsor family" }));
+  await screen.findByRole("heading", { name: commitment === "cash" ? "Added to your cart" : /You made Family 12-3/ });
 }
 
 describe("ClaimModal success view", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
     cleanup();
   });
 
@@ -216,16 +228,33 @@ describe("ClaimModal success view", () => {
     expect(screen.queryByText("We've emailed you the family's full wish list.")).not.toBeInTheDocument();
   });
 
-  it("cash success shows the volunteer line and donation link, not the gifts lines", async () => {
+  it("cash adds to the local cart without calling the claim API, and offers the cart CTA", async () => {
     const user = userEvent.setup();
-    renderAuthedClaim({ ...giftsClaim, commitment_type: "cash" }, [giftDeadline]);
+    const claimSpy = vi.spyOn(api, "claimFamily");
+    renderAuthedClaim(giftsClaim);
 
     await submitClaim(user, "cash");
 
-    expect(screen.getByText("Our volunteers will purchase the family's wishes with your donation.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Complete your donation" })).toHaveAttribute("href", DONATE_URL);
-    expect(screen.queryByText("We've emailed you the family's full wish list.")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Drop your wrapped gifts off by/)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Added to your cart" })).toBeInTheDocument();
+    // No claim was created — the cash door is checkout-only
+    expect(claimSpy).not.toHaveBeenCalled();
+    // The family is in the local cart, keyed by the donor's user id
+    const stored = JSON.parse(localStorage.getItem("kim:cart:4") ?? "[]") as { family_id: number; includes_groceries: boolean }[];
+    expect(stored).toEqual([{ family_id: 5, includes_groceries: false }]);
+    // No external donation link (the old DONATE_URL path is gone)
+    expect(screen.queryByRole("link", { name: "Complete your donation" })).not.toBeInTheDocument();
+  });
+
+  it("cart CTA closes the modal and navigates to the donor cart", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderStatefulClaim(giftsClaim, onClose);
+
+    await submitClaim(user, "cash");
+    await user.click(screen.getByRole("button", { name: "Go to cart & checkout" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("location")).toHaveTextContent("/donor/cart");
   });
 
   it("Keep browsing closes the modal without navigating", async () => {

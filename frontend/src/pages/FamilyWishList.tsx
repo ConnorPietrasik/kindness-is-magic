@@ -163,9 +163,11 @@ export default function FamilyWishList() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-emerald-800">
                   {data.claimed_by_current_user
-                    ? data.claim_status === "active"
-                      ? "You are sponsoring this family"
-                      : "Your sponsorship of this family is fulfilled"
+                    ? data.claim_status === "pending"
+                      ? "You are sponsoring this family — payment pending"
+                      : data.claim_status === "active"
+                        ? "You are sponsoring this family"
+                        : "Your sponsorship of this family is fulfilled"
                     : data.claim_status === "active"
                       ? "This family is already sponsored"
                       : "This family's sponsorship has been fulfilled"}

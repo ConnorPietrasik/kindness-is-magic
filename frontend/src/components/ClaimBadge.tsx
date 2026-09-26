@@ -15,6 +15,8 @@ export interface ClaimBadgeProps {
 export function ClaimBadge({ status, commitmentType, donorName, claimId }: ClaimBadgeProps) {
   const colorMap: Record<string, string> = {
     active: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    // Cash, unpaid, not expired (the claim is in the payment flow)
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
     fulfilled: "bg-gray-100 text-gray-600 border-gray-200",
   };
   const cls = colorMap[status] ?? "bg-blue-100 text-blue-800 border-blue-200";

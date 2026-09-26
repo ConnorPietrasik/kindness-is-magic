@@ -44,9 +44,14 @@ const mockClaim: FamilyClaimDetail = {
     max_age: 10,
   },
   commitment_type: "gifts",
+  payment_status: "paid",
   notes: "Please wrap gifts",
   created_at: "2025-11-01T00:00:00Z",
   fulfilled_at: null,
+  paid_at: null,
+  payment_expires_at: null,
+  zeffy_payment_id: null,
+  includes_groceries: false,
   donor_user_id: 4,
   donor_display_name: "Alice Donor",
   family_wish: {
@@ -122,6 +127,82 @@ describe("DonorClaimDetail", () => {
     cleanup();
     vi.restoreAllMocks();
     localStorage.clear();
+  });
+
+  const pendingCashClaim: FamilyClaimDetail = {
+    ...mockClaim,
+    commitment_type: "cash",
+    payment_status: "pending",
+    paid_at: null,
+    payment_expires_at: "2025-12-04T00:00:00Z",
+    includes_groceries: true,
+    family_wish: null,
+    people: [],
+  };
+
+  const paidCashClaim: FamilyClaimDetail = {
+    ...mockClaim,
+    commitment_type: "cash",
+    payment_status: "paid",
+    paid_at: "2025-11-20T00:00:00Z",
+    payment_expires_at: null,
+    includes_groceries: true,
+    family_wish: null,
+    people: [],
+  };
+
+  it("shows the awaiting-payment state, expiry, cart CTA and reassurance note for pending cash", async () => {
+    renderClaim(mockDonorUser, pendingCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.getByText("Payment expires")).toBeInTheDocument();
+    expect(screen.getByText("If your payment doesn't match automatically, an admin will review it within a day.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to cart & checkout" })).toBeInTheDocument();
+    // Cash claims show no wish-purchasing controls
+    expect(screen.queryByRole("button", { name: /gift purchased/ })).not.toBeInTheDocument();
+  });
+
+  it("hides the cart CTA for non-owners of a pending cash claim", async () => {
+    renderClaim(mockAdminUser, pendingCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go to cart & checkout" })).not.toBeInTheDocument();
+  });
+
+  it("shows the paid date and groceries on a paid cash claim", async () => {
+    renderClaim(mockDonorUser, paidCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Paid")).toBeInTheDocument();
+    expect(screen.getByText(/incl\. groceries/)).toBeInTheDocument();
+    expect(screen.queryByText("Awaiting payment")).not.toBeInTheDocument();
+  });
+
+  it("hides the commitment dropdown in the edit dialog once the claim is paid", async () => {
+    const user = userEvent.setup();
+    renderClaim(mockDonorUser, paidCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    await openActionsMenu(user);
+    await user.click(await screen.findByRole("menuitem", { name: "Edit details" }));
+
+    await screen.findByText("Edit Sponsorship Details");
+    expect(screen.queryByLabelText("Commitment Type")).not.toBeInTheDocument();
+    expect(screen.getByText(/locked once the claim is paid/)).toBeInTheDocument();
   });
 
   it("renders the claim details for the owner", async () => {

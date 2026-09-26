@@ -1174,6 +1174,94 @@ describe("donor claims API functions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Donor — Cart (cash sponsorship checkout)
+// ---------------------------------------------------------------------------
+describe("donor cart API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("donorGetCart — GET /api/donor/cart", async () => {
+    const cart = { items: [], item_count: 0, total_usd: 0, payment_expires_at: null, email_error: null };
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: cart });
+    const result = await apiModule.donorGetCart();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/cart");
+    expect(result).toEqual(cart);
+  });
+
+  it("donorToggleCartGroceries — PATCH /api/donor/cart/items/:claimId", async () => {
+    mockAxiosInstance.patch.mockResolvedValueOnce({ data: { claim_id: 31, includes_groceries: true } });
+    const result = await apiModule.donorToggleCartGroceries(31, true);
+    expect(mockAxiosInstance.patch).toHaveBeenCalledWith("/api/donor/cart/items/31", {
+      includes_groceries: true,
+    });
+    expect(result).toEqual({ claim_id: 31, includes_groceries: true });
+  });
+
+  it("donorCartCheckout — POST /api/donor/cart/checkout with items (empty = pure re-checkout)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({
+      data: { zeffy_url: "https://zeffy.example/f?email=donor@example.com", claim_ids: [31] },
+    });
+    await apiModule.donorCartCheckout([{ family_id: 10, includes_groceries: true }]);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/donor/cart/checkout", {
+      items: [{ family_id: 10, includes_groceries: true }],
+    });
+
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { zeffy_url: "https://zeffy.example/f?email=donor@example.com", claim_ids: [] } });
+    await apiModule.donorCartCheckout([]);
+    expect(mockAxiosInstance.post).toHaveBeenLastCalledWith("/api/donor/cart/checkout", { items: [] });
+  });
+
+  it("donorCartConfirm — POST /api/donor/cart/confirm (no body)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { status: "pending" } });
+    await apiModule.donorCartConfirm();
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/donor/cart/confirm");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin — Zeffy Payments (unmatched-payment reconciliation)
+// ---------------------------------------------------------------------------
+describe("admin zeffy payments API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminListZeffyPayments — GET /api/admin/zeffy/payments (cursor + CSV columns)", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], has_more: false, next_cursor: null } });
+    await apiModule.adminListZeffyPayments({
+      starting_after: "0195f3a2-bb0c-7b00-8000-0000000000ff",
+      limit: 25,
+      columns: ["amount_cents", "buyer_email"],
+    });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/payments", {
+      params: {
+        starting_after: "0195f3a2-bb0c-7b00-8000-0000000000ff",
+        limit: 25,
+        columns: "amount_cents,buyer_email",
+      },
+    });
+  });
+
+  it("adminListZeffyPayments — omitting params sends none", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], has_more: false, next_cursor: null } });
+    await apiModule.adminListZeffyPayments();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/payments");
+  });
+
+  it("adminListZeffyPendingClaims — GET /api/admin/zeffy/pending-claims", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { donors: [] } });
+    const result = await apiModule.adminListZeffyPendingClaims();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/pending-claims");
+    expect(result).toEqual({ donors: [] });
+  });
+
+  it("adminMatchZeffyPayment — POST /api/admin/zeffy/payments/:id/match with claim_ids", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { payment_id: "0195f3a2-bb0c-7b00-8000-0000000000ff", claims: [] } });
+    await apiModule.adminMatchZeffyPayment("0195f3a2-bb0c-7b00-8000-0000000000ff", [31, 32]);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/zeffy/payments/0195f3a2-bb0c-7b00-8000-0000000000ff/match", {
+      claim_ids: [31, 32],
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Public — Claim Family
 // ---------------------------------------------------------------------------
 describe("claim family API functions", () => {

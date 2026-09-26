@@ -22,6 +22,7 @@ from app.auth import get_password_hash
 from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.deadlines import deadline_checks_loop
+from app.payments import claim_expiry_loop
 from app.models import User, UserRole, default_display_name_from_email
 
 
@@ -205,6 +206,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
 
     leader_fd = _try_acquire_leader_lock()
     deadline_task: asyncio.Task | None = None
+    expiry_task: asyncio.Task | None = None
 
     if leader_fd is not None:
         db = None
@@ -255,16 +257,23 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
         if not os.environ.get("DISABLE_BACKGROUND_TASKS"):
             deadline_task = asyncio.create_task(deadline_checks_loop())
             logger.info("Daily deadline-check task started.")
+            # Hourly expiry sweep for unpaid cash claims — runs once on
+            # startup (catching any claims that lapsed while the app was
+            # down), then hourly. Same DISABLE_BACKGROUND_TASKS opt-out as
+            # the deadline loop (tests exercise run_claim_expiry directly).
+            expiry_task = asyncio.create_task(claim_expiry_loop())
+            logger.info("Hourly claim-expiry task started.")
     else:
         logger.info("Not the leader worker — skipping startup seed and background tasks.")
 
     try:
         yield
     finally:
-        if deadline_task is not None:
-            deadline_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await deadline_task
+        for task in (deadline_task, expiry_task):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
         if leader_fd is not None:
             os.close(leader_fd)  # releases the flock
 
@@ -367,6 +376,7 @@ from app.admin_invites import invite_admin_router  # noqa: E402
 from app.admin_wishes import admin_wishes_router  # noqa: E402
 from app.admin_emails import email_admin_router  # noqa: E402
 from app.admin_deadlines import deadline_admin_router  # noqa: E402
+from app.admin_zeffy import zeffy_admin_router  # noqa: E402
 
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
@@ -377,6 +387,7 @@ app.include_router(invite_admin_router)
 app.include_router(admin_wishes_router)
 app.include_router(email_admin_router)
 app.include_router(deadline_admin_router)
+app.include_router(zeffy_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)
@@ -402,6 +413,13 @@ app.include_router(families_router)
 from app.deadlines_routes import router as deadlines_router  # noqa: E402
 
 app.include_router(deadlines_router)
+
+# ---------------------------------------------------------------------------
+# Include Zeffy webhook (public; the primary automatic payment apply path)
+# ---------------------------------------------------------------------------
+from app.zeffy_routes import router as zeffy_router  # noqa: E402
+
+app.include_router(zeffy_router)
 
 # ---------------------------------------------------------------------------
 # Include purchaser self-service routes

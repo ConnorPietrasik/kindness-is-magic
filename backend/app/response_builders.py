@@ -15,12 +15,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import DeclarativeBase, Session
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.column_filter import ColumnRequest
-from app.config import MAX_FAMILY_PERSONS
+from app.config import CASH_CLAIM_PAYMENT_HOURS, MAX_FAMILY_PERSONS
 from app.display_ids import compute_display_ids, compute_position_maps, wish_display_id
 from app.models import (
+    ClaimPaymentStatus,
+    CommitmentType,
     Deadline,
     Family,
     FamilyVerificationStatus,
@@ -119,11 +121,51 @@ def build_claim_summary(claim: FamilyClaim, family: FamilyInfo, email_error: str
         id=claim.id,
         family=family,
         commitment_type=claim.commitment_type,
+        payment_status=claim.payment_status,
         notes=claim.notes,
         created_at=claim.created_at,
         fulfilled_at=claim.fulfilled_at,
+        paid_at=claim.paid_at,
+        payment_expires_at=claim_payment_expires_at(claim),
+        zeffy_payment_id=claim.zeffy_payment_id,
+        includes_groceries=claim.includes_groceries,
         email_error=email_error,
     )
+
+
+# ---------------------------------------------------------------------------
+# Cash claim payment state (derived)
+# ---------------------------------------------------------------------------
+
+
+def claim_payment_expires_at(claim: FamilyClaim) -> datetime | None:
+    """Derived payment expiry for a pending cash claim: ``created_at + CASH_CLAIM_PAYMENT_HOURS``.
+
+    None for gift claims, paid claims, and soft-deleted rows. May be in the
+    past while the claim is still pending (the hourly sweep hasn't run yet) —
+    clients render such items as expired.
+    """
+    if claim.deleted_at is None and claim.commitment_type == CommitmentType.cash and claim.payment_status == ClaimPaymentStatus.pending:
+        return claim.created_at + timedelta(hours=CASH_CLAIM_PAYMENT_HOURS)
+    return None
+
+
+def claim_status_for(claim: FamilyClaim, now: datetime | None = None) -> str:
+    """Display status of a non-deleted claim: "fulfilled" / "pending" / "active".
+
+    * ``"fulfilled"`` — ``fulfilled_at`` is set.
+    * ``"pending"`` — cash, unpaid, and the payment window has not lapsed
+      (same derivation the admin surface and public list use).
+    * ``"active"`` — everything else (gifts, paid cash, sweep-lag pendings).
+    """
+    if claim.fulfilled_at is not None:
+        return "fulfilled"
+    expires_at = claim_payment_expires_at(claim)
+    if expires_at is not None:
+        now = now or datetime.now(timezone.utc)
+        if expires_at > now:
+            return "pending"
+    return "active"
 
 
 # ---------------------------------------------------------------------------
@@ -714,7 +756,7 @@ def build_family_detail(
             )
         )
         if active_claim:
-            claim_status = "fulfilled" if active_claim.fulfilled_at is not None else "active"
+            claim_status = claim_status_for(active_claim)
             claim_commitment_type = active_claim.commitment_type.value
             claim_id = active_claim.id
             donor = (
@@ -878,7 +920,7 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
         "wish_review_requested_at": fam.wish_review_requested_at,
         "wish_rejection_reason": fam.wish_rejection_reason,
         "referrer_notes": fam.referrer_notes,
-        "claim_status": "fulfilled" if claim is not None and claim.fulfilled_at is not None else "active" if claim is not None else None,
+        "claim_status": claim_status_for(claim) if claim is not None else None,
         "claim_commitment_type": claim.commitment_type.value if claim is not None else None,
         "claim_donor_name": ctx.donor_map.get(claim.donor_user_id) if claim is not None else None,
         "claim_id": claim.id if claim is not None else None,

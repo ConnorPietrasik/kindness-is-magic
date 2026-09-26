@@ -57,6 +57,9 @@ describe("KIND_LABELS", () => {
     "referrer_rejected",
     "claim_confirmation",
     "admin_failure_notice",
+    "payment_request",
+    "payment_confirmed",
+    "payment_expired",
   ];
 
   it("has a display label for every email kind", () => {

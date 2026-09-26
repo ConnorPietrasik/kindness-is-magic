@@ -3,9 +3,9 @@ import { useState } from "react";
 import type { Location } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { claimFamily } from "../lib/api";
-import { DONATE_URL } from "../lib/links";
 import { donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDay, setPendingClaimFamilyId } from "../lib/utils";
@@ -96,7 +96,11 @@ function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: num
 function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => void }) {
   const [commitmentType, setCommitmentType] = useState<CommitmentType>("gifts");
   const [claimed, setClaimed] = useState<FamilyClaimSummary | null>(null);
+  // Cash claims go through the checkout flow: the modal only adds the family
+  // to the frontend cart — the claim is created at checkout.
+  const [addedToCart, setAddedToCart] = useState(false);
   const queryClient = useQueryClient();
+  const { addToCart } = useCart();
 
   const claimMut = useMutation({
     mutationFn: () => claimFamily(familyId, commitmentType),
@@ -108,8 +112,21 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
     },
   });
 
+  const handleSponsor = () => {
+    if (commitmentType === "cash") {
+      addToCart(familyId);
+      setAddedToCart(true);
+      return;
+    }
+    claimMut.mutate();
+  };
+
   if (claimed) {
     return <ClaimSuccess claim={claimed} onClose={onClose} />;
+  }
+
+  if (addedToCart) {
+    return <CashAddedToCart onClose={onClose} />;
   }
 
   return (
@@ -150,14 +167,45 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
       </div>
 
       <div className="flex gap-3">
-        <Button className="flex-1" onClick={() => claimMut.mutate()} loading={claimMut.isPending}>
-          {claimMut.isPending ? "Sponsoring…" : "Sponsor family"}
+        <Button className="flex-1" onClick={handleSponsor} loading={claimMut.isPending}>
+          {claimMut.isPending ? "Sponsoring…" : commitmentType === "cash" ? "Add to cart" : "Sponsor family"}
         </Button>
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel
         </Button>
       </div>
       <MutationErrors mutations={[claimMut]} />
+    </>
+  );
+}
+
+/**
+ * CashAddedToCart — in-modal view after the cash option adds the family to
+ * the frontend cart. The claim is created at checkout, so there is nothing
+ * committed yet — the donor goes to the cart to review and pay.
+ */
+function CashAddedToCart({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <h3 className="mb-2 text-lg font-semibold text-gray-900">Added to your cart</h3>
+      <p className="mb-4 text-sm text-gray-600">This family is in your sponsorship cart. Go to the cart to review it and pay securely.</p>
+
+      <div className="flex gap-3">
+        <Button
+          className="flex-1"
+          onClick={() => {
+            onClose();
+            navigate(ROUTES.DONOR_CART);
+          }}
+        >
+          Go to cart & checkout
+        </Button>
+        <Button variant="secondary" className="flex-1" onClick={onClose}>
+          Keep browsing
+        </Button>
+      </div>
     </>
   );
 }
@@ -186,31 +234,12 @@ function ClaimSuccess({ claim, onClose }: { claim: FamilyClaimSummary; onClose: 
       <div className="mt-4">
         <h4 className="text-sm font-semibold text-gray-900">What happens next</h4>
         <ul className="mt-2 space-y-2 text-sm text-gray-600">
-          {claim.commitment_type === "gifts" ? (
-            <>
-              <li>
-                {claim.email_error
-                  ? "We couldn't email you the wish list — you can view it on your sponsorship page."
-                  : "We've emailed you the family's full wish list."}
-              </li>
-              {dropoff && <li>Drop your wrapped gifts off by {formatDay(dropoff.dueDate)}.</li>}
-            </>
-          ) : (
-            <>
-              <li>Our volunteers will purchase the family's wishes with your donation.</li>
-              {/* TODO(payment): this points at the external Zeffy form — replace with the in-app payment flow when one exists. */}
-              <li>
-                <a
-                  href={DONATE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-brand-dark underline underline-offset-2 hover:text-brand-light"
-                >
-                  Complete your donation
-                </a>
-              </li>
-            </>
-          )}
+          <li>
+            {claim.email_error
+              ? "We couldn't email you the wish list — you can view it on your sponsorship page."
+              : "We've emailed you the family's full wish list."}
+          </li>
+          {dropoff && <li>Drop your wrapped gifts off by {formatDay(dropoff.dueDate)}.</li>}
         </ul>
       </div>
 

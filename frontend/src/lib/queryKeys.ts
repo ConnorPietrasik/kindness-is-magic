@@ -190,6 +190,13 @@ export const adminDeadlines = ["adminDeadlines"] as const;
 export const publicFamilies = ["publicFamilies"] as const;
 
 // ---------------------------------------------------------------------------
+// Donor — Cart (cash sponsorship checkout)
+// ---------------------------------------------------------------------------
+
+/** Donor's committed cart (in-progress pending cash claims) */
+export const donorCart = ["donorCart"] as const;
+
+// ---------------------------------------------------------------------------
 // Public — Wish List
 // ---------------------------------------------------------------------------
 
@@ -238,3 +245,12 @@ export const donorMe = ["donorMe"] as const;
 export const donorClaims = ["donorClaims"] as const;
 /** Single claim detail (pass id at call site) */
 export const donorClaim = (id: number) => ["donorClaim", id] as const;
+
+// ---------------------------------------------------------------------------
+// Admin — Zeffy Payments (unmatched-payment reconciliation)
+// ---------------------------------------------------------------------------
+
+/** Admin Zeffy payment list (cursor-based; cursor passed at call site) */
+export const adminZeffyPayments = ["adminZeffyPayments"] as const;
+/** Admin Zeffy pending claims (match-modal grouped data) */
+export const adminZeffyPendingClaims = ["adminZeffyPendingClaims"] as const;

@@ -26,6 +26,10 @@ from app.mail import (
     build_family_verified_email,
     build_invite_email,
     build_password_reset_email,
+    build_payment_confirmed_email,
+    build_payment_email_failure_notice,
+    build_payment_expired_email,
+    build_payment_request_email,
     build_referrer_approved_email,
     build_referrer_rejected_email,
 )
@@ -162,6 +166,58 @@ EXAMPLES = [
             donor_email="alex.thompson@example.com",
             family_display_id="3-2",
             claim_id=42,
+            error_summary="SMTP connection refused",
+        ),
+        "unsubscribe": False,
+    },
+    # Payment-flow emails share a two-family cart (one with the groceries
+    # add-on) so the line table, totals row, and plural copy are all visible.
+    {
+        "filename": "12-payment-request.html",
+        "label": "Payment Request (please-pay nudge)",
+        "body": build_payment_request_email(
+            donor_name="Alex Thompson",
+            lines=[
+                {"display_id": "3-2", "includes_groceries": True, "line_total_usd": 600},
+                {"display_id": "4-1", "includes_groceries": False, "line_total_usd": 500},
+            ],
+            total_usd=1100,
+            expires_at=datetime(2025, 7, 31, 12, 0),
+            cart_url="https://kindnessismagic.love/donor/cart",
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "13-payment-confirmed.html",
+        "label": "Payment Confirmed (off by default — Zeffy sends its own receipt)",
+        "body": build_payment_confirmed_email(
+            donor_name="Alex Thompson",
+            lines=[
+                {"display_id": "3-2", "includes_groceries": True, "line_total_usd": 600},
+                {"display_id": "4-1", "includes_groceries": False, "line_total_usd": 500},
+            ],
+            total_usd=1100,
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "14-payment-expired.html",
+        "label": "Payment Expired (window closed)",
+        "body": build_payment_expired_email(
+            donor_name="Alex Thompson",
+            lines=[
+                {"display_id": "3-2", "includes_groceries": True, "line_total_usd": 600},
+                {"display_id": "4-1", "includes_groceries": False, "line_total_usd": 500},
+            ],
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "15-admin-payment-failure.html",
+        "label": "Admin Payment Email Failure Notice",
+        "body": build_payment_email_failure_notice(
+            donor_email="alex.thompson@example.com",
+            payment_kind="payment_request",
             error_summary="SMTP connection refused",
         ),
         "unsubscribe": False,

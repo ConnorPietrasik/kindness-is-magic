@@ -24,18 +24,43 @@ const mockActiveClaim: FamilyClaimSummary = {
   id: 1,
   family: familyBase,
   commitment_type: "gifts",
+  payment_status: "paid",
   notes: null,
   created_at: "2025-11-01T00:00:00Z",
   fulfilled_at: null,
+  paid_at: null,
+  payment_expires_at: null,
+  zeffy_payment_id: null,
+  includes_groceries: false,
 };
 
 const mockFulfilledClaim: FamilyClaimSummary = {
   id: 2,
   family: { ...familyBase, id: 6, display_id: "2-2" },
   commitment_type: "cash",
+  payment_status: "paid",
   notes: null,
   created_at: "2025-10-01T00:00:00Z",
   fulfilled_at: "2025-11-15T00:00:00Z",
+  paid_at: "2025-11-10T00:00:00Z",
+  payment_expires_at: null,
+  zeffy_payment_id: null,
+  includes_groceries: true,
+};
+
+const mockPendingCashClaim: FamilyClaimSummary = {
+  id: 3,
+  family: { ...familyBase, id: 7, display_id: "2-3" },
+  commitment_type: "cash",
+  payment_status: "pending",
+  notes: null,
+  created_at: "2025-12-01T00:00:00Z",
+  fulfilled_at: null,
+  paid_at: null,
+  // Deliberately in the future relative to the test run
+  payment_expires_at: "2099-12-04T00:00:00Z",
+  zeffy_payment_id: null,
+  includes_groceries: true,
 };
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -77,6 +102,50 @@ describe("DonorClaims", () => {
     expect(screen.getAllByText("fulfilled").length).toBe(1);
     expect(screen.getAllByText("gifts").length).toBe(1);
     expect(screen.getAllByText("cash").length).toBe(1);
+  });
+
+  it("shows the awaiting-payment state, expiry, cart CTA and reassurance note for pending cash", async () => {
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([mockPendingCashClaim]);
+
+    wrap(<DonorClaims />);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-3")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.getByText(/Pay by/)).toBeInTheDocument();
+    // The cart CTA links to the donor cart
+    expect(screen.getByRole("link", { name: "Go to checkout" })).toHaveAttribute("href", "/donor/cart");
+    // Settled reassurance copy while a cash claim is unpaid
+    expect(screen.getByText("If your payment doesn't match automatically, an admin will review it within a day.")).toBeInTheDocument();
+  });
+
+  it("shows the paid date and groceries on a paid cash claim (no awaiting-payment state)", async () => {
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([mockFulfilledClaim]);
+
+    wrap(<DonorClaims />);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-2")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Paid/)).toBeInTheDocument();
+    expect(screen.getByText(/incl\. groceries/)).toBeInTheDocument();
+    expect(screen.queryByText("Awaiting payment")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Go to checkout" })).not.toBeInTheDocument();
+  });
+
+  it("hides the reassurance note when no claim awaits payment", async () => {
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveClaim]);
+
+    wrap(<DonorClaims />);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("If your payment doesn't match automatically")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when there are no claims", async () => {

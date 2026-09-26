@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
-import type { PublicFamilySummary, User } from "../types";
+import type { FamilyClaimSummary, PublicFamilySummary, User } from "../types";
 import PublicFamilies from "./PublicFamilies";
 
 /* ------------------------------------------------------------------ */
@@ -21,8 +21,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 4,
     min_age: 5,
     max_age: 14,
-    sponsored: false,
-    claimed_by_current_user: false,
+    claim_status: null,
   },
   {
     id: 2,
@@ -31,8 +30,7 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 30,
     max_age: 35,
-    sponsored: false,
-    claimed_by_current_user: false,
+    claim_status: null,
   },
   {
     id: 3,
@@ -41,8 +39,49 @@ const mockFamilies: PublicFamilySummary[] = [
     person_count: 2,
     min_age: 8,
     max_age: 8,
-    sponsored: false,
-    claimed_by_current_user: false,
+    claim_status: null,
+  },
+];
+
+const mockDonorClaims: FamilyClaimSummary[] = [
+  {
+    id: 100,
+    family: { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12 },
+    commitment_type: "gifts",
+    payment_status: "paid",
+    notes: null,
+    created_at: "2025-11-01T00:00:00Z",
+    fulfilled_at: null,
+    paid_at: null,
+    payment_expires_at: null,
+    zeffy_payment_id: null,
+    includes_groceries: false,
+  },
+  {
+    id: 101,
+    family: { id: 21, display_id: "3-2", bio: null, person_count: 2, min_age: 3, max_age: 8 },
+    commitment_type: "cash",
+    payment_status: "pending",
+    notes: null,
+    created_at: "2025-11-02T00:00:00Z",
+    fulfilled_at: null,
+    paid_at: null,
+    payment_expires_at: "2025-11-05T00:00:00Z",
+    zeffy_payment_id: null,
+    includes_groceries: true,
+  },
+  {
+    id: 102,
+    family: { id: 22, display_id: "3-3", bio: null, person_count: 3, min_age: 10, max_age: 15 },
+    commitment_type: "gifts",
+    payment_status: "paid",
+    notes: null,
+    created_at: "2025-10-01T00:00:00Z",
+    fulfilled_at: "2025-11-20T00:00:00Z",
+    paid_at: null,
+    payment_expires_at: null,
+    zeffy_payment_id: null,
+    includes_groceries: false,
   },
 ];
 
@@ -85,6 +124,12 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 const wrap = (ui: React.ReactElement, path = "/families", user: User | null = null) => {
   const queryClient = createQueryClient();
   queryClient.setQueryData(auth, user);
+  // The "Sponsored by me" section is enabled for claim-capable users — keep
+  // it empty by default so existing tests don't see it (unless a test already
+  // spied on the API to supply its own claims).
+  if (user && user.role !== "family" && !vi.isMockFunction(api.donorListClaims)) {
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([]);
+  }
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
@@ -156,8 +201,7 @@ describe("PublicFamilies", () => {
       person_count: 1,
       min_age: 5,
       max_age: 14,
-      sponsored: false,
-      claimed_by_current_user: false,
+      claim_status: null,
     };
     const singleMemberResponse = {
       ...mockResponse,
@@ -242,51 +286,7 @@ describe("PublicFamilies", () => {
     });
   });
 
-  /* Sponsored visibility */
-
-  it("shows a Sponsored badge on sponsored families (not the current user's)", async () => {
-    const sponsoredFamily: PublicFamilySummary = {
-      id: 4,
-      display_id: "0-4",
-      bio: null,
-      person_count: 3,
-      min_age: 5,
-      max_age: 10,
-      sponsored: true,
-      claimed_by_current_user: false,
-    };
-    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: [...mockFamilies, sponsoredFamily] });
-
-    wrap(<PublicFamilies />);
-
-    await waitFor(() => {
-      expect(screen.getByText("0-4")).toBeInTheDocument();
-    });
-    expect(screen.getByText("Sponsored")).toBeInTheDocument();
-  });
-
-  it("shows a Your Sponsorship badge on the current user's claim", async () => {
-    const myClaim: PublicFamilySummary = {
-      id: 5,
-      display_id: "0-5",
-      bio: null,
-      person_count: 2,
-      min_age: 4,
-      max_age: 9,
-      sponsored: true,
-      claimed_by_current_user: true,
-    };
-    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: [myClaim] });
-
-    wrap(<PublicFamilies />);
-
-    await waitFor(() => {
-      expect(screen.getByText("0-5")).toBeInTheDocument();
-    });
-    expect(screen.getByText("Your Sponsorship")).toBeInTheDocument();
-    // No plain "Sponsored" badge for the current user's claim
-    expect(screen.queryByText("Sponsored")).not.toBeInTheDocument();
-  });
+  /* Show-claimed toggle (include_claimed) */
 
   it("hides the show-sponsored checkbox from anonymous visitors", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
@@ -315,7 +315,7 @@ describe("PublicFamilies", () => {
     expect(checkbox).not.toBeChecked();
   });
 
-  it("toggling show-sponsored as admin refetches with show_sponsored=true", async () => {
+  it("toggling show-sponsored as admin refetches with include_claimed=true", async () => {
     const user = userEvent.setup();
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
@@ -327,32 +327,128 @@ describe("PublicFamilies", () => {
     // Debounced 300ms — wait for the refetch with the new param
     await waitFor(
       () => {
-        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ show_sponsored: true }));
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ include_claimed: true }));
       },
       { timeout: 2000 }
     );
   });
 
-  it("ignores a ?show_sponsored=true URL param for non-admins", async () => {
+  it("ignores a ?include_claimed=true URL param for non-admins", async () => {
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
-    // A donor pasting an admin's shareable link must not get sponsored families
-    wrap(<PublicFamilies />, "/families?show_sponsored=true", mockUser);
+    // A donor pasting an admin's shareable link must not get claimed families
+    wrap(<PublicFamilies />, "/families?include_claimed=true", mockUser);
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
     const params = spy.mock.calls[0]?.[0];
-    expect(params?.show_sponsored).toBeUndefined();
+    expect(params?.include_claimed).toBeUndefined();
     expect(screen.queryByLabelText("Show sponsored families")).not.toBeInTheDocument();
   });
 
   it("restores the show-sponsored checkbox from the URL for admins", async () => {
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
-    wrap(<PublicFamilies />, "/families?show_sponsored=true", mockAdmin);
+    wrap(<PublicFamilies />, "/families?include_claimed=true", mockAdmin);
 
     const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
     expect(checkbox).toBeChecked();
-    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.objectContaining({ show_sponsored: true })));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.objectContaining({ include_claimed: true })));
+  });
+
+  /* Claim-status chips on revealed (include_claimed) cards */
+
+  it("renders claim chips from the three-state claim_status on revealed families", async () => {
+    const revealed: PublicFamilySummary[] = [
+      { id: 4, display_id: "0-4", bio: null, person_count: 3, min_age: 5, max_age: 10, claim_status: "active" },
+      { id: 5, display_id: "0-5", bio: null, person_count: 2, min_age: 4, max_age: 9, claim_status: "pending" },
+      { id: 6, display_id: "0-6", bio: null, person_count: 1, min_age: 60, max_age: null, claim_status: "fulfilled" },
+    ];
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: revealed });
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0-4")).toBeInTheDocument();
+    });
+    // Green Sponsored for active
+    const sponsoredChip = screen.getByText("Sponsored");
+    expect(sponsoredChip).toHaveClass("bg-emerald-100", "text-emerald-800");
+    // Amber Awaiting payment for pending
+    const pendingChip = screen.getByText("Awaiting payment");
+    expect(pendingChip).toHaveClass("bg-amber-100", "text-amber-800");
+    // Grey Fulfilled
+    const fulfilledChip = screen.getByText("Fulfilled");
+    expect(fulfilledChip).toHaveClass("bg-slate-200", "text-slate-600");
+  });
+
+  it("renders no chip for unclaimed families", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByText("Sponsored")).not.toBeInTheDocument();
+    expect(screen.queryByText("Awaiting payment")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fulfilled")).not.toBeInTheDocument();
+  });
+
+  /* "Sponsored by me" section (claim-capable users) */
+
+  it("shows the Sponsored by me section with per-claim chips for claim-capable users", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    vi.spyOn(api, "donorListClaims").mockResolvedValue(mockDonorClaims);
+
+    wrap(<PublicFamilies />, "/families", mockUser);
+
+    expect(await screen.findByText("Sponsored by me")).toBeInTheDocument();
+    // One card per claim
+    expect(screen.getByText("3-1")).toBeInTheDocument();
+    expect(screen.getByText("3-2")).toBeInTheDocument();
+    expect(screen.getByText("3-3")).toBeInTheDocument();
+    // Chips: active gifts → Sponsored, pending cash → Awaiting payment, fulfilled → Fulfilled
+    expect(screen.getByText("Sponsored")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.getByText("Fulfilled")).toBeInTheDocument();
+    // Pending-cash card gets the cart CTA
+    expect(screen.getByRole("button", { name: /Go to cart/ })).toBeInTheDocument();
+  });
+
+  it("hides the Sponsored by me section when the user has no claims", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([]);
+
+    wrap(<PublicFamilies />, "/families", mockUser);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByText("Sponsored by me")).not.toBeInTheDocument();
+  });
+
+  it("does not query donor claims for anonymous visitors", async () => {
+    const spy = vi.spyOn(api, "donorListClaims");
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("dedupes the user's claimed families out of the revealed grid", async () => {
+    // The revealed grid contains family 20 (also in the user's claims)
+    const revealed: PublicFamilySummary[] = [
+      { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12, claim_status: "active" },
+      { id: 30, display_id: "4-1", bio: null, person_count: 2, min_age: 1, max_age: 6, claim_status: null },
+    ];
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: revealed });
+    vi.spyOn(api, "donorListClaims").mockResolvedValue(mockDonorClaims);
+
+    wrap(<PublicFamilies />, "/families?include_claimed=true", mockAdmin);
+
+    await waitFor(() => expect(screen.getByText("Sponsored by me")).toBeInTheDocument());
+    // Family 3-1 appears in the section but not twice (grid copy deduped out)
+    expect(screen.getAllByText("3-1").length).toBe(1);
+    // Other revealed families still render
+    expect(screen.getByText("4-1")).toBeInTheDocument();
   });
 
   /* Fully-sponsored milestone banner */

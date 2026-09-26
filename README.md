@@ -46,9 +46,9 @@ AGENTS.md               Agent instructions (root, backend/, frontend/, e2e/)
    cp .env.example .env
    ```
 
-   That's all it takes for local dev: `.env.example` ships with committed test
-   values (marked `[TEST]`) that work out of the box here and in CI. **Replace
-   the marked test values before deploying to production** — for the secrets,
+   That's all it takes for local dev: `.env.example` ships with committed
+   dev/CI placeholder values that work out of the box here and in CI.
+   **Replace the values production needs before deploying** — for the secrets,
    generate real ones with
    `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`. SMTP
    settings are only needed if you want real emails — with `DEBUG=true`,
@@ -150,10 +150,11 @@ cd /opt/kindness-is-magic
 cp .env.example .env
 ```
 
-`.env.example` ships with committed test values (marked `[TEST]`, e.g.
-`ci-test-*` / `kindness-test*`): replace every one of them.
-`./run-compose.sh prod setup` lists any that are still present and refuses to
-continue until they're replaced.
+`.env.example` ships with committed dev/CI placeholder values (e.g.
+`ci-test-*` / `kindness-test*`): replace the ones production uses.
+`./run-compose.sh prod setup` lists the production-critical ones (secrets,
+credentials, hostnames, contacts) that still match `.env.example` and refuses
+to continue until they're replaced.
 
 | Key | Notes |
 |-----|-------|

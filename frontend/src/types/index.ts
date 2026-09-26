@@ -8,6 +8,7 @@ export type {
   AdminReferrersListParams,
   AdminUsersListParams,
   AdminWishesListParams,
+  AdminZeffyPaymentsParams,
   DeadlineListResponse,
   EmailListResponse,
   FamilyDropdownItem,
@@ -36,6 +37,11 @@ export type {
   AdminUserCreate,
   AdminUserUpdate,
   AdminWishUpdate,
+  CartCheckoutItem,
+  CartCheckoutResult,
+  CartConfirmResult,
+  ClaimFamilyInfo,
+  ClaimPaymentStatus,
   ClaimStatus,
   CommitmentType,
   Deadline,
@@ -45,6 +51,8 @@ export type {
   DeadlineUpdate,
   DeliveryFamilySummary,
   DeliverySlipItem,
+  DonorCart,
+  DonorCartItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishPurchaseMark,
@@ -100,7 +108,14 @@ export type {
   WishPurchaseMark,
   WishSummary,
   WishType,
+  ZeffyMatchResult,
+  ZeffyPayment,
+  ZeffyPaymentsResponse,
+  ZeffyPendingClaimItem,
+  ZeffyPendingClaimsResponse,
+  ZeffyPendingDonorGroup,
+  ZeffyUnmatchResult,
 } from "./domain";
-export { getClaimStatus, PERSON_ROLES, personRoleLabel, WISH_TYPE } from "./domain";
+export { getClaimStatus, isPendingCash, PERSON_ROLES, personRoleLabel, WISH_TYPE } from "./domain";
 export type { DashboardTileDef } from "./tiles";
 export { DASHBOARD_TILES } from "./tiles";

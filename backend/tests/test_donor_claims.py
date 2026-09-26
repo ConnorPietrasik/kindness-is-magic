@@ -168,8 +168,9 @@ class TestClaimCreation:
         assert body["fulfilled_at"] is None
         assert body["family"]["id"] == fam.id
 
-    def test_claim_family_cash(self, test_client: TestClient, db: Session):
-        """Claim family with cash → 201."""
+    def test_claim_family_cash_donor_forbidden(self, test_client: TestClient, db: Session):
+        """Donor cash claim POST → 403 — donors create cash claims via the
+        cart checkout, not this endpoint."""
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
@@ -178,8 +179,32 @@ class TestClaimCreation:
             f"/api/families/{fam.id}/claim",
             json={"commitment_type": "cash"},
         )
+        assert resp.status_code == 403
+
+    def test_claim_family_cash_admin_recovery(self, test_client: TestClient, db: Session, admin_user):
+        """Admin cash claim (recovery path) → 201, created pending, no email
+        (the donor in that flow already paid — the match confirmation is
+        their email)."""
+        from app.models import FamilyClaim
+
+        _admin_login(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "cash"},
+        )
         assert resp.status_code == 201
-        assert resp.json()["commitment_type"] == "cash"
+        body = resp.json()
+        assert body["commitment_type"] == "cash"
+        assert body["payment_status"] == "pending"
+        assert body["paid_at"] is None
+        assert "email_error" not in body or body["email_error"] is None
+
+        claim = db.query(FamilyClaim).filter_by(family_id=fam.id).first()
+        assert claim.payment_status.value == "pending"
+        assert claim.paid_at is None
 
     def test_claim_already_claimed(self, test_client: TestClient, db: Session):
         """Claim already-claimed family → 409."""
@@ -193,10 +218,10 @@ class TestClaimCreation:
         )
         assert resp.status_code == 201
 
-        # Second claim attempt
+        # Second claim attempt (gifts again — cash as a donor is 403)
         resp2 = test_client.post(
             f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "cash"},
+            json={"commitment_type": "gifts"},
         )
         assert resp2.status_code == 409
 
@@ -261,9 +286,10 @@ class TestClaimCreation:
         assert resp.status_code == 400
         assert "limit" in resp.json()["detail"].lower()
 
-    def test_claim_cash_no_cap(self, test_client: TestClient, db: Session):
-        """6th family with cash (no cap) → 201."""
-        _create_donor(test_client)
+    def test_claim_cash_no_cap(self, test_client: TestClient, db: Session, admin_user):
+        """Admin claims 6th family with cash (no cap) → 201 (cash is the
+        admin/referrer recovery path — no GIFT_CLAIM_CAP)."""
+        _admin_login(test_client)
 
         for i in range(6):
             from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
@@ -944,10 +970,11 @@ class TestFulfill:
 
 
 class TestPublicFamiliesClaimedFlag:
-    def test_browse_as_donor_claimed_true(self, test_client: TestClient, db: Session):
-        """Browse families as donor → claimed_by_current_user is true for own
-        claims. The donor's own sponsored family stays in the default list;
-        show_sponsored is admin-only, so a donor gets the same list with it."""
+    def test_browse_as_donor_claimed_hidden_by_default(self, test_client: TestClient, db: Session):
+        """A donor's claimed family is hidden from the default list like any
+        other claim; include_claimed=true — which the owner may pass —
+        reveals their own claim with claim_status. The browse page's
+        "Sponsored by me" is served by GET /api/donor/claims instead."""
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
@@ -957,31 +984,55 @@ class TestPublicFamiliesClaimedFlag:
             json={"commitment_type": "gifts"},
         )
 
-        # Default list keeps the donor's own (now-sponsored) family, badged
+        # Default list hides even the donor's own claim
         families = test_client.get("/api/families").json()["families"]
-        claimed = [f for f in families if f["id"] == fam.id]
-        assert len(claimed) == 1
-        assert claimed[0]["sponsored"] is True
-        assert claimed[0]["claimed_by_current_user"] is True
+        assert all(f["id"] != fam.id for f in families)
 
-        # show_sponsored is ignored for non-admins — the donor sees the same list
-        resp = test_client.get("/api/families?show_sponsored=true")
+        # include_claimed=true reveals it with a claim_status
+        resp = test_client.get("/api/families?include_claimed=true")
         assert resp.status_code == 200
-        families = resp.json()["families"]
-        claimed = [f for f in families if f["id"] == fam.id]
+        claimed = [f for f in resp.json()["families"] if f["id"] == fam.id]
         assert len(claimed) == 1
-        assert claimed[0]["sponsored"] is True
-        assert claimed[0]["claimed_by_current_user"] is True
+        assert claimed[0]["claim_status"] == "active"
 
-    def test_browse_unauthenticated_claimed_false(self, test_client: TestClient, db: Session):
-        """Browse families unauthenticated → claimed_by_current_user is false for all."""
-        _create_claimed_family(db)
+    def test_browse_unauthenticated_claimed_hidden(self, test_client: TestClient, db: Session):
+        """Browse families unauthenticated → claimed families are hidden by
+        default, and include_claimed=true reveals nothing claimed (the
+        owner/admin gate)."""
+        from app.auth import get_password_hash
+        from app.models import ClaimPaymentStatus, CommitmentType, FamilyClaim, User, UserRole
+
+        data = _create_claimed_family(db)
+        fam = data["family"]
+        # Donor created directly in the DB — register-donor auto-logs-in and
+        # would leave an auth cookie on the client (this test stays anon)
+        donor = User(
+            email=DONOR_EMAIL,
+            hashed_password=get_password_hash(DONOR_PASSWORD),
+            role=UserRole.donor,
+            display_name=None,
+        )
+        db.add(donor)
+        db.flush()
+        claim = FamilyClaim(
+            donor_user_id=donor.id,
+            family_id=fam.id,
+            commitment_type=CommitmentType.gifts,
+            payment_status=ClaimPaymentStatus.paid,
+        )
+        db.add(claim)
+        db.commit()
 
         resp = test_client.get("/api/families")
         assert resp.status_code == 200
         families = resp.json()["families"]
-        for f in families:
-            assert f["claimed_by_current_user"] is False
+        assert all(f["claim_status"] is None for f in families)
+        assert all(f["id"] != fam.id for f in families)
+
+        # include_claimed without auth: the claimed family stays hidden
+        resp = test_client.get("/api/families?include_claimed=true")
+        assert resp.status_code == 200
+        assert all(f["id"] != fam.id for f in resp.json()["families"])
 
     def test_wish_list_returns_claim_info(self, test_client: TestClient, db: Session):
         """Wish-list endpoint returns claim_id and claim_status for claimed families."""
@@ -1013,6 +1064,58 @@ class TestPublicFamiliesClaimedFlag:
         assert body["claimed_by_current_user"] is False
         assert body["claim_status"] is None
         assert body["claim_id"] is None
+
+    def test_wish_list_pending_status_owner_only(self, test_client: TestClient, db: Session):
+        """Wish-list "pending" is owner-only: the owner of an unpaid,
+        not-yet-expired cash claim sees "pending"; other visitors (logged-in
+        or anonymous) see "active" — their discovery path is the 409 at
+        claim time. A lapsed (not yet swept) window also reads "active"."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models import ClaimPaymentStatus, CommitmentType, FamilyClaim, User
+
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+        user = db.query(User).filter(User.email == DONOR_EMAIL).first()
+        claim = FamilyClaim(
+            donor_user_id=user.id,
+            family_id=fam.id,
+            commitment_type=CommitmentType.cash,
+            payment_status=ClaimPaymentStatus.pending,
+        )
+        db.add(claim)
+        db.commit()
+        db.refresh(claim)
+
+        # Owner: pending
+        body = test_client.get(f"/api/families/{fam.id}/wish-list").json()
+        assert body["claimed_by_current_user"] is True
+        assert body["claim_status"] == "pending"
+        assert body["claim_id"] == claim.id
+
+        # Other logged-in donor: active (no ownership distinction for them)
+        test_client.post(
+            "/api/auth/register-donor",
+            json={"display_name": "Viewer", "email": DONOR2_EMAIL, "password": DONOR2_PASSWORD},
+        )
+        login_as(test_client, DONOR2_EMAIL, DONOR2_PASSWORD)
+        body = test_client.get(f"/api/families/{fam.id}/wish-list").json()
+        assert body["claimed_by_current_user"] is False
+        assert body["claim_status"] == "active"
+
+        # Anonymous: active
+        test_client.cookies.clear()
+        body = test_client.get(f"/api/families/{fam.id}/wish-list").json()
+        assert body["claim_status"] == "active"
+
+        # Window lapsed (sweep is hourly — the claim is still pending in the
+        # DB): even the owner sees "active" until the sweep frees the family
+        claim.created_at = datetime.now(timezone.utc) - timedelta(hours=73)
+        db.commit()
+        login_as(test_client, DONOR_EMAIL, DONOR_PASSWORD)
+        body = test_client.get(f"/api/families/{fam.id}/wish-list").json()
+        assert body["claim_status"] == "active"
 
 
 # =========================================================================

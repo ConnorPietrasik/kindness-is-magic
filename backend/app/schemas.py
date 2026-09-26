@@ -1,11 +1,12 @@
 """Pydantic request/response schemas."""
 
 from datetime import date, datetime
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, BeforeValidator, Field, ValidationInfo, field_validator, model_serializer, model_validator
 
 from app.models import (
+    ClaimPaymentStatus,
     CommitmentType,
     DeadlineMode,
     DeadlineType,
@@ -1290,6 +1291,11 @@ class PublicFamilySummary(BaseModel):
 
     Excludes all PII (family_name, contact_name, phone_number, address).
     Only ``display_id`` is exposed so donors can identify the family anonymously.
+
+    ``claim_status`` ("active" / "pending" / "fulfilled") is set on items
+    revealed via ``include_claimed=true`` — admin sees all claimed families,
+    the claiming owner their own only ("pending" = cash, unpaid, not
+    expired); hidden families have no claim, so it is null otherwise.
     """
 
     id: int
@@ -1298,8 +1304,7 @@ class PublicFamilySummary(BaseModel):
     person_count: int
     min_age: int | None = None
     max_age: int | None = None
-    sponsored: bool = False
-    claimed_by_current_user: bool = False
+    claim_status: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -1514,9 +1519,18 @@ class FamilyClaimSummary(BaseModel):
     id: int
     family: FamilyInfo
     commitment_type: CommitmentType
+    payment_status: ClaimPaymentStatus
     notes: str | None = None
     created_at: datetime
     fulfilled_at: datetime | None = None
+    # Payment fields — for cash claims (gift claims stay at the defaults).
+    paid_at: datetime | None = None
+    # Derived: created_at + CASH_CLAIM_PAYMENT_HOURS for pending cash claims,
+    # None otherwise. May be in the past while the claim is still pending
+    # (hourly-sweep lag) — clients render such items as expired.
+    payment_expires_at: datetime | None = None
+    zeffy_payment_id: str | None = None
+    includes_groceries: bool = False
     email_error: str | None = None
 
     model_config = {"from_attributes": True}
@@ -1535,9 +1549,16 @@ class FamilyClaimDetail(BaseModel):
     id: int
     family: FamilyInfo
     commitment_type: CommitmentType
+    payment_status: ClaimPaymentStatus
     notes: str | None = None
     created_at: datetime
     fulfilled_at: datetime | None = None
+    paid_at: datetime | None = None
+    # Derived: created_at + CASH_CLAIM_PAYMENT_HOURS for pending cash claims,
+    # None otherwise (see FamilyClaimSummary).
+    payment_expires_at: datetime | None = None
+    zeffy_payment_id: str | None = None
+    includes_groceries: bool = False
     donor_user_id: int
     donor_display_name: str
     family_wish: WishSummary | None = None
@@ -1571,6 +1592,185 @@ class DonorWishPurchaseMark(BaseModel):
 
     purchased_where: clearable_text(200)
     purchaser_note: clearable_text(400)
+
+
+# ---------------------------------------------------------------------------
+# Donor cart (cash sponsorship checkout)
+# ---------------------------------------------------------------------------
+
+
+class CartItem(BaseModel):
+    """One committed (in-progress) pending cash claim in the donor's cart."""
+
+    claim_id: int
+    family: FamilyInfo
+    includes_groceries: bool
+    line_total_usd: int
+    # Derived: created_at + CASH_CLAIM_PAYMENT_HOURS. May be in the past
+    # while the claim is still pending (hourly-sweep lag) — the cart renders
+    # such items as expired.
+    payment_expires_at: datetime | None = None
+
+
+class CartResponse(BaseModel):
+    """GET /api/donor/cart — the server half of the cart page.
+
+    The frontend merges these committed items with the local uncommitted
+    ones. ``payment_expires_at`` is the earliest expiry across items; the
+    line/total prices here are the source of truth the server recompute at
+    checkout relies on.
+    """
+
+    items: list[CartItem]
+    item_count: int
+    total_usd: int
+    payment_expires_at: datetime | None = None
+    # Set when the window's "please pay" nudge has a failed send and no
+    # successful one (derived from the email log — the nudge went out on a
+    # previous request). The cart page shows a short inline note when set.
+    email_error: str | None = None
+
+
+class CartItemUpdate(BaseModel):
+    """Body for PATCH /api/donor/cart/items/{claim_id}."""
+
+    includes_groceries: bool
+
+
+class CartCheckoutItem(BaseModel):
+    """One uncommitted cart item submitted at checkout."""
+
+    family_id: int
+    includes_groceries: bool = False
+
+
+class CartCheckoutRequest(BaseModel):
+    """Body for POST /api/donor/cart/checkout.
+
+    ``items`` is the donor's uncommitted (frontend-local) cart; an empty
+    body is a pure re-checkout of the existing pending cart.
+    """
+
+    items: list[CartCheckoutItem] = []
+
+
+class CartCheckoutResponse(BaseModel):
+    """Checkout result: the Zeffy URL (donor email pre-filled, percent-encoded) and the committed claim ids.
+
+    The amount can't be pre-filled (Zeffy forms don't accept an amount URL
+    parameter) — the donor enters the whole-cart total by hand, guided by
+    the cart page's how-to-pay instructions.
+
+    The frontend opens ``zeffy_url`` in a new tab and drops the returned
+    claim ids' families from local storage (they are now server-side, still
+    listed from GET /api/donor/cart).
+    """
+
+    zeffy_url: str
+    claim_ids: list[int]
+
+
+class CartConfirmResponse(BaseModel):
+    """POST /api/donor/cart/confirm result.
+
+    * ``pending`` — no matching payment found yet (keep polling the cart).
+    * ``mismatch`` — this donor paid a different amount on the campaign
+      (``expected_usd`` vs ``found_usd``); an admin can match manually.
+    * ``paid`` — the payment was applied; ``claims`` are the now-paid claims.
+    """
+
+    status: Literal["pending", "mismatch", "paid"]
+    expected_usd: int | None = None
+    found_usd: int | None = None
+    claims: list[FamilyClaimSummary] = []
+
+
+class AdminClaimMarkPaid(BaseModel):
+    """Body for the admin mark-paid endpoint (offline cash/cheque with no
+    Zeffy record). ``zeffy_payment_id`` is optional — set when the offline
+    payment does have a Zeffy record to link."""
+
+    zeffy_payment_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Admin Zeffy reconciliation (unmatched-payments page)
+# ---------------------------------------------------------------------------
+
+
+class AdminZeffyPayment(BaseModel):
+    """One Zeffy payment enriched with local match state.
+
+    ``matched`` / ``claim_ids`` are local: the claims storing this payment
+    id (a matched payment lists them; an unmatched one has none).
+    """
+
+    id: str
+    created_at: datetime
+    amount_cents: int
+    currency: str
+    buyer_name: str | None = None
+    buyer_email: str | None = None
+    receipt_url: str | None = None
+    claim_ids: list[int]
+    matched: bool
+
+
+class AdminZeffyPaymentsResponse(BaseModel):
+    """Zeffy payment list — cursor-based (Zeffy's pagination), not the page
+    envelope the other admin lists use."""
+
+    payments: list[AdminZeffyPayment]
+    has_more: bool
+    next_cursor: str | None = None
+
+
+class AdminZeffyPendingClaimItem(BaseModel):
+    """One active unpaid cash claim in the match-modal payload."""
+
+    claim_id: int
+    family: FamilyInfo
+    includes_groceries: bool
+    line_total_usd: int
+    payment_expires_at: datetime | None = None
+
+
+class AdminZeffyPendingDonorGroup(BaseModel):
+    """Unpaid cash claims grouped by donor (match-modal: per-donor
+    checkboxes + expected amount)."""
+
+    donor_id: int
+    donor_email: str
+    donor_display_name: str | None = None
+    item_count: int
+    total_usd: int
+    claims: list[AdminZeffyPendingClaimItem]
+
+
+class AdminZeffyPendingClaimsResponse(BaseModel):
+    """GET /api/admin/zeffy/pending-claims — grouped modal data (no
+    columns/pagination, the admin_deadlines precedent)."""
+
+    donors: list[AdminZeffyPendingDonorGroup]
+
+
+class AdminZeffyMatchRequest(BaseModel):
+    """Body for the admin manual match: the claims the payment covers.
+
+    A subset of a donor's cart is fine (a $600 payment covering one $500
+    claim — the admin's judgment)."""
+
+    claim_ids: list[int]
+
+
+class AdminZeffyMatchResponse(BaseModel):
+    payment_id: str
+    claims: list[FamilyClaimSummary]
+
+
+class AdminZeffyUnmatchResponse(BaseModel):
+    payment_id: str
+    claim_ids: list[int]
 
 
 class DonorWishPurchaseResponse(BaseModel):

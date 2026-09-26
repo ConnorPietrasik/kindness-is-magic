@@ -11,7 +11,18 @@ from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
 from app.config import APP_BASE_URL
-from app.models import EmailKind, EmailPreference, EmailStatus, SentEmail
+from app.display_ids import compute_display_ids
+from app.models import (
+    EmailKind,
+    EmailPreference,
+    EmailStatus,
+    Family,
+    FamilyClaim,
+    Person,
+    SentEmail,
+    User,
+)
+from app.response_builders import batch_load_family_wishes, batch_load_person_wishes
 
 logger = logging.getLogger(__name__)
 
@@ -378,6 +389,18 @@ def build_claim_confirmation_email(
 <p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts.</p>"""
 
 
+def build_payment_email_failure_notice(donor_email: str, payment_kind: str, error_summary: str) -> str:
+    """Build the HTML body for an admin notification about a failed payment-flow email."""
+    base = APP_BASE_URL
+    return f"""<p>An error occurred while sending a sponsorship payment email to a donor.</p>
+<table style="width:100%;border-collapse:collapse;margin:16px 0;">
+<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{donor_email}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Email type</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{payment_kind}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{error_summary}</td></tr>
+</table>
+<p style="text-align:center;"><a href="{base}/admin" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Admin Dashboard</a></p>"""
+
+
 def build_admin_email_failure_notice(
     donor_email: str,
     family_display_id: str,
@@ -421,4 +444,245 @@ async def send_admin_notification(
         user_id=user_id,
         exempt_unsubscribe=True,
         include_unsubscribe_link=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Gift claim confirmation — send flow (shared by the claim endpoint and the
+# cash→gifts commitment toggle)
+# ---------------------------------------------------------------------------
+
+
+async def send_claim_confirmation(claim: FamilyClaim, fam: Family, user: User, db: Session) -> str | None:
+    """Send the gift-claim confirmation email to the donor.
+
+    Returns an error message string if the email failed, or None on success
+    (unsubscribe suppression counts as success).
+    """
+    # Build display_id early so the except block can reference it
+    display_id = compute_display_ids(db, "family", [fam], scope=None).get(fam.id, "0")
+
+    try:
+        # Load people + wishes for the email body
+        people = db.query(Person).filter(Person.family_id == fam.id, Person.deleted_at.is_(None)).order_by(Person.id).all()
+        person_ids = [p.id for p in people]
+        wishes_by_person = batch_load_person_wishes(db, person_ids)
+
+        # Build people data for the template
+        people_data = [
+            {
+                "given_name": p.given_name,
+                "age": p.age,
+                "wishes": [
+                    {"type": w.type.value, "description": w.description, "size": w.size, "color": w.color}
+                    for w in wishes_by_person.get(p.id, [])
+                ],
+            }
+            for p in people
+        ]
+
+        base = APP_BASE_URL
+        claim_detail_url = f"{base}/donor/claims/{claim.id}"
+
+        body = build_claim_confirmation_email(
+            donor_name=user.display_name,
+            family_display_id=display_id,
+            family_wish=batch_load_family_wishes(db, [fam.id]).get(fam.id, ""),
+            family_bio=fam.bio,
+            people=people_data,
+            claim_detail_url=claim_detail_url,
+        )
+
+        result = await send_email(
+            to=user.email,
+            subject=f"Sponsorship Confirmation — Family {display_id}",
+            html_body=body,
+            db=db,
+            kind=EmailKind.claim_confirmation,
+            user_id=user.id,
+        )
+
+        if result["sent"]:
+            return None
+        if result.get("reason") == "unsubscribed":
+            # Unsubscribe suppression is not an error
+            return None
+
+        # SMTP failure or other send failure
+        logger.error(
+            "Claim confirmation email failed: claim_id=%s donor_email=%s family_display_id=%s reason=%s",
+            claim.id,
+            user.email,
+            display_id,
+            result.get("reason"),
+        )
+        return await _send_admin_failure_notice(db, user.email, f"Family {display_id}", claim.id, result.get("reason", "unknown"), user.id)
+
+    except Exception:  # noqa: BLE001
+        # Safety net for template rendering or other unexpected errors
+        logger.error("Unexpected error sending claim confirmation for claim %s", claim.id, exc_info=True)
+        return await _send_admin_failure_notice(db, user.email, f"Family {display_id}", claim.id, "unexpected error", user.id)
+
+
+async def _send_admin_failure_notice(
+    db: Session, donor_email: str, family_display_id: str, claim_id: int, error_summary: str, user_id: int | None
+) -> str:
+    """Attempt the admin failure notice (non-blocking) and return the error string."""
+    try:
+        admin_body = build_admin_email_failure_notice(
+            donor_email=donor_email,
+            family_display_id=family_display_id,
+            claim_id=claim_id,
+            error_summary=error_summary,
+        )
+        await send_admin_notification(
+            subject="Sponsorship Confirmation Email Failed",
+            body_html=admin_body,
+            db=db,
+            kind=EmailKind.admin_failure_notice,
+            user_id=user_id,
+        )
+    except Exception:  # noqa: BLE001
+        logger.error("Admin notification also failed for claim %s", claim_id, exc_info=True)
+    return "Confirmation email failed to send"
+
+
+# ---------------------------------------------------------------------------
+# Cash sponsorship payment emails (Zeffy flow)
+# ---------------------------------------------------------------------------
+
+# Settled donor-reassurance copy — shown wherever a cash claim is unpaid so a
+# donor whose payment doesn't auto-match never thinks the processor ate their
+# money.
+PAYMENT_REASSURANCE_LINE = "If your payment doesn't match automatically, an admin will review it within a day."
+
+
+def _format_usd(amount_usd: int) -> str:
+    """Format whole-dollar USD as ``$500`` (cart prices are whole dollars)."""
+    return f"${amount_usd:,.0f}"
+
+
+def _payment_cart_table(lines: list[dict]) -> str:
+    """HTML table rows for cart lines.
+
+    Each line dict: ``display_id`` (str), ``includes_groceries`` (bool),
+    ``line_total_usd`` (int).
+    """
+    rows = ""
+    for line in lines:
+        groceries = " + groceries" if line.get("includes_groceries") else ""
+        rows += f"""<tr>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;">Family {line["display_id"]}{groceries}</td>
+  <td style="padding:8px 12px;border-bottom:1px solid #eeeeee;text-align:right;">{_format_usd(line["line_total_usd"])}</td>
+</tr>"""
+    return rows
+
+
+def _build_payment_table(lines: list[dict], total_usd: int) -> str:
+    """Cart table with a bolded total row."""
+    return f"""<table style="width:100%;border-collapse:collapse;margin:16px 0;">
+{_payment_cart_table(lines)}
+<tr>
+  <td style="padding:8px 12px;font-weight:bold;">Total</td>
+  <td style="padding:8px 12px;text-align:right;font-weight:bold;">{_format_usd(total_usd)}</td>
+</tr>
+</table>"""
+
+
+def build_payment_request_email(
+    donor_name: str,
+    lines: list[dict],
+    total_usd: int,
+    expires_at: datetime,
+    cart_url: str,
+) -> str:
+    """Build the HTML body for the "please pay" nudge email.
+
+    Sent at checkout and at the gifts→cash toggle (at most once per payment
+    window). Carries the cart families, the total, the expiry date, a link to
+    the cart page, and the reassurance line below the content.
+
+    Carries the how-to-pay instructions, since the Zeffy form can't
+    pre-fill the amount: the donor must enter the exact total by hand, and
+    the optional 11% "keep Zeffy free" tip (which goes to Zeffy, not the
+    family) should be set to $0 via its "Other" option — with a screenshot
+    (served from ``{APP_BASE_URL}/zeffy-tip-zero.png``) of how.
+    """
+    expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "the end of the payment window"
+    n = len(lines)
+    family_word = "family" if n == 1 else "families"
+    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+<p>Thank you for sponsoring {n} {family_word} on Kindness Is Magic ✨ Your sponsorship is reserved, but the {family_word} are only yours once payment lands.</p>
+{_build_payment_table(lines, total_usd)}
+<p style="text-align:center;margin-top:24px;"><a href="{cart_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to your cart &amp; pay</a></p>
+<p><strong>How to pay on Zeffy:</strong></p>
+<ol style="margin:8px 0;padding-left:20px;">
+  <li style="margin:6px 0;">Enter <strong>{_format_usd(total_usd)}</strong> exactly as the donation amount. The Zeffy form can't pre-fill it — and the exact total is what lets us match your payment to these {family_word} automatically.</li>
+  <li style="margin:6px 0;">Set the optional <strong>"Help keep Zeffy free"</strong> tip to <strong>$0</strong>: choose <em>Other</em> in the tip dropdown and enter 0. The 11% default tip goes to Zeffy, not the family. We use Zeffy because it's fee-free, so every penny of your donation goes to the family — the tip is the only extra charge on the page.</li>
+</ol>
+<img src="{APP_BASE_URL}/zeffy-tip-zero.png" alt="Zeffy form: the 'Help keep Zeffy free' tip dropdown showing 11% — choose Other and enter $0" style="max-width:100%;border:1px solid #dddddd;border-radius:4px;margin:8px 0 4px;">
+<p style="font-size:12px;color:#888888;text-align:center;">Choose "Other" in the tip dropdown and enter $0.</p>
+<p>Your payment window closes on <strong>{expires_str}</strong>. If a sponsorship is still unpaid when the window closes, it is released back to the browse list.</p>
+<p style="margin-top:16px;font-size:14px;color:#666666;">{PAYMENT_REASSURANCE_LINE}</p>"""
+
+
+def build_payment_confirmed_email(
+    donor_name: str,
+    lines: list[dict],
+    total_usd: int,
+) -> str:
+    """Build the HTML body for the payment-confirmed email.
+
+    Sent from the shared apply path (confirm / webhook / Zeffy match) and
+    admin mark-paid, so every payment — however recorded — gets exactly one
+    confirmation. Only sent when ``SEND_PAYMENT_CONFIRMED_EMAIL`` is enabled
+    (off by default — Zeffy already emails the donor its receipt). Notes the
+    groceries add-ons and that Zeffy itself sends the tax receipt.
+    """
+    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+<p>Your payment of <strong>{_format_usd(total_usd)}</strong> has been received — your sponsorship is confirmed ✨</p>
+{_build_payment_table(lines, total_usd)}
+<p>What happens next: the organization will purchase the families' wishes. <strong>Zeffy will email your tax receipt separately</strong> — no action is needed from you.</p>
+<p style="text-align:center;margin-top:24px;"><a href="{APP_BASE_URL}/donor/claims" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">View your sponsorships</a></p>"""
+
+
+def build_payment_expired_email(
+    donor_name: str,
+    lines: list[dict],
+) -> str:
+    """Build the HTML body for the expiry notice.
+
+    Also carries the reassurance line: a donor who paid but didn't
+    auto-match watches their claim expire and must be told the money is being
+    handled, not lost.
+    """
+    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+<p>The following sponsorships in your cart were still unpaid when the payment window closed, so they have been released back to the browse list:</p>
+{_payment_cart_table(lines)}
+<p>If you paid but your payment didn't match automatically, <strong>your money has not been lost</strong> — it is being handled.</p>
+<p style="margin-top:16px;font-size:14px;color:#666666;">{PAYMENT_REASSURANCE_LINE}</p>"""
+
+
+def payment_request_already_sent(donor_email: str, window_anchor: datetime, db: Session) -> bool:
+    """True if a "please pay" nudge was already sent after *window_anchor*.
+
+    The window anchor is the ``min(created_at)`` of the donor's pending cash
+    claims — the same derivation as the cart's displayed earliest expiry.
+    Only ``sent`` rows count (a failed send doesn't block a retry in the same
+    window). Served by the existing recipient+sent_at index.
+
+    ``>=`` (not ``>``): the nudge is always recorded after its claims are
+    created, and ``>=`` stays correct when both timestamps collapse to the
+    same instant (e.g. one long database transaction).
+    """
+    return (
+        db.query(SentEmail.id)
+        .filter(
+            SentEmail.recipient_email == donor_email.strip().lower(),
+            SentEmail.kind == EmailKind.payment_request,
+            SentEmail.status == EmailStatus.sent,
+            SentEmail.sent_at >= window_anchor,
+        )
+        .first()
+        is not None
     )

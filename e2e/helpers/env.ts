@@ -97,6 +97,13 @@ export function getBaseUrl(): string {
 }
 
 /**
+ * Read an arbitrary key from the project .env (environment wins).
+ */
+export function getEnvValue(key: string): string | undefined {
+  return process.env[key] ?? readProjectEnv().get(key);
+}
+
+/**
  * Check whether SUPPRESS_SEND is explicitly disabled (set to 0) in .env.
  * Returns true if SUPPRESS_SEND is 0 (bad for e2e), false otherwise.
  */

@@ -131,6 +131,15 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "sender_name", label: "Sender", visible: true },
     { key: "sent_at", label: "Sent", visible: true },
   ],
+  adminZeffyPayments: [
+    { key: "created_at", label: "Date", visible: true },
+    { key: "buyer_name", label: "Buyer", visible: true },
+    { key: "buyer_email", label: "Email", visible: true },
+    { key: "amount_cents", label: "Amount", visible: true },
+    { key: "currency", label: "Currency", visible: true },
+    { key: "receipt_url", label: "Receipt", visible: false },
+    { key: "matched", label: "Matched", visible: true },
+  ],
   // Donor tables — order only (no visibility toggle on these pages).
   donorClaims: [
     { key: "family", label: "Family", visible: true },

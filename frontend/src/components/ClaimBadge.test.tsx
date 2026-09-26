@@ -42,6 +42,12 @@ describe("ClaimBadge", () => {
     expect(screen.getByText("active — full")).toHaveClass("bg-emerald-100", "text-emerald-800");
   });
 
+  it("uses the amber style for pending (cash, unpaid) claims", () => {
+    wrap(<ClaimBadge status="pending" commitmentType="cash" />);
+
+    expect(screen.getByText("pending — cash")).toHaveClass("bg-amber-100", "text-amber-800");
+  });
+
   it("falls back to the default style for unknown statuses", () => {
     wrap(<ClaimBadge status="weird" commitmentType="full" />);
 

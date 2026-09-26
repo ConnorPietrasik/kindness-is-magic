@@ -86,6 +86,23 @@ prod_setup() {
     exit 1
   fi
 
+  # The Zeffy mock (dev/e2e stack only): a production backend pointed at it
+  # would 502 every checkout, so refuse the committed mock values.
+  local zeffy_mock_vars=()
+  for var in ZEFFY_API_KEY ZEFFY_API_BASE; do
+    value="$(env_get "$var")"
+    example_value="$(example_get "$var")"
+    if [ -n "$value" ] && [ "$value" = "$example_value" ]; then
+      zeffy_mock_vars+=("$var")
+    fi
+  done
+  if [ "${#zeffy_mock_vars[@]}" -gt 0 ]; then
+    echo "Error: .env still has the Zeffy MOCK values from .env.example (dev/e2e only):"
+    printf '  - %s\n' "${zeffy_mock_vars[@]}"
+    echo "Set real Zeffy credentials for production (or leave ZEFFY_API_BASE unset)."
+    exit 1
+  fi
+
   if [ "$(env_get DEBUG)" = "true" ]; then
     echo "Warning: DEBUG=true in .env — production would run with insecure cookies and no rate limiting."
   fi

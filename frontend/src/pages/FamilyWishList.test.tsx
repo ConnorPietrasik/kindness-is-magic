@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { CartProvider } from "../context/CartContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
@@ -62,10 +63,12 @@ const wrap = ({ user = null, state }: WrapOptions = {}) => {
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
           <AuthProvider>
-            <StateProbe />
-            <Routes>
-              <Route path="/families/:id/wish-list" element={<FamilyWishList />} />
-            </Routes>
+            <CartProvider>
+              <StateProbe />
+              <Routes>
+                <Route path="/families/:id/wish-list" element={<FamilyWishList />} />
+              </Routes>
+            </CartProvider>
           </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
@@ -180,6 +183,21 @@ describe("FamilyWishList sponsored status", () => {
     wrap({ user: mockUser });
 
     await screen.findByText("You are sponsoring this family");
+    expect(screen.getByRole("link", { name: "View sponsorship details →" })).toHaveAttribute("href", "/donor/claims/42");
+    expect(screen.queryByRole("button", { name: "Sponsor this family" })).not.toBeInTheDocument();
+  });
+
+  it("tells the owner of an unpaid cash claim that payment is pending (link kept)", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({
+      ...mockWishList,
+      claim_status: "pending",
+      claim_id: 42,
+      claimed_by_current_user: true,
+    });
+
+    wrap({ user: mockUser });
+
+    await screen.findByText("You are sponsoring this family — payment pending");
     expect(screen.getByRole("link", { name: "View sponsorship details →" })).toHaveAttribute("href", "/donor/claims/42");
     expect(screen.queryByRole("button", { name: "Sponsor this family" })).not.toBeInTheDocument();
   });

@@ -33,6 +33,7 @@ export const ROUTES = {
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
   ADMIN_EMAILS: "/admin/emails",
+  ADMIN_ZEFFY_PAYMENTS: "/admin/zeffy-payments",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
@@ -55,6 +56,7 @@ export const ROUTES = {
   // ── Donor self-service ───────────────────────────────────
   DONOR_CLAIMS: "/donor/claims",
   DONOR_CLAIM_DETAIL: "/donor/claims/:id",
+  DONOR_CART: "/donor/cart",
 
   // ── Public ────────────────────────────────────────────────
   HOME: "/home",

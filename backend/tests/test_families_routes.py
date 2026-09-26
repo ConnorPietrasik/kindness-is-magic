@@ -771,7 +771,7 @@ def test_list_families_family_with_no_people(db, test_client: TestClient, family
 
 
 # ---------------------------------------------------------------------------
-# Sponsored visibility (hide others' sponsored families by default)
+# Claimed visibility (hide claimed families by default; include_claimed opts in)
 # ---------------------------------------------------------------------------
 
 
@@ -786,14 +786,24 @@ def _make_donor_user(db, email: str, password: str = "DonorPass1234!") -> int:
     return donor.id
 
 
-def _make_claim(db, donor_user_id: int, family_id: int, *, fulfilled: bool = False, deleted: bool = False) -> None:
-    """Create a FamilyClaim row directly in the DB."""
-    from app.models import CommitmentType, FamilyClaim
+def _make_claim(
+    db,
+    donor_user_id: int,
+    family_id: int,
+    *,
+    fulfilled: bool = False,
+    deleted: bool = False,
+    commitment_type=None,
+    payment_status=None,
+) -> None:
+    """Create a FamilyClaim row directly in the DB (defaults: gifts/paid)."""
+    from app.models import ClaimPaymentStatus, CommitmentType, FamilyClaim
 
     claim = FamilyClaim(
         donor_user_id=donor_user_id,
         family_id=family_id,
-        commitment_type=CommitmentType.gifts,
+        commitment_type=commitment_type or CommitmentType.gifts,
+        payment_status=payment_status or ClaimPaymentStatus.paid,
         fulfilled_at=datetime.now(timezone.utc) if fulfilled else None,
         deleted_at=datetime.now(timezone.utc) if deleted else None,
     )
@@ -819,9 +829,10 @@ def _eligible_family(db, family_name: str):
     return fam
 
 
-def test_list_families_hides_sponsored_by_default(db, test_client: TestClient, family_record, admin_user):
-    """A family with an active claim is hidden from the default list but
-    revealed (flagged sponsored) for admins via show_sponsored=true."""
+def test_list_families_hides_claimed_by_default(db, test_client: TestClient, family_record, admin_user):
+    """A family with an active claim is hidden from the default list (no
+    owner exception) but revealed — with claim_status — via
+    include_claimed=true, which the owner may pass for their own claims."""
     from app.models import FamilyVerificationStatus, WishLockLevel
     from tests.conftest import login_as
 
@@ -831,23 +842,22 @@ def test_list_families_hides_sponsored_by_default(db, test_client: TestClient, f
     donor_id = _make_donor_user(db, "sponsor@test.com")
     _make_claim(db, donor_id, family_record.id)
 
-    resp = test_client.get("/api/families")
-    assert resp.status_code == 200
-    assert resp.json()["total"] == 0
+    # Default: hidden for anonymous and for the claiming donor alike
+    assert test_client.get("/api/families").json()["total"] == 0
+    login_as(test_client, "sponsor@test.com", "DonorPass1234!")
+    assert test_client.get("/api/families").json()["total"] == 0
 
-    login_as(test_client, "admin@test.com", "AdminPass123!")
-    resp = test_client.get("/api/families?show_sponsored=true")
-    assert resp.status_code == 200
-    data = resp.json()
+    # include_claimed=true: the owner may opt in and their revealed claim
+    # carries claim_status (active gift claim → "active")
+    data = test_client.get("/api/families?include_claimed=true").json()
     assert data["total"] == 1
     assert data["families"][0]["id"] == family_record.id
-    assert data["families"][0]["sponsored"] is True
-    assert data["families"][0]["claimed_by_current_user"] is False
+    assert data["families"][0]["claim_status"] == "active"
 
 
 def test_list_families_hides_fulfilled_claims_by_default(db, test_client: TestClient, family_record, admin_user):
     """A fulfilled (non-deleted) claim also hides the family by default;
-    an admin can reveal it with show_sponsored=true."""
+    include_claimed reveals it with claim_status "fulfilled" (owner or admin)."""
     from app.models import FamilyVerificationStatus, WishLockLevel
     from tests.conftest import login_as
 
@@ -859,14 +869,18 @@ def test_list_families_hides_fulfilled_claims_by_default(db, test_client: TestCl
 
     assert test_client.get("/api/families").json()["total"] == 0
 
-    login_as(test_client, "admin@test.com", "AdminPass123!")
-    data = test_client.get("/api/families?show_sponsored=true").json()
+    # Anonymous: include_claimed reveals nothing claimed
+    assert test_client.get("/api/families?include_claimed=true").json()["total"] == 0
+
+    # Owner: their own fulfilled claim is revealed with "fulfilled"
+    login_as(test_client, "sponsor@test.com", "DonorPass1234!")
+    data = test_client.get("/api/families?include_claimed=true").json()
     assert data["total"] == 1
-    assert data["families"][0]["sponsored"] is True
+    assert data["families"][0]["claim_status"] == "fulfilled"
 
 
 def test_list_families_soft_deleted_claim_keeps_family_visible(db, test_client: TestClient, family_record):
-    """A soft-deleted claim frees the family: visible by default, not sponsored."""
+    """A soft-deleted claim frees the family: visible by default, no status."""
     from app.models import FamilyVerificationStatus, WishLockLevel
 
     family_record.verification_status = FamilyVerificationStatus.verified
@@ -877,13 +891,13 @@ def test_list_families_soft_deleted_claim_keeps_family_visible(db, test_client: 
 
     data = test_client.get("/api/families").json()
     assert data["total"] == 1
-    assert data["families"][0]["sponsored"] is False
+    assert data["families"][0]["claim_status"] is None
 
 
-def test_list_families_sponsored_flags_mixed(db, test_client: TestClient, family_record, admin_user):
-    """Admin (show_sponsored): sponsored flag distinguishes claimed vs open
-    families."""
-    from app.models import FamilyVerificationStatus, WishLockLevel
+def test_list_families_claimed_flags_mixed(db, test_client: TestClient, family_record, admin_user):
+    """include_claimed as admin: claim_status distinguishes claimed vs open
+    families; anonymous gets no claimed families at all."""
+    from app.models import CommitmentType, FamilyVerificationStatus, WishLockLevel
     from tests.conftest import login_as
 
     open_fam = _eligible_family(db, "Open Family")
@@ -893,39 +907,56 @@ def test_list_families_sponsored_flags_mixed(db, test_client: TestClient, family
     db.commit()
     donor_id = _make_donor_user(db, "sponsor@test.com")
     _make_claim(db, donor_id, claimed_fam.id)
+    _make_claim(db, donor_id, family_record.id, commitment_type=CommitmentType.cash)
 
+    # Anonymous: include_claimed reveals nothing claimed (open family only)
+    data = test_client.get("/api/families?include_claimed=true").json()
+    by_id = {fam["id"]: fam for fam in data["families"]}
+    assert data["total"] == 1
+    assert by_id[open_fam.id]["claim_status"] is None
+
+    # Admin: include_claimed reveals all claimed families
     login_as(test_client, "admin@test.com", "AdminPass123!")
-    data = test_client.get("/api/families?show_sponsored=true").json()
+    data = test_client.get("/api/families?include_claimed=true").json()
+    by_id = {fam["id"]: fam for fam in data["families"]}
     by_id = {fam["id"]: fam for fam in data["families"]}
     assert data["total"] == 3
-    assert by_id[claimed_fam.id]["sponsored"] is True
-    assert by_id[open_fam.id]["sponsored"] is False
-    assert by_id[family_record.id]["sponsored"] is False
-    # No one is logged in — nobody's claim belongs to the current user
-    assert all(fam["claimed_by_current_user"] is False for fam in data["families"])
+    assert by_id[claimed_fam.id]["claim_status"] == "active"
+    assert by_id[open_fam.id]["claim_status"] is None
+    # A paid cash claim (recovery path, already matched) reads "active"
+    assert by_id[family_record.id]["claim_status"] == "active"
 
 
-def test_list_families_claimed_by_current_user_flag(db, test_client: TestClient, family_record):
-    """A logged-in donor sees claimed_by_current_user on their own claim."""
-    from app.models import FamilyVerificationStatus, WishLockLevel
+def test_list_families_pending_cash_shows_pending_status(db, test_client: TestClient, family_record, admin_user):
+    """An unpaid, not-yet-expired cash claim reads "pending" in the revealed
+    list for its owner (and hides the family by default like any other claim;
+    other visitors get no "pending" from the list at all)."""
+    from app.models import ClaimPaymentStatus, CommitmentType, FamilyVerificationStatus, WishLockLevel
     from tests.conftest import login_as
 
     family_record.verification_status = FamilyVerificationStatus.verified
     family_record.wish_lock_level = WishLockLevel.admin
     db.commit()
     donor_id = _make_donor_user(db, "sponsor@test.com")
-    _make_claim(db, donor_id, family_record.id)
+    _make_claim(db, donor_id, family_record.id, commitment_type=CommitmentType.cash, payment_status=ClaimPaymentStatus.pending)
 
+    # Hidden by default even though it's "only" pending — and include_claimed
+    # reveals nothing claimed to anonymous visitors
+    assert test_client.get("/api/families").json()["total"] == 0
+    assert test_client.get("/api/families?include_claimed=true").json()["total"] == 0
+
+    # Owner: their own pending claim is revealed with "pending"
     login_as(test_client, "sponsor@test.com", "DonorPass1234!")
-    data = test_client.get("/api/families").json()
+    data = test_client.get("/api/families?include_claimed=true").json()
     assert data["total"] == 1
-    assert data["families"][0]["sponsored"] is True
-    assert data["families"][0]["claimed_by_current_user"] is True
+    assert data["families"][0]["claim_status"] == "pending"
 
 
-def test_list_families_logged_in_user_sees_own_claim(db, test_client: TestClient, family_record, admin_user):
-    """A logged-in donor sees their own sponsored family (badged) but not
-    other people's sponsored families, without show_sponsored."""
+def test_list_families_logged_in_user_claim_visibility(db, test_client: TestClient, family_record, admin_user):
+    """A logged-in donor sees neither their own claimed family nor others'
+    by default; include_claimed=true reveals their OWN claimed families only
+    (others' stay hidden); admin sees all (the browse page's "Sponsored by
+    me" section is served by GET /api/donor/claims instead)."""
     from tests.conftest import login_as
 
     own_fam = _eligible_family(db, "My Claimed Family")
@@ -935,27 +966,34 @@ def test_list_families_logged_in_user_sees_own_claim(db, test_client: TestClient
     _make_claim(db, donor_id, own_fam.id)
     _make_claim(db, other_donor_id, other_fam.id)
 
-    # Anonymous: both sponsored families hidden
-    data = test_client.get("/api/families").json()
-    assert data["total"] == 0
+    # Anonymous: both claimed families hidden
+    assert test_client.get("/api/families").json()["total"] == 0
 
-    # Logged-in donor, default list: only their own claim is visible
+    # Logged-in donor, default list: nothing claimed is visible
     login_as(test_client, "me@test.com", "DonorPass1234!")
-    data = test_client.get("/api/families").json()
+    assert test_client.get("/api/families").json()["total"] == 0
+
+    # include_claimed=true: only the donor's OWN claim is revealed
+    data = test_client.get("/api/families?include_claimed=true").json()
     assert data["total"] == 1
     assert data["families"][0]["id"] == own_fam.id
-    assert data["families"][0]["sponsored"] is True
-    assert data["families"][0]["claimed_by_current_user"] is True
+    assert data["families"][0]["claim_status"] == "active"
 
-    # show_sponsored is admin-only: a donor passing it gets the same list
-    data = test_client.get("/api/families?show_sponsored=true").json()
+    # The other donor sees only their own claim, not the first donor's
+    login_as(test_client, "other@test.com", "DonorPass1234!")
+    data = test_client.get("/api/families?include_claimed=true").json()
     assert data["total"] == 1
+    assert data["families"][0]["id"] == other_fam.id
 
-    # Admin: default list hides both (others' claims); show_sponsored reveals all
+    # A donor without any claims gets no claimed families at all
+    _make_donor_user(db, "viewer@test.com")
+    login_as(test_client, "viewer@test.com", "DonorPass1234!")
+    assert test_client.get("/api/families?include_claimed=true").json()["total"] == 0
+
+    # Admin sees both
     login_as(test_client, "admin@test.com", "AdminPass123!")
     assert test_client.get("/api/families").json()["total"] == 0
-    data = test_client.get("/api/families?show_sponsored=true").json()
-    assert data["total"] == 2
+    assert test_client.get("/api/families?include_claimed=true").json()["total"] == 2
 
 
 def test_list_families_fulfilled_count_zero_without_claims(db, test_client: TestClient, family_record):
@@ -966,7 +1004,7 @@ def test_list_families_fulfilled_count_zero_without_claims(db, test_client: Test
 def test_list_families_fulfilled_count(db, test_client: TestClient, family_record):
     """fulfilled_count counts non-deleted fulfilled claims on non-deleted
     families only — active claims, soft-deleted claims, and soft-deleted
-    families don't count. It ignores filters and show_sponsored."""
+    families don't count. It ignores filters and include_claimed."""
     active_fam = _eligible_family(db, "Active Claim Family")
     fulfilled_fam = _eligible_family(db, "Fulfilled Family")
     deleted_claim_fam = _eligible_family(db, "Deleted Claim Family")
@@ -981,4 +1019,4 @@ def test_list_families_fulfilled_count(db, test_client: TestClient, family_recor
     _make_claim(db, donor_id, deleted_fam.id, fulfilled=True)  # family is soft-deleted — doesn't count
 
     assert test_client.get("/api/families").json()["fulfilled_count"] == 1
-    assert test_client.get("/api/families?show_sponsored=true").json()["fulfilled_count"] == 1
+    assert test_client.get("/api/families?include_claimed=true").json()["fulfilled_count"] == 1

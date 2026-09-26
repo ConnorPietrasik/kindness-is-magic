@@ -505,7 +505,10 @@ export type EmailKind =
   | "referrer_approved"
   | "referrer_rejected"
   | "claim_confirmation"
-  | "admin_failure_notice";
+  | "admin_failure_notice"
+  | "payment_request"
+  | "payment_confirmed"
+  | "payment_expired";
 
 /** Mirrors backend EmailStatus enum. */
 export type EmailStatus = "sent" | "failed" | "reset";
@@ -542,9 +545,12 @@ export interface PublicFamilySummary {
   person_count: number;
   min_age: number | null;
   max_age: number | null;
-  /** Family has a sponsor (active or fulfilled claim); hidden by default. */
-  sponsored: boolean;
-  claimed_by_current_user: boolean;
+  /**
+   * Set on families revealed via `include_claimed=true`: "active" /
+   * "pending" / "fulfilled" ("pending" = cash, unpaid, not expired).
+   * Hidden families have no claim, so it is null for them.
+   */
+  claim_status: string | null;
 }
 
 /** Mirrors backend PublicFamilyListResponse — paginated public families list. */
@@ -713,44 +719,170 @@ export function getClaimStatus(fulfilled_at: string | null): ClaimStatus {
 /** What the donor is committing to. */
 export type CommitmentType = "gifts" | "cash";
 
+/** Payment status of a claim — mirrors backend ClaimPaymentStatus enum. */
+export type ClaimPaymentStatus = "pending" | "paid";
+
+/** Minimal family info embedded in claim/cart responses (deliberately PII-free). */
+export interface ClaimFamilyInfo {
+  id: number;
+  display_id: string;
+  bio: string | null;
+  person_count: number;
+  min_age: number | null;
+  max_age: number | null;
+}
+
+/**
+ * A claim in the cash payment flow: a cash commitment that hasn't been
+ * marked paid yet (the "Awaiting payment" state).
+ */
+export function isPendingCash(claim: { commitment_type: CommitmentType; payment_status: ClaimPaymentStatus }): boolean {
+  return claim.commitment_type === "cash" && claim.payment_status === "pending";
+}
+
 /** Compact claim for list views. */
 export interface FamilyClaimSummary {
   id: number;
-  family: {
-    id: number;
-    display_id: string;
-    bio: string | null;
-    person_count: number;
-    min_age: number | null;
-    max_age: number | null;
-  };
+  family: ClaimFamilyInfo;
   commitment_type: CommitmentType;
+  payment_status: ClaimPaymentStatus;
   notes: string | null;
   created_at: string;
   fulfilled_at: string | null;
+  paid_at: string | null;
+  /** Derived: created_at + 48h for pending cash claims; null otherwise. May be in the past while the claim is still pending (hourly-sweep lag) — render such items as expired. */
+  payment_expires_at: string | null;
+  zeffy_payment_id: string | null;
+  includes_groceries: boolean;
   email_error?: string;
 }
 
 /** Full claim detail with wish list. */
 export interface FamilyClaimDetail {
   id: number;
-  family: {
-    id: number;
-    display_id: string;
-    bio: string | null;
-    person_count: number;
-    min_age: number | null;
-    max_age: number | null;
-  };
+  family: ClaimFamilyInfo;
   commitment_type: CommitmentType;
+  payment_status: ClaimPaymentStatus;
   notes: string | null;
   created_at: string;
   fulfilled_at: string | null;
+  paid_at: string | null;
+  /** Derived: created_at + 48h for pending cash claims; null otherwise. */
+  payment_expires_at: string | null;
+  zeffy_payment_id: string | null;
+  includes_groceries: boolean;
   donor_user_id: number;
   donor_display_name: string;
   /** The family's family wish — part of the claim. Null if none exists. */
   family_wish: WishSummary | null;
   people: PersonWishItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Donor cart (cash sponsorship checkout)
+// ---------------------------------------------------------------------------
+
+/** One committed (in-progress) pending cash claim in the donor's cart. */
+export interface DonorCartItem {
+  claim_id: number;
+  family: ClaimFamilyInfo;
+  includes_groceries: boolean;
+  line_total_usd: number;
+  /** Derived: created_at + 48h. May be in the past while the claim is still pending (hourly-sweep lag) — render as expired. */
+  payment_expires_at: string | null;
+}
+
+/** The server half of the cart page — merged with the local uncommitted items. */
+export interface DonorCart {
+  items: DonorCartItem[];
+  item_count: number;
+  total_usd: number;
+  /** Earliest expiry across committed items; null when there are none. */
+  payment_expires_at: string | null;
+  /** Set when the window's "please pay" nudge has a failed send and no successful one. */
+  email_error: string | null;
+}
+
+/** One uncommitted cart item submitted at checkout. */
+export interface CartCheckoutItem {
+  family_id: number;
+  includes_groceries: boolean;
+}
+
+/** POST /api/donor/cart/checkout result. */
+export interface CartCheckoutResult {
+  /** The Zeffy form URL with the donor email pre-filled (percent-encoded) — the amount can't be pre-filled (Zeffy forms don't accept an amount URL parameter); the donor enters the total by hand per the cart page's instructions. */
+  zeffy_url: string;
+  /** The claim ids just committed — their families drop out of the local cart. */
+  claim_ids: number[];
+}
+
+/** POST /api/donor/cart/confirm result (dollars, int). */
+export interface CartConfirmResult {
+  status: "pending" | "mismatch" | "paid";
+  expected_usd?: number;
+  found_usd?: number;
+  claims?: FamilyClaimSummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Zeffy payment reconciliation
+// ---------------------------------------------------------------------------
+
+/** One Zeffy payment on the dedicated campaign, enriched with local match state. */
+export interface ZeffyPayment {
+  id: string;
+  created_at: string;
+  amount_cents: number;
+  currency: string;
+  buyer_name: string | null;
+  buyer_email: string | null;
+  receipt_url: string | null;
+  /** The claims storing this payment id (matched payments list them). */
+  claim_ids: number[];
+  matched: boolean;
+}
+
+/** Cursor-based (Zeffy pagination) payment list envelope — not the page envelope. */
+export interface ZeffyPaymentsResponse {
+  payments: ZeffyPayment[];
+  has_more: boolean;
+  next_cursor: string | null;
+}
+
+/** One active unpaid cash claim in the match-modal payload. */
+export interface ZeffyPendingClaimItem {
+  claim_id: number;
+  family: ClaimFamilyInfo;
+  includes_groceries: boolean;
+  line_total_usd: number;
+  payment_expires_at: string | null;
+}
+
+/** Unpaid cash claims grouped by donor (match-modal data). */
+export interface ZeffyPendingDonorGroup {
+  donor_id: number;
+  donor_email: string;
+  donor_display_name: string | null;
+  item_count: number;
+  total_usd: number;
+  claims: ZeffyPendingClaimItem[];
+}
+
+export interface ZeffyPendingClaimsResponse {
+  donors: ZeffyPendingDonorGroup[];
+}
+
+/** POST /api/admin/zeffy/payments/{id}/match result. */
+export interface ZeffyMatchResult {
+  payment_id: string;
+  claims: FamilyClaimSummary[];
+}
+
+/** POST /api/admin/zeffy/payments/{id}/unmatch result (the claims reverted to pending). */
+export interface ZeffyUnmatchResult {
+  payment_id: string;
+  claim_ids: number[];
 }
 
 /** Body for creating a family claim. */
