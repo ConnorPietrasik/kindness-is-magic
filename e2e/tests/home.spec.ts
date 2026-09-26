@@ -3,11 +3,12 @@
  *
  * Creates no data, so there is no afterAll cleanup:
  *  - Unauthenticated "/" lands on the brochure at /home.
- *  - "Meet the Families" reaches the public browse page.
+ *  - "Choose a family to sponsor" reaches the public browse page.
  *  - The header title on /families links back to /home; on /home it scrolls
  *    to the top instead.
- *  - The header section nav and the hero CTA anchor to the brochure sections;
- *    the section nav is hidden below the sm breakpoint.
+ *  - The header section nav anchors to the brochure sections; the nav is
+ *    hidden below the sm breakpoint. The hero's donate CTA points at the
+ *    exact external donate URL (asserted by attribute — never clicked out).
  *  - Footer legal links reach their pages; Donate and social links point at
  *    the exact external URLs (asserted by attribute — never clicked out).
  *  - An authenticated visitor still sees the brochure (no redirect away) with
@@ -42,10 +43,10 @@ test.describe("Home brochure (public)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
   });
 
-  test("Meet the Families navigates to the public browse page", async ({ page }) => {
+  test("Choose a family to sponsor navigates to the public browse page", async ({ page }) => {
     await page.goto("/home");
     /* The label appears in the hero and the closing band — click the first */
-    await page.getByRole("link", { name: "Meet the Families" }).first().click();
+    await page.getByRole("link", { name: "Choose a family to sponsor" }).first().click();
     await expect(page).toHaveURL(/\/families/);
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
   });
@@ -72,18 +73,17 @@ test.describe("Home brochure (public)", () => {
 
   test("section nav anchors the brochure and scrolls to the section", async ({ page }) => {
     await page.goto("/home");
-    // The hero has a same-named link — scope to the header nav
     await page.locator("header").getByRole("link", { name: "How it works" }).click();
     await expect(page).toHaveURL(/\/home#how-it-works/);
     await expect(page.getByRole("heading", { name: "How it works", level: 2 })).toBeInViewport({ timeout: 5_000 });
   });
 
-  test("hero How it works button anchors to the section", async ({ page }) => {
+  test("hero Donate button links to the external donate page", async ({ page }) => {
     await page.goto("/home");
-    // The header nav has a same-named link — scope to the hero (first section)
-    await page.locator("section").first().getByRole("link", { name: "How it works" }).click();
-    await expect(page).toHaveURL(/\/home#how-it-works/);
-    await expect(page.getByRole("heading", { name: "How it works", level: 2 })).toBeInViewport({ timeout: 5_000 });
+    // The closing band and footer have same-named links — scope to the hero (first section)
+    const donate = page.locator("section").first().getByRole("link", { name: "Donate" });
+    await expect(donate).toHaveAttribute("href", DONATE_URL);
+    await expect(donate).toHaveAttribute("target", "_blank");
   });
 
   test("section nav is hidden on narrow viewports", async ({ page }) => {

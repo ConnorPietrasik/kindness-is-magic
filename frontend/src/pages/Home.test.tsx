@@ -92,13 +92,25 @@ describe("Home", () => {
     expect(screen.getByRole("heading", { name: "Our mission" })).toBeInTheDocument();
   });
 
-  it("Meet the Families links to the browse page", () => {
+  it("the sponsor-family CTAs link to the browse page", () => {
     wrap();
 
     // Hero CTA and closing-band CTA both point at the browse page
-    const links = screen.getAllByRole("link", { name: "Meet the Families" });
-    expect(links.length).toBeGreaterThanOrEqual(1);
+    const links = screen.getAllByRole("link", { name: "Choose a family to sponsor" });
+    expect(links.length).toBeGreaterThanOrEqual(2);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/families"));
+  });
+
+  it("the hero's second CTA is the generic external donate link", () => {
+    wrap();
+
+    // Hero and closing band carry the donate CTA (the footer's is asserted separately)
+    const links = screen.getAllByRole("link", { name: "Donate" });
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    links.forEach((link) => {
+      expect(link).toHaveAttribute("href", DONATE_URL);
+      expect(link).toHaveAttribute("target", "_blank");
+    });
   });
 
   it("shows legal, donate, social, and contact links with exact hrefs in the footer", () => {

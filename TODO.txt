@@ -4,7 +4,6 @@ Change the public family list to say "Family #ID" and use database ID instead of
 Add wish card generator so that nice wish cards can be easily printed for each wish; include a link in the donor gift-claim email so they can print too
 Split purchased fields into having donors get a different field / automatically separate them in the purchaser / admin fields to avoid admins being confused and thinking that a gift was really confirmed if the donor ends up flaking
 Gift-claims should have a "$100 Walmart gift card for Christmas dinner" optional
-/home updates: "Choose families to sponsor directly" (or better-worded) + "Donate" buttons top and bottom. The "Donate" button replaces "How it works" since they can just scroll down
 Add a note to the public family list that it costs $500 to sponsor a family directly and include standard donate link with a "100% of your donation goes to gifts" message
 Add wish guidelines
 Automated failure checks and admin emails

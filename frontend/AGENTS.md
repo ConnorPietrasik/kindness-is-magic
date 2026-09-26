@@ -60,6 +60,7 @@ All query keys are defined here as `as const` arrays (some as factory functions 
 - Tailwind utility classes only. No CSS modules, styled-components, or arbitrary CSS files.
 - Modify `src/index.css` only for global styles, Tailwind `@theme` changes, or app-wide behavior.
 - Avoid inline styles except for dynamic values that cannot be expressed with Tailwind.
+- Button and CTA labels use sentence case
 - Every text-like `<input>` and `<FormField>` must have an `autoComplete` attribute (default `"off"`, semantic values like `"email"` where appropriate). Omit on checkboxes, radios, and other non-text controls.
 
 ## Components

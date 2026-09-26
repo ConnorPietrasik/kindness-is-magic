@@ -67,14 +67,16 @@ export default function Home() {
               to={ROUTES.PUBLIC_FAMILIES}
               className="rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-dark shadow transition-all duration-300 hover:bg-white/90 hover:scale-105 active:scale-95"
             >
-              Meet the Families
+              Choose a family to sponsor
             </Link>
-            <Link
-              to={`${ROUTES.HOME}#how-it-works`}
+            <a
+              href={DONATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="rounded-lg border border-white/40 bg-white/10 px-6 py-3 text-base font-semibold text-white transition-all duration-300 hover:bg-white/20 hover:scale-105 active:scale-95"
             >
-              How it works
-            </Link>
+              Donate
+            </a>
           </div>
           <img
             src={heroPhoto}
@@ -189,7 +191,7 @@ export default function Home() {
               to={ROUTES.PUBLIC_FAMILIES}
               className="rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-dark shadow transition-all duration-300 hover:bg-white/90 hover:scale-105 active:scale-95"
             >
-              Meet the Families
+              Choose a family to sponsor
             </Link>
             <a
               href={DONATE_URL}
