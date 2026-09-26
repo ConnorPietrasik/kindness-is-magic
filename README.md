@@ -11,7 +11,7 @@ A web app that connects donors with families: families (referred by referrers) c
 - **Delivery** people are assigned families and use packing slips and delivery slips to ship the gifts.
 - **Admins** oversee everything: referrers, invites, families, people, wishes, assignments, deadlines, the sent-email log, and CSV bulk import.
 
-There are six roles: `admin`, `referrer`, `family`, `purchaser`, `delivery`, `donor`. Auth is cookie-based (HttpOnly JWT access + refresh tokens); the frontend silently refreshes expiring tokens.
+There are six roles: `admin`, `referrer`, `family`, `purchaser`, `delivery`, `donor`. Auth is cookie-based (HttpOnly JWT access + refresh tokens); when an access token expires, the frontend silently refreshes it and retries the request.
 
 ## Tech stack
 
@@ -30,7 +30,7 @@ backend/   FastAPI app (app/ is a flat module layout), alembic migrations, tests
 frontend/  React + Vite SPA (src/), Vitest tests
 e2e/       Playwright end-to-end tests
 .env.example   All runtime configuration (secrets, admin bootstrap, SMTP, ...)
-docker-compose.yml      Dev stack: Traefik + Postgres + backend + frontend
+docker-compose.yml      Dev stack: Traefik + Postgres + backend + frontend + zeffy-mock
 docker-compose.prod.yml Production stack (nginx + 2-worker backend + Traefik HTTPS)
 deploy/                 Production deploy scripts (CD entrypoint, server setup, SSH wrapper)
 run-compose.sh          Wrapper that always runs docker compose from the repo root
@@ -108,7 +108,7 @@ see **Releases (CD)** below.
 
 Runtime config lives in `.env` (see `.env.example` for documented defaults): JWT secrets and token lifetimes, bootstrap admin, `DEBUG` (insecure cookies + no rate limiting in dev), invite expiry, SMTP mail settings, `APP_BASE_URL` (links in emails), and production-only `PUBLIC_HOSTNAME` / `LETSENCRYPT_EMAIL` for the Traefik/Let's Encrypt setup.
 
-Business-logic constants — per-family person limit, gift claim cap, refresh-token rotation grace window, and event-deadline enforcement timing — live in `backend/app/config.py` and are changed there in code, not via `.env` (only `APP_BASE_URL` in that file is env-sourced).
+Business-logic constants — per-family person limit, gift claim cap, refresh-token rotation grace window, and event-deadline enforcement timing — live in `backend/app/config.py` and are changed there in code, not via `.env`.
 
 ## Zeffy (cash sponsorships)
 

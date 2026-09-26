@@ -1,13 +1,12 @@
 # Backend - Agent Instructions
 
-**No backward compatibility needed.** The app is not yet deployed.
-
 ## Stack
 
 - **FastAPI** + **SQLAlchemy 2.0** (declarative models) + **Alembic** for migrations
 - **PyJWT** for auth (access tokens + refresh tokens), **bcrypt** for password hashing
 - **psycopg** (v3) for Postgres
 - **slowapi** for rate limiting
+- **httpx** for the Zeffy API client
 
 ## Runtime
 
@@ -29,6 +28,7 @@ Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware 
 - **Partial-update sentinel convention:** `partial_update()` (`response_builders.py`) uses `exclude_unset=True`; `None` means no-op. To clear nullable columns: send `0` for FKs, `""` for any other nullable field. For typed fields where `""` wouldn't parse (e.g. `datetime`), add a `mode="before"` validator coercing `""` → `_CLEAR`. See `FamilyUpdate.pickup_window`.
 - **Referrer notes bypass wish lock:** `referrer_notes` is always editable regardless of lock level; standard fields are still blocked when locked. Standard family/person edits go through `check_wish_edit_lock(user, family)` (`permissions.py`) — admin is never blocked, referrer is blocked at `admin` lock, family is blocked at `referrer`/`admin` lock.
 - **Display IDs:** List endpoints return `id` (DB key for mutations) and `display_id` (presentational hierarchical position, e.g. `3-2-1`). Always use `compute_display_ids()` from `display_ids.py` — see its docstring for format and enumeration rules (multi-scope endpoints such as packing slips batch via `compute_position_maps()`).
+- **Cash-claim payment lifecycle:** Cash claims carry a payment window (`CASH_CLAIM_PAYMENT_HOURS`) and a `ClaimPaymentStatus`. Every payment — however recorded — flows through the single idempotent apply path in `payments.py` (Zeffy webhook is the primary auto-apply; manual confirm and admin manual match reuse it), so a payment yields at most one confirmation email. An hourly `claim_expiry_loop` soft-deletes lapsed pending cash claims (no lazy sweep). Donor confirmation email is off by default (`SEND_PAYMENT_CONFIRMED_EMAIL`) since Zeffy emails its own receipt.
 
 ## Project Structure
 
@@ -57,8 +57,10 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
 | `admin_emails.py` | Admin sent-email log (list/filter) |
 | `admin_deadlines.py` | Admin CRUD for event deadlines (no `columns`/pagination, hard delete) |
+| `admin_zeffy.py` | Admin Zeffy payment reconciliation (list payments, manual match/unmatch) |
 | `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
 | `deadlines.py` | Deadline enforcement (armed checks, batch actions, daily background task) |
+| `payments.py` | Cash-claim payment lifecycle (shared idempotent apply path, hourly expiry sweep) |
 | `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
 | `donor_routes.py` | Donor / claim-capable self-service (family claims — available to admin, referrer, purchaser, donor) |
 | `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |
@@ -66,6 +68,8 @@ All app code lives under `app/` (flat, no subdirectories):
 | `family_routes.py` | Family self-service endpoints |
 | `families_routes.py` | Public family resource endpoints |
 | `deadlines_routes.py` | Public read-only deadline endpoints (banner data, no auth) |
+| `zeffy.py` | Read-only Zeffy API client (payment reconciliation to donor carts) |
+| `zeffy_routes.py` | Public Zeffy payment webhook (primary automatic apply path) |
 | `people_routes.py` | Shared person endpoints |
 | `csv_import.py` | Bulk CSV import (referrers/families/people/users) |
 | `rate_limit.py` | Rate limiter configuration (`slowapi`) |
@@ -93,7 +97,7 @@ Migrations live in `alembic/versions/`. Tests live in `tests/` (root-level, sibl
 
 ## Config
 
-See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `DEBUG`, invite expiry, SMTP mail settings, `APP_BASE_URL`.
+See `.env` at the project root for runtime config: JWT secrets, token lifetimes, bootstrap admin credentials, `DEBUG`, invite expiry, SMTP mail settings, `APP_BASE_URL`, and Zeffy integration settings (`ZEFFY_*`). Cash-claim amounts are env-overridable in `config.py` (`CASH_CLAIM_AMOUNT_USD`, `CASH_CLAIM_GROCERIES_AMOUNT_USD`); the payment window (`CASH_CLAIM_PAYMENT_HOURS`) is a plain code constant.
 
 ## Running Tests
 

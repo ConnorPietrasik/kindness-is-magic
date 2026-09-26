@@ -64,6 +64,8 @@ prod_setup() {
   for var in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB \
              SECRET_KEY REFRESH_SECRET_KEY \
              ADMIN_EMAIL ADMIN_PASSWORD \
+             APP_BASE_URL \
+             MAIL_USERNAME MAIL_PASSWORD MAIL_FROM \
              PUBLIC_HOSTNAME LETSENCRYPT_EMAIL; do
     value="$(env_get "$var")"
     if [ -z "$value" ]; then
@@ -86,20 +88,21 @@ prod_setup() {
     exit 1
   fi
 
-  # The Zeffy mock (dev/e2e stack only): a production backend pointed at it
-  # would 502 every checkout, so refuse the committed mock values.
-  local zeffy_mock_vars=()
-  for var in ZEFFY_API_KEY ZEFFY_API_BASE; do
+  # Dev/e2e-only Zeffy values: a production backend pointed at the mock would
+  # 502 every checkout, and ZEFFY_MIN_INTERVAL_SECONDS=0 disables the throttle
+  # protecting the rate-limited real API — refuse the committed dev values.
+  local zeffy_dev_vars=()
+  for var in ZEFFY_API_KEY ZEFFY_API_BASE ZEFFY_MIN_INTERVAL_SECONDS; do
     value="$(env_get "$var")"
     example_value="$(example_get "$var")"
     if [ -n "$value" ] && [ "$value" = "$example_value" ]; then
-      zeffy_mock_vars+=("$var")
+      zeffy_dev_vars+=("$var")
     fi
   done
-  if [ "${#zeffy_mock_vars[@]}" -gt 0 ]; then
-    echo "Error: .env still has the Zeffy MOCK values from .env.example (dev/e2e only):"
-    printf '  - %s\n' "${zeffy_mock_vars[@]}"
-    echo "Set real Zeffy credentials for production (or leave ZEFFY_API_BASE unset)."
+  if [ "${#zeffy_dev_vars[@]}" -gt 0 ]; then
+    echo "Error: .env still has dev/e2e Zeffy values from .env.example:"
+    printf '  - %s\n' "${zeffy_dev_vars[@]}"
+    echo "Set real Zeffy credentials for production (or leave ZEFFY_API_BASE / ZEFFY_MIN_INTERVAL_SECONDS unset)."
     exit 1
   fi
 

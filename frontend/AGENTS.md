@@ -1,7 +1,5 @@
 # Frontend — Agent Instructions
 
-**No backward compatibility needed.** The app is not yet deployed.
-
 ## TypeScript
 
 - Never use `any`. Use `unknown` and narrow, or import the correct type from `src/types/`.
@@ -10,6 +8,7 @@
 ## Server State
 
 All remote data goes through React Query. `useState` is only for local UI state (form drafts, open menus, etc.). Never duplicate server data in component state.
+- **Exception:** `CartContext` holds the donor's uncommitted cart (localStorage draft data; committed claims go through React Query).
 
 ## API Layer (`src/lib/api.ts`)
 
@@ -17,7 +16,7 @@ All remote data goes through React Query. `useState` is only for local UI state 
 - Use the typed helpers (`apiGet`, `apiPost`, `apiPatch`, `apiPut`, `apiDelete`) — they auto-extract `response.data`.
 - **Exception:** `loginRequest` returns the full `AxiosResponse` so `AuthContext` can destructure `{ data }`. Do not change this.
 - Public endpoints (family browsing, donor registration) use the same Axios instance — no separate unauthenticated client.
-- For create operations, wrap payloads with `normalizePayload()` from `src/lib/utils.ts` to convert empty strings to `null` on nullable fields.
+- Create functions in `api.ts` wrap payloads with `normalizePayload()` (empty strings → `null` on nullable fields).
 - For update operations, call `normalizeUpdatePayload(formData, original)` **in the page/component** to build a minimal patch payload (omits unchanged fields), then pass the result to the api update function — `api.ts` update functions do not normalize.
 
 ## Query Keys (`src/lib/queryKeys.ts`)

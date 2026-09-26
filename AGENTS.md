@@ -12,10 +12,6 @@
 - Prefer modifying existing modules over creating new ones.
 - Do not add dependencies without asking specifically. However, don't be afraid to ask if something would be helpful.
 - When introducing new code, prefer current recommended patterns and actively maintained libraries over deprecated approaches.
-- **No backward compatibility needed.** The app is not yet deployed. 
-- **Do not consider existing users.** The database is wiped regularly.
-- **No database downgrade.** The database is wiped regularly so that's a waste of time. No backfill either.
-- If something is easily verifiable, **check it instead of wasting time thinking.**
 - **Terminology:** a donor's commitment to a family is a "claim" in code but a "sponsorship" in user-facing text.
 
 ## Planning

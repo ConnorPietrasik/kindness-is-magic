@@ -33,6 +33,10 @@ Each test file is self-contained and creates its own data. Tests that need authe
 
 Unlike those five, there is no `donor.json` storageState (the CSV does seed a donor account, but tests don't use it). Donor users are created dynamically per-test via API and log in through the UI.
 
+## Zeffy-dependent tests
+
+`donor-cart.spec.ts` and `admin-zeffy-payments.spec.ts` run the cash-sponsorship flow against the bundled `zeffy-mock` (see `helpers/zeffy-mock.ts`). They self-skip with a printed reason when the stack's `.env` is not wired to the mock — so with real Zeffy credentials configured, these two specs skip by design. Don't work around it: the real API is org-rate-limited and tests must never hit it. A standard dev stack (`.env.example` values) runs them.
+
 ## Conventions
 
 - **`data-id` on table rows.** Family and people table rows carry `data-id={entity.id}` so tests can extract the raw DB ID for API calls. The visible ID column shows the presentational `display_id` (e.g. `3-2-1`), which must not be parsed as a DB key.
@@ -41,6 +45,7 @@ Unlike those five, there is no `donor.json` storageState (the CSV does seed a do
 - Reuse helpers from `helpers/auth.ts`, `helpers/assertions.ts`, and `helpers/api.ts`.
 - **Unique test data per run.** Use `Math.random().toString(36).slice(2, 8)` suffixes on names/emails so re-runs without a DB wipe don't collide with stale records from prior runs.
 - **`test.describe.serial()` for shared module state.** When tests within a file share module-level variables (IDs, credentials), wrap them in `test.describe.serial()` so they run in order on a single worker. Module state is cached per worker process, **not per test**: a plain `describe` whose tests land in multiple batches on the same worker re-runs `beforeAll` with the same import-time values (e.g. the same random email), and setup collides with its own earlier data (409 — emails stay reserved even after soft-delete).
+- **Mock payments are tag-scoped.** The zeffy specs share one mock across the fully-parallel suite; the reset/seed/list helpers take a tag — only ever touch your own spec's tag.
 - **APIs for setup/teardown only.** Use `helpers/api.ts` to create test data before tests and clean up in `test.afterAll`. Do not use APIs to find IDs, navigate, or verify state that the test is meant to exercise through the UI. If a test is about the UI, the UI is the path.
 
 ## Cleanup — The Golden Rule
