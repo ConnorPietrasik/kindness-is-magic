@@ -36,9 +36,6 @@ export default function ForgotPassword() {
           <p className="mb-4 text-sm text-gray-700">
             If an account exists for <strong>{email}</strong>, a password reset link has been sent.
           </p>
-          <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-xs text-gray-400">
-            <em>Dev note: Check the backend logs for the reset token.</em>
-          </p>
           <Link to={ROUTES.LOGIN} className="text-btn-start hover:underline">
             ← Back to login
           </Link>
