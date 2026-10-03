@@ -491,6 +491,7 @@ async def invite_referrer(
             expires_at=expires_at,
             from_name=inviter_name,
             email=data.email,
+            email_message=data.email_message,
         )
         result = await send_email(
             to=data.email,

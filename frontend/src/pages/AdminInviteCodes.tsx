@@ -16,10 +16,12 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
 import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
+import { InviteEmailPreview } from "../components/InviteEmailPreview";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
@@ -30,7 +32,7 @@ import { useTableWidth } from "../hooks/useTableWidth";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
 import { formatApiError, formatDateTime } from "../lib/utils";
-import type { InviteListParams, ReferrerInviteResponse } from "../types";
+import type { InviteListParams, ReferrerInviteCreatePayload, ReferrerInviteResponse } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -290,12 +292,30 @@ export default function AdminInviteCodes() {
 function InviteGenerator() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { user } = useAuth();
   const [familyLimit, setFamilyLimit] = useState("");
   const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
   const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
 
+  // The invite email is only sent when an email address is provided — the
+  // custom message field and preview only make sense in that case.
+  const hasEmail = email.trim().length > 0;
+
+  // Parsed limit for the email preview; null while the field is empty/invalid.
+  const parsedLimit = useMemo(() => {
+    if (familyLimit === "") return null;
+    const n = parseInt(familyLimit, 10);
+    return Number.isNaN(n) || n < 1 || n > 999 ? null : n;
+  }, [familyLimit]);
+
+  // Inviter name for the email preview — mirrors _get_inviter_name (backend/app/auth_routes.py).
+  // This route is admin-only, so only the admin branch is reachable: the display name, falling
+  // back to "Kindness Fairy" (truthy check, so an empty string falls through too).
+  const inviterName = user?.display_name || (user?.role === "admin" ? "Kindness Fairy" : null);
+
   const createMut = useMutation({
-    mutationFn: (data: { family_limit: number; email: string | null }) => createReferrerInvite(data),
+    mutationFn: (data: ReferrerInviteCreatePayload) => createReferrerInvite(data),
     onSuccess: (data) => {
       setInvite(data);
       queryClient.invalidateQueries({ queryKey: adminInvites });
@@ -321,6 +341,7 @@ function InviteGenerator() {
     createMut.mutate({
       family_limit: limit,
       email: email.trim() || null,
+      email_message: message.trim() || null,
     });
   };
 
@@ -343,35 +364,58 @@ function InviteGenerator() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <FormField
-          label="Family Limit"
-          type="number"
-          fieldProps={{
-            value: familyLimit,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFamilyLimit(e.target.value),
-            required: true,
-            min: 1,
-            max: 999,
-            placeholder: "e.g. 10",
-            autoComplete: "off",
-          }}
-        />
-        <FormField
-          label="Email (optional)"
-          type="email"
-          fieldProps={{
-            value: email,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
-            placeholder: "referrer@example.com",
-            autoComplete: "off",
-          }}
-        />
-        <Button type="submit" loading={createMut.isPending} className="sm:ml-auto">
-          {createMut.isPending ? "Generating\u2026" : "Generate"}
-        </Button>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <FormField
+            label="Family Limit"
+            type="number"
+            fieldProps={{
+              value: familyLimit,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFamilyLimit(e.target.value),
+              required: true,
+              min: 1,
+              max: 999,
+              placeholder: "e.g. 10",
+              autoComplete: "off",
+            }}
+          />
+          <FormField
+            label="Email (optional)"
+            type="email"
+            fieldProps={{
+              value: email,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
+              placeholder: "referrer@example.com",
+              autoComplete: "off",
+            }}
+          />
+          <Button type="submit" loading={createMut.isPending} className="sm:ml-auto">
+            {createMut.isPending ? "Generating\u2026" : "Generate"}
+          </Button>
+        </div>
+        {hasEmail && (
+          <FormField
+            label="Custom Message (optional)"
+            as="textarea"
+            fieldProps={{
+              value: message,
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value),
+              placeholder: "Leave blank to send the default message",
+              autoComplete: "off",
+              rows: 4,
+              // Keep in sync with the email_message max_length on ReferrerInviteCreate (backend/app/schemas.py)
+              maxLength: 5000,
+            }}
+          />
+        )}
       </form>
       <p className="mt-3 text-xs text-gray-400">Including an email locks this invite to that address</p>
+
+      {/* Live preview of the invite email as it will be sent — only when an email
+          is set, since the backend skips sending without one */}
+      {hasEmail && (
+        <InviteEmailPreview message={message} familyLimit={parsedLimit} email={email.trim() || null} inviterName={inviterName} />
+      )}
     </Card>
   );
 }

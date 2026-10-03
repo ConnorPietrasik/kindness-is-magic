@@ -2,7 +2,9 @@
 
 import logging
 import os
+import re
 from datetime import datetime
+from html import escape
 from urllib.parse import urlencode
 
 import jwt
@@ -186,6 +188,56 @@ def _wrap_email(body_html: str, unsubscribe_url: str | None) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _render_custom_message_html(message: str) -> str:
+    """Render the admin's plain-text message as HTML paragraphs.
+
+    Input is plain text, never HTML — every line is escaped. Line-break
+    rendering (shared with the frontend preview): normalize ``\r\n`` to
+    ``\n`` first, then blank lines split paragraphs and single newlines
+    within a paragraph become ``<br/>``.
+    """
+    text = message.replace("\r\n", "\n")
+    paragraphs = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    rendered = []
+    for para in paragraphs:
+        lines = "<br/>".join(escape(line) for line in para.split("\n"))
+        rendered.append(f"<p>{lines}</p>")
+    return "\n".join(rendered)
+
+
+def _invite_email_functional_block(code: str, expires_at: datetime, email: str | None, limit_line: str) -> str:
+    """Functional block shared by the default and custom-message invite emails.
+
+    Always renders: the invite code, the locked-email note (when ``email``
+    is set), the expiry line, and the "Get Started" CTA. ``limit_line`` holds
+    the default variant's "connect up to N families" prose — the
+    custom-message variant replaces the personal prose, so it passes "";
+    an empty ``limit_line`` contributes no line at all (no blank line).
+    """
+    expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
+    base = APP_BASE_URL
+    # Build the register link — include email query param when locked
+    register_path = "/register-referrer"
+    email_locked_note = ""
+    if email:
+        register_path += f"?{urlencode({'code': code, 'email': email})}"
+        email_locked_note = f'<p style="font-size:14px;color:#666666;">This invite is locked to <strong>{email}</strong>. You\'ll register using this email address.</p>'
+    # An empty limit_line is skipped entirely. email_locked_note keeps its
+    # slot even when empty: the long-standing no-email default output has a
+    # blank line there, and this refactor must not change that email.
+    block = [
+        f'<p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>',
+        email_locked_note,
+    ]
+    if limit_line:
+        block.append(limit_line)
+    block.append(f"<p>This invite expires on <strong>{expires_str}</strong>.</p>")
+    block.append(
+        f'<p style="text-align:center;"><a href="{base}{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>'
+    )
+    return "\n".join(block)
+
+
 def build_invite_email(
     code: str,
     family_limit: int,
@@ -193,29 +245,29 @@ def build_invite_email(
     from_name: str | None = None,
     unsubscribe_url: str | None = None,
     email: str | None = None,
+    email_message: str | None = None,
 ) -> str:
-    """Build the HTML body for a referrer invite email."""
-    expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "Not specified"
-    base = APP_BASE_URL
+    """Build the HTML body for a referrer invite email.
+
+    ``email_message`` is optional plain text written by the generating admin.
+    When set, it replaces the personal prose (greeting, intro,
+    family-limit line, closing) and is HTML-escaped; the functional block
+    (code, locked-email note, expiry, CTA) renders in both variants.
+    """
+    if email_message:
+        return f"""{_render_custom_message_html(email_message)}
+{_invite_email_functional_block(code, expires_at, email, "")}"""
+
     from_line = (
         f"<p>You've been invited by <strong>{from_name}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
         if from_name
         else "<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
     )
     family_word = "family" if family_limit == 1 else "families"
-    # Build the register link — include email query param when locked
-    register_path = "/register-referrer"
-    email_locked_note = ""
-    if email:
-        register_path += f"?{urlencode({'code': code, 'email': email})}"
-        email_locked_note = f'<p style="font-size:14px;color:#666666;">This invite is locked to <strong>{email}</strong>. You\'ll register using this email address.</p>'
+    limit_line = f"<p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most.</p>"
     return f"""{from_line}
 <p>We'd love your help connecting {family_word} in need with the support and joy they deserve. Here's your unique invite code to get started:</p>
-<p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
-{email_locked_note}
-<p>As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most.</p>
-<p>This invite expires on <strong>{expires_str}</strong>.</p>
-<p style="text-align:center;"><a href="{base}{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
+{_invite_email_functional_block(code, expires_at, email, limit_line)}
 <p style="margin-top:16px;">Thank you for being part of something wonderful. Together, we can make kindness magical.</p>"""
 
 

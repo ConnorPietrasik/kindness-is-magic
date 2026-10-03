@@ -183,6 +183,75 @@ class TestInviteReferrerCreate:
         # build_invite_email should NOT have been called (no email)
         assert captured_html == {}
 
+    def test_invite_email_message_passthrough(self, test_client: TestClient, admin_user):
+        """A custom email message is passed through to build_invite_email (stripped)."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured["value"] = _kw
+            return "<html></html>"
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "newref@example.com", "email_message": "  Hi there, welcome!  "},
+            )
+        assert resp.status_code == 201
+        assert captured["value"].get("email_message") == "Hi there, welcome!"
+
+    def test_invite_email_message_defaults_to_none(self, test_client: TestClient, admin_user):
+        """Without email_message, build_invite_email gets None (default email prose)."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured["value"] = _kw
+            return "<html></html>"
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "newref@example.com"},
+            )
+        assert resp.status_code == 201
+        assert captured["value"].get("email_message") is None
+
+    def test_invite_email_message_blank_normalized_to_none(self, test_client: TestClient, admin_user):
+        """A whitespace-only email_message is normalized to None (default email prose)."""
+        from unittest.mock import patch
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+
+        captured = {}
+
+        def fake_build_invite(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured["value"] = _kw
+            return "<html></html>"
+
+        with patch("app.auth_routes.build_invite_email", side_effect=fake_build_invite):
+            resp = test_client.post(
+                "/api/auth/invite-referrer",
+                json={"family_limit": 10, "email": "newref@example.com", "email_message": "   "},
+            )
+        assert resp.status_code == 201
+        assert captured["value"].get("email_message") is None
+
+    def test_invite_email_message_too_long_rejected(self, test_client: TestClient, admin_user):
+        """email_message over 5000 chars returns 422."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email_message": "x" * 5001},
+        )
+        assert resp.status_code == 422
+
     def test_invite_email_invalid_format(self, test_client: TestClient, admin_user):
         """Invalid email format in request body returns 422."""
         login_as(test_client, "admin@test.com", "AdminPass123!")

@@ -100,9 +100,17 @@ test.describe("Invite and self-registration", () => {
     await adminPage.getByRole("button", { name: "+ Generate new" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
-    /* Fill family limit, email, and generate */
+    /* Fill family limit, email, and a custom message */
     await adminPage.getByLabel("Family Limit").fill("3");
     await adminPage.getByLabel("Email (optional)").fill(`e2e-email-invite-${SUFFIX}@example.com`);
+    await adminPage.getByLabel("Custom Message (optional)").fill("Welcome to the magic!");
+
+    /* Live preview reflects the custom message; the default prose is gone
+       (paragraph role — the same text also sits in the Custom Message textarea) */
+    await expect(adminPage.getByRole("paragraph").filter({ hasText: "Welcome to the magic!" })).toBeVisible();
+    await expect(adminPage.getByText("KRI-XXXXXX")).toBeVisible();
+    await expect(adminPage.getByText(/We'd love your help connecting/)).not.toBeVisible();
+
     await adminPage.getByRole("button", { name: "Generate" }).click();
 
     /* Wait for invite code display */

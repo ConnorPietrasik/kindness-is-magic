@@ -294,6 +294,96 @@ class TestEmailTemplates:
         assert '/register-referrer"' in html or "/register-referrer>" in html
         assert "?code=" not in html
 
+    def test_invite_email_custom_message_rendered_escaped(self):
+        """Custom message is plain text — HTML in it renders as escaped text."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-CUST",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            email="newref@example.com",
+            email_message="Please watch <script>alert('x')</script> before registering",
+        )
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
+        assert "alert(&#x27;x&#x27;)" in html
+
+    def test_invite_email_custom_message_keeps_paragraph_and_line_structure(self):
+        """Blank lines split paragraphs; single newlines within a paragraph become <br/>."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-TIME",
+            family_limit=3,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            email_message="Hi there!\n\nTimeline:\n- Monday: intro call\n- Tuesday: site visit\n\nWarm regards,\nJane",
+        )
+        assert "<p>Hi there!</p>" in html
+        assert "<p>Timeline:<br/>- Monday: intro call<br/>- Tuesday: site visit</p>" in html
+        assert "<p>Warm regards,<br/>Jane</p>" in html
+
+    def test_invite_email_custom_message_normalizes_crlf(self):
+        """Windows line endings split paragraphs the same way."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-CRLF",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            email_message="Line one\r\n\r\nLine two",
+        )
+        assert "<p>Line one</p>" in html
+        assert "<p>Line two</p>" in html
+
+    def test_invite_email_custom_message_keeps_functional_block(self):
+        """Code, locked-email note, expiry, and CTA still render with a custom message."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-FUNC",
+            family_limit=2,
+            expires_at=datetime(2026, 12, 25, 12, 0, tzinfo=timezone.utc),
+            email="locked@example.com",
+            email_message="Custom prose here.",
+        )
+        assert "Custom prose here." in html
+        assert "KMG-FUNC" in html
+        assert "locked to <strong>locked@example.com</strong>" in html
+        assert "December 25, 2026" in html
+        assert "Get Started" in html
+
+    def test_invite_email_custom_message_replaces_default_prose(self):
+        """Greeting, intro, family-limit line, and closing are gone when custom is set."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-CUST2",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            from_name="Jane Smith",
+            email="newref@example.com",
+            email_message="Custom prose here.",
+        )
+        assert "Custom prose here." in html
+        assert "invited by" not in html
+        assert "We'd love your help" not in html
+        assert "connect up to" not in html
+        assert "Thank you for being part of something wonderful" not in html
+
+    def test_invite_email_custom_message_no_blank_line_without_limit_line(self):
+        """The custom variant has no family-limit line — it must not leave a blank line in the block."""
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-BLANK",
+            family_limit=2,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            email="locked@example.com",
+            email_message="Custom prose here.",
+        )
+        assert "\n\n" not in html
+
     def test_family_invite_email_contains_code_and_name(self):
         from app.mail import build_family_invite_email
 

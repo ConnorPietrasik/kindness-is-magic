@@ -411,6 +411,7 @@ export interface PersonPayload {
 export interface ReferrerInviteCreatePayload {
   family_limit: number;
   email?: string | null;
+  email_message?: string | null;
 }
 
 /** Response when admin creates an invite. */

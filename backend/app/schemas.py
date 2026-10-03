@@ -69,6 +69,7 @@ class ReferrerInviteCreate(BaseModel):
 
     family_limit: int = Field(..., ge=1, le=999)
     email: str | None = None
+    email_message: str | None = Field(None, max_length=5000)
 
     @field_validator("email")
     @classmethod
@@ -76,6 +77,15 @@ class ReferrerInviteCreate(BaseModel):
         if v is None:
             return v
         return validate_email(v)
+
+    @field_validator("email_message")
+    @classmethod
+    def clean_email_message(cls, v: str | None) -> str | None:
+        """Strip surrounding whitespace; blank values fall back to the default email message."""
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped or None
 
 
 class ReferrerSelfRegister(BaseModel):
