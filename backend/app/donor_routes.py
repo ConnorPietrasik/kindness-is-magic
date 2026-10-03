@@ -47,7 +47,6 @@ from app.payments import (
 from app.permissions import require_admin, require_claim_capable
 from app.rate_limit import limiter
 from app.response_builders import (
-    apply_purchase_fields,
     batch_build_family_info,
     batch_load_person_wishes,
     build_claim_summary,
@@ -65,15 +64,13 @@ from app.schemas import (
     CartItem,
     CartItemUpdate,
     CartResponse,
-    DonorWishPurchaseMark,
-    DonorWishPurchaseResponse,
+    DonorWishSummary,
     FamilyClaimDetail,
     FamilyClaimSummary,
     FamilyClaimUpdate,
     FamilyInfo,
     PersonWishItem,
     UserResponse,
-    WishSummary,
 )
 import app.zeffy as zeffy
 from app.mail import send_claim_confirmation
@@ -561,14 +558,14 @@ def get_claim(
         includes_groceries=claim.includes_groceries,
         donor_user_id=claim.donor_user_id,
         donor_display_name=claim.donor_user.display_name,
-        family_wish=WishSummary.model_validate(family_wish) if family_wish is not None else None,
+        family_wish=DonorWishSummary.model_validate(family_wish) if family_wish is not None else None,
         people=[
             PersonWishItem(
                 given_name=p.given_name,
                 role=p.role,
                 age=p.age,
                 note=p.note,
-                wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                wishes=[DonorWishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
             )
             for p in people
         ],
@@ -695,58 +692,6 @@ def cancel_claim(
     claim.deleted_at = datetime.now(timezone.utc)
     db.commit()
     logger.info("User %s cancelled claim %s", user.id, claim_id)
-
-
-# ---------------------------------------------------------------------------
-# POST /api/donor/claims/{claim_id}/wishes/{wish_id}/mark-purchased
-# ---------------------------------------------------------------------------
-
-
-@router.post("/claims/{claim_id}/wishes/{wish_id}/mark-purchased")
-def mark_wish_purchased(
-    claim_id: int,
-    wish_id: int,
-    data: DonorWishPurchaseMark,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_claim_capable),
-) -> DonorWishPurchaseResponse:
-    """Mark a wish as purchased. Sets purchased_at, purchased_where, purchaser_note, assigned_to_id.
-
-    No received_at — that's set by delivery. Owner or admin only.
-
-    Cash sponsorships have no wish purchasing: the flat amount covers the
-    whole family (400, not 403 — the donor owns the claim, just not this
-    action).
-    """
-    claim = get_claim_or_403(db, claim_id, user)
-    if claim.commitment_type == CommitmentType.cash:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cash sponsorships have no wish purchasing — the flat amount covers the family's wishes",
-        )
-
-    # Wish must exist and belong to the claimed family
-    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
-    # A claim covers the whole family: person wishes resolve their family
-    # through the person; family wishes belong to the claimed family directly
-    if wish.person_id is None:
-        if wish.family_id != claim.family_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the sponsored family")
-    else:
-        person = get_or_404(db, Person, wish.person_id, "Person not found")
-        if person.family_id != claim.family_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish does not belong to the sponsored family")
-
-    wish.assigned_to_id = user.id
-    apply_purchase_fields(
-        wish, purchased_at=datetime.now(timezone.utc), purchased_where=data.purchased_where, purchaser_note=data.purchaser_note
-    )
-
-    db.commit()
-    db.refresh(wish)
-
-    logger.info("User %s marked wish %s as purchased on claim %s", user.id, wish_id, claim_id)
-    return DonorWishPurchaseResponse.model_validate(wish)
 
 
 # ---------------------------------------------------------------------------

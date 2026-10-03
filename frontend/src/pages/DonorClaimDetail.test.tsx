@@ -61,12 +61,6 @@ const mockClaim: FamilyClaimDetail = {
     description: "Family outing",
     size: null,
     color: null,
-    assigned_to_id: null,
-    purchased_at: null,
-    purchased_where: null,
-    received_at: null,
-    purchaser_note: null,
-    deleted_at: null,
   },
   people: [
     {
@@ -82,12 +76,6 @@ const mockClaim: FamilyClaimDetail = {
           description: "Socks",
           size: "S",
           color: null,
-          assigned_to_id: null,
-          purchased_at: null,
-          purchased_where: null,
-          received_at: null,
-          purchaser_note: null,
-          deleted_at: null,
         },
       ],
     },
@@ -162,8 +150,6 @@ describe("DonorClaimDetail", () => {
     expect(screen.getByText("Payment expires")).toBeInTheDocument();
     expect(screen.getByText("If your payment doesn't match automatically, an admin will review it within a day.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Go to cart & checkout" })).toBeInTheDocument();
-    // Cash claims show no wish-purchasing controls
-    expect(screen.queryByRole("button", { name: /gift purchased/ })).not.toBeInTheDocument();
   });
 
   it("hides the cart CTA for non-owners of a pending cash claim", async () => {
@@ -264,48 +250,6 @@ describe("DonorClaimDetail", () => {
     });
   });
 
-  it("marks the family wish as purchased from the dialog", async () => {
-    const user = userEvent.setup();
-    const markSpy = vi
-      .spyOn(api, "donorMarkWishPurchased")
-      .mockResolvedValue({ ...mockClaim.family_wish!, purchased_at: "2025-12-01T00:00:00Z" });
-    // Add a sibling with both wish types so her row has two mark buttons
-    const samWish = mockClaim.people[0]!.wishes[0]!;
-    const riley = {
-      given_name: "Riley",
-      role: "daughter" as const,
-      age: 11,
-      note: null,
-      wishes: [
-        { ...samWish, id: 12, type: "practical" as const, description: "Backpack" },
-        { ...samWish, id: 13, type: "fun" as const, description: "LEGO set" },
-      ],
-    };
-    renderClaim(mockDonorUser, { ...mockClaim, people: [...mockClaim.people, riley] });
-
-    await waitFor(() => {
-      expect(screen.getByText("Family outing")).toBeInTheDocument();
-    });
-
-    // One button per active wish (family wish first, then members'), labeled
-    // by wish category so a child's fun and practical buttons are distinct
-    const markButtons = screen.getAllByRole("button", { name: /gift purchased/ });
-    expect(markButtons[0]).toHaveTextContent("Mark family gift purchased");
-    expect(markButtons[1]).toHaveTextContent("Mark practical gift purchased");
-    expect(markButtons[2]).toHaveTextContent("Mark practical gift purchased");
-    expect(markButtons[3]).toHaveTextContent("Mark fun gift purchased");
-    const firstMarkButton = markButtons[0];
-    if (!firstMarkButton) throw new Error("mark purchased button not found");
-    await user.click(firstMarkButton);
-    await user.type(await screen.findByLabelText("Purchased at"), "Target");
-    await user.type(screen.getByLabelText("Note"), "Gift card inside");
-    await user.click(screen.getByRole("button", { name: "Mark purchased" }));
-
-    await waitFor(() => {
-      expect(markSpy).toHaveBeenCalledWith(1, 10, { purchased_where: "Target", purchaser_note: "Gift card inside" });
-    });
-  });
-
   describe("wish table column order", () => {
     const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
 
@@ -323,20 +267,20 @@ describe("DonorClaimDetail", () => {
       renderClaim(mockDonorUser);
       await waitFor(() => expect(screen.getByText("Family Members & Wishes")).toBeInTheDocument());
 
-      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish"]);
 
       const age = screen.getByRole("columnheader", { name: "Age" });
       const name = screen.getByRole("columnheader", { name: "Name" });
       dragBefore(age, name);
 
-      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish"]);
       expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaimWishes")!)).toEqual(["age", "name", "practical_wish", "fun_wish"]);
 
       // Reset-order button appears and restores the default layout
       const resetBtn = await screen.findByRole("button", { name: "Reset order" });
       const user = userEvent.setup();
       await user.click(resetBtn);
-      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(headerOrder()).toEqual(["Name", "Age", "Practical Wish", "Fun Wish"]);
     });
 
     it("the paired wish columns move together as one unit", async () => {
@@ -348,7 +292,7 @@ describe("DonorClaimDetail", () => {
       dragBefore(funWish, age);
 
       // The whole pair lands before Age, still adjacent
-      expect(headerOrder()).toEqual(["Name", "Practical Wish", "Fun Wish", "Age", "Actions"]);
+      expect(headerOrder()).toEqual(["Name", "Practical Wish", "Fun Wish", "Age"]);
       expect(JSON.parse(localStorage.getItem("kim:columnOrder:donorClaimWishes")!)).toEqual(["name", "practical_wish", "fun_wish", "age"]);
     });
 
@@ -357,7 +301,7 @@ describe("DonorClaimDetail", () => {
       renderClaim(mockDonorUser);
       await waitFor(() => expect(screen.getByText("Family Members & Wishes")).toBeInTheDocument());
 
-      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish", "Actions"]);
+      expect(headerOrder()).toEqual(["Age", "Name", "Practical Wish", "Fun Wish"]);
     });
 
     it("shows Reset order on an empty claim when the persisted order is customized", async () => {

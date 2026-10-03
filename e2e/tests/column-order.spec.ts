@@ -163,7 +163,7 @@ test.describe("Donor claim detail — wish table column order", () => {
     await expect(page.getByText("Family Members & Wishes")).toBeVisible({ timeout: 10_000 });
 
     // --- Wish table column order ---
-    await expect(wishHeaders(page)).toHaveText(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+    await expect(wishHeaders(page)).toHaveText(["Name", "Age", "Practical Wish", "Fun Wish"]);
 
     // Drag "Fun Wish" onto the left edge of "Age" — the whole pair
     // (Practical + Fun) moves together and stays adjacent.
@@ -171,15 +171,15 @@ test.describe("Donor claim detail — wish table column order", () => {
     const age = page.getByRole("columnheader", { name: "Age" });
     await funWish.dragTo(age, { targetPosition: { x: 4, y: 8 } });
 
-    await expect(wishHeaders(page)).toHaveText(["Name", "Practical Wish", "Fun Wish", "Age", "Actions"]);
+    await expect(wishHeaders(page)).toHaveText(["Name", "Practical Wish", "Fun Wish", "Age"]);
 
     // Persists across reload.
     await page.reload({ waitUntil: "networkidle" });
-    await expect(wishHeaders(page)).toHaveText(["Name", "Practical Wish", "Fun Wish", "Age", "Actions"]);
+    await expect(wishHeaders(page)).toHaveText(["Name", "Practical Wish", "Fun Wish", "Age"]);
 
     // Reset restores the default layout.
     await page.getByRole("button", { name: "Reset order" }).click();
-    await expect(wishHeaders(page)).toHaveText(["Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
+    await expect(wishHeaders(page)).toHaveText(["Name", "Age", "Practical Wish", "Fun Wish"]);
 
     await context.close();
   });

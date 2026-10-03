@@ -259,6 +259,20 @@ export interface WishSummary {
   deleted_at: string | null;
 }
 
+/** Mirrors DonorWishSummary — donor-facing wish shape, content only (claim detail + public wish list).
+ *
+ * Carries no purchase-tracking fields: the purchased state is set by org roles (purchaser/admin)
+ * and is not exposed to donors.
+ */
+export interface DonorWishSummary {
+  id: number;
+  display_id: string | null;
+  type: WishType;
+  description: string;
+  size: string | null;
+  color: string | null;
+}
+
 /** Mirrors WishListSummary — wish with person/family/assignee context for admin list.
  *
  * Person-wish rows resolve their family/referrer through the person; family-wish
@@ -575,7 +589,7 @@ export interface PersonWishItem {
   role: PersonRole;
   age: number;
   note: string | null;
-  wishes: WishSummary[];
+  wishes: DonorWishSummary[];
 }
 
 /** Mirrors FamilyWishListResponse (family_name excluded for privacy). */
@@ -775,7 +789,7 @@ export interface FamilyClaimDetail {
   donor_user_id: number;
   donor_display_name: string;
   /** The family's family wish — part of the claim. Null if none exists. */
-  family_wish: WishSummary | null;
+  family_wish: DonorWishSummary | null;
   people: PersonWishItem[];
 }
 
@@ -895,12 +909,6 @@ export interface FamilyClaimCreate {
 export interface FamilyClaimUpdate {
   commitment_type?: CommitmentType | null;
   notes?: string | null;
-}
-
-/** Body for marking a wish purchased by a donor (no received_at). */
-export interface DonorWishPurchaseMark {
-  purchased_where?: string | null;
-  purchaser_note?: string | null;
 }
 
 // ---------------------------------------------------------------------------

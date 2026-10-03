@@ -35,7 +35,6 @@ import type {
   DonorCartItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
-  DonorWishPurchaseMark,
   EmailListResponse,
   FamilyClaimDetail,
   FamilyClaimSummary,
@@ -82,7 +81,6 @@ import type {
   WishDetail,
   WishListResponse,
   WishPurchaseMark,
-  WishSummary,
   ZeffyMatchResult,
   ZeffyPaymentsResponse,
   ZeffyPendingClaimsResponse,
@@ -770,11 +768,6 @@ export function donorUpdateClaim(claimId: number, payload: FamilyClaimUpdate): P
 /** Cancel (soft-delete) a claim. */
 export function donorCancelClaim(claimId: number): Promise<void> {
   return apiDelete(`/api/donor/claims/${claimId}`);
-}
-
-/** Mark a wish as purchased (donor — no received_at). */
-export function donorMarkWishPurchased(claimId: number, wishId: number, payload: DonorWishPurchaseMark): Promise<WishSummary> {
-  return apiPost(`/api/donor/claims/${claimId}/wishes/${wishId}/mark-purchased`, payload);
 }
 
 /** Admin: fulfill a claim. */

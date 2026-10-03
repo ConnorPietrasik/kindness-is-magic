@@ -8,7 +8,6 @@ from app.schemas import (
     AdminUserCreate,
     AdminUserUpdate,
     AdminWishUpdate,
-    DonorWishPurchaseMark,
     FamilyCreate,
     FamilyCreateByReferrer,
     FamilyUpdate,
@@ -401,14 +400,6 @@ class TestWishPurchaseMarkSchemas:
 
     def test_batch_purchase_mark_normalizes_whitespace_in_purchased_where(self):
         m = WishBatchMarkPurchased(wish_ids=[1], purchased_where="  Kmart\n ")
-        assert m.purchased_where == "Kmart"
-
-    def test_donor_purchase_mark_rejects_html_in_purchased_where(self):
-        with pytest.raises(ValidationError):
-            DonorWishPurchaseMark(purchased_where=HTML_PAYLOAD)
-
-    def test_donor_purchase_mark_normalizes_whitespace_in_purchased_where(self):
-        m = DonorWishPurchaseMark(purchased_where="  Kmart\n ")
         assert m.purchased_where == "Kmart"
 
 

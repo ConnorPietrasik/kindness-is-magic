@@ -20,14 +20,10 @@ from app.models import (
     Family,
     FamilyClaim,
     FamilyVerificationStatus,
-    Person,
-    PersonRole,
     SentEmail,
     User,
     UserRole,
-    Wish,
     WishLockLevel,
-    WishType,
 )
 from app.payments import run_claim_expiry
 from tests.conftest import login_as, make_family
@@ -234,26 +230,6 @@ def _login_donor(test_client: TestClient) -> TestClient:
 
 
 class TestCashGuards:
-    def _family_with_wish(self, db: Session) -> Family:
-        fam = _eligible_family(db, "Wish Family")
-        person = Person(family_id=fam.id, given_name="Child", age=6, role=PersonRole.son)
-        db.add(person)
-        db.flush()
-        wish = Wish(person_id=person.id, type=WishType.fun, description="A kite")
-        db.add(wish)
-        db.commit()
-        return fam
-
-    def test_mark_wish_purchased_cash_rejected(self, test_client: TestClient, db: Session, admin_user):
-        _login_donor(test_client)
-        fam = self._family_with_wish(db)
-        claim = _pending_cash_claim(db, fam)
-        wish = db.query(Wish).filter(Wish.family_id == fam.id).first()
-
-        resp = test_client.post(f"/api/donor/claims/{claim.id}/wishes/{wish.id}/mark-purchased", json={"purchased_where": "Shop"})
-        assert resp.status_code == 400
-        assert "cash" in resp.json()["detail"].lower()
-
     def test_fulfill_unpaid_cash_rejected(self, test_client: TestClient, db: Session, admin_user):
         _login_donor(test_client)
         fam = _eligible_family(db, "Unfulfillable Family")

@@ -18,20 +18,12 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { type UseColumnOrderResult, useColumnOrder } from "../hooks/useColumnOrder";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
-import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorMarkWishPurchased, donorUpdateClaim } from "../lib/api";
+import { donorCancelClaim, donorFulfillClaim, donorGetClaim, donorUpdateClaim } from "../lib/api";
 import { PAYMENT_REASSURANCE_COPY } from "../lib/constants";
 import { donorCart, donorClaim, donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatDateTime } from "../lib/utils";
-import type {
-  CommitmentType,
-  DonorWishPurchaseMark,
-  FamilyClaimDetail,
-  FamilyClaimUpdate,
-  PersonRole,
-  WishSummary,
-  WishType,
-} from "../types";
+import type { CommitmentType, DonorWishSummary, FamilyClaimDetail, FamilyClaimUpdate, PersonRole } from "../types";
 import { getClaimStatus, isPendingCash, personRoleLabel } from "../types";
 
 export default function DonorClaimDetail() {
@@ -145,14 +137,9 @@ export default function DonorClaimDetail() {
 
         {/* Family wish — a claim covers the whole family, wish included */}
         {data.family_wish && (
-          <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
-              <p className="mt-1 text-sm text-violet-800">{data.family_wish.description}</p>
-            </div>
-            {data.commitment_type === "gifts" && canAct && (
-              <MarkPurchasedButton wish={data.family_wish} claimId={claimId} personName="Family" />
-            )}
+          <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
+            <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
+            <p className="mt-1 text-sm text-violet-800">{data.family_wish.description}</p>
           </div>
         )}
 
@@ -170,13 +157,7 @@ export default function DonorClaimDetail() {
         {data.people.length === 0 ? (
           <Card className="py-8 text-center text-gray-400">No family members added yet.</Card>
         ) : (
-          <WishTable
-            people={data.people}
-            commitmentType={data.commitment_type}
-            canAct={canAct}
-            claimId={claimId}
-            columnOrder={columnOrder}
-          />
+          <WishTable people={data.people} columnOrder={columnOrder} />
         )}
       </main>
     </div>
@@ -199,15 +180,9 @@ const wishHeaders: Record<string, React.ReactNode> = {
 
 function WishTable({
   people,
-  commitmentType,
-  canAct,
-  claimId,
   columnOrder,
 }: {
-  people: { given_name: string; role: PersonRole; age: number; note: string | null; wishes: WishSummary[] }[];
-  commitmentType: CommitmentType;
-  canAct: boolean;
-  claimId: number;
+  people: { given_name: string; role: PersonRole; age: number; note: string | null; wishes: DonorWishSummary[] }[];
   columnOrder: UseColumnOrderResult;
 }) {
   const { orderedKeys, reorder, moveBy } = columnOrder;
@@ -231,13 +206,11 @@ function WishTable({
           </DraggableTh>
         ))}
         {hasNotes(people) && <Th>Note</Th>}
-        {commitmentType === "gifts" && canAct && <Th>Actions</Th>}
       </TableHead>
       <TableBody>
         {people.map((person, idx) => {
-          const activeWishes = person.wishes.filter((w) => !w.deleted_at);
-          const practicalOrAdult = activeWishes.find((w) => w.type === "practical" || w.type === "adult");
-          const fun = activeWishes.find((w) => w.type === "fun");
+          const practicalOrAdult = person.wishes.find((w) => w.type === "practical" || w.type === "adult");
+          const fun = person.wishes.find((w) => w.type === "fun");
           const isAdult = person.age >= 18;
           const personCells: Record<string, React.ReactNode> = {
             name: (
@@ -261,134 +234,11 @@ function WishTable({
                 <Fragment key={key}>{personCells[key]}</Fragment>
               ))}
               {hasNotes(people) && <Td className="max-w-xs text-gray-500">{person.note ?? "—"}</Td>}
-              {commitmentType === "gifts" && canAct && (
-                <Td>
-                  <div className="flex flex-col gap-1">
-                    {activeWishes.map((wish) => (
-                      <MarkPurchasedButton key={wish.id} wish={wish} claimId={claimId} personName={person.given_name} />
-                    ))}
-                  </div>
-                </Td>
-              )}
             </Tr>
           );
         })}
       </TableBody>
     </Table>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Mark purchased Button + Dialog                                      */
-/* ------------------------------------------------------------------ */
-
-/** Button labels by wish category. A child's row can hold one fun + one
- * practical wish, so those need the category; adult wishes are unique per row
- * and use the generic label. */
-const WISH_MARK_LABELS: Record<WishType, string> = {
-  adult: "Mark gift purchased",
-  family: "Mark family gift purchased",
-  fun: "Mark fun gift purchased",
-  practical: "Mark practical gift purchased",
-};
-
-function MarkPurchasedButton({ wish, claimId, personName }: { wish: WishSummary; claimId: number; personName: string }) {
-  const [open, setOpen] = useState(false);
-  const [purchasedWhere, setPurchasedWhere] = useState("");
-  const [purchaserNote, setPurchaserNote] = useState("");
-  const queryClient = useQueryClient();
-  const toast = useToast();
-
-  const markMut = useMutation({
-    mutationFn: (payload: DonorWishPurchaseMark) => donorMarkWishPurchased(claimId, wish.id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: donorClaim(claimId) });
-      toast.success(`Wish marked as purchased for ${personName}`);
-      setOpen(false);
-      setPurchasedWhere("");
-      setPurchaserNote("");
-    },
-  });
-
-  if (wish.purchased_at) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-        ✓ Purchased{wish.purchased_where ? ` at ${wish.purchased_where}` : ""}
-      </span>
-    );
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-700"
-      >
-        {WISH_MARK_LABELS[wish.type]}
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="mb-3 text-base font-semibold text-gray-900">Mark as purchased — {personName}</h3>
-            <p className="mb-4 text-sm text-gray-600">{wishText(wish)}</p>
-
-            <div className="mb-3">
-              <label htmlFor="purchased-where" className="mb-1 block text-sm font-medium text-gray-700">
-                Purchased at
-              </label>
-              <input
-                id="purchased-where"
-                type="text"
-                value={purchasedWhere}
-                onChange={(e) => setPurchasedWhere(e.target.value)}
-                placeholder="e.g. Target, Amazon"
-                autoComplete="off"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label htmlFor="purchaser-note" className="mb-1 block text-sm font-medium text-gray-700">
-                Note
-              </label>
-              <input
-                id="purchaser-note"
-                type="text"
-                value={purchaserNote}
-                onChange={(e) => setPurchaserNote(e.target.value)}
-                placeholder="Optional note"
-                maxLength={500}
-                autoComplete="off"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                className="flex-1"
-                onClick={() =>
-                  markMut.mutate({
-                    // purchased_where always overwrites (null clears)
-                    purchased_where: purchasedWhere || null,
-                    // "" is the backend sentinel for clearing (null = no change)
-                    purchaser_note: purchaserNote,
-                  })
-                }
-                loading={markMut.isPending}
-              >
-                {markMut.isPending ? "Marking…" : "Mark purchased"}
-              </Button>
-              <Button variant="secondary" className="flex-1" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-            <MutationErrors mutations={[markMut]} />
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 

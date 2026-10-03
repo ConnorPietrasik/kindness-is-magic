@@ -123,9 +123,8 @@ export default function FamilyWishList() {
             </TableHead>
             <TableBody>
               {data.people.map((person, idx) => {
-                const activeWishes = person.wishes.filter((w) => !w.deleted_at);
-                const practicalOrAdult = activeWishes.find((w) => w.type === "practical" || w.type === "adult");
-                const fun = activeWishes.find((w) => w.type === "fun");
+                const practicalOrAdult = person.wishes.find((w) => w.type === "practical" || w.type === "adult");
+                const fun = person.wishes.find((w) => w.type === "fun");
                 const isAdult = person.age >= 18;
                 return (
                   <Tr key={idx}>

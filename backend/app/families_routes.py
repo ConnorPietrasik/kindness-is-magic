@@ -40,13 +40,13 @@ from app.response_builders import (
     get_active_or_404,
 )
 from app.schemas import (
+    DonorWishSummary,
     FamilyClaimCreate,
     FamilyClaimSummary,
     FamilyWishListResponse,
     PersonWishItem,
     PublicFamilyListResponse,
     PublicFamilySummary,
-    WishSummary,
 )
 from app.search_sort import FAMILY_MAX_AGE, FAMILY_MIN_AGE, FAMILY_PERSON_COUNT, PUBLIC_FAMILY_SORT_FIELDS, build_sort_clause
 
@@ -322,7 +322,7 @@ def get_family_wish_list(
                 role=p.role,
                 age=p.age,
                 note=p.note,
-                wishes=[WishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                wishes=[DonorWishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
             )
             for p in people
         ],

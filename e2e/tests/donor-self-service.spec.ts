@@ -1,6 +1,6 @@
 /**
  * Donor Self-Service — donor home (shared dashboard), claim a family, view claims,
- * mark wishes as purchased, cancel claim.
+ * view claim detail (read-only wish list), cancel claim.
  *
  * Creates an isolated donor user + family scenario so parallel workers
  * don't collide with each other or with CSV-seeded data.
@@ -240,9 +240,9 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await context.close();
   });
 
-  // ── View claim detail and mark wish as purchased ───────────────────────
+  // ── View claim detail (read-only wish list) ────────────────────────────
 
-  test("donor views claim detail and marks wish as purchased", async ({ browser }) => {
+  test("donor views claim detail as a read-only wish list", async ({ browser }) => {
     if (!testData.donorEmail || !testData.donorPassword) {
       test.skip();
       return;
@@ -279,28 +279,14 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
     await expect(page.getByText("Family Wish", { exact: true })).toBeVisible();
     await expect(page.getByText("A warm blanket for everyone")).toBeVisible();
 
-    // For gifts claims, per-wish "… gift purchased" buttons should be visible
-    const markPurchasedBtn = page.getByRole("button", { name: "gift purchased" });
-    const count = await markPurchasedBtn.count();
-    expect(count).toBeGreaterThan(0);
+    // The member's wishes render in the table (scenario: child with a
+    // practical and a fun wish)
+    await expect(page.getByText("Warm winter coat")).toBeVisible();
+    await expect(page.getByText("LEGO set")).toBeVisible();
 
-    // Click the first mark button
-    await markPurchasedBtn.first().click();
-
-    // Mark purchased dialog should appear
-    await expect(page.getByRole("heading", { name: /Mark as purchased/ })).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Fill in purchase details
-    await page.getByLabel("Purchased at").fill("Target");
-    await page.getByLabel("Note").fill("Got a great deal");
-
-    // Submit
-    await page.getByRole("button", { name: "Mark purchased", exact: true }).click();
-
-    // Should show success toast and "Purchased" indicator
-    await expect(page.getByText("✓ Purchased")).toBeVisible({ timeout: 10_000 });
+    // Donors can no longer mark wishes purchased — the claim detail is a
+    // read-only shopping list.
+    await expect(page.getByRole("button", { name: /Mark .* purchased/ })).toHaveCount(0);
 
     await context.close();
   });

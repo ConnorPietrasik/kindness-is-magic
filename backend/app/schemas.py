@@ -854,6 +854,23 @@ class WishSummary(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DonorWishSummary(BaseModel):
+    """Donor-facing wish shape — content only (claim detail + public wish list).
+
+    Carries no purchase-tracking fields: the purchased state is set by org
+    roles (purchaser/admin) and is not exposed to donors.
+    """
+
+    id: int
+    display_id: str | None = None
+    type: WishType
+    description: str
+    size: str | None = None
+    color: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class WishDetail(WishSummary):
     """Full wish with person info (person fields are null for family wishes)."""
 
@@ -1343,7 +1360,7 @@ class PersonWishItem(BaseModel):
     role: PersonRole
     age: int
     note: str | None = None
-    wishes: list[WishSummary] = []
+    wishes: list[DonorWishSummary] = []
 
     model_config = {"from_attributes": True}
 
@@ -1571,7 +1588,7 @@ class FamilyClaimDetail(BaseModel):
     includes_groceries: bool = False
     donor_user_id: int
     donor_display_name: str
-    family_wish: WishSummary | None = None
+    family_wish: DonorWishSummary | None = None
     people: list[PersonWishItem] = []
 
     model_config = {"from_attributes": True}
@@ -1592,16 +1609,6 @@ class FamilyClaimUpdate(BaseModel):
 
     commitment_type: CommitmentType | None = None
     notes: clearable_text(500)
-
-
-class DonorWishPurchaseMark(BaseModel):
-    """Body for marking a wish purchased by a donor.
-
-    Like WishPurchaseMark but **no received_at** — that's set by delivery.
-    """
-
-    purchased_where: clearable_text(200)
-    purchaser_note: clearable_text(400)
 
 
 # ---------------------------------------------------------------------------
@@ -1781,15 +1788,3 @@ class AdminZeffyMatchResponse(BaseModel):
 class AdminZeffyUnmatchResponse(BaseModel):
     payment_id: str
     claim_ids: list[int]
-
-
-class DonorWishPurchaseResponse(BaseModel):
-    """Response for the donor mark-purchased endpoint."""
-
-    id: int
-    purchased_at: datetime | None
-    purchased_where: str | None
-    purchaser_note: str | None
-    assigned_to_id: int | None
-
-    model_config = {"from_attributes": True}

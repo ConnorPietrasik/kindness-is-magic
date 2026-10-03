@@ -1,4 +1,4 @@
-"""Tests for donor claims: self-registration, claim CRUD, mark-purchased, fulfill."""
+"""Tests for donor claims: self-registration, claim CRUD, fulfill."""
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -459,6 +459,12 @@ class TestClaimCRUD:
         assert len(body["people"]) == 1
         assert body["people"][0]["given_name"] == "Child"
         assert len(body["people"][0]["wishes"]) == 2
+        # Donor-facing wish payloads carry no purchase-tracking data
+        purchase_keys = {"assigned_to_id", "purchased_at", "purchased_where", "received_at", "purchaser_note"}
+        assert not (purchase_keys & body["family_wish"].keys())
+        for person in body["people"]:
+            for wish in person["wishes"]:
+                assert not (purchase_keys & wish.keys())
 
     def test_get_another_user_claim(self, test_client: TestClient, db: Session):
         """View another user's claim → 403."""
@@ -691,215 +697,6 @@ class TestClaimCRUD:
             json={"commitment_type": "gifts"},
         )
         assert resp.status_code == 201
-
-
-# =========================================================================
-# Mark Purchased
-# =========================================================================
-
-
-class TestMarkPurchased:
-    def test_mark_wish_purchased(self, test_client: TestClient, db: Session):
-        """Mark wish purchased on own claim → sets purchased_at, etc."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-        wish = data["wishes"][0]
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
-            json={"purchased_where": "Target", "purchaser_note": "Got it!"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["purchased_at"] is not None
-        assert body["purchased_where"] == "Target"
-        assert body["purchaser_note"] == "Got it!"
-        assert body["assigned_to_id"] is not None
-
-    def test_mark_purchased_empty_purchased_where_clears(self, test_client: TestClient, db: Session):
-        """'' on purchased_where clears it to NULL (previously stored '' as-is)."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-        wish = data["wishes"][0]
-        wish.purchased_where = "Old store"
-        db.commit()
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
-            json={"purchased_where": ""},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["purchased_where"] is None
-
-    def test_mark_purchased_no_received_at(self, test_client: TestClient, db: Session):
-        """Mark wish purchased does NOT set received_at."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-        wish = data["wishes"][0]
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
-            json={"purchased_where": "Target"},
-        )
-        assert resp.status_code == 200
-
-        # Verify received_at is not set
-        db.refresh(wish)
-        assert wish.received_at is None
-
-    def test_mark_purchased_another_user_claim(self, test_client: TestClient, db: Session):
-        """Mark wish purchased on another user's claim → 403."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-        wish = data["wishes"][0]
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        # Log in as another donor
-        test_client.post(
-            "/api/auth/register-donor",
-            json={
-                "display_name": "Donor 2",
-                "email": DONOR2_EMAIL,
-                "password": DONOR2_PASSWORD,
-            },
-        )
-        login_as(test_client, DONOR2_EMAIL, DONOR2_PASSWORD)
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
-            json={"purchased_where": "Target"},
-        )
-        assert resp.status_code == 403
-
-    def test_mark_purchased_wish_not_in_claim(self, test_client: TestClient, db: Session):
-        """Mark wish not belonging to claimed family → 400."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-
-        # Create another family with wishes
-        from app.models import FamilyVerificationStatus, Person, PersonRole, Wish, WishLockLevel, WishType
-
-        other_fam = make_family(
-            db,
-            family_name="Other Family",
-            family_wish="A wish",
-            contact_name="Other Contact",
-            phone_number="555-000-0001",
-            verification_status=FamilyVerificationStatus.verified,
-            wish_lock_level=WishLockLevel.admin,
-        )
-        db.add(other_fam)
-        db.flush()
-        other_person = Person(family_id=other_fam.id, given_name="Other Child", age=5, role=PersonRole.son)
-        db.add(other_person)
-        db.flush()
-        other_wish = Wish(person_id=other_person.id, type=WishType.practical, description="A coat")
-        db.add(other_wish)
-        db.commit()
-        db.refresh(other_wish)
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{other_wish.id}/mark-purchased",
-            json={"purchased_where": "Target"},
-        )
-        assert resp.status_code == 400
-
-    def test_mark_purchased_family_wish(self, test_client: TestClient, db: Session):
-        """Family wishes are part of the claim — can be marked purchased."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-
-        from app.models import Wish, WishType
-
-        fam_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family).first()
-        assert fam_wish is not None
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{fam_wish.id}/mark-purchased",
-            json={"purchased_where": "Target"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["purchased_at"] is not None
-        assert body["purchased_where"] == "Target"
-        assert body["assigned_to_id"] is not None
-
-    def test_mark_purchased_family_wish_not_in_claim(self, test_client: TestClient, db: Session):
-        """Family wish of another family → 400."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-
-        from app.models import FamilyVerificationStatus, Wish, WishLockLevel, WishType
-
-        other_fam = make_family(
-            db,
-            family_name="Other Family",
-            family_wish="A wish",
-            contact_name="Other Contact",
-            phone_number="555-000-0002",
-            verification_status=FamilyVerificationStatus.verified,
-            wish_lock_level=WishLockLevel.admin,
-        )
-        db.add(other_fam)
-        db.flush()
-        other_fam_wish = db.query(Wish).filter(Wish.family_id == other_fam.id, Wish.type == WishType.family).first()
-        assert other_fam_wish is not None
-        db.commit()
-        db.refresh(other_fam_wish)
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{other_fam_wish.id}/mark-purchased",
-            json={"purchased_where": "Target"},
-        )
-        assert resp.status_code == 400
 
 
 # =========================================================================
@@ -1173,24 +970,3 @@ class TestMultiRoleClaims:
         _admin_login(test_client)
         resp = test_client.delete(f"/api/donor/claims/{claim_id}")
         assert resp.status_code == 204
-
-    def test_admin_can_mark_purchased_on_other_claims(self, test_client: TestClient, db: Session, admin_user):
-        """Admin can mark wish purchased on another user's claim."""
-        _create_donor(test_client)
-        data = _create_claimed_family(db)
-        fam = data["family"]
-        wish = data["wishes"][0]
-
-        resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
-            json={"commitment_type": "gifts"},
-        )
-        claim_id = resp.json()["id"]
-
-        # Admin logs in and marks purchased
-        _admin_login(test_client)
-        resp = test_client.post(
-            f"/api/donor/claims/{claim_id}/wishes/{wish.id}/mark-purchased",
-            json={"purchased_where": "Admin purchase"},
-        )
-        assert resp.status_code == 200

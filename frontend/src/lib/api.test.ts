@@ -1158,14 +1158,6 @@ describe("donor claims API functions", () => {
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/donor/claims/5");
   });
 
-  it("donorMarkWishPurchased — POST /api/donor/claims/:claimId/wishes/:wishId/mark-purchased", async () => {
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 10, purchased_at: "2025-01-01" } });
-    await apiModule.donorMarkWishPurchased(5, 10, { purchased_where: "Target" });
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/donor/claims/5/wishes/10/mark-purchased", {
-      purchased_where: "Target",
-    });
-  });
-
   it("donorFulfillClaim — POST /api/donor/claims/:id/fulfill", async () => {
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 5, status: "fulfilled" } });
     await apiModule.donorFulfillClaim(5);

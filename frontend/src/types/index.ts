@@ -55,7 +55,7 @@ export type {
   DonorCartItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
-  DonorWishPurchaseMark,
+  DonorWishSummary,
   EmailKind,
   EmailStatus,
   FamilyClaimCreate,
