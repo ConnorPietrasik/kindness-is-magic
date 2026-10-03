@@ -328,7 +328,7 @@ function InviteGenerator() {
     <Card className="mb-6 border border-gray-200">
       <h3 className="mb-3 text-base font-semibold text-gray-900">Generate Invite Code</h3>
       <p className="mb-4 text-sm text-gray-500">
-        Create a one-time invite code that allows someone to self-register as a referrer. The code expires after 24 hours.
+        Create a one-time invite code that allows someone to self-register as a referrer. The code expires after 7 days.
       </p>
 
       {/* Success display */}
