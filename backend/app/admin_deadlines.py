@@ -87,7 +87,7 @@ def update_deadline(
     partial_update(deadline, body)
     db.commit()
     db.refresh(deadline)
-    logger.info("Admin %s updated deadline (id=%s)", _admin.email, deadline_id)
+    logger.info("Admin updated deadline (id=%s)", deadline_id)
     return build_deadline_item(deadline)
 
 
@@ -101,5 +101,5 @@ def delete_deadline(
     deadline = get_or_404(db, Deadline, deadline_id, "Deadline not found")
     db.delete(deadline)
     db.commit()
-    logger.info("Admin %s deleted deadline (id=%s)", _admin.email, deadline_id)
+    logger.info("Admin deleted deadline (id=%s)", deadline_id)
     return Response(status_code=204)

@@ -314,7 +314,7 @@ def create_user(
 
     db.commit()
     db.refresh(user)
-    logger.info("Admin %s created user '%s' (id=%s)", _admin.email, user.email, user.id)
+    logger.info("Admin created user (id=%s)", user.id)
     return UserDetail(**build_user_detail(user, db))
 
 
@@ -357,7 +357,7 @@ def update_user(
     partial_update(user, body)
     db.commit()
     db.refresh(user)
-    logger.info("Admin %s updated user (id=%s)", _admin.email, user_id)
+    logger.info("Admin updated user (id=%s)", user_id)
     return UserDetail(**build_user_detail(user, db))
 
 
@@ -373,7 +373,7 @@ def restore_user(
     user.deleted_at = None
     db.commit()
     db.refresh(user)
-    logger.info("Admin %s restored user '%s' (id=%s)", _admin.email, user.email, user_id)
+    logger.info("Admin restored user (id=%s)", user_id)
     return UserDetail(**build_user_detail(user, db))
 
 
@@ -388,7 +388,7 @@ def reset_user_password(
     user.hashed_password = get_password_hash(body.password)
     db.commit()
     db.refresh(user)
-    logger.info("Admin %s reset password for user '%s' (id=%s)", _admin.email, user.email, user_id)
+    logger.info("Admin reset password for user (id=%s)", user_id)
     return UserDetail(**build_user_detail(user, db))
 
 
@@ -405,5 +405,5 @@ def delete_user(
     # Unassign purchaser wishes so they are not orphaned
     db.query(Wish).filter(Wish.assigned_to_id == user_id).update({Wish.assigned_to_id: None}, synchronize_session=False)
     db.commit()
-    logger.info("Admin %s soft-deleted user '%s' (id=%s)", _admin.email, user.email, user_id)
+    logger.info("Admin soft-deleted user (id=%s)", user_id)
     return Response(status_code=204)

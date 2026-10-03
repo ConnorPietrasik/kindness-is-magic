@@ -15,7 +15,9 @@
 
 ## Logging
 
-Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware logs every HTTP request with `request_id`, `user_id`, `user_email`, `user_role`, `method`, `path`, `status_code`, `duration_ms` and adds `X-Request-ID` to responses. A `_RequestContextFilter` auto-injects `request_id`/`user_id` into all log records during request handling. Set `LOG_LEVEL` env var to control verbosity (default `INFO`).
+Structured JSON to stdout via `JsonFormatter` (`main.py`). A request middleware logs every HTTP request with `request_id`, `user_id`, `user_role`, `method`, `path`, `status_code`, `duration_ms` and adds `X-Request-ID` to responses. A `_RequestContextFilter` auto-injects `request_id`/`user_id` into all log records during request handling. Set `LOG_LEVEL` env var to control verbosity (default `INFO`).
+
+**No emails in logs (PII minimization).** The actor is always the `user_id` (auto-injected for authenticated requests; unauthenticated flows such as login/self-register include `user_id=` in the message). Look up the email from the DB if it ever matters. The single exception is the unsubscribe endpoint, where the address may belong to no user.
 
 ## Key Patterns
 

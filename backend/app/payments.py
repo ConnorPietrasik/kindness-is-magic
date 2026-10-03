@@ -122,13 +122,13 @@ async def _best_effort_payment_email(
     try:
         result = await send_email(to=donor.email, subject=subject, html_body=body_html, db=db, kind=kind, user_id=donor.id)
     except Exception as exc:  # noqa: BLE001
-        logger.error("Unexpected error sending %s email to %s: %s", kind.value, donor.email, exc, exc_info=True)
+        logger.error("Unexpected error sending %s email (user_id=%s): %s", kind.value, donor.id, exc, exc_info=True)
         result = {"sent": False, "reason": "unexpected error"}
 
     if result["sent"] or result.get("reason") == "unsubscribed":
         return
 
-    logger.error("Payment email failed: kind=%s to=%s reason=%s", kind.value, donor.email, result.get("reason"))
+    logger.error("Payment email failed: kind=%s user_id=%s reason=%s", kind.value, donor.id, result.get("reason"))
     try:
         await send_admin_notification(
             subject=f"Sponsorship Payment Email Failed ({kind.value})",
@@ -138,7 +138,7 @@ async def _best_effort_payment_email(
             user_id=donor.id,
         )
     except Exception:  # noqa: BLE001
-        logger.error("Admin notification also failed for %s email to %s", kind.value, donor.email, exc_info=True)
+        logger.error("Admin notification also failed for %s email (user_id=%s)", kind.value, donor.id, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ async def send_payment_request_email(db: Session, donor: User, claims: list[Fami
     if anchor is None:
         return None
     if payment_request_already_sent(donor.email, anchor, db):
-        logger.info("Payment request already sent after window anchor for %s — skipping nudge", donor.email)
+        logger.info("Payment request already sent after window anchor (user_id=%s) — skipping nudge", donor.id)
         return None
 
     families = [c.family for c in claims]

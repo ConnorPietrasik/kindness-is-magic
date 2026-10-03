@@ -82,7 +82,7 @@ def update_person(
 
     db.commit()
     db.refresh(per)
-    logger.info("%s updated person (id=%s)", owner.user.email, per_id)
+    logger.info("Person updated (id=%s)", per_id)
     return PersonDetail(**build_person_detail(per, db))
 
 
@@ -106,5 +106,5 @@ def delete_person(
     per.deleted_at = now
     soft_delete_person_wishes(db, per_id, now)
     db.commit()
-    logger.info("%s soft-deleted person (id=%s)", owner.user.email, per_id)
+    logger.info("Person soft-deleted (id=%s)", per_id)
     return Response(status_code=204)

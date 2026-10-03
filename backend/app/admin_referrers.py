@@ -180,7 +180,7 @@ def create_referrer(
     db.add(ref)
     db.commit()
     db.refresh(ref)
-    logger.info("Admin %s created referrer '%s' (id=%s)", _admin.email, ref.name, ref.id)
+    logger.info("Admin created referrer '%s' (id=%s)", ref.name, ref.id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -195,7 +195,7 @@ def update_referrer(
     partial_update(ref, body)
     db.commit()
     db.refresh(ref)
-    logger.info("Admin %s updated referrer (id=%s)", _admin.email, ref_id)
+    logger.info("Admin updated referrer (id=%s)", ref_id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -222,7 +222,7 @@ def restore_referrer(
     )
     db.commit()
     db.refresh(ref)
-    logger.info("Admin %s restored referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    logger.info("Admin restored referrer '%s' (id=%s)", ref.name, ref_id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -253,7 +253,7 @@ def delete_referrer(
         db.query(Wish).filter(Wish.assigned_to_id.in_(user_ids)).update({Wish.assigned_to_id: None}, synchronize_session=False)
 
     db.commit()
-    logger.info("Admin %s soft-deleted referrer '%s' (id=%s, users disabled=%d)", _admin.email, ref.name, ref_id, len(user_ids))
+    logger.info("Admin soft-deleted referrer '%s' (id=%s, users disabled=%d)", ref.name, ref_id, len(user_ids))
     return Response(status_code=204)
 
 
@@ -277,7 +277,7 @@ async def approve_referrer(
     db.commit()
     db.refresh(ref)
 
-    logger.info("Admin %s approved referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    logger.info("Admin approved referrer '%s' (id=%s)", ref.name, ref_id)
 
     # Send approval email
     await _send_referrer_approved_email(ref, db, user_id=_admin.id)
@@ -298,7 +298,7 @@ async def reject_referrer(
     db.commit()
     db.refresh(ref)
 
-    logger.info("Admin %s rejected referrer '%s' (id=%s)", _admin.email, ref.name, ref_id)
+    logger.info("Admin rejected referrer '%s' (id=%s)", ref.name, ref_id)
 
     # Send rejection email
     await _send_referrer_rejected_email(ref, db, user_id=_admin.id)
@@ -334,7 +334,7 @@ def reset_sent_emails(
         )
     db.commit()
     db.refresh(ref)
-    logger.info("Admin %s reset %d sent invite emails for referrer (id=%s)", _admin.email, reset_count, ref_id)
+    logger.info("Admin reset %d sent invite emails for referrer (id=%s)", reset_count, ref_id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 

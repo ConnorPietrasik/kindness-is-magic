@@ -3,8 +3,9 @@
 Covers:
 - X-Request-ID response header (16 hex chars, unique per request, present on
   error responses too)
-- the structured JSON access log line (request_id, user_id, user_email,
-  user_role, method, path, status_code, duration_ms)
+- the structured JSON access log line (request_id, user_id, user_role,
+  method, path, status_code, duration_ms) — no user_email (PII minimization;
+  the actor is the user_id, the email lives in the DB)
 - JWT-derived user fields in the access log for authenticated requests
 - log level by status class (INFO / WARNING / ERROR)
 - _RequestContextFilter auto-injection of request_id/user_id into business
@@ -78,7 +79,6 @@ def _assert_json_line(record: logging.LogRecord) -> dict:
         "msg",
         "request_id",
         "user_id",
-        "user_email",
         "user_role",
         "method",
         "path",
@@ -86,6 +86,8 @@ def _assert_json_line(record: logging.LogRecord) -> dict:
         "duration_ms",
     ):
         assert key in payload, f"missing {key} in {payload}"
+    # Emails are intentionally never logged (see AGENTS.md, Logging).
+    assert "user_email" not in payload, f"user_email leaked into log line: {payload}"
     return payload
 
 
@@ -115,7 +117,7 @@ class TestAccessLogLine:
         assert record.levelno == logging.INFO
         assert record.getMessage() == "Request"
         assert record.user_id == "-"
-        assert record.user_email == "-"
+        assert not hasattr(record, "user_email")
         assert record.user_role == "-"
         assert record.method == "GET"
         assert record.path == "/api/health"
@@ -133,9 +135,9 @@ class TestAccessLogLine:
         record = next(r for r in _access_log_records(caplog) if r.path == "/api/auth/me")
         assert record.levelno == logging.INFO
         assert record.user_id == str(admin_user.id)
-        assert record.user_email == "admin@test.com"
+        assert not hasattr(record, "user_email")  # PII never logged
         assert record.user_role == "admin"
-        assert _assert_json_line(record)["user_email"] == "admin@test.com"
+        assert "user_email" not in _assert_json_line(record)
 
     def test_invalid_token_logged_as_anonymous(self, test_client: TestClient, caplog: pytest.LogCaptureFixture):
         test_client.cookies.set("access_token", "not-a-valid-jwt")
@@ -144,7 +146,7 @@ class TestAccessLogLine:
 
         record = _access_log_records(caplog)[0]
         assert record.user_id == "-"
-        assert record.user_email == "-"
+        assert not hasattr(record, "user_email")
         assert record.user_role == "-"
 
     def test_level_warning_on_404(self, test_client: TestClient, caplog: pytest.LogCaptureFixture):

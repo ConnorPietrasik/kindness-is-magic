@@ -53,7 +53,7 @@ class JsonFormatter(logging.Formatter):
             "msg": record.getMessage(),
         }
         # Attach request context when available (from middleware)
-        for _key in ("request_id", "user_id", "user_email", "user_role", "method", "path", "status_code", "duration_ms"):
+        for _key in ("request_id", "user_id", "user_role", "method", "path", "status_code", "duration_ms"):
             val = getattr(record, _key, None)
             if val is not None:
                 payload[_key] = val
@@ -125,9 +125,10 @@ async def log_request_middleware(request: Request, call_next):
     request_id = uuid.uuid4().hex[:16]
     token = _request_id_ctx.set(request_id)
 
-    # Extract user from JWT cookie (no DB hit)
+    # Extract user from JWT cookie (no DB hit). No email in logs — PII
+    # minimization: the actor is the user_id; look the email up in the DB if
+    # it ever matters.
     user_id = "-"
-    user_email = "-"
     user_role = "-"
     access_token = request.cookies.get("access_token")
     if access_token:
@@ -136,7 +137,6 @@ async def log_request_middleware(request: Request, call_next):
 
             payload = decode_access_token(access_token)
             user_id = payload.get("sub", "-") or "-"
-            user_email = payload.get("email", "-") or "-"
             user_role = payload.get("role", "-") or "-"
             _user_id_ctx.set(str(user_id))
         except Exception:
@@ -158,7 +158,6 @@ async def log_request_middleware(request: Request, call_next):
         extra={
             "request_id": request_id,
             "user_id": user_id,
-            "user_email": user_email,
             "user_role": user_role,
             "method": request.method,
             "path": request.url.path,

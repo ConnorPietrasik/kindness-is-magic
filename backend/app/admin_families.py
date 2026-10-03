@@ -367,7 +367,7 @@ def create_family(
     attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s created family '%s' (id=%s)", _admin.email, fam.family_name, fam.id)
+    logger.info("Admin created family '%s' (id=%s)", fam.family_name, fam.id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
@@ -396,7 +396,7 @@ def update_family(
         attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s updated family (id=%s)", _admin.email, fam_id)
+    logger.info("Admin updated family (id=%s)", fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
@@ -414,7 +414,7 @@ def restore_family(
     restore_family_cascade(db, fam_id)
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s restored family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin restored family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
@@ -430,7 +430,7 @@ def delete_family(
     soft_delete_family_cascade(db, fam_id, now)
     fam.deleted_at = now
     db.commit()
-    logger.info("Admin %s soft-deleted family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin soft-deleted family '%s' (id=%s)", fam.family_name, fam_id)
     return Response(status_code=204)
 
 
@@ -465,7 +465,7 @@ def admin_approve_wishes(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s fully approved wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin fully approved wishes for family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
@@ -496,7 +496,7 @@ def admin_reject_wishes(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s rejected wishes for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin rejected wishes for family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
 
 
@@ -519,5 +519,5 @@ def admin_reset_wish_state(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Admin %s reset wish state for family '%s' (id=%s)", _admin.email, fam.family_name, fam_id)
+    logger.info("Admin reset wish state for family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))

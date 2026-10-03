@@ -137,7 +137,7 @@ async def send_email(
 
     # Unsubscribe gate (skip for exempt emails like password resets)
     if not exempt_unsubscribe and check_unsubscribed(to_addr, db):
-        logger.info("Email suppressed (unsubscribed): %s", to_addr)
+        logger.info("Email suppressed (unsubscribed): kind=%s", kind)
         _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "unsubscribed")
         return {"sent": False, "reason": "unsubscribed"}
 
@@ -154,11 +154,11 @@ async def send_email(
 
     try:
         await mail_manager.send_message(message)
-        logger.info("Email sent: to=%s subject=%s", to_addr, subject)
+        logger.info("Email sent: kind=%s", kind)
         _record_sent_email(db, to_addr, kind, user_id, EmailStatus.sent, None)
         return {"sent": True, "reason": None}
     except Exception as exc:  # noqa: BLE001
-        logger.error("SMTP error sending email to %s: %s", to_addr, exc)
+        logger.error("SMTP error sending email (kind=%s): %s", kind, exc)
         _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "smtp_error")
         return {"sent": False, "reason": "smtp_error"}
 

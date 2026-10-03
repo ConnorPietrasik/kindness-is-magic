@@ -98,24 +98,24 @@ async def zeffy_webhook(
 
     donor = db.query(User).filter(func.lower(User.email) == buyer_email.strip().lower(), User.deleted_at.is_(None)).first()
     if donor is None:
-        logger.info("Zeffy webhook: buyer %s has no account — ignoring (admin manual match is the backstop)", buyer_email)
+        logger.info("Zeffy webhook: payment %s has no account — ignoring (admin manual match is the backstop)", payment.id)
         return {"status": "ignored"}
 
     claims = pending_cash_claims_for(db, donor.id)
     if not claims:
-        logger.info("Zeffy webhook: %s has no pending cart — ignoring (admin manual match is the backstop)", buyer_email)
+        logger.info("Zeffy webhook: payment %s has no pending cart — ignoring (admin manual match is the backstop)", payment.id)
         return {"status": "ignored"}
 
     total_cents = claims_total_usd(claims) * 100
     anchor = cart_window_anchor(claims)
     if payment.currency != "usd" or payment.amount != total_cents or anchor is None or payment.created < int(anchor.timestamp()):
         logger.info(
-            "Zeffy webhook: payment %s (%s %s, created %s) doesn't exactly match %s's cart ($%s) — ignoring (admin manual match is the backstop)",
+            "Zeffy webhook: payment %s (%s %s, created %s) doesn't exactly match donor %s's cart ($%s) — ignoring (admin manual match is the backstop)",
             payment.id,
             payment.amount // 100,
             payment.currency,
             payment.created,
-            buyer_email,
+            donor.id,
             total_cents // 100,
         )
         return {"status": "ignored"}

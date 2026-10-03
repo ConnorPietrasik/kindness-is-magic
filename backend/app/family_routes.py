@@ -69,7 +69,7 @@ def update_self(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Family user %s updated own profile (family id=%s)", user.email, fam.id)
+    logger.info("Family user updated own profile (family id=%s)", fam.id)
     return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False, include_claim=False))
 
 
@@ -102,7 +102,7 @@ def request_review(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Family user %s requested review (family id=%s)", user.email, fam.id)
+    logger.info("Family user requested review (family id=%s)", fam.id)
     return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False, include_claim=False))
 
 
@@ -129,7 +129,7 @@ def cancel_review(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Family user %s cancelled review request (family id=%s)", user.email, fam.id)
+    logger.info("Family user cancelled review request (family id=%s)", fam.id)
     return FamilySelfServiceDetail(**build_family_detail(fam, db, include_delivery=False, include_claim=False))
 
 

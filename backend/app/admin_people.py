@@ -196,7 +196,7 @@ def create_person(
     )
     db.commit()
     db.refresh(per)
-    logger.info("Admin %s created person '%s' (id=%s) in family %s", _admin.email, per.given_name, per.id, body.family_id)
+    logger.info("Admin created person '%s' (id=%s) in family %s", per.given_name, per.id, body.family_id)
     return PersonDetail(**build_person_detail(per, db))
 
 
@@ -225,7 +225,7 @@ def update_person(
 
     db.commit()
     db.refresh(per)
-    logger.info("Admin %s updated person (id=%s)", _admin.email, per_id)
+    logger.info("Admin updated person (id=%s)", per_id)
     return PersonDetail(**build_person_detail(per, db))
 
 
@@ -246,7 +246,7 @@ def restore_person(
     restore_person_wishes(db, per_id)
     db.commit()
     db.refresh(per)
-    logger.info("Admin %s restored person (id=%s)", _admin.email, per_id)
+    logger.info("Admin restored person (id=%s)", per_id)
     return PersonDetail(**build_person_detail(per, db))
 
 
@@ -262,7 +262,7 @@ def delete_person(
     # Soft-delete all associated wishes
     soft_delete_person_wishes(db, per_id, now)
     db.commit()
-    logger.info("Admin %s soft-deleted person (id=%s)", _admin.email, per_id)
+    logger.info("Admin soft-deleted person (id=%s)", per_id)
     return Response(status_code=204)
 
 
@@ -346,7 +346,7 @@ def create_person_wish(
     db.add(wish)
     db.commit()
     db.refresh(wish)
-    logger.info("Admin %s created wish (id=%s) for person (id=%s)", _admin.email, wish.id, per_id)
+    logger.info("Admin created wish (id=%s) for person (id=%s)", wish.id, per_id)
 
     return WishDetail(**build_wish_detail(wish, per, db))
 
@@ -403,7 +403,7 @@ def update_person_wish(
     partial_update(wish, body)
     db.commit()
     db.refresh(wish)
-    logger.info("Admin %s updated wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+    logger.info("Admin updated wish (id=%s) for person (id=%s)", wish_id, per_id)
 
     return WishDetail(**build_wish_detail(wish, per, db))
 
@@ -424,7 +424,7 @@ def delete_person_wish(
 
     wish.deleted_at = datetime.now(timezone.utc)
     db.commit()
-    logger.info("Admin %s soft-deleted wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+    logger.info("Admin soft-deleted wish (id=%s) for person (id=%s)", wish_id, per_id)
     return Response(status_code=204)
 
 
@@ -464,6 +464,6 @@ def restore_person_wish(
     wish.deleted_at = None
     db.commit()
     db.refresh(wish)
-    logger.info("Admin %s restored wish (id=%s) for person (id=%s)", _admin.email, wish_id, per_id)
+    logger.info("Admin restored wish (id=%s) for person (id=%s)", wish_id, per_id)
 
     return WishDetail(**build_wish_detail(wish, per, db))

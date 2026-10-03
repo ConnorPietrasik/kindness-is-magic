@@ -103,7 +103,7 @@ def update_self(
     partial_update(ref, body)
     db.commit()
     db.refresh(ref)
-    logger.info("Referrer %s updated own profile (id=%s)", user.email, ref.id)
+    logger.info("Referrer updated own profile (id=%s)", ref.id)
     return ReferrerDetail(**build_referrer_detail(ref, db))
 
 
@@ -184,7 +184,7 @@ def create_family(
     attach_family_wish(db, fam, body.family_wish)
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s created family '%s' (id=%s)", user.email, fam.family_name, fam.id)
+    logger.info("Referrer created family '%s' (id=%s)", fam.family_name, fam.id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
@@ -213,7 +213,7 @@ def update_family(
 
     db.commit()
     db.refresh(owner.family)
-    logger.info("Referrer %s updated family (id=%s)", owner.user.email, fam_id)
+    logger.info("Referrer updated family (id=%s)", fam_id)
     return FamilyDetail(**build_family_detail(owner.family, db, include_referrer_notes=True, include_claim=False))
 
 
@@ -230,7 +230,7 @@ def delete_family(
     soft_delete_family_cascade(db, fam_id, now)
     fam.deleted_at = now
     db.commit()
-    logger.info("Referrer %s soft-deleted family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer soft-deleted family '%s' (id=%s)", fam.family_name, fam_id)
     return Response(status_code=204)
 
 
@@ -313,7 +313,7 @@ async def verify_family(
     fam.verification_status = FamilyVerificationStatus.verified
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s verified family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer verified family '%s' (id=%s)", fam.family_name, fam_id)
 
     # Send verification notification email to the family
     await _send_family_verified_email(
@@ -344,7 +344,7 @@ async def reject_family(
     fam.verification_status = FamilyVerificationStatus.rejected
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s rejected family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer rejected family '%s' (id=%s)", fam.family_name, fam_id)
 
     # Send rejection notification email to the family
     await _send_family_rejected_email(
@@ -435,7 +435,7 @@ def referrer_approve_wishes(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s approved wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer approved wishes for family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
@@ -465,7 +465,7 @@ def referrer_reject_wishes(
 
     db.commit()
     db.refresh(fam)
-    logger.info("Referrer %s rejected wishes for family '%s' (id=%s)", owner.user.email, fam.family_name, fam_id)
+    logger.info("Referrer rejected wishes for family '%s' (id=%s)", fam.family_name, fam_id)
     return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_claim=False))
 
 
@@ -556,7 +556,7 @@ def create_family_person(
     )
     db.commit()
     db.refresh(per)
-    logger.info("Referrer %s created person '%s' (id=%s) in family %s", owner.user.email, per.given_name, per.id, fid)
+    logger.info("Referrer created person '%s' (id=%s) in family %s", per.given_name, per.id, fid)
     return PersonDetail(**build_person_detail(per, db))
 
 

@@ -79,9 +79,10 @@ def _issue_session(response: Response, user: User, db: Session) -> None:
     /refresh answers 401 "revoked" (the cookie exists but the server has
     no record of the token).
     """
-    # The access log middleware reads ``email`` from the JWT to correlate
-    # log lines with the acting user (see log_request_middleware in main.py).
-    access_token = create_access_token(data={"sub": str(user.id), "email": user.email, "role": user.role})
+    # The access log middleware correlates log lines with the acting user via
+    # ``sub`` (see log_request_middleware in main.py). No email in the token
+    # — PII minimization; the user_id is enough to look it up if needed.
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, db=db)
     set_auth_cookies(response, access_token, refresh_token)
 
@@ -179,7 +180,7 @@ def login(request: Request, data: UserLogin, response: Response, db: Session = D
     _issue_session(response, user, db)
     db.commit()
 
-    logger.info("User logged in: %s (role=%s)", user.email, user.role)
+    logger.info("User logged in: user_id=%s role=%s", user.id, user.role)
 
     return {
         "message": "Login successful",
@@ -214,7 +215,7 @@ def logout(
     db.commit()
 
     clear_auth_cookies(response)
-    logger.info("User logged out: %s", _user.email)
+    logger.info("User logged out")
     return {"message": "Logged out"}
 
 
@@ -316,7 +317,7 @@ def update_profile(
     db.commit()
     db.refresh(user)
 
-    logger.info("User updated profile: %s", user.email)
+    logger.info("User updated profile")
     return user
 
 
@@ -350,7 +351,7 @@ def change_password(
 
     db.commit()
 
-    logger.info("User changed password: %s", user.email)
+    logger.info("User changed password")
     return {"message": "Password changed"}
 
 
@@ -401,9 +402,9 @@ async def forgot_password(request: Request, data: ForgotPassword, db: Session = 
     )
 
     if result["sent"]:
-        logger.info("Password reset email sent: user_id=%s email=%s", user.id, user.email)
+        logger.info("Password reset email sent: user_id=%s", user.id)
     else:
-        logger.error("Password reset email failed: user_id=%s email=%s", user.id, user.email)
+        logger.error("Password reset email failed: user_id=%s", user.id)
 
     return {"message": "If the email exists, a reset link has been sent"}
 
@@ -446,7 +447,7 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
 
     db.commit()
 
-    logger.info("User reset password via token: %s", user.email)
+    logger.info("User reset password via token: user_id=%s", user.id)
     return {"message": "Password has been reset"}
 
 
@@ -601,7 +602,7 @@ def register_referrer(
     _issue_session(response, user, db)
     db.commit()
 
-    logger.info("Referrer self-registered via invite %s: %s", data.code, data.email)
+    logger.info("Referrer self-registered via invite %s: user_id=%s", data.code, user.id)
 
     return ReferrerSelfRegisterResponse(
         user=UserResponse.model_validate(user),
@@ -667,7 +668,7 @@ async def register_family(
     _issue_session(response, user, db)
     db.commit()
 
-    logger.info("Family self-registered via invite: %s (referrer_id=%s)", data.email, referrer.id)
+    logger.info("Family self-registered via invite: user_id=%s (referrer_id=%s)", user.id, referrer.id)
 
     # 5. Send notification email to referrer
     referrer_user = db.query(User).filter(User.referrer_id == referrer.id).first()
@@ -744,6 +745,6 @@ def register_donor(
     _issue_session(response, user, db)
     db.commit()
 
-    logger.info("Donor self-registered: %s", data.email)
+    logger.info("Donor self-registered: user_id=%s", user.id)
 
     return DonorSelfRegisterResponse(user=UserResponse.model_validate(user))

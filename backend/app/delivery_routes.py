@@ -65,7 +65,7 @@ def list_families(
             }
         )
 
-    logger.info("Delivery %s listed families (total=%d)", current_user.email, len(result))
+    logger.info("Delivery listed families (total=%d)", len(result))
     return result
 
 
@@ -93,5 +93,5 @@ def get_packing_slips(
         return []
 
     result = build_packing_slips(db, families)
-    logger.info("Delivery %s listed packing slips (families=%d)", current_user.email, len(result))
+    logger.info("Delivery listed packing slips (families=%d)", len(result))
     return result

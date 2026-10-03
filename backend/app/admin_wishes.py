@@ -302,7 +302,7 @@ def list_wishes(
         for w in wishes_with_context
     ]
 
-    logger.info("Admin %s listed wishes (page=%d, total=%d)", admin.email, page, total)
+    logger.info("Admin listed wishes (page=%d, total=%d)", page, total)
 
     return column_filtered_page(items, columns, key="wishes", total=total, page=page, page_size=page_size, always_include={"id"})
 
@@ -396,7 +396,7 @@ def batch_mark_purchased(
 
     db.commit()
 
-    logger.info("Admin %s batch-marked %d wishes as purchased", admin.email, len(wish_ids))
+    logger.info("Admin batch-marked %d wishes as purchased", len(wish_ids))
     return {"marked_count": len(wish_ids)}
 
 
@@ -446,7 +446,7 @@ def update_wish(
     db.commit()
     db.refresh(wish)
 
-    logger.info("Admin %s updated wish (id=%d)", admin.email, wish_id)
+    logger.info("Admin updated wish (id=%d)", wish_id)
     return WishDetail(**build_wish_detail(wish, person, db))
 
 
@@ -476,5 +476,5 @@ def mark_purchased(
     db.commit()
     db.refresh(wish)
 
-    logger.info("Admin %s marked wish (id=%d) as purchased", admin.email, wish_id)
+    logger.info("Admin marked wish (id=%d) as purchased", wish_id)
     return WishDetail(**build_wish_detail(wish, person, db))

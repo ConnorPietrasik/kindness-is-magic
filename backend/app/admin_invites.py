@@ -168,6 +168,6 @@ def revoke_invite(
     db.commit()
     db.refresh(invite)
 
-    logger.info("Admin %s revoked invite %s (id=%s)", _admin.email, invite.code, invite_id)
+    logger.info("Admin revoked invite %s (id=%s)", invite.code, invite_id)
     admin_map, referrer_map = _resolve_invite_relations(invite, db)
     return _build_invite_summary(invite, admin_map, referrer_map)
