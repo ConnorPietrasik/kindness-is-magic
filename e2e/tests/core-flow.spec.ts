@@ -344,9 +344,9 @@ test.describe("Core Flow", () => {
 
       await publicPage.goto(`/families/${testData.familyId}/wish-list`);
 
-      /* Page heading shows the display ID (numeric, e.g. "1" or "2-3") */
+      /* Page heading shows the labeled display ID (numeric, e.g. "Family ID: 2-3") */
       await expect(
-        publicPage.getByRole("heading", { name: /^\d+(?:-\d+)*$/ }),
+        publicPage.getByRole("heading", { name: /^Family ID: \d+(?:-\d+)*$/ }),
       ).toBeVisible({ timeout: 10_000 });
 
       /* Family wish card is visible */

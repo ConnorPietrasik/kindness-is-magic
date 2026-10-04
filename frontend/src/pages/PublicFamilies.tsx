@@ -321,6 +321,7 @@ function FamilyCard({ family }: { family: PublicFamilySummary }) {
     <Link to={route.familyWishList(family.id)}>
       <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="mb-2 flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-500">Family ID:</span>
           <span className="text-xl font-bold tracking-tight text-gray-900">{family.display_id}</span>
           {chip && (
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${chip.cls}`}>
@@ -370,6 +371,7 @@ function SponsoredClaimCard({ claim }: { claim: FamilyClaimSummary }) {
     <Link to={route.familyWishList(claim.family.id)}>
       <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="mb-2 flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-500">Family ID:</span>
           <span className="text-xl font-bold tracking-tight text-gray-900">{claim.family.display_id}</span>
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${chip.cls}`}>
             {chip.label}

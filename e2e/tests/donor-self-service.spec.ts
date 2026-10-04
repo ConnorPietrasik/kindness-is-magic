@@ -179,7 +179,7 @@ test.describe.serial("Donor Self-Service — claim lifecycle", () => {
 
     // Navigate to the family wish list directly
     await page.goto(`/families/${testData.familyId}/wish-list`);
-    // Page heading is display_id (e.g. "10-1"); verify by checking family members section
+    // Page heading is the labeled display ID (e.g. "Family ID: 10-1"); verify via family members section
     await expect(page.getByText("Family Members")).toBeVisible({ timeout: 10_000 });
 
     // Click "Claim this family" button

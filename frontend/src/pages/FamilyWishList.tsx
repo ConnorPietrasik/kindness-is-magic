@@ -90,14 +90,20 @@ export default function FamilyWishList() {
         <div className="print-only mb-6 items-center gap-4 border-b border-gray-200 pb-4">
           <Logo className="h-14 w-14" />
           <div className="text-left">
-            <div className="text-lg font-bold text-gray-900">{data.display_id}</div>
+            <div className="flex items-baseline gap-2 text-lg font-bold text-gray-900">
+              <span className="font-medium text-gray-500">Family ID:</span>
+              {data.display_id}
+            </div>
             <div className="text-sm text-gray-500">Kindness is Magic — Family Wish List</div>
           </div>
         </div>
 
         {/* Family header */}
         <div className="mb-8">
-          <h2 className="no-print text-2xl font-bold tracking-tight text-gray-900">{data.display_id}</h2>
+          <h2 className="no-print flex items-baseline gap-2 text-2xl font-bold tracking-tight text-gray-900">
+            <span className="text-base font-medium text-gray-500">Family ID:</span>
+            {data.display_id}
+          </h2>
           {data.bio && <p className="mt-2 text-gray-600">{data.bio}</p>}
           <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
             <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
