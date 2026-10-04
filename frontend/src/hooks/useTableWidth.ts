@@ -1,6 +1,7 @@
 /** Hook for managing per-resource table width preference with localStorage persistence. */
 
 import { useEffect, useState } from "react";
+import { safeGetItem, safeSetItem } from "../lib/utils";
 
 const STORAGE_PREFIX = "kim:tableWidth:";
 const EVENT_TYPE = "kim:table-width-change";
@@ -42,20 +43,16 @@ export function useTableWidth(resourceKey: string) {
   const defaultMode = DEFAULT_WIDTH_MODES[resourceKey] ?? FALLBACK_WIDTH_MODE;
 
   const [widthMode, setWidthModeState] = useState<TableWidthMode>(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored && stored in WIDTH_CLASS_MAP) {
-        return stored as TableWidthMode;
-      }
-    } catch {
-      // ignore malformed data
+    const stored = safeGetItem(storageKey);
+    if (stored && stored in WIDTH_CLASS_MAP) {
+      return stored as TableWidthMode;
     }
     return defaultMode;
   });
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, widthMode);
+    safeSetItem(storageKey, widthMode);
   }, [storageKey, widthMode]);
 
   // Listen for changes from other hook instances (e.g. ColumnToggle applying changes)
@@ -71,7 +68,7 @@ export function useTableWidth(resourceKey: string) {
   }, [resourceKey]);
 
   const setWidthMode = (mode: TableWidthMode) => {
-    localStorage.setItem(storageKey, mode);
+    safeSetItem(storageKey, mode);
     window.dispatchEvent(new CustomEvent(EVENT_TYPE, { detail: { resourceKey, mode } }));
     setWidthModeState(mode);
   };

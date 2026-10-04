@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useColumnVisibility } from "./useColumnVisibility";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 
@@ -89,6 +90,22 @@ describe("useColumnVisibility", () => {
     });
 
     expect(result.current.visibleColumns).toEqual(["name", "family_limit"]);
+  });
+
+  it("survives when storage access is blocked (defaults, no crash)", () => {
+    const deny = () => {
+      throw new Error("SecurityError: storage access denied");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(deny);
+    const setItemSpy = vi.spyOn(window.localStorage, "setItem").mockImplementation(deny);
+
+    const { result } = renderHook(() => useColumnVisibility("adminReferrers"));
+
+    // Read failure → defaults; the mount-time persist failure is swallowed with a warning
+    expect(result.current.visibleColumns).toEqual(["name", "family_limit"]);
+    expect(setItemSpy).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
   });
 
   it("handles malformed localStorage data gracefully", () => {

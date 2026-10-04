@@ -1,6 +1,7 @@
 /** Hook for managing per-resource column order with localStorage persistence. */
 
 import { useEffect, useState } from "react";
+import { safeGetItem, safeSetItem } from "../lib/utils";
 import { COLUMNS, type ColumnDef, normalizeColumnOrder } from "../types/columns";
 
 const STORAGE_PREFIX = "kim:columnOrder:";
@@ -72,20 +73,20 @@ export function useColumnOrder(resourceKey: string, visibleKeys?: string[]): Use
   const storageKey = STORAGE_PREFIX + resourceKey;
 
   const [orderedKeys, setOrderedKeysState] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
+    const stored = safeGetItem(storageKey);
+    if (stored) {
+      try {
         return normalizeColumnOrder(JSON.parse(stored), defs);
+      } catch {
+        // ignore malformed data
       }
-    } catch {
-      // ignore malformed data
     }
     return defs.map((d) => d.key);
   });
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(orderedKeys));
+    safeSetItem(storageKey, JSON.stringify(orderedKeys));
   }, [storageKey, orderedKeys]);
 
   // Listen for changes from other hook instances (e.g. ColumnToggle resetting)
@@ -102,7 +103,7 @@ export function useColumnOrder(resourceKey: string, visibleKeys?: string[]): Use
 
   /** Internal setter that persists + dispatches a sync event for other hook instances. */
   const setOrderedKeys = (keys: string[]) => {
-    localStorage.setItem(storageKey, JSON.stringify(keys));
+    safeSetItem(storageKey, JSON.stringify(keys));
     window.dispatchEvent(new CustomEvent(EVENT_TYPE, { detail: { resourceKey, columns: keys } }));
     setOrderedKeysState(keys);
   };

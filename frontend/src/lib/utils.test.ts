@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   chooseSlipColumns,
   clearPendingClaimFamilyId,
@@ -15,6 +15,9 @@ import {
   normalizePayload,
   normalizeUpdatePayload,
   nowIso,
+  safeGetItem,
+  safeRemoveItem,
+  safeSetItem,
   setPendingClaimFamilyId,
   toDatetimeLocalValue,
 } from "./utils";
@@ -376,6 +379,58 @@ describe("formatApiError", () => {
       },
     };
     expect(formatApiError(error)).toBe("Plain error string; Object error");
+  });
+});
+
+describe("safe storage access", () => {
+  const deny = () => {
+    throw new Error("SecurityError: storage access denied");
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("safeGetItem returns the stored value, or null when absent", () => {
+    expect(safeGetItem("kim:test")).toBeNull();
+    localStorage.setItem("kim:test", "hello");
+    expect(safeGetItem("kim:test")).toBe("hello");
+  });
+
+  it("safeGetItem swallows failures and warns", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(deny);
+    expect(safeGetItem("kim:test")).toBeNull();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("safeSetItem persists the value", () => {
+    safeSetItem("kim:test", "hello");
+    expect(localStorage.getItem("kim:test")).toBe("hello");
+  });
+
+  it("safeSetItem swallows failures and warns", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(deny);
+    expect(() => safeSetItem("kim:test", "hello")).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("safeRemoveItem removes the stored value", () => {
+    localStorage.setItem("kim:test", "hello");
+    safeRemoveItem("kim:test");
+    expect(localStorage.getItem("kim:test")).toBeNull();
+  });
+
+  it("safeRemoveItem swallows failures and warns", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(window.localStorage, "removeItem").mockImplementation(deny);
+    expect(() => safeRemoveItem("kim:test")).not.toThrow();
+    expect(warn).toHaveBeenCalled();
   });
 });
 

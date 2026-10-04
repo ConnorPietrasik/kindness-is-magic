@@ -1,6 +1,7 @@
 /** Hook for managing per-role dashboard tile visibility with localStorage persistence. */
 
 import { useEffect, useState } from "react";
+import { safeGetItem, safeSetItem } from "../lib/utils";
 import { DASHBOARD_TILES, type DashboardTileDef } from "../types/tiles";
 
 const STORAGE_PREFIX = "kim:dashboardTiles:";
@@ -25,24 +26,24 @@ export function useDashboardTiles(role: string): UseDashboardTilesResult {
   const getDefaultKeys = () => defs.filter((d) => d.visible).map((d) => d.key);
 
   const [visibleTiles, setVisibleTilesState] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
+    const stored = safeGetItem(storageKey);
+    if (stored) {
+      try {
         const parsed = JSON.parse(stored) as unknown;
         if (Array.isArray(parsed)) {
           const validKeys = new Set(defs.map((d) => d.key));
           return parsed.filter((k): k is string => typeof k === "string" && validKeys.has(k));
         }
+      } catch {
+        // ignore malformed data
       }
-    } catch {
-      // ignore malformed data
     }
     return getDefaultKeys();
   });
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(visibleTiles));
+    safeSetItem(storageKey, JSON.stringify(visibleTiles));
   }, [storageKey, visibleTiles]);
 
   // Listen for changes from other hook instances (e.g. TileToggle applying changes)
@@ -59,7 +60,7 @@ export function useDashboardTiles(role: string): UseDashboardTilesResult {
 
   /** Internal setter that persists + dispatches a sync event for other hook instances. */
   const setVisibleTiles = (keys: string[]) => {
-    localStorage.setItem(storageKey, JSON.stringify(keys));
+    safeSetItem(storageKey, JSON.stringify(keys));
     window.dispatchEvent(new CustomEvent(EVENT_TYPE, { detail: { role, tiles: keys } }));
     setVisibleTilesState(keys);
   };

@@ -1,6 +1,7 @@
 /** Hook for managing per-resource column visibility with localStorage persistence. */
 
 import { useEffect, useMemo, useState } from "react";
+import { safeGetItem, safeSetItem } from "../lib/utils";
 import { COLUMN_FIELD_MAP, COLUMNS, type ColumnDef } from "../types/columns";
 
 const STORAGE_PREFIX = "kim:columns:";
@@ -13,22 +14,22 @@ export function useColumnVisibility(resourceKey: string) {
   const getDefaultKeys = () => defs.filter((c) => c.visible).map((c) => c.key);
 
   const [visibleColumns, setVisibleColumnsState] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
+    const stored = safeGetItem(storageKey);
+    if (stored) {
+      try {
         const parsed = JSON.parse(stored) as string[];
         const validKeys = new Set(defs.map((d) => d.key));
         return parsed.filter((k) => validKeys.has(k));
+      } catch {
+        // ignore malformed data
       }
-    } catch {
-      // ignore malformed data
     }
     return getDefaultKeys();
   });
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(visibleColumns));
+    safeSetItem(storageKey, JSON.stringify(visibleColumns));
   }, [storageKey, visibleColumns]);
 
   // Listen for changes from other hook instances (e.g. ColumnToggle applying changes)
@@ -45,7 +46,7 @@ export function useColumnVisibility(resourceKey: string) {
 
   /** Internal setter that persists + dispatches a sync event for other hook instances. */
   const setVisibleColumns = (columns: string[]) => {
-    localStorage.setItem(storageKey, JSON.stringify(columns));
+    safeSetItem(storageKey, JSON.stringify(columns));
     window.dispatchEvent(new CustomEvent(EVENT_TYPE, { detail: { resourceKey, columns } }));
     setVisibleColumnsState(columns);
   };

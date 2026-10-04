@@ -31,7 +31,7 @@ import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminListInvites, adminRevokeInvite, createReferrerInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
-import { formatApiError, formatDateTime } from "../lib/utils";
+import { formatApiError, formatDateTime, safeGetItem, safeSetItem } from "../lib/utils";
 import type { InviteListParams, ReferrerInviteCreatePayload, ReferrerInviteResponse } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -299,19 +299,12 @@ function InviteGenerator() {
   const { user } = useAuth();
   const [familyLimit, setFamilyLimit] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState(() => {
-    try {
-      return localStorage.getItem(INVITE_MESSAGE_STORAGE_KEY) ?? "";
-    } catch {
-      // ignore malformed/unavailable storage
-      return "";
-    }
-  });
+  const [message, setMessage] = useState(() => safeGetItem(INVITE_MESSAGE_STORAGE_KEY) ?? "");
   const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
 
   // Persist to localStorage so the message survives navigation and browser restarts.
   useEffect(() => {
-    localStorage.setItem(INVITE_MESSAGE_STORAGE_KEY, message);
+    safeSetItem(INVITE_MESSAGE_STORAGE_KEY, message);
   }, [message]);
 
   // The invite email is only sent when an email address is provided — the

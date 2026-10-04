@@ -1,6 +1,43 @@
 import type { EmailStatus, WishLockLevel } from "../types";
 
 /**
+ * Safe localStorage access — wrappers that never throw.
+ *
+ * Some browsers deny storage access outright (e.g. the user has blocked
+ * site data for this origin, `SecurityError`), and writes can exceed the
+ * storage quota (`QuotaExceededError`). Everything we persist is a
+ * best-effort preference or draft, so a failure should degrade gracefully
+ * (the feature keeps working, the value just won't stick) rather than
+ * crash the page.
+ */
+export function safeGetItem(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch (err) {
+    // Storage unavailable (e.g. site data blocked) — behave as if empty
+    console.warn(`Could not read "${key}" from localStorage:`, err);
+    return null;
+  }
+}
+
+export function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    // Storage full/unavailable — the value simply won't persist
+    console.warn(`Could not persist "${key}" to localStorage:`, err);
+  }
+}
+
+export function safeRemoveItem(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    console.warn(`Could not remove "${key}" from localStorage:`, err);
+  }
+}
+
+/**
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */
@@ -257,11 +294,11 @@ interface PendingClaimFamilyEntry {
 
 export function setPendingClaimFamilyId(familyId: number): void {
   const entry: PendingClaimFamilyEntry = { id: familyId, setAt: Date.now() };
-  localStorage.setItem(PENDING_CLAIM_FAMILY_KEY, JSON.stringify(entry));
+  safeSetItem(PENDING_CLAIM_FAMILY_KEY, JSON.stringify(entry));
 }
 
 export function getPendingClaimFamilyId(): number | null {
-  const raw = localStorage.getItem(PENDING_CLAIM_FAMILY_KEY);
+  const raw = safeGetItem(PENDING_CLAIM_FAMILY_KEY);
   if (raw == null) return null;
 
   let parsed: unknown;
@@ -285,7 +322,7 @@ export function getPendingClaimFamilyId(): number | null {
 }
 
 export function clearPendingClaimFamilyId(): void {
-  localStorage.removeItem(PENDING_CLAIM_FAMILY_KEY);
+  safeRemoveItem(PENDING_CLAIM_FAMILY_KEY);
 }
 
 /**

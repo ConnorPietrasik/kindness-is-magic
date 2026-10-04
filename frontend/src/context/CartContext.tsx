@@ -12,6 +12,7 @@
  */
 
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { safeGetItem, safeSetItem } from "../lib/utils";
 import { useAuth } from "./AuthContext";
 
 /** One uncommitted cart item. */
@@ -45,12 +46,7 @@ function isLocalCartItem(value: unknown): value is LocalCartItem {
 
 /** Read + validate one user's cart from localStorage (dedupes per family). */
 function readCart(userId: number): LocalCartItem[] {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(`${STORAGE_PREFIX}${userId}`);
-  } catch {
-    return [];
-  }
+  const raw = safeGetItem(`${STORAGE_PREFIX}${userId}`);
   if (raw == null) return [];
   let parsed: unknown;
   try {
@@ -94,11 +90,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // items were loaded for, so a user switch can never cross-write).
   useEffect(() => {
     if (cart.userId == null) return;
-    try {
-      localStorage.setItem(`${STORAGE_PREFIX}${cart.userId}`, JSON.stringify(cart.items));
-    } catch {
-      // Storage full/unavailable — the cart simply won't persist this session
-    }
+    // Storage full/unavailable — the cart simply won't persist this session (safeSetItem warns)
+    safeSetItem(`${STORAGE_PREFIX}${cart.userId}`, JSON.stringify(cart.items));
   }, [cart]);
 
   const addToCart = (familyId: number): void => {
