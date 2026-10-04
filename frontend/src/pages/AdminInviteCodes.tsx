@@ -289,14 +289,30 @@ export default function AdminInviteCodes() {
 /* ------------------------------------------------------------------ */
 /* InviteGenerator — inline form for creating new invite codes         */
 /* ------------------------------------------------------------------ */
+/* Persisted locally so an admin can reuse the same custom message for many
+   referrers across visits (per-browser preference, like the other kim:* keys). */
+const INVITE_MESSAGE_STORAGE_KEY = "kim:referrerInviteMessage";
+
 function InviteGenerator() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
   const [familyLimit, setFamilyLimit] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => {
+    try {
+      return localStorage.getItem(INVITE_MESSAGE_STORAGE_KEY) ?? "";
+    } catch {
+      // ignore malformed/unavailable storage
+      return "";
+    }
+  });
   const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
+
+  // Persist to localStorage so the message survives navigation and browser restarts.
+  useEffect(() => {
+    localStorage.setItem(INVITE_MESSAGE_STORAGE_KEY, message);
+  }, [message]);
 
   // The invite email is only sent when an email address is provided — the
   // custom message field and preview only make sense in that case.

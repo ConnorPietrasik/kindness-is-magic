@@ -197,6 +197,30 @@ describe("AdminInviteCodes", () => {
     expect(screen.queryByText(/You're invited to help make a difference/)).not.toBeInTheDocument();
   });
 
+  it("restores the custom message from a previous visit via localStorage", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListInvites").mockResolvedValue(emptyListResponse);
+
+    const firstVisit = wrap("/admin/invite-codes");
+    await waitFor(() => {
+      expect(screen.getByText("No invite codes found.")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "+ Generate new" }));
+    await user.type(screen.getByLabelText("Email (optional)"), "newref@example.com");
+    await user.type(screen.getByLabelText("Custom Message (optional)"), "Hello from Kindness!");
+    firstVisit.unmount();
+
+    // Simulate returning later: fresh render, generator reopened, new email typed
+    wrap("/admin/invite-codes");
+    await waitFor(() => {
+      expect(screen.getByText("No invite codes found.")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "+ Generate new" }));
+    await user.type(screen.getByLabelText("Email (optional)"), "another@example.com");
+
+    expect(screen.getByLabelText("Custom Message (optional)")).toHaveValue("Hello from Kindness!");
+  });
+
   it("sends a null message when no message is provided", async () => {
     const user = userEvent.setup();
     vi.spyOn(api, "adminListInvites").mockResolvedValue(emptyListResponse);
