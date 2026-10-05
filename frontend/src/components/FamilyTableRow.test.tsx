@@ -44,6 +44,7 @@ function makeFamily(overrides: Partial<FamilyDetail> = {}): FamilyDetail {
     wish_review_requested_at: null,
     wish_rejection_reason: null,
     referrer_notes: null,
+    contact_email: null,
     claim_status: null,
     claim_commitment_type: null,
     claim_donor_name: null,
@@ -160,6 +161,23 @@ describe("FamilyTableRow", () => {
     await user.click(within(menu).getByRole("menuitem", { name: "View delivery slip" }));
 
     expect(callbacks.onViewDeliverySlip).toHaveBeenCalledWith(1);
+  });
+
+  it("shows Send email and calls the callback when onSendEmail is provided", async () => {
+    const onSendEmail = vi.fn();
+    const { user } = renderRow({ onSendEmail });
+
+    const menu = await openMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: "Send email" }));
+
+    expect(onSendEmail).toHaveBeenCalledWith(1);
+  });
+
+  it("hides Send email when onSendEmail is not provided", async () => {
+    const { user } = renderRow();
+
+    const menu = await openMenu(user);
+    expect(within(menu).queryByRole("menuitem", { name: "Send email" })).not.toBeInTheDocument();
   });
 
   it("menu callbacks fire for delete, reset lock, and fully approve", async () => {

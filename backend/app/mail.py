@@ -188,8 +188,8 @@ def _wrap_email(body_html: str, unsubscribe_url: str | None) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _render_custom_message_html(message: str) -> str:
-    """Render the admin's plain-text message as HTML paragraphs.
+def render_custom_message_html(message: str) -> str:
+    """Render a plain-text message as escaped HTML paragraphs (shared renderer).
 
     Input is plain text, never HTML — every line is escaped. Line-break
     rendering (shared with the frontend preview): normalize ``\r\n`` to
@@ -255,7 +255,7 @@ def build_invite_email(
     (code, locked-email note, expiry, CTA) renders in both variants.
     """
     if email_message:
-        return f"""{_render_custom_message_html(email_message)}
+        return f"""{render_custom_message_html(email_message)}
 {_invite_email_functional_block(code, expires_at, email, "")}"""
 
     from_line = (

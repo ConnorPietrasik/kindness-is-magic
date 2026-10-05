@@ -100,11 +100,25 @@ def list_referrers(
         )
         family_count_map = {rid: count for rid, count in family_counts}
 
+    # Recipient prefill: batch-resolve referrer user emails unconditionally
+    # (not a display column — the client's columns param never requests it)
+    # and guarantee it in the output via always_include.
+    email_map: dict[int, str] = {}
+    if referrers:
+        ref_ids = {r.id for r in referrers}
+        for u in db.query(User).filter(User.referrer_id.in_(ref_ids), User.deleted_at.is_(None)).all():
+            email_map[u.referrer_id] = u.email
+
     items = [
-        ReferrerDetail(**build_referrer_detail(r, db, family_count=family_count_map.get(r.id, 0), admin_map=admin_map)) for r in referrers
+        ReferrerDetail(
+            **build_referrer_detail(r, db, family_count=family_count_map.get(r.id, 0), admin_map=admin_map, email=email_map.get(r.id))
+        )
+        for r in referrers
     ]
 
-    return column_filtered_page(items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id", "email"}
+    )
 
 
 @referrer_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -159,7 +173,9 @@ def get_referrer(
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
     ref = get_active_or_404(db, Referrer, ref_id, "Referrer not found")
-    return ReferrerDetail(**build_referrer_detail(ref, db))
+    # Recipient prefill: single lookup of the referrer user's email.
+    referrer_user = db.query(User).filter(User.referrer_id == ref.id, User.deleted_at.is_(None)).first()
+    return ReferrerDetail(**build_referrer_detail(ref, db, email=referrer_user.email if referrer_user else None))
 
 
 @referrer_admin_router.post("", status_code=201)

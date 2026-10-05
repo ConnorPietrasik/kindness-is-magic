@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type React from "react";
 import { Fragment, useMemo, useState } from "react";
+import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
@@ -42,6 +43,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   payment_request: "Payment Request",
   payment_confirmed: "Payment Confirmation",
   payment_expired: "Payment Expired",
+  custom_message: "Custom Message",
 };
 
 const STATUS_OPTIONS: EmailStatus[] = ["sent", "failed", "reset"];
@@ -55,6 +57,7 @@ export default function AdminEmails() {
   const [searchQuery, setSearchQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<EmailKind | "">("");
   const [statusFilter, setStatusFilter] = useState<EmailStatus | "">("");
+  const [composerOpen, setComposerOpen] = useState(false);
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminSentEmails");
@@ -116,6 +119,7 @@ export default function AdminEmails() {
               </Button>
             )}
             <ColumnToggle resourceKey="adminSentEmails" />
+            <Button onClick={() => setComposerOpen(true)}>+ Compose</Button>
           </div>
         </div>
 
@@ -213,6 +217,9 @@ export default function AdminEmails() {
           onPageChange={pagination.goToPage}
           onPageSizeChange={pagination.setPageSize}
         />
+
+        {/* Generic compose — no prefill (any recipient) */}
+        <AdminEmailComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
       </main>
     </div>
   );

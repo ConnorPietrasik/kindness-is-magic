@@ -450,6 +450,10 @@ class ReferrerDetail(BaseModel):
     family_invite_code: str
     family_count: int
     invite_count: int | None = None
+    # Admin-only recipient prefill: the referrer user's email.
+    # Populated only by admin endpoints (null elsewhere, incl. referrer
+    # self-service, which shares this schema).
+    email: str | None = None
     approval_status: ReferrerApprovalStatus
     approved_by_admin_name: str | None = None
     approved_at: datetime | None = None
@@ -554,6 +558,42 @@ class EmailListResponse(BaseModel):
     page: int = 1
     page_size: int = 50
     total_pages: int = 0
+
+
+class AdminSendEmailRequest(BaseModel):
+    """Admin sends a freeform ("custom") email to any recipient.
+
+    ``message`` is plain text, never HTML — the server renders it to
+    escaped HTML paragraphs. A blank subject is replaced by the default
+    subject server-side.
+    """
+
+    recipient_email: str = Field(..., min_length=1, max_length=120)
+    subject: str | None = Field(None, max_length=200)
+    message: str = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("recipient_email")
+    @classmethod
+    def check_recipient_email(cls, v: str) -> str:
+        return validate_email(v)
+
+    @field_validator("message")
+    @classmethod
+    def check_message_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("message must not be blank")
+        return v
+
+
+class AdminSendEmailResult(BaseModel):
+    """Outcome of an admin custom-email send attempt.
+
+    ``reason`` is ``"unsubscribed"`` or ``"smtp_error"`` when ``sent`` is
+    False — mirrors ``send_email``'s return dict.
+    """
+
+    sent: bool
+    reason: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -661,6 +701,10 @@ class FamilyDetail(BaseModel):
     wish_review_requested_at: datetime | None = None
     wish_rejection_reason: Optional[str] = None
     referrer_notes: str | None = None
+    # Admin-only recipient prefill: the family contact user's email.
+    # Populated only by admin endpoints (null elsewhere, incl. referrer
+    # self-service, which shares this schema).
+    contact_email: str | None = None
     # Claim info for admin families table
     claim_status: str | None = None
     claim_commitment_type: str | None = None

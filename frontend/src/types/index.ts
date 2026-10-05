@@ -34,6 +34,8 @@ export type {
   CsvValidationStats,
 } from "./csv";
 export type {
+  AdminSendEmailPayload,
+  AdminSendEmailResult,
   AdminUserCreate,
   AdminUserUpdate,
   AdminWishUpdate,

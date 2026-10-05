@@ -26,6 +26,7 @@ function makeReferrer(overrides: Partial<ReferrerDetail>): ReferrerDetail {
     created_at: "2025-01-01T00:00:00Z",
     deleted_at: null,
     invite_count: null,
+    email: null,
     ...overrides,
   };
 }
@@ -38,6 +39,7 @@ const mockReferrer1 = makeReferrer({
   phone_number: "5551234567",
   family_invite_code: "HOPE1",
   approval_status: "pending",
+  email: "hope@example.com",
 });
 
 const mockReferrer2 = makeReferrer({
@@ -223,6 +225,25 @@ describe("AdminReferrers", () => {
     await waitFor(() => {
       expect(api.adminRejectReferrer).toHaveBeenCalledWith(1, expect.anything());
     });
+  });
+
+  it("row Send email opens the composer prefilled with the referrer email", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminReferrers />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
+    });
+
+    const triggers = screen.getAllByRole("button", { name: "More actions" });
+    await user.click(triggers[0]!);
+    await user.click(screen.getByRole("menuitem", { name: "Send email" }));
+
+    expect(await screen.findByText("Send email")).toBeInTheDocument();
+    expect(screen.getByText("Referrer 1 — Hope Referrer")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("hope@example.com");
   });
 
   it("reset sent emails flow confirms and calls API", async () => {

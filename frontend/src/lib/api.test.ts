@@ -1317,3 +1317,40 @@ describe("deadline API functions", () => {
     expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/deadlines/3");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Admin — Sent Email Log
+// ---------------------------------------------------------------------------
+describe("admin sent-email API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminSendCustomEmail — POST /api/admin/emails/send (blank subject sent as null)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { sent: true, reason: null } });
+    const result = await apiModule.adminSendCustomEmail({
+      recipient_email: "rec@example.com",
+      subject: "",
+      message: "Hello",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/emails/send", {
+      recipient_email: "rec@example.com",
+      subject: null,
+      message: "Hello",
+    });
+    expect(result).toEqual({ sent: true, reason: null });
+  });
+
+  it("adminSendCustomEmail — keeps a provided subject and returns the result dict", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { sent: false, reason: "unsubscribed" } });
+    const result = await apiModule.adminSendCustomEmail({
+      recipient_email: "rec@example.com",
+      subject: "Hi",
+      message: "Hello",
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/emails/send", {
+      recipient_email: "rec@example.com",
+      subject: "Hi",
+      message: "Hello",
+    });
+    expect(result).toEqual({ sent: false, reason: "unsubscribed" });
+  });
+});

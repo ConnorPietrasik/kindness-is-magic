@@ -8,6 +8,7 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -74,6 +75,8 @@ export default function AdminFamilies() {
   const [maxPersonCount, setMaxPersonCount] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
+  // Row whose "Send email" action was chosen (drives the page-level composer)
+  const [sendEmailFamily, setSendEmailFamily] = useState<FamilyDetail | null>(null);
   const pendingPayload = useRef<FamilyPayload | null>(null);
 
   // Column visibility + user column order
@@ -211,6 +214,13 @@ export default function AdminFamilies() {
   }
 
   const families = listData?.families ?? [];
+
+  // Look up the row the action came from (the prefill + context label need its
+  // contact_email / display fields, not just the id)
+  function handleSendEmail(id: number) {
+    const fam = families.find((f) => f.id === id);
+    if (fam) setSendEmailFamily(fam);
+  }
 
   if (listLoading) return <PageSpinner />;
 
@@ -430,6 +440,7 @@ export default function AdminFamilies() {
                         referrerMap={referrerMap}
                         showPackingSlipAction
                         showDeliverySlipAction
+                        onSendEmail={handleSendEmail}
                         onEdit={(id) => (editingId === id ? cancelForm() : openEdit(id))}
                         onDelete={(id) => confirmDelete(id)}
                         onRestore={(id) => setRestoreConfirm(id)}
@@ -575,6 +586,16 @@ export default function AdminFamilies() {
             confirmLabel="Yes, fully approve"
             loadingLabel="Approving…"
             confirmVariant="primary"
+          />
+
+          {/* Send email — one composer for the whole table, prefilled per row */}
+          <AdminEmailComposer
+            open={sendEmailFamily !== null}
+            contextLabel={
+              sendEmailFamily ? `Family ${sendEmailFamily.display_id ?? sendEmailFamily.id} — ${sendEmailFamily.family_name}` : null
+            }
+            prefilledRecipient={sendEmailFamily?.contact_email ?? null}
+            onClose={() => setSendEmailFamily(null)}
           />
 
           {/* Pagination */}

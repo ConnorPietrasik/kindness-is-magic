@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { Fragment, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
+import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
@@ -84,6 +85,9 @@ export default function AdminFamilyPeople() {
   const [searchParams] = useSearchParams();
   const cameFromReferrer = searchParams.get("from") === "referrer";
 
+  // Drives the header "Send email" composer
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
+
   // Column visibility + user column order (shared with the main people
   // page — same column registry, so one order applies to both tables).
   // This per-family sub-table omits the Family column (context already
@@ -101,7 +105,9 @@ export default function AdminFamilyPeople() {
     [orderedKeys, visibleColumns]
   );
 
-  // Family detail (needed only when coming from referrer to build back link)
+  // Family detail (fetch is shared with HierarchicalManage's parent query —
+  // this hook exists for the back link when coming from referrer, and also
+  // supplies the "Send email" recipient prefill via the same cache entry)
   const { data: familyDetail } = useQuery({
     queryKey: adminFamilyDetail(famIdStr),
     queryFn: () => adminGetFamily(famIdNum),
@@ -135,6 +141,9 @@ export default function AdminFamilyPeople() {
               </Button>
             )}
             <ColumnToggle resourceKey="adminPeople" />
+            <Button variant="secondary" onClick={() => setSendEmailOpen(true)}>
+              Send email
+            </Button>
           </div>
         </div>
 
@@ -199,6 +208,14 @@ export default function AdminFamilyPeople() {
               readonly: true,
             },
           }}
+        />
+
+        {/* Send email — prefilled from the family contact user's email */}
+        <AdminEmailComposer
+          open={sendEmailOpen}
+          contextLabel={familyDetail ? `Family ${familyDetail.display_id ?? familyDetail.id} — ${familyDetail.family_name}` : null}
+          prefilledRecipient={familyDetail?.contact_email ?? null}
+          onClose={() => setSendEmailOpen(false)}
         />
       </main>
     </div>

@@ -60,6 +60,7 @@ describe("KIND_LABELS", () => {
     "payment_request",
     "payment_confirmed",
     "payment_expired",
+    "custom_message",
   ];
 
   it("has a display label for every email kind", () => {
@@ -132,6 +133,19 @@ describe("AdminEmails", () => {
     await waitFor(() => {
       expect(screen.getByText("No sent emails found.")).toBeInTheDocument();
     });
+  });
+
+  it("+ Compose opens the composer with no prefill", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListSentEmails").mockResolvedValue(emptyListResponse);
+
+    wrap();
+
+    await user.click(await screen.findByRole("button", { name: "+ Compose" }));
+
+    // Dialog title + blank recipient (no prefill)
+    expect(await screen.findByText("Send email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("");
   });
 
   it("passes search, kind, and status filters to the API", async () => {

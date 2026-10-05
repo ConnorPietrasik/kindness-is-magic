@@ -220,6 +220,7 @@ def build_referrer_detail(
     *,
     family_count: int | None = None,
     admin_map: dict[int, str] | None = None,
+    email: str | None = None,
 ) -> dict:
     """Build a dict suitable for ReferrerDetail, including family_count.
 
@@ -227,6 +228,9 @@ def build_referrer_detail(
     Pass ``family_count`` to skip the query when it is already known.
     Pass ``admin_map`` (id → display_name) to resolve the approving admin
     name without a per-referrer query when building a list response.
+    Pass a pre-resolved ``email`` (the referrer user's email, for the
+    admin's send-email prefill) — None when not resolved; the builder
+    never queries for it itself.
     """
     if family_count is None:
         family_count = (
@@ -256,6 +260,7 @@ def build_referrer_detail(
         "phone_number": ref.phone_number,
         "family_invite_code": ref.family_invite_code,
         "family_count": family_count,
+        "email": email,
         "approval_status": ref.approval_status,
         "approved_by_admin_name": approved_by_name,
         "approved_at": ref.approved_at,
@@ -690,6 +695,7 @@ def build_family_detail(
     person_count: int | None = None,
     display_id: str | None = None,
     include_referrer_notes: bool = False,
+    include_contact_email: bool = False,
     include_delivery: bool = True,
     include_claim: bool = True,
     claim_map: dict[int, FamilyClaim] | None = None,
@@ -703,6 +709,10 @@ def build_family_detail(
     that already batch-compute IDs).
     Pass ``include_referrer_notes=True`` to include the referrer_notes field
     (for referrer and admin views; omit for family self-service).
+    Pass ``include_contact_email=True`` to resolve the family contact
+    user's email (admin-only send-email prefill; only the admin detail
+    endpoint opts in). The ``contact_email`` key is always present in the
+    result — None when not resolved or when no linked user exists.
     Pass ``include_delivery=False`` to skip the delivery-user lookup
     (for family self-service views that don't expose delivery info).
     Pass ``include_claim=False`` to skip claim lookups.
@@ -729,6 +739,13 @@ def build_family_detail(
         ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
         if ref:
             referrer_name = ref.name
+
+    # Resolve family contact email (admin-only prefill; skip otherwise)
+    contact_email: str | None = None
+    if include_contact_email:
+        contact_user = db.query(User).filter(User.family_id == fam.id, User.deleted_at.is_(None)).first()
+        if contact_user:
+            contact_email = contact_user.email
 
     # Resolve delivery user name (skip for self-service views)
     delivery_user_name: str | None = None
@@ -780,6 +797,7 @@ def build_family_detail(
         "phone_number": fam.phone_number,
         "family_wish": family_wish,
         "contact_name": fam.contact_name,
+        "contact_email": contact_email,
         "verification_status": fam.verification_status,
         "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
@@ -806,6 +824,7 @@ class FamilyListContext:
     count_map: dict[int, int]
     pos_map: dict[int, str]
     referrer_map: dict[int, str]
+    contact_email_map: dict[int, str]
     delivery_user_map: dict[int, str]
     claim_map: dict[int, FamilyClaim]
     donor_map: dict[int, str]
@@ -820,6 +839,7 @@ def load_family_list_context(
     scope: int | None,
     include_claim: bool = False,
     show_status_labels: bool = False,
+    include_contact_email: bool = False,
 ) -> FamilyListContext:
     """Batch-load the lookup maps needed to build a family list page.
 
@@ -831,6 +851,12 @@ def load_family_list_context(
     (``None`` = flat admin numbering).  ``include_claim`` loads claim and
     donor names (admin views); ``show_status_labels`` gives pending/rejected
     families ``"PENDING"``/``"REJECTED"`` display IDs.
+    ``include_contact_email`` loads the family contact user's email per
+    family (admin send-email prefill). Gated on the kwarg *alone*, not on
+    ``cols.needs(...)`` — the field is not a display column, so the client's
+    ``columns`` param never contains it and the lookup would be skipped
+    forever. Only the admin active list opts in; other callers (referrer
+    self-service, admin deleted list) must leave it off.
     """
     if cols is None:
         cols = ColumnRequest.parse(None)
@@ -851,6 +877,11 @@ def load_family_list_context(
         if referrer_ids:
             for ref in db.query(Referrer).filter(Referrer.id.in_(referrer_ids), Referrer.deleted_at.is_(None)).all():
                 referrer_map[ref.id] = ref.name
+
+    contact_email_map: dict[int, str] = {}
+    if include_contact_email and family_ids:
+        for u in db.query(User).filter(User.family_id.in_(family_ids), User.deleted_at.is_(None)).all():
+            contact_email_map[u.family_id] = u.email
 
     delivery_user_map: dict[int, str] = {}
     if cols.needs("delivery_user_name"):
@@ -881,6 +912,7 @@ def load_family_list_context(
         count_map=count_map,
         pos_map=pos_map,
         referrer_map=referrer_map,
+        contact_email_map=contact_email_map,
         delivery_user_map=delivery_user_map,
         claim_map=claim_map,
         donor_map=donor_map,
@@ -905,6 +937,7 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
         "family_name": fam.family_name,
         "family_wish": ctx.family_wish_map.get(fam.id, ""),
         "contact_name": fam.contact_name,
+        "contact_email": ctx.contact_email_map.get(fam.id),
         "referrer_id": fam.referrer_id,
         "referrer_name": ctx.referrer_map.get(fam.referrer_id) if fam.referrer_id else None,
         "delivery_user_id": fam.delivery_user_id,

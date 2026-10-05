@@ -32,6 +32,7 @@ const mockFamily: FamilyDetail = {
   wish_review_requested_at: null,
   wish_rejection_reason: null,
   referrer_notes: null,
+  contact_email: "alice@example.com",
   claim_status: null,
   claim_commitment_type: null,
   claim_donor_name: null,
@@ -119,6 +120,19 @@ describe("AdminFamilyPeople", () => {
     await screen.findAllByText("The Johnsons");
     expect(screen.queryByRole("button", { name: "Fully approve" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View wish list" })).toBeInTheDocument();
+  });
+
+  it("header Send email opens the composer prefilled with the family contact email", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findAllByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+
+    // Dialog heading (the header button keeps the same label)
+    expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
+    expect(screen.getByText("Family 2-1 — The Johnsons")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("alice@example.com");
   });
 
   it("fully approve flow confirms and calls API", async () => {

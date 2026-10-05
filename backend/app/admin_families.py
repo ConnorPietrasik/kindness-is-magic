@@ -148,11 +148,18 @@ def list_families(
 
     # Conditional lookups — skip queries for columns the client doesn't need
     cols = ColumnRequest.parse(columns)
-    ctx = load_family_list_context(db, families, cols, scope=referrer_id, include_claim=True, show_status_labels=True)
+    # include_contact_email is unconditional (not a display column — the
+    # client's columns param never requests it) and guaranteed in the output
+    # via always_include, so send-email prefill works regardless of selection.
+    ctx = load_family_list_context(
+        db, families, cols, scope=referrer_id, include_claim=True, show_status_labels=True, include_contact_email=True
+    )
 
     items = [FamilyDetail(**build_family_list_item(f, ctx)) for f in families]
 
-    return column_filtered_page(items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id", "contact_email"}
+    )
 
 
 @family_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -339,7 +346,7 @@ def get_family(
     _admin: User = Depends(require_admin),
 ) -> FamilyDetail:
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
-    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True))
+    return FamilyDetail(**build_family_detail(fam, db, include_referrer_notes=True, include_contact_email=True))
 
 
 @family_admin_router.post("", status_code=201)

@@ -25,6 +25,7 @@ const mockFamilyDetail: FamilyDetail = {
   wish_review_requested_at: null,
   wish_rejection_reason: null,
   referrer_notes: "Called twice, prefers email",
+  contact_email: null,
   claim_status: null,
   claim_commitment_type: null,
   claim_donor_name: null,

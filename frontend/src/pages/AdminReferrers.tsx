@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { Fragment, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
+import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -60,6 +61,8 @@ export default function AdminReferrers() {
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
   const [resetSentEmailsConfirm, setResetSentEmailsConfirm] = useState<number | null>(null);
+  // Row whose "Send email" action was chosen (drives the page-level composer)
+  const [sendEmailReferrer, setSendEmailReferrer] = useState<ReferrerDetail | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -359,6 +362,10 @@ export default function AdminReferrers() {
                                         ]
                                       : []),
                                     {
+                                      label: "Send email",
+                                      onClick: () => setSendEmailReferrer(r),
+                                    },
+                                    {
                                       label: "Reset sent emails",
                                       onClick: () => setResetSentEmailsConfirm(r.id),
                                     },
@@ -493,6 +500,14 @@ export default function AdminReferrers() {
             confirmLabel="Yes, reject"
             loadingLabel="Rejecting…"
             confirmVariant="danger"
+          />
+
+          {/* Send email — one composer for the whole table, prefilled per row */}
+          <AdminEmailComposer
+            open={sendEmailReferrer !== null}
+            contextLabel={sendEmailReferrer ? `Referrer ${sendEmailReferrer.id} — ${sendEmailReferrer.name}` : null}
+            prefilledRecipient={sendEmailReferrer?.email ?? null}
+            onClose={() => setSendEmailReferrer(null)}
           />
 
           {/* Reset sent emails confirmation */}

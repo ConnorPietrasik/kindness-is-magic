@@ -57,6 +57,7 @@ const mockReferrerDetail: ReferrerDetail = {
   created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
   invite_count: 5,
+  email: null,
 };
 
 const mockPendingFamily: PendingFamilySummary = {

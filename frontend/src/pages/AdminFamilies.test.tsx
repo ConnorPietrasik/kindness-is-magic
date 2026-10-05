@@ -37,6 +37,7 @@ function makeFamily(overrides: Partial<FamilyDetail>): FamilyDetail {
     wish_review_requested_at: null,
     wish_rejection_reason: null,
     referrer_notes: null,
+    contact_email: null,
     claim_status: null,
     claim_commitment_type: null,
     claim_donor_name: null,
@@ -51,6 +52,7 @@ const mockFamily1 = makeFamily({
   display_id: "F-101",
   family_name: "The Johnsons",
   contact_name: "Jane Johnson",
+  contact_email: "jane@example.com",
   family_wish: "A new bed",
   phone_number: "5551234567",
 });
@@ -167,6 +169,24 @@ describe("AdminFamilies", () => {
     await waitFor(() => {
       expect(screen.getByText("No families yet.")).toBeInTheDocument();
     });
+  });
+
+  it("row Send email opens the composer prefilled with the family contact email", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    const menu = await openRowMenu(user, 0);
+    await user.click(within(menu).getByRole("menuitem", { name: "Send email" }));
+
+    expect(await screen.findByText("Send email")).toBeInTheDocument();
+    expect(screen.getByText("Family F-101 — The Johnsons")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("jane@example.com");
   });
 
   it("switches to Deleted tab and fetches deleted families", async () => {

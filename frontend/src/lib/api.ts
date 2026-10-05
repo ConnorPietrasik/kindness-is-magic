@@ -15,6 +15,8 @@ import type {
   AdminFamiliesListParams,
   AdminPeopleListParams,
   AdminReferrersListParams,
+  AdminSendEmailPayload,
+  AdminSendEmailResult,
   AdminUserCreate,
   AdminUsersListParams,
   AdminUserUpdate,
@@ -483,6 +485,17 @@ export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
 export function adminListSentEmails(params?: AdminEmailsListParams): Promise<EmailListResponse> {
   const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
   return apiGet("/api/admin/emails", p);
+}
+
+/**
+ * Admin sends a freeform ("custom") email to any recipient.
+ *
+ * A blank subject is sent as null (the server applies its default subject).
+ * `normalizePayload` can't do this — `subject` isn't in its NULLABLE_FIELDS
+ * whitelist — so it's handled explicitly here.
+ */
+export function adminSendCustomEmail(data: AdminSendEmailPayload): Promise<AdminSendEmailResult> {
+  return apiPost("/api/admin/emails/send", { ...data, subject: data.subject ? data.subject : null });
 }
 
 // ---------------------------------------------------------------------------

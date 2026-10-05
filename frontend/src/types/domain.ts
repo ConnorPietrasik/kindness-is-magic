@@ -94,6 +94,9 @@ export interface ReferrerDetail {
   deleted_at: string | null;
   /** Sent invite email count; only /api/referrer/me populates it (null elsewhere). */
   invite_count: number | null;
+  /** Admin-only recipient prefill: the referrer user's email. Populated only by
+   * admin endpoints (null elsewhere, incl. referrer self-service). */
+  email: string | null;
 }
 
 /** Mirrors ReferrerInviteSummary. */
@@ -166,6 +169,9 @@ export interface FamilyDetail {
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
   referrer_notes: string | null;
+  /** Admin-only recipient prefill: the family contact user's email. Populated only
+   * by admin endpoints (null elsewhere, incl. referrer self-service). */
+  contact_email: string | null;
   // Claim info for admin families table
   claim_status: string | null;
   claim_commitment_type: string | null;
@@ -523,7 +529,8 @@ export type EmailKind =
   | "admin_failure_notice"
   | "payment_request"
   | "payment_confirmed"
-  | "payment_expired";
+  | "payment_expired"
+  | "custom_message";
 
 /** Mirrors backend EmailStatus enum. */
 export type EmailStatus = "sent" | "failed" | "reset";
@@ -546,6 +553,22 @@ export interface SentEmailSummary {
   failure_reason: string | null;
   sent_at: string;
   sender_name: string | null;
+}
+
+/** Payload for an admin custom-email send. Mirrors AdminSendEmailRequest. */
+export interface AdminSendEmailPayload {
+  recipient_email: string;
+  /** Blank ("") subjects are sent as null — the server applies its default subject. */
+  subject: string | null;
+  /** Plain text, never HTML. */
+  message: string;
+}
+
+/** Outcome of an admin custom-email send attempt. Mirrors AdminSendEmailResult. */
+export interface AdminSendEmailResult {
+  sent: boolean;
+  /** "unsubscribed" or "smtp_error" when `sent` is false. */
+  reason: "unsubscribed" | "smtp_error" | null;
 }
 
 // ---------------------------------------------------------------------------

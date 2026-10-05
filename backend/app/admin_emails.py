@@ -5,14 +5,16 @@ All endpoints are guarded with ``require_admin``.
 
 import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
+from app.mail import render_custom_message_html, send_email
 from app.models import EmailKind, EmailStatus, SentEmail, User
 from app.permissions import require_admin
-from app.schemas import EmailListResponse, SentEmailSummary
+from app.rate_limit import limiter
+from app.schemas import AdminSendEmailRequest, AdminSendEmailResult, EmailListResponse, SentEmailSummary
 from app.search_sort import EMAIL_SORT_FIELDS, build_sort_clause, escape_like
 
 logger = logging.getLogger(__name__)
@@ -78,3 +80,39 @@ def list_sent_emails(
     ]
 
     return column_filtered_page(items, columns, key="emails", total=total, page=page, page_size=page_size, always_include={"id"})
+
+
+# Default subject for admin custom emails when the admin leaves it blank.
+CUSTOM_EMAIL_DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨"
+
+
+@email_admin_router.post("/send")
+@limiter.limit("5/minute")
+async def send_custom_email(
+    request: Request,
+    body: AdminSendEmailRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> AdminSendEmailResult:
+    """Send a freeform email to any recipient.
+
+    Reuses the shared ``send_email`` path as-is: the unsubscribe gate
+    applies (unsubscribed recipients are blocked and reported, never
+    bypassed), the branded wrap + unsubscribe footer are included, and one
+    ``SentEmail`` row (kind ``custom_message``) records the attempt with
+    the acting admin as the user. The message body itself is never stored
+    — the log row is the only record of the send.
+    """
+    recipient = body.recipient_email.strip().lower()
+    subject = (body.subject or "").strip() or CUSTOM_EMAIL_DEFAULT_SUBJECT
+    html_body = render_custom_message_html(body.message)
+
+    result = await send_email(
+        to=recipient,
+        subject=subject,
+        html_body=html_body,
+        db=db,
+        kind=EmailKind.custom_message,
+        user_id=admin.id,
+    )
+    return AdminSendEmailResult(**result)

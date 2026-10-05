@@ -25,6 +25,8 @@ export interface FamilyTableRowProps {
   showPackingSlipAction?: boolean;
   /** Show "View delivery slip" in the actions menu (admin families page). */
   showDeliverySlipAction?: boolean;
+  /** Show "Send email" in the actions menu (opens the page's composer). */
+  onSendEmail?: (id: number) => void;
   /** Toggles the row's inline edit form (open if closed, close if open). */
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
@@ -59,6 +61,7 @@ export function FamilyTableRow({
   fromReferrer = false,
   showPackingSlipAction = false,
   showDeliverySlipAction = false,
+  onSendEmail,
   onEdit,
   onDelete,
   onRestore,
@@ -170,6 +173,14 @@ export function FamilyTableRow({
               </Button>
               <ActionsDropdown
                 items={[
+                  ...(onSendEmail
+                    ? [
+                        {
+                          label: "Send email",
+                          onClick: () => onSendEmail(f.id),
+                        },
+                      ]
+                    : []),
                   ...(showPackingSlipAction && onViewPackingSlip
                     ? [
                         {

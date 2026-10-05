@@ -423,6 +423,8 @@ class EmailKind(str, enum.Enum):
     payment_request = "payment_request"
     payment_confirmed = "payment_confirmed"
     payment_expired = "payment_expired"
+    # Freeform email an admin hand-wrote and sent to any recipient.
+    custom_message = "custom_message"
 
 
 class EmailStatus(str, enum.Enum):

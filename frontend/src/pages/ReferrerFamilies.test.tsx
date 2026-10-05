@@ -27,6 +27,7 @@ const mockReferrer: ReferrerDetail = {
   created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
   invite_count: 0,
+  email: null,
 };
 
 function makeFamily(overrides: Partial<FamilyDetail> & Pick<FamilyDetail, "id" | "family_name">): FamilyDetail {
@@ -49,6 +50,7 @@ function makeFamily(overrides: Partial<FamilyDetail> & Pick<FamilyDetail, "id" |
     wish_review_requested_at: null,
     wish_rejection_reason: null,
     referrer_notes: null,
+    contact_email: null,
     claim_status: null,
     claim_commitment_type: null,
     claim_donor_name: null,

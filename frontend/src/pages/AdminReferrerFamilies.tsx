@@ -6,8 +6,10 @@
  * tabs (active/deleted), pagination, restore confirmation, dialogs.
  */
 
+import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
@@ -66,6 +68,17 @@ export default function AdminReferrerFamilies() {
   const familiesKey = adminReferrerFamilies(refIdStr);
   const deletedFamiliesKey = adminDeletedReferrerFamilies(refIdStr);
 
+  // Recipient prefill for the page-level "Send email" button. Shares the
+  // adminReferrerDetail key with HierarchicalManage's parent fetch (dedupes).
+  const { data: referrerDetail } = useQuery({
+    queryKey: referrerKey,
+    queryFn: () => adminGetReferrer(refIdNum),
+  });
+
+  // Target of the page-level composer: the referrer itself (header button) or
+  // one of the row's families (row action menu)
+  const [sendEmailTarget, setSendEmailTarget] = useState<{ type: "referrer" } | { type: "family"; family: FamilyDetail } | null>(null);
+
   // Wish-lock row actions (reset lock / fully approve) — also refreshes
   // this referrer's scoped family list
   const { resetMut, fullyApproveMut } = useWishLockActions({ extraInvalidationKeys: [familiesKey] });
@@ -98,6 +111,9 @@ export default function AdminReferrerFamilies() {
               </Button>
             )}
             <ColumnToggle resourceKey="adminFamilies" />
+            <Button variant="secondary" onClick={() => setSendEmailTarget({ type: "referrer" })}>
+              Send email
+            </Button>
           </div>
         </div>
 
@@ -135,6 +151,10 @@ export default function AdminReferrerFamilies() {
                 onMoveBy={moveBy}
                 onResetLock={(id) => resetMut.mutate(id)}
                 onFullyApprove={(id) => fullyApproveMut.mutate(id)}
+                onSendEmail={(id) => {
+                  const fam = (rows as FamilyDetail[]).find((f) => f.id === id);
+                  if (fam) setSendEmailTarget({ type: "family", family: fam });
+                }}
                 isLockActionPending={resetMut.isPending || fullyApproveMut.isPending}
               />
             ),
@@ -183,6 +203,29 @@ export default function AdminReferrerFamilies() {
           confirmLabel="Yes, fully approve"
           loadingLabel="Approving…"
           confirmVariant="primary"
+        />
+
+        {/* Send email — one composer for the referrer (header) and the family
+            rows (action menu), prefilled from the respective prefill field */}
+        <AdminEmailComposer
+          open={sendEmailTarget !== null}
+          contextLabel={
+            sendEmailTarget === null
+              ? null
+              : sendEmailTarget.type === "referrer"
+                ? referrerDetail
+                  ? `Referrer ${referrerDetail.id} — ${referrerDetail.name}`
+                  : null
+                : `Family ${sendEmailTarget.family.display_id ?? sendEmailTarget.family.id} — ${sendEmailTarget.family.family_name}`
+          }
+          prefilledRecipient={
+            sendEmailTarget === null
+              ? null
+              : sendEmailTarget.type === "referrer"
+                ? (referrerDetail?.email ?? null)
+                : (sendEmailTarget.family.contact_email ?? null)
+          }
+          onClose={() => setSendEmailTarget(null)}
         />
       </main>
     </div>
@@ -266,6 +309,7 @@ function FamiliesTable({
   onMoveBy,
   onResetLock,
   onFullyApprove,
+  onSendEmail,
   isLockActionPending,
 }: {
   rows: FamilyDetail[];
@@ -276,6 +320,7 @@ function FamiliesTable({
   onMoveBy: (unit: string[], delta: -1 | 1) => void;
   onResetLock: (id: number) => void;
   onFullyApprove: (id: number) => void;
+  onSendEmail: (id: number) => void;
   isLockActionPending: boolean;
 }) {
   if (rows.length === 0) {
@@ -314,6 +359,7 @@ function FamiliesTable({
                 onRestore={callbacks.onRestore}
                 onResetLock={onResetLock}
                 onFullyApprove={onFullyApprove}
+                onSendEmail={onSendEmail}
                 isDeleting={callbacks.isDeleting}
                 isRestoring={callbacks.isRestoring}
                 isLockActionPending={isLockActionPending}

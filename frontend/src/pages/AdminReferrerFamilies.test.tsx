@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
@@ -24,6 +25,7 @@ const mockReferrer: ReferrerDetail = {
   created_at: "2025-01-01T00:00:00Z",
   deleted_at: null,
   invite_count: null,
+  email: "ray@example.com",
 };
 
 const mockFamily: FamilyDetail = {
@@ -46,6 +48,7 @@ const mockFamily: FamilyDetail = {
   wish_review_requested_at: null,
   wish_rejection_reason: null,
   referrer_notes: null,
+  contact_email: "alice@example.com",
   claim_status: null,
   claim_commitment_type: null,
   claim_donor_name: null,
@@ -99,5 +102,32 @@ describe("AdminReferrerFamilies", () => {
 
     // Families table row
     expect(await screen.findByText("The Johnsons")).toBeInTheDocument();
+  });
+
+  it("header Send email opens the composer prefilled with the referrer email", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+
+    // Dialog heading (the header button keeps the same label)
+    expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
+    expect(screen.getByText("Referrer 2 — Referrer Ray")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("ray@example.com");
+  });
+
+  it("row Send email opens the composer prefilled with the family contact email", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Send email" }));
+
+    // Dialog heading (the header button keeps the same label)
+    expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
+    expect(screen.getByText("Family 2-1 — The Johnsons")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toHaveValue("alice@example.com");
   });
 });
