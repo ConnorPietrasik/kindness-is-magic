@@ -8,7 +8,7 @@ starting with ``#``.  Recognised section names (case-insensitive) are:
 - **referrers**  — name, family_limit, phone_number
 - **families**   — referrer_name, family_name, family_wish, contact_name, bio, address, phone_number, fully_approved
 - **people**     — family_name, given_name, age, wish, size, color, fun_wish, role, note
-- **users**      — email, password, role, referrer_name_or_id, family_name_or_id
+- **users**      — email, password, role, referrer_name_or_id, family_name_or_id, display_name
 
 Sections are processed in dependency order:
     referrers → families → people → users

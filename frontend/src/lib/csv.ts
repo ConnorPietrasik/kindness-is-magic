@@ -15,12 +15,20 @@ import type { CsvSections, CsvValidationResult } from "../types";
 /** Section names the backend recognises (case-insensitive). */
 export const KNOWN_SECTIONS = ["referrers", "families", "people", "users"] as const;
 
-/** Expected header columns per section (lowercase, trimmed). */
+/** All header columns the backend accepts per section (lowercase, trimmed). */
 export const EXPECTED_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly string[]> = {
   referrers: ["name", "family_limit", "phone_number"],
-  families: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number"],
+  families: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number", "fully_approved"],
   people: ["family_name", "given_name", "age", "wish", "size", "color", "fun_wish", "role", "note"],
   users: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"],
+};
+
+/** Columns the backend treats as optional — their absence is not an error. */
+export const OPTIONAL_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly string[]> = {
+  referrers: [],
+  families: ["fully_approved"],
+  people: [],
+  users: [],
 };
 
 /** Regex that matches a section header line (e.g. `# referrers`). */
@@ -176,8 +184,10 @@ export function validateCsvForImport(sections: CsvSections): CsvValidationResult
       continue;
     }
 
-    // Check for missing expected columns
-    const missing = expected.filter((h) => !headers.includes(h));
+    // Check for missing required columns (optional columns may be absent)
+    const optional = OPTIONAL_HEADERS[lowerName as (typeof KNOWN_SECTIONS)[number]] ?? [];
+    const required = expected.filter((h) => !optional.includes(h));
+    const missing = required.filter((h) => !headers.includes(h));
     if (missing.length > 0) {
       errors.push(`Section "${name}" is missing columns: ${missing.map((h) => `"${h}"`).join(", ")}.`);
     }

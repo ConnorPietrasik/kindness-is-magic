@@ -1,4 +1,3 @@
-Fix: Section "families" has extra columns: "fully_approved".
 Add user guides for each role
 Add wish card generator so that nice wish cards can be easily printed for each wish; include a link in the donor gift-claim email so they can print too
 Gift-claims should have a "$100 Walmart gift card for Christmas dinner" optional

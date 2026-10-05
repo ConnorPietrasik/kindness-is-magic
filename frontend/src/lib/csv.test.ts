@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { EXPECTED_HEADERS, isValidCsvFile, KNOWN_SECTIONS, parseCsvLine, parseCsvSections, validateCsvForImport } from "./csv";
+import {
+  EXPECTED_HEADERS,
+  isValidCsvFile,
+  KNOWN_SECTIONS,
+  OPTIONAL_HEADERS,
+  parseCsvLine,
+  parseCsvSections,
+  validateCsvForImport,
+} from "./csv";
 
 /* ------------------------------------------------------------------ */
 /* parseCsvLine                                                        */
@@ -202,6 +210,31 @@ describe("validateCsvForImport", () => {
     expect(result.warnings.some((w) => w.includes("extra columns"))).toBe(true);
   });
 
+  it("accepts the optional fully_approved column in families without warning", () => {
+    const sections = {
+      families: {
+        headers: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number", "fully_approved"],
+        rows: [["Acme", "Smiths", "Pizza", "John", "", "", "555", "yes"]],
+      },
+    };
+    const result = validateCsvForImport(sections);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some((w) => w.includes("fully_approved"))).toBe(false);
+  });
+
+  it("does not error when the optional fully_approved column is absent", () => {
+    const sections = {
+      families: {
+        headers: ["referrer_name", "family_name", "family_wish", "contact_name", "bio", "address", "phone_number"],
+        rows: [["Acme", "Smiths", "Pizza", "John", "", "", "555"]],
+      },
+    };
+    const result = validateCsvForImport(sections);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
   it("warns about unknown sections", () => {
     const sections = {
       referrers: {
@@ -357,9 +390,10 @@ describe("EXPECTED_HEADERS", () => {
   });
 
   it("has correct family headers", () => {
-    expect(EXPECTED_HEADERS.families.length).toBe(7);
+    expect(EXPECTED_HEADERS.families.length).toBe(8);
     expect(EXPECTED_HEADERS.families).toContain("referrer_name");
     expect(EXPECTED_HEADERS.families).toContain("family_name");
+    expect(EXPECTED_HEADERS.families).toContain("fully_approved");
   });
 
   it("has correct people headers", () => {
@@ -377,5 +411,18 @@ describe("EXPECTED_HEADERS", () => {
 
   it("has correct users headers", () => {
     expect(EXPECTED_HEADERS.users).toEqual(["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"]);
+  });
+});
+
+describe("OPTIONAL_HEADERS", () => {
+  it("defines entries for all four sections", () => {
+    expect(Object.keys(OPTIONAL_HEADERS)).toEqual(["referrers", "families", "people", "users"]);
+  });
+
+  it("marks fully_approved as the only optional column (in families)", () => {
+    expect(OPTIONAL_HEADERS.families).toEqual(["fully_approved"]);
+    expect(OPTIONAL_HEADERS.referrers).toEqual([]);
+    expect(OPTIONAL_HEADERS.people).toEqual([]);
+    expect(OPTIONAL_HEADERS.users).toEqual([]);
   });
 });
