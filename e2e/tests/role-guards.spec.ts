@@ -27,6 +27,7 @@ const GUARDS: { role: string; route: string; redirect: RegExp }[] = [
 
   // Referrer cannot access admin, family, purchaser, delivery routes
   { role: "referrer", route: "/admin/referrers", redirect: /\/dashboard/ },
+  { role: "referrer", route: "/admin/wish-cards", redirect: /\/dashboard/ },
   { role: "referrer", route: "/family/dashboard", redirect: /\/dashboard/ },
   { role: "referrer", route: "/purchaser/assigned-gifts", redirect: /\/dashboard/ },
   { role: "referrer", route: "/delivery", redirect: /\/dashboard/ },

@@ -30,6 +30,7 @@ export const ROUTES = {
   ADMIN_DEADLINES: "/admin/deadlines",
   ADMIN_PACKING_SLIPS: "/admin/packing-slips",
   ADMIN_DELIVERY_SLIPS: "/admin/delivery-slips",
+  ADMIN_WISH_CARDS: "/admin/wish-cards",
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
   ADMIN_EMAILS: "/admin/emails",

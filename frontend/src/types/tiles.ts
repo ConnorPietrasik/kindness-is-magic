@@ -94,6 +94,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "wish-cards",
+      route: ROUTES.ADMIN_WISH_CARDS,
+      icon: "🗒️",
+      label: "Blank Wish Cards",
+      desc: "Print blank cards to fill in by hand",
+      visible: true,
+    },
+    {
       key: "emails",
       route: ROUTES.ADMIN_EMAILS,
       icon: "📧",
