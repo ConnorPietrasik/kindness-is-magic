@@ -100,15 +100,22 @@ export default function FamilyWishList() {
 
         {/* Family header */}
         <div className="mb-8">
-          <h2 className="no-print flex items-baseline gap-2 text-2xl font-bold tracking-tight text-gray-900">
-            <span className="text-base font-medium text-gray-500">Family ID:</span>
-            {data.display_id}
-          </h2>
-          {data.bio && <p className="mt-2 text-gray-600">{data.bio}</p>}
-          <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
-            <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
-            <p className="mt-1 text-sm text-violet-800">{data.family_wish}</p>
+          <div className="no-print flex items-start justify-between gap-4">
+            <h2 className="flex items-baseline gap-2 text-2xl font-bold tracking-tight text-gray-900">
+              <span className="text-base font-medium text-gray-500">Family ID:</span>
+              {data.display_id}
+            </h2>
+            <Link to={route.familyWishCards(familyId)} className="shrink-0 text-sm font-medium text-violet-600 hover:underline">
+              Print wish cards →
+            </Link>
           </div>
+          {data.bio && <p className="mt-2 text-gray-600">{data.bio}</p>}
+          {data.family_wish && (
+            <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+              <h3 className="text-sm font-semibold text-violet-900">Family Wish</h3>
+              <p className="mt-1 text-sm text-violet-800">{data.family_wish.description}</p>
+            </div>
+          )}
         </div>
 
         {/* People wishes */}

@@ -18,8 +18,8 @@ import FamilyWishList from "./FamilyWishList";
 const mockWishList: FamilyWishListResponse = {
   display_id: "0-1",
   bio: null,
-  family_wish: "A warm winter for everyone.",
-  people: [{ given_name: "Alex", role: "son", age: 8, note: null, wishes: [] }],
+  family_wish: { id: 1, display_id: null, type: "family", description: "A warm winter for everyone.", size: null, color: null },
+  people: [{ display_id: "0-1-1", given_name: "Alex", role: "son", age: 8, note: null, wishes: [] }],
   claimed_by_current_user: false,
   claim_status: null,
   claim_id: null,
@@ -98,6 +98,26 @@ describe("FamilyWishList header", () => {
     expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
     // Back link returns to the family list
     expect(screen.getByRole("link", { name: "← Back" })).toHaveAttribute("href", "/families");
+  });
+
+  it("links to the printable wish cards page", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap();
+
+    const link = await screen.findByRole("link", { name: "Print wish cards →" });
+    expect(link).toHaveAttribute("href", "/families/1/wish-cards");
+  });
+
+  it("hides the family wish box when the family has no family wish", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({ ...mockWishList, family_wish: null });
+
+    wrap();
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Print wish cards →" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: "Family Wish" })).not.toBeInTheDocument();
   });
 
   it("shows dashboard link and sign out when logged in", async () => {

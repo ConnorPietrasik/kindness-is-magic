@@ -457,6 +457,8 @@ class TestClaimCRUD:
         assert body["family_wish"]["type"] == "family"
         assert body["family_wish"]["description"] == "Warm clothes"
         assert len(body["people"]) == 1
+        # Flat-format display ID: no referrer → ref 0, first family → 1, first person → 1
+        assert body["people"][0]["display_id"] == "0-1-1"
         assert body["people"][0]["given_name"] == "Child"
         assert len(body["people"][0]["wishes"]) == 2
         # Donor-facing wish payloads carry no purchase-tracking data

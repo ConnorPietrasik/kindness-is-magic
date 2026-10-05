@@ -25,13 +25,18 @@ def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, fa
     assert "display_id" in data
     assert data["display_id"] != "0"  # valid position assigned
     assert "family_name" not in data  # intentionally excluded for privacy
-    assert data["family_wish"] == "World peace"  # family wish wish row (family_record fixture)
+    # family_wish is the wish row (family_record fixture) — object shape
+    assert data["family_wish"]["type"] == "family"
+    assert data["family_wish"]["description"] == "World peace"
+    assert data["family_wish"]["display_id"] == "0-1-F"  # family's flat ID + family suffix
     assert data["bio"] == family.bio
     assert len(data["people"]) == len(family_with_people["people"])
 
     # Check person fields
     people = family_with_people["people"]
     for i, person in enumerate(people):
+        # Flat-format display ID: no referrer → ref 0, first family → 1
+        assert data["people"][i]["display_id"] == f"0-1-{i + 1}"
         assert data["people"][i]["given_name"] == person.given_name
         assert data["people"][i]["age"] == person.age
         assert data["people"][i]["role"] == person.role.value
@@ -40,6 +45,21 @@ def test_wish_list_returns_200_with_valid_family(db, test_client: TestClient, fa
         assert len(data["people"][i]["wishes"]) == 2
         wish_types = {w["type"] for w in data["people"][i]["wishes"]}
         assert {"practical", "fun"} == wish_types
+        # Each wish carries its own display ID: the person's flat ID + type suffix
+        wish_display_ids = {w["display_id"] for w in data["people"][i]["wishes"]}
+        assert wish_display_ids == {f"0-1-{i + 1}A", f"0-1-{i + 1}B"}
+
+
+def test_wish_list_family_wish_null_when_absent(db, test_client: TestClient, family_record):
+    """A family with no active family wish returns family_wish=null."""
+    family_record.wish_lock_level = "admin"
+    fam_wish = db.query(Wish).filter(Wish.family_id == family_record.id, Wish.type == WishType.family).first()
+    fam_wish.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+
+    resp = test_client.get(f"/api/families/{family_record.id}/wish-list")
+    assert resp.status_code == 200
+    assert resp.json()["family_wish"] is None
 
 
 def test_wish_list_includes_optional_fields(db, test_client: TestClient, family_record):

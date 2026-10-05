@@ -38,6 +38,7 @@ const AdminAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() 
 const AdminEmails: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmails"));
 const AdminZeffyPayments: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminZeffyPayments"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
+const FamilyWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishCards"));
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
@@ -411,6 +412,7 @@ export default function App() {
         <Route path={ROUTES.FINANCIALS} element={<Financials />} />
         <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
         <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
+        <Route path={ROUTES.FAMILY_WISH_CARDS} element={<FamilyWishCards />} />
 
         {/* ── Root: role dashboards, or the brochure for guests ─── */}
         <Route path={ROUTES.ROOT} element={<DashboardRedirect />} />

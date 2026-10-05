@@ -544,6 +544,9 @@ def get_claim(
     # The family wish is part of the claim too — a claim covers the whole family
     family_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.is_(None)).first()
 
+    # Flat-format person display IDs (e.g. 3-2-1)
+    person_display_ids = compute_display_ids(db, "person", people, scope=None)
+
     return FamilyClaimDetail(
         id=claim.id,
         family=build_family_info(fam, db),
@@ -561,6 +564,7 @@ def get_claim(
         family_wish=DonorWishSummary.model_validate(family_wish) if family_wish is not None else None,
         people=[
             PersonWishItem(
+                display_id=person_display_ids.get(p.id, "0"),
                 given_name=p.given_name,
                 role=p.role,
                 age=p.age,

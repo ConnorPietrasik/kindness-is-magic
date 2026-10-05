@@ -17,7 +17,7 @@ from app.config import GIFT_CLAIM_CAP
 from app.database import get_db
 from app.deadlines import GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.mail import send_claim_confirmation
-from app.display_ids import compute_display_ids
+from app.display_ids import compute_display_ids, wish_display_id
 from app.permissions import require_claim_capable
 from app.models import (
     ClaimPaymentStatus,
@@ -29,10 +29,11 @@ from app.models import (
     Person,
     User,
     UserRole,
+    Wish,
     WishLockLevel,
+    WishType,
 )
 from app.response_builders import (
-    batch_load_family_wishes,
     batch_load_person_wishes,
     build_claim_summary,
     build_family_info,
@@ -309,20 +310,33 @@ def get_family_wish_list(
         else:
             claim_status = "active"
 
-    # Family wish is a wish row — single lookup for this family
-    family_wish = batch_load_family_wishes(db, [fam.id]).get(fam.id, "")
+    # Flat-format person display IDs for the public view (e.g. 3-2-1)
+    person_display_ids = compute_display_ids(db, "person", people, scope=None)
+
+    # Family wish is a wish row — single lookup for this family (same
+    # partial-index-backed query as the claim detail), richer shape than the
+    # bare description string so the wish cards can show size/color.
+    fam_wish = db.query(Wish).filter(Wish.family_id == fam.id, Wish.type == WishType.family, Wish.deleted_at.is_(None)).first()
+
+    def _wish_summary(wish: Wish, owner_display_id: str) -> DonorWishSummary:
+        # Donor-facing wish carrying its own display ID (owner's flat ID +
+        # type suffix, e.g. 3-2-1A / 3-2-F) — the wish cards print it.
+        summary = DonorWishSummary.model_validate(wish)
+        summary.display_id = wish_display_id(owner_display_id, wish.type)
+        return summary
 
     return FamilyWishListResponse(
         display_id=display_id,
         bio=fam.bio,
-        family_wish=family_wish,
+        family_wish=_wish_summary(fam_wish, display_id) if fam_wish is not None else None,
         people=[
             PersonWishItem(
+                display_id=person_display_ids.get(p.id, "0"),
                 given_name=p.given_name,
                 role=p.role,
                 age=p.age,
                 note=p.note,
-                wishes=[DonorWishSummary.model_validate(w) for w in wishes_by_person.get(p.id, [])],
+                wishes=[_wish_summary(w, person_display_ids.get(p.id, "0")) for w in wishes_by_person.get(p.id, [])],
             )
             for p in people
         ],

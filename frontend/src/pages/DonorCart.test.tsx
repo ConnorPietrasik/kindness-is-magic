@@ -47,8 +47,8 @@ function wishList(displayId: string, claimStatus: string | null = null): FamilyW
   return {
     display_id: displayId,
     bio: "A family in need.",
-    family_wish: "Wishes.",
-    people: [{ given_name: "Alex", role: "son", age: 8, note: null, wishes: [] }],
+    family_wish: { id: 1, display_id: null, type: "family", description: "Wishes.", size: null, color: null },
+    people: [{ display_id: "0-1-1", given_name: "Alex", role: "son", age: 8, note: null, wishes: [] }],
     claimed_by_current_user: false,
     claim_status: claimStatus,
     claim_id: claimStatus != null ? 99 : null,

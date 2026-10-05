@@ -405,6 +405,7 @@ def build_claim_confirmation_email(
     family_bio: str | None,
     people: list[dict],
     claim_detail_url: str,
+    wish_cards_url: str,
 ) -> str:
     """Build the HTML body for a donor claim confirmation email.
 
@@ -416,6 +417,7 @@ def build_claim_confirmation_email(
         people: List of person dicts with given_name, age, and wishes.
             Each wish has type, description, and optional size.
         claim_detail_url: Full URL to the claim detail page.
+        wish_cards_url: Full URL to the printable wish-card sheet.
     """
     has_children = any(p["age"] < 18 for p in people)
 
@@ -437,8 +439,11 @@ def build_claim_confirmation_email(
 <h2 style="font-size:16px;color:{_BRAND_COLOR};margin-top:20px;">Wish List</h2>
 {family_wish_html}
 {table_html}
-<p style="text-align:center;margin-top:24px;"><a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">View Your Sponsorship</a></p>
-<p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts.</p>"""
+<p style="text-align:center;margin-top:24px;">
+<a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;margin:0 4px 8px;">View Your Sponsorship</a>
+<a href="{wish_cards_url}" style="display:inline-block;padding:12px 24px;border:2px solid {_BRAND_COLOR};color:{_BRAND_COLOR};text-decoration:none;border-radius:4px;font-weight:bold;margin:0 4px;">Print Wish Cards</a>
+</p>
+<p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts. Print the wish cards and attach them to the gifts you buy.</p>"""
 
 
 def build_payment_email_failure_notice(donor_email: str, payment_kind: str, error_summary: str) -> str:
@@ -535,6 +540,7 @@ async def send_claim_confirmation(claim: FamilyClaim, fam: Family, user: User, d
 
         base = APP_BASE_URL
         claim_detail_url = f"{base}/donor/claims/{claim.id}"
+        wish_cards_url = f"{base}/families/{fam.id}/wish-cards"
 
         body = build_claim_confirmation_email(
             donor_name=user.display_name,
@@ -543,6 +549,7 @@ async def send_claim_confirmation(claim: FamilyClaim, fam: Family, user: User, d
             family_bio=fam.bio,
             people=people_data,
             claim_detail_url=claim_detail_url,
+            wish_cards_url=wish_cards_url,
         )
 
         result = await send_email(

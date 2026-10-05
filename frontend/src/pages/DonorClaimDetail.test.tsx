@@ -64,6 +64,7 @@ const mockClaim: FamilyClaimDetail = {
   },
   people: [
     {
+      display_id: "3-2-1",
       given_name: "Sam",
       role: "son",
       age: 8,

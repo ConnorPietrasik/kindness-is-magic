@@ -146,6 +146,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Jane Doe" in html
 
@@ -159,6 +160,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "School supplies and winter gear" in html
         assert "Family wish:" in html
@@ -173,6 +175,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Family 2-5" in html
 
@@ -186,6 +189,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio="We need warm clothes.",
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "We need warm clothes." in html
 
@@ -199,6 +203,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         # Should not have a standalone empty <p> tag
         assert "<p></p>" not in html
@@ -223,6 +228,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=people,
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Alice (age 8)" in html
         assert "A coat" in html
@@ -250,6 +256,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=people,
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Bob (age 25)" in html
         assert "Winter jacket" in html
@@ -265,6 +272,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "No family members" in html
 
@@ -278,9 +286,27 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://example.com/donor/claims/42",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "View Your Sponsorship" in html
         assert "http://example.com/donor/claims/42" in html
+
+    def test_email_includes_wish_cards_cta(self):
+        from app.mail import build_claim_confirmation_email
+
+        html = build_claim_confirmation_email(
+            donor_name="Jane",
+            family_display_id="1-1",
+            family_wish="Warm clothes",
+            family_bio=None,
+            people=[],
+            claim_detail_url="http://example.com/donor/claims/42",
+            wish_cards_url="http://example.com/families/7/wish-cards",
+        )
+        # Second CTA alongside the primary one
+        assert "Print Wish Cards" in html
+        assert "http://example.com/families/7/wish-cards" in html
+        assert "View Your Sponsorship" in html
 
     def test_email_includes_branding(self):
         from app.mail import build_claim_confirmation_email
@@ -292,6 +318,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=[],
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Kindness Is Magic" in html
 
@@ -316,6 +343,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=people,
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Shoes (Size 24)" in html
         # Lego set should not have empty parens
@@ -349,6 +377,7 @@ class TestClaimConfirmationEmailTemplate:
             family_bio=None,
             people=people,
             claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
         )
         assert "Shoes (Size 24, Red)" in html
         assert "Winter jacket (Navy)" in html
@@ -694,6 +723,27 @@ class TestClaimConfirmationEmailOnCreation:
         assert resp.status_code == 201
         claim_id = resp.json()["id"]
         assert f"/donor/claims/{claim_id}" in sent_emails[0]
+
+    def test_wish_cards_link_in_email(self, test_client: TestClient, db: Session):
+        """Email includes the wish-card sheet URL in the second CTA."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        sent_emails = []
+
+        async def _capture_send(to, subject, html_body, db=None, **kwargs):
+            sent_emails.append(html_body)
+            return {"sent": True, "reason": None}
+
+        with patch("app.mail.send_email", new=_capture_send):
+            resp = test_client.post(
+                f"/api/families/{fam.id}/claim",
+                json={"commitment_type": "gifts"},
+            )
+
+        assert resp.status_code == 201
+        assert f"/families/{fam.id}/wish-cards" in sent_emails[0]
 
     def test_admin_notification_failure_does_not_cascade(self, test_client: TestClient, db: Session):
         """If both email and admin notification fail, claim still succeeds with email_error."""

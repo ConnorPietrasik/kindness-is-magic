@@ -1400,6 +1400,8 @@ class PublicFamilyListResponse(BaseModel):
 class PersonWishItem(BaseModel):
     """Single person on the public wish list."""
 
+    # Flat display ID (e.g. ``3-2-1``) — the person's hierarchical position.
+    display_id: str
     given_name: str
     role: PersonRole
     age: int
@@ -1418,7 +1420,7 @@ class FamilyWishListResponse(BaseModel):
 
     display_id: str
     bio: str | None = None
-    family_wish: str
+    family_wish: DonorWishSummary | None = None
     people: list[PersonWishItem]
     claimed_by_current_user: bool = False
     claim_status: str | None = None

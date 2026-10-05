@@ -1426,13 +1426,14 @@ class TestPackingSlipWishDisplayId:
 
 
 class TestWishDisplayIdNonStaffBoundary:
-    """Public family wish list + donor claim detail keep display_id null.
+    """Donor claim detail keeps display_id null; the public wish list carries it.
 
-    These two non-staff endpoints are out of scope for wish display ids —
-    this guards the boundary.
+    The donor claim detail is out of scope for wish display ids — this guards
+    that boundary. The public wish list is the exception: the wish-cards page
+    prints the wish display ids, so it carries them.
     """
 
-    def test_public_wish_list_display_id_null(self, test_client: TestClient, wish_display_tree):
+    def test_public_wish_list_display_ids(self, test_client: TestClient, wish_display_tree):
         tree = wish_display_tree
         resp = test_client.get(f"/api/families/{tree['family'].id}/wish-list")
         assert resp.status_code == 200
@@ -1440,9 +1441,13 @@ class TestWishDisplayIdNonStaffBoundary:
         # The family heading keeps its flat display id
         assert body["display_id"] == f"{tree['referrer'].id}-1"
         assert any(p["given_name"] == "WishChild" for p in body["people"])
-        for person in body["people"]:
-            for w in person["wishes"]:
-                assert w["display_id"] is None
+        # Person wishes carry their flat wish display id (person id + type suffix)
+        by_id = {w["id"]: w["display_id"] for person in body["people"] for w in person["wishes"]}
+        assert by_id[tree["child_a"].id] == f"{tree['referrer'].id}-1-1A"
+        assert by_id[tree["child_b"].id] == f"{tree['referrer'].id}-1-1B"
+        assert by_id[tree["adult_x"].id] == f"{tree['referrer'].id}-1-2X"
+        # The family wish carries the family's flat id + F
+        assert body["family_wish"]["display_id"] == f"{tree['referrer'].id}-1-F"
 
     def test_donor_claim_detail_display_id_null(self, test_client: TestClient, wish_display_tree):
         tree = wish_display_tree

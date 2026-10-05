@@ -64,6 +64,7 @@ export const ROUTES = {
   FINANCIALS: "/financials",
   PUBLIC_FAMILIES: "/families",
   FAMILY_WISH_LIST: "/families/:id/wish-list",
+  FAMILY_WISH_CARDS: "/families/:id/wish-cards",
 
   // ── Root ──────────────────────────────────────────────────
   ROOT: "/",
@@ -80,6 +81,7 @@ export const route = {
   adminInviteCodes: (openGenerator?: boolean) => (openGenerator ? "/admin/invite-codes?generate=1" : "/admin/invite-codes"),
   adminFamilyPeople: (id: number | string) => `/admin/families/${id}/people`,
   familyWishList: (id: number | string) => `/families/${id}/wish-list`,
+  familyWishCards: (id: number | string) => `/families/${id}/wish-cards`,
   adminPackingSlips: (familyIds?: number[]) =>
     familyIds && familyIds.length > 0 ? `/admin/packing-slips?family_ids=${familyIds.join(",")}` : "/admin/packing-slips",
   adminDeliverySlips: (familyIds?: number[]) =>

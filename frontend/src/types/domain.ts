@@ -608,6 +608,8 @@ export interface PublicFamilyListResponse {
 
 /** Mirrors PersonWishItem on the backend wish-list response. */
 export interface PersonWishItem {
+  /** Flat display ID (e.g. "3-2-1") — the person's hierarchical position. */
+  display_id: string;
   given_name: string;
   role: PersonRole;
   age: number;
@@ -619,7 +621,8 @@ export interface PersonWishItem {
 export interface FamilyWishListResponse {
   display_id: string;
   bio: string | null;
-  family_wish: string;
+  /** Active family wish (size/color for the wish card); null when the family has none. */
+  family_wish: DonorWishSummary | null;
   people: PersonWishItem[];
   claimed_by_current_user: boolean;
   claim_status: string | null;
