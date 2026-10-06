@@ -304,14 +304,20 @@ def build_family_rejected_email(family_name: str, referrer_name: str) -> str:
 
 
 def build_family_invite_email(code: str, referrer_name: str, email: str) -> str:
-    """Build the HTML body for a family invite email sent by a referrer."""
+    """Build the HTML body for a family invite email sent by a referrer.
+
+    The email carries just the invitation, the code, and the "Get Started"
+    CTA; wish-writing tips and examples live on the public wish list guide
+    page, which the closing line links to.
+    """
     base = APP_BASE_URL
     register_path = f"{base}/register-family?{urlencode({'code': code, 'email': email})}"
     return f"""<p>Hi there,</p>
 <p>This is an invitation to join <strong>Kindness Is Magic</strong>, a program where supporters give holiday gifts to families. <strong>{referrer_name}</strong> has invited your family to take part.</p>
 <p>Use the invite code below to register:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
-<p style="text-align:center;"><a href="{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>"""
+<p style="text-align:center;"><a href="{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
+<p style="margin-top:16px;font-size:14px;color:#666666;">When you're ready to share your wishes, our <a href="{base}/wish-list-guide" style="color:{_BRAND_COLOR};text-decoration:underline;">wish list guide</a> has tips and plenty of great examples to inspire you.</p>"""
 
 
 def build_referrer_approved_email(referrer_name: str) -> str:

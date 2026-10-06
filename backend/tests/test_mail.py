@@ -405,6 +405,16 @@ class TestEmailTemplates:
         html = build_family_invite_email(code="KFI-XYZ789", referrer_name="John Doe", email="family@example.com")
         assert "Get Started" in html
 
+    def test_family_invite_email_links_wish_list_guide(self, monkeypatch):
+        """The slimmed email points at the public wish list guide off APP_BASE_URL."""
+        from app import mail as mail_mod
+        from app.mail import build_family_invite_email
+
+        monkeypatch.setattr(mail_mod, "APP_BASE_URL", "http://custom.example.com")
+        html = build_family_invite_email(code="KFI-ABC123", referrer_name="Jane Smith", email="family@example.com")
+        assert 'href="http://custom.example.com/wish-list-guide"' in html
+        assert "wish list guide" in html
+
 
 # ---------------------------------------------------------------------------
 # Unsubscribe endpoint tests

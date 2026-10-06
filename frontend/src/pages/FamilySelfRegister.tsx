@@ -149,17 +149,25 @@ export default function FamilySelfRegister() {
             }}
           />
 
-          <FormField
-            label="Family Wish"
-            fieldProps={{
-              value: form.family_wish,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
-              required: true,
-              maxLength: 100,
-              placeholder: "What would make your family's year special?",
-              autoComplete: "off",
-            }}
-          />
+          <div>
+            <FormField
+              label="Family Wish"
+              fieldProps={{
+                value: form.family_wish,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
+                required: true,
+                maxLength: 100,
+                placeholder: "What would make your family's year special?",
+                autoComplete: "off",
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Not sure what to wish for?{" "}
+              <Link to={ROUTES.WISH_LIST_GUIDE} className="text-btn-start hover:underline">
+                See the wish list guide
+              </Link>
+            </p>
+          </div>
 
           <FormField
             label="Contact Name"

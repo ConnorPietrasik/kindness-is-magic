@@ -156,6 +156,7 @@ EXAMPLES = [
                 },
             ],
             claim_detail_url="https://kindnessismagic.love/donor/claims/42",
+            wish_cards_url="https://kindnessismagic.love/families/17/wish-cards",
         ),
         "unsubscribe": True,
     },

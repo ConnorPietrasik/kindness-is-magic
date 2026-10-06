@@ -47,6 +47,7 @@ const DeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => im
 const Home: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Home"));
 const PrivacyPolicy: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PrivacyPolicy"));
 const Financials: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/Financials"));
+const WishListGuide: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/WishListGuide"));
 const PublicFamilies: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PublicFamilies"));
 const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorSelfRegister"));
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
@@ -419,6 +420,7 @@ export default function App() {
         <Route path={ROUTES.HOME} element={<Home />} />
         <Route path={ROUTES.PRIVACY} element={<PrivacyPolicy />} />
         <Route path={ROUTES.FINANCIALS} element={<Financials />} />
+        <Route path={ROUTES.WISH_LIST_GUIDE} element={<WishListGuide />} />
         <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
         <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
         <Route path={ROUTES.FAMILY_WISH_CARDS} element={<FamilyWishCards />} />

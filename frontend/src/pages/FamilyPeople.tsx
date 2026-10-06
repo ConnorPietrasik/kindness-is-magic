@@ -18,6 +18,7 @@ import { PersonForm } from "../components/PersonForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { WishCellAdult, WishCellType } from "../components/WishCell";
+import { WishTipsPanel } from "../components/WishTipsPanel";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { createFamilyPerson, deletePerson, getFamilyMe, getPerson, listFamilyPeople, updatePerson } from "../lib/api";
 import { familyMe, familyPeople } from "../lib/queryKeys";
@@ -86,6 +87,9 @@ export default function FamilyPeople() {
           <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Manage People</h2>
           {!isLocked && <Button onClick={openCreate}>+ Add person</Button>}
         </div>
+
+        {/* Wish-writing tips — read-only guidance, shown even when locked */}
+        <WishTipsPanel />
 
         {/* Lock banner */}
         {isLocked && (

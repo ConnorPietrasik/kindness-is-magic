@@ -146,6 +146,12 @@ export default function FamilyDashboard() {
             </span>
           </span>
         </Link>
+        <p className="mb-6 -mt-3 text-xs text-gray-400">
+          Not sure what to wish for?{" "}
+          <Link to={ROUTES.WISH_LIST_GUIDE} className="text-btn-start hover:underline">
+            See the wish list guide
+          </Link>
+        </p>
 
         {/* ── Family info card ──────────────────────────────── */}
         <Card className="mb-6">

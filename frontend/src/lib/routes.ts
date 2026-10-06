@@ -63,6 +63,7 @@ export const ROUTES = {
   HOME: "/home",
   PRIVACY: "/privacy",
   FINANCIALS: "/financials",
+  WISH_LIST_GUIDE: "/wish-list-guide",
   PUBLIC_FAMILIES: "/families",
   FAMILY_WISH_LIST: "/families/:id/wish-list",
   FAMILY_WISH_CARDS: "/families/:id/wish-cards",
