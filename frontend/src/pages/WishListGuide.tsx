@@ -2,11 +2,12 @@
  * Wish List Guide — static public page.
  *
  * The standalone guide that family invite emails link to (and that the
- * registration, dashboard, and people pages point at). It explains the wish
- * model — what each family member gets and the $50 per-item limit — carries
- * the founder's Operation Nice List tips, and publishes the full fun and
- * practical example lists (deduped: the three movie-ticket lines are one
- * entry; the portable charger genuinely appears in both lists).
+ * registration, dashboard, and people pages point at). It follows the order
+ * families fill things in — the $100 family wish (fulfilled if funds are
+ * available) first, then the per-member wishes with the $50 limit — carries
+ * the founder's Operation Nice List tips, and publishes the full family-wish,
+ * fun, and practical example lists (deduped: the three movie-ticket lines
+ * are one entry; the portable charger genuinely appears in both lists).
  */
 
 import { StaticPage } from "../components/StaticPage";
@@ -78,11 +79,26 @@ export default function WishListGuide() {
   return (
     <StaticPage title="Writing Your Wish List">
       <p>
-        When you add your family members, each one gets to tell us what they'd love to receive. Here's how the wish list works, with tips
+        You'll start with a wish for your whole family, then add a wish for each family member. Here's how the wish list works, with tips
         and plenty of examples to get you started.
       </p>
 
-      <h2>What you can wish for</h2>
+      <h2>The family wish</h2>
+      <p>
+        Your family wish is a <strong>gift for the whole household</strong> — it isn't tied to one person. It has a{" "}
+        <strong>$100 price limit</strong> (double the $50 limit on individual wishes) and is fulfilled if funds are available.
+      </p>
+      <h3>Family wish examples</h3>
+      <ul>
+        <li>Pots &amp; pans</li>
+        <li>Toaster oven</li>
+        <li>Microwave</li>
+        <li>Air fryer</li>
+        <li>Bath rugs &amp; towels</li>
+        <li>Vacuum cleaner</li>
+      </ul>
+
+      <h2>Wishes for your family members</h2>
       <ul>
         <li>Every member of the household gets a gift.</li>
         <li>
@@ -90,9 +106,8 @@ export default function WishListGuide() {
           <strong>fun</strong> (toys, games, treats).
         </li>
         <li>Adults (18 and over) get one wish.</li>
-        <li>Plus one wish for the whole family.</li>
         <li>
-          Every item has a <strong>$50 price limit</strong>.
+          Every individual wish has a <strong>$50 price limit</strong>.
         </li>
       </ul>
 

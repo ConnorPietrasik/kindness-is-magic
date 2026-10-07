@@ -18,7 +18,7 @@ const WISH_TIPS_CLOSED_KEY = "wish-tips-closed";
 
 /** 5-item digest of the guide's tips (the full guide carries the examples). */
 const TIPS = [
-  "Every item has a $50 price limit.",
+  "Every individual wish has a $50 price limit.",
   "Every family member gets a gift: children (under 18) get one practical wish and one fun wish, adults (18+) get one wish, and your family gets one wish for the whole household.",
   'Be specific — include the size, color, and any details (e.g. "purple size XL sweatshirt with a giraffe on it").',
   "Wishes must be real, purchasable items — we can't ask donors for gift cards.",

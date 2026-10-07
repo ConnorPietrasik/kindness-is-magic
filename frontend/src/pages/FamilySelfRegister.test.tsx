@@ -76,6 +76,13 @@ describe("FamilySelfRegister", () => {
     expect(screen.getByText("If no address, write 'none'")).toBeInTheDocument();
   });
 
+  it("shows family wish info under the Family Wish field", () => {
+    wrap(<FamilySelfRegister />);
+
+    expect(screen.getByText(/A gift for the whole household \(up to \$100, fulfilled if funds are available\)/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the wish list guide" })).toHaveAttribute("href", "/wish-list-guide");
+  });
+
   it("pre-fills invite code from URL param and locks the field", () => {
     wrap(<FamilySelfRegister />, "/register-family?code=KFI-FAMILY1");
 

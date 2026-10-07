@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FamilyDetail } from "../types";
 import { FamilyForm } from "./FamilyForm";
@@ -38,6 +39,9 @@ const referrerMap: Record<number, string> = {
   3: "Bob Wilson",
 };
 
+// FamilyForm renders a router Link (wish list guide), so wrap every render in a router.
+const wrap = (node: React.ReactElement) => <MemoryRouter>{node}</MemoryRouter>;
+
 describe("FamilyForm", () => {
   afterEach(() => {
     cleanup();
@@ -54,14 +58,14 @@ describe("FamilyForm", () => {
   /* ── Referrer selector on edit ──────────────────────────── */
 
   it("shows referrer dropdown on create mode", () => {
-    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />));
 
     expect(screen.getByLabelText("Referrer")).toBeInTheDocument();
     expect(screen.getByText("Select referrer…")).toBeInTheDocument();
   });
 
   it("shows referrer dropdown on edit mode with current referrer selected", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
     expect(select).toBeInTheDocument();
@@ -70,25 +74,27 @@ describe("FamilyForm", () => {
 
   it("keeps user input when the same family refetches (new initial object identity)", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    const { rerender } = render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
     await user.type(screen.getByLabelText("Family Name"), " X");
 
     // A background refetch delivers a new object for the same family id
-    rerender(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail }} />);
+    rerender(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail }} />));
 
     expect(screen.getByLabelText("Family Name")).toHaveValue("The Smiths X");
   });
 
   it("repopulates the form when the edited family changes", async () => {
-    const { rerender } = render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    const { rerender } = render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     rerender(
-      <FamilyForm
-        {...defaultProps}
-        title="Edit Family"
-        isEdit={true}
-        initial={{ ...mockFamilyDetail, id: 99, family_name: "The Others" }}
-      />
+      wrap(
+        <FamilyForm
+          {...defaultProps}
+          title="Edit Family"
+          isEdit={true}
+          initial={{ ...mockFamilyDetail, id: 99, family_name: "The Others" }}
+        />
+      )
     );
 
     expect(screen.getByLabelText("Family Name")).toHaveValue("The Others");
@@ -98,7 +104,7 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />));
 
     const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
     await user.selectOptions(select, "3");
@@ -109,13 +115,13 @@ describe("FamilyForm", () => {
   });
 
   it("shows 'Unassign referrer' option on edit mode", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     expect(screen.getByText("Unassign referrer")).toBeInTheDocument();
   });
 
   it("selects 'Unassign referrer' when referrer_id is null", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail, referrer_id: null }} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail, referrer_id: null }} />));
 
     const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
     expect(select.value).toBe("0");
@@ -125,7 +131,7 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />));
 
     const select = screen.getByLabelText("Referrer") as HTMLSelectElement;
     await user.selectOptions(select, "0");
@@ -136,7 +142,7 @@ describe("FamilyForm", () => {
   });
 
   it("does not show 'Select referrer…' placeholder on edit", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     expect(screen.queryByText("Select referrer…")).not.toBeInTheDocument();
   });
@@ -147,7 +153,7 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} onSubmit={onSubmit} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} onSubmit={onSubmit} />));
 
     // Fill required fields
     await user.selectOptions(screen.getByLabelText("Referrer"), "1");
@@ -174,29 +180,36 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onCancel={onCancel} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onCancel={onCancel} />));
 
     await user.click(screen.getByText("Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it("shows loading state on submit button", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} loading={true} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} loading={true} />));
 
     expect(screen.getByText("Saving…")).toBeInTheDocument();
   });
 
   /* ── Address (always required) ─────────────────────── */
 
+  it("shows family wish help text and guide link under the Family Wish field", () => {
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />));
+
+    expect(screen.getByText(/A gift for the whole household \(up to \$100, fulfilled if funds are available\)\./)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the wish list guide" })).toHaveAttribute("href", "/wish-list-guide");
+  });
+
   it("shows address as required with help text", () => {
-    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} />));
 
     expect(screen.getByLabelText("Address")).toBeRequired();
     expect(screen.getByText("If no address, write 'none'")).toBeInTheDocument();
   });
 
   it("shows address and phone even when optional fields are hidden", () => {
-    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} showOptionalFields={false} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} showOptionalFields={false} />));
 
     expect(screen.getByLabelText("Address")).toBeInTheDocument();
     expect(screen.getByLabelText("Phone Number")).toBeInTheDocument();
@@ -206,7 +219,7 @@ describe("FamilyForm", () => {
   /* ── Pickup Window (admin only) ─────────────────────────── */
 
   it("shows pickup window field in admin context", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     expect(screen.getByText("Pickup Window")).toBeInTheDocument();
     const datetimeInputs = document.querySelectorAll('input[type="datetime-local"]');
@@ -214,7 +227,7 @@ describe("FamilyForm", () => {
   });
 
   it("does not show pickup window field without referrerMap", () => {
-    render(<FamilyForm title="Edit Family Profile" isEdit={true} initial={mockFamilyDetail} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+    render(wrap(<FamilyForm title="Edit Family Profile" isEdit={true} initial={mockFamilyDetail} onSubmit={vi.fn()} onCancel={vi.fn()} />));
 
     expect(screen.queryByText("Pickup Window")).not.toBeInTheDocument();
   });
@@ -223,7 +236,7 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} onSubmit={onSubmit} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Add Family" isEdit={false} initial={{}} onSubmit={onSubmit} />));
 
     // Fill required fields
     await user.selectOptions(screen.getByLabelText("Referrer"), "1");
@@ -252,7 +265,7 @@ describe("FamilyForm", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
 
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} onSubmit={onSubmit} />));
 
     // Verify the datetime-local input is pre-filled
     const pickupInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
@@ -281,19 +294,19 @@ describe("FamilyForm", () => {
   /* ── Referrer Notes (admin only) ─────────────────────────── */
 
   it("does not show referrer notes field by default", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
 
     expect(screen.queryByText("Referrer Notes")).not.toBeInTheDocument();
   });
 
   it("shows referrer notes field when showReferrerNotes is true", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />));
 
     expect(screen.getByText("Referrer Notes")).toBeInTheDocument();
   });
 
   it("pre-fills referrer notes from initial data", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />));
 
     const textareas = screen.getAllByRole("textbox") as HTMLTextAreaElement[];
     const notesTextarea = textareas.find((t) => t.value === mockFamilyDetail.referrer_notes);
@@ -305,7 +318,9 @@ describe("FamilyForm", () => {
     const onSubmit = vi.fn();
 
     render(
-      <FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes onSubmit={onSubmit} />
+      wrap(
+        <FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes onSubmit={onSubmit} />
+      )
     );
 
     // Find the referrer notes textarea and change it
@@ -325,7 +340,7 @@ describe("FamilyForm", () => {
   });
 
   it("shows character counter for referrer notes", () => {
-    render(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />);
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showReferrerNotes />));
 
     // Character counter should show current length / 1000
     expect(screen.getByText(new RegExp(`${mockFamilyDetail.referrer_notes!.length}/1000`))).toBeInTheDocument();

@@ -77,7 +77,7 @@ test.describe.serial("Admin custom emails", () => {
   });
 
   test("admin sends a custom email from the family detail page", async ({ browser }) => {
-    if (!familyId || !familyUserId) test.skip("setup incomplete");
+    test.skip(!familyId || !familyUserId, "setup incomplete");
 
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
@@ -110,7 +110,7 @@ test.describe.serial("Admin custom emails", () => {
   });
 
   test("the custom email is logged on the Sent Emails page", async ({ browser }) => {
-    if (!familyId) test.skip("setup incomplete");
+    test.skip(!familyId, "setup incomplete");
 
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();

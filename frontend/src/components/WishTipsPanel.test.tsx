@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { WishTipsPanel } from "./WishTipsPanel";
 
 const WISH_TIPS_CLOSED_KEY = "wish-tips-closed";
-const TIP_TEXT = /Every item has a \$50 price limit\./;
+const TIP_TEXT = /Every individual wish has a \$50 price limit\./;
 const TOGGLE_NAME = /How to write a great wish/;
 
 const renderPanel = () =>

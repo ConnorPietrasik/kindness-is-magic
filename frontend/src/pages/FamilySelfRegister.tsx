@@ -162,6 +162,10 @@ export default function FamilySelfRegister() {
               }}
             />
             <p className="mt-1 text-xs text-gray-400">
+              A gift for the whole household (up to $100, fulfilled if funds are available) — e.g. toaster oven, pots &amp; pans, vacuum
+              cleaner.
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
               Not sure what to wish for?{" "}
               <Link to={ROUTES.WISH_LIST_GUIDE} className="text-btn-start hover:underline">
                 See the wish list guide

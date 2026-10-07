@@ -2,8 +2,9 @@
  * Wish list guide (/wish-list-guide) — public flows plus the family entry points.
  *
  * Creates no data, so there is no afterAll cleanup:
- *  - A guest can load /wish-list-guide directly and sees the three sections:
- *    eligibility/$50, the tips, and both example lists (fun and practical).
+ *  - A guest can load /wish-list-guide directly and sees the four sections
+ *    in entry order: the family wish ($100), member eligibility/$50, the
+ *    tips, and the example lists (family wish, fun, practical).
  *  - A guest sees the guide link under the Family Wish field on /register-family.
  *  - The footer link from /home reaches the guide. The footer-link assertion
  *    lives here (not in home.spec.ts's LEGAL_PAGES pin) so it stays in one place.
@@ -15,25 +16,32 @@
 import { test, expect } from "@playwright/test";
 
 /** A digest line that is only rendered while the tips panel is expanded. */
-const TIP_LINE = "Every item has a $50 price limit.";
+const TIP_LINE = "Every individual wish has a $50 price limit.";
 
 test.describe("Wish list guide (public)", () => {
-  test("guest loads the guide directly and sees all three sections", async ({ page }) => {
+  test("guest loads the guide directly and sees all four sections", async ({ page }) => {
     await page.goto("/wish-list-guide");
     await expect(page.getByRole("heading", { name: "Writing Your Wish List", level: 1 })).toBeVisible({ timeout: 10_000 });
 
-    /* Section 1: eligibility and the $50 limit */
-    await expect(page.getByRole("heading", { name: "What you can wish for" })).toBeVisible();
-    await expect(page.getByText("Every member of the household gets a gift.")).toBeVisible();
-    await expect(page.getByText("Plus one wish for the whole family.")).toBeVisible();
-    await expect(page.getByText("Every item has a $50 price limit.")).toBeVisible();
+    /* Section 1: the family wish (entered first; $100, fulfilled if funds are available) */
+    await expect(page.getByRole("heading", { name: "The family wish" })).toBeVisible();
+    await expect(page.getByText(/double the \$50 limit on individual wishes/)).toBeVisible();
+    await expect(page.getByText(/fulfilled if funds are available/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Family wish examples" })).toBeVisible();
+    await expect(page.getByText("Toaster oven")).toBeVisible();
+    await expect(page.getByText("Vacuum cleaner")).toBeVisible();
 
-    /* Section 2: the tips */
+    /* Section 2: member eligibility and the $50 limit */
+    await expect(page.getByRole("heading", { name: "Wishes for your family members" })).toBeVisible();
+    await expect(page.getByText("Every member of the household gets a gift.")).toBeVisible();
+    await expect(page.getByText("Every individual wish has a $50 price limit.")).toBeVisible();
+
+    /* Section 3: the tips */
     await expect(page.getByRole("heading", { name: "How to fill it in" })).toBeVisible();
     await expect(page.getByText("Enter first names only.")).toBeVisible();
     await expect(page.getByText("Wishes must be real, purchasable items — we can't ask donors for gift cards.")).toBeVisible();
 
-    /* Section 3: both example lists, complete */
+    /* Section 4: both member example lists, complete */
     await expect(page.getByRole("heading", { name: "Great wish examples" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fun wishes" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Practical wishes" })).toBeVisible();
@@ -46,6 +54,9 @@ test.describe("Wish list guide (public)", () => {
   test("guide link sits under the Family Wish field on /register-family", async ({ page }) => {
     await page.goto("/register-family");
     await expect(page.getByRole("heading", { name: "Family Registration" })).toBeVisible({ timeout: 10_000 });
+
+    /* The condensed family-wish info sits under the field, with the guide link */
+    await expect(page.getByText(/A gift for the whole household \(up to \$100, fulfilled if funds are available\)/)).toBeVisible();
 
     const link = page.getByRole("link", { name: "See the wish list guide" });
     await expect(link).toBeVisible();

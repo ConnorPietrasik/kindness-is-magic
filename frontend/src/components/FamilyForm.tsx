@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { ROUTES } from "../lib/routes";
 import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
@@ -141,16 +143,24 @@ export function FamilyForm({
             }}
           />
 
-          <FormField
-            label="Family Wish"
-            fieldProps={{
-              value: form.family_wish,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
-              required: true,
-              maxLength: 100,
-              autoComplete: "off",
-            }}
-          />
+          <div>
+            <FormField
+              label="Family Wish"
+              fieldProps={{
+                value: form.family_wish,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("family_wish", e.target.value),
+                required: true,
+                maxLength: 100,
+                autoComplete: "off",
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              A gift for the whole household (up to $100, fulfilled if funds are available).{" "}
+              <Link to={ROUTES.WISH_LIST_GUIDE} className="text-btn-start hover:underline">
+                See the wish list guide
+              </Link>
+            </p>
+          </div>
 
           <div>
             <FormField
