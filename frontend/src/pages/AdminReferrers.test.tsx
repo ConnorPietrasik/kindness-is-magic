@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import type { ReferrerDetail, ReferrerListResponse } from "../types";
+import type { ReferrerDetail, ReferrerListResponse, User } from "../types";
 import AdminReferrers from "./AdminReferrers";
 
 /* ------------------------------------------------------------------ */
@@ -59,6 +60,16 @@ const mockDeletedReferrer = makeReferrer({
   family_invite_code: "GONE1",
   deleted_at: "2025-02-01T00:00:00Z",
 });
+
+const mockAdminUser: User = {
+  id: 1,
+  email: "admin@test.com",
+  role: "admin",
+  display_name: "Admin",
+  referrer_id: null,
+  family_id: null,
+  created_at: "2025-01-01T00:00:00Z",
+};
 
 const mockListResponse: ReferrerListResponse = {
   referrers: [mockReferrer1, mockReferrer2],
@@ -121,25 +132,22 @@ describe("AdminReferrers", () => {
     expect(screen.getByText("3 / 3")).toBeInTheDocument();
   });
 
-  it("navigates to invite codes with generator open", async () => {
+  it("toggles the invite code generator inline (no navigation)", async () => {
     const user = userEvent.setup();
     mockListApis();
 
-    let currentLocation = "";
-    function LocationProbe() {
-      const location = useLocation();
-      currentLocation = location.pathname + location.search;
-      return null;
-    }
-
+    /* The generator reads the inviter name via useAuth(), so this test wraps
+       in an AuthProvider with a resolved current user. */
     const queryClient = createQueryClient();
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(mockAdminUser);
     render(
       <MemoryRouter initialEntries={["/admin/referrers"]}>
         <QueryClientProvider client={queryClient}>
-          <ToastContainer>
-            <AdminReferrers />
-            <LocationProbe />
-          </ToastContainer>
+          <AuthProvider>
+            <ToastContainer>
+              <AdminReferrers />
+            </ToastContainer>
+          </AuthProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -147,10 +155,19 @@ describe("AdminReferrers", () => {
     await waitFor(() => {
       expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("heading", { name: "Generate Invite Code" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Invite referrers" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Generate Invite Code" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Hide generator" })).toBeInTheDocument();
 
-    expect(currentLocation).toBe("/admin/invite-codes?generate=1");
+    await user.click(screen.getByRole("button", { name: "Hide generator" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Generate Invite Code" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Invite referrers" })).toBeInTheDocument();
   });
 
   it("shows empty state when no referrers", async () => {
@@ -415,5 +432,28 @@ describe("AdminReferrers", () => {
     await waitFor(() => {
       expect(screen.getByText("Referrer created")).toBeInTheDocument();
     });
+  });
+
+  it("toggles the create form closed when the add button is clicked again", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminReferrers />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Hope Referrer")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "+ Add referrer" }));
+    await waitFor(() => {
+      expect(screen.getByText("Add Referrer")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Hide form" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Hide form" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Add Referrer")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "+ Add referrer" })).toBeInTheDocument();
   });
 });

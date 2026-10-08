@@ -78,10 +78,13 @@ test.describe("Core Flow", () => {
       const adminContext = await browser.newContext({ storageState: "storage/admin.json" });
       const adminPage = await adminContext.newPage();
 
-      await adminPage.goto("/admin/invite-codes");
-      await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+      /* Generation and the later approval (step 3) both happen on the
+         referrers page, so the same admin page covers both steps */
+      await adminPage.goto("/admin/referrers");
+      await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
-      await adminPage.getByRole("button", { name: "+ Generate new" }).click();
+      /* Open the inline generator form */
+      await adminPage.getByRole("button", { name: "Invite referrers" }).click();
       await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
       await adminPage.getByLabel("Family Limit").fill("5");

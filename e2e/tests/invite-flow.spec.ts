@@ -38,11 +38,11 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-codes");
-    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
-    /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
+    /* Open the inline generator form */
+    await adminPage.getByRole("button", { name: "Invite referrers" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit and generate */
@@ -93,11 +93,11 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-codes");
-    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
-    /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
+    /* Open the inline generator form */
+    await adminPage.getByRole("button", { name: "Invite referrers" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     /* Fill family limit, email, and a custom message */
@@ -131,11 +131,11 @@ test.describe("Invite and self-registration", () => {
       storageState: "storage/admin.json",
     });
     const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin/invite-codes");
-    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
 
-    /* Open the generator form */
-    await adminPage.getByRole("button", { name: "+ Generate new" }).click();
+    /* Open the inline generator form */
+    await adminPage.getByRole("button", { name: "Invite referrers" }).click();
     await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
 
     await adminPage.getByLabel("Family Limit").fill("3");

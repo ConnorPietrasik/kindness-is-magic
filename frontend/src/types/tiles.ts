@@ -49,7 +49,7 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       route: ROUTES.ADMIN_INVITE_CODES,
       icon: "💌",
       label: "Invite Codes",
-      desc: "Manage invite codes for self-registration",
+      desc: "View and revoke referrer invite codes",
       visible: true,
     },
     {

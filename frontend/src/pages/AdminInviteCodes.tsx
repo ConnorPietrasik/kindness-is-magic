@@ -1,57 +1,42 @@
 /**
  * Admin — Invite Codes Management
  *
- * List, filter, revoke invite codes. Generate new codes inline.
+ * List, filter, revoke invite codes. New codes are generated from the
+ * Referrers page (InviteGenerator).
  * Uses useCrudManager for list query and revoke mutation.
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Fragment, useMemo, useState } from "react";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
-import { FormField } from "../components/FormField";
 import { HeaderBar } from "../components/HeaderBar";
-import { InviteEmailPreview } from "../components/InviteEmailPreview";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
-import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminListInvites, adminRevokeInvite, createReferrerInvite } from "../lib/api";
+import { adminListInvites, adminRevokeInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
-import { formatApiError, formatDateTime, safeGetItem, safeSetItem } from "../lib/utils";
-import type { InviteListParams, ReferrerInviteCreatePayload, ReferrerInviteResponse } from "../types";
+import { formatDateTime } from "../lib/utils";
+import type { InviteListParams } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
   const pagination = usePagination();
-  const [searchParams] = useSearchParams();
 
   const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
   const [showExpired, setShowExpired] = useState<boolean | undefined>(undefined);
-  // ?generate=1 opens the generator (e.g. navigation from the referrers page)
-  const [showGenerator, setShowGenerator] = useState(searchParams.get("generate") === "1");
-  const generateParamOpen = searchParams.get("generate") === "1";
-
-  useEffect(() => {
-    // Covers the param appearing while the page is already mounted (same route,
-    // search change only), where the useState initializer has already run.
-    if (generateParamOpen) setShowGenerator(true);
-  }, [generateParamOpen]);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -125,7 +110,6 @@ export default function AdminInviteCodes() {
               </Button>
             )}
             <ColumnToggle resourceKey="adminInvites" />
-            <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide generator" : "+ Generate new"}</Button>
           </div>
         </div>
 
@@ -133,9 +117,6 @@ export default function AdminInviteCodes() {
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
           Email-locked codes are auto-approved when redeemed. Unlocked codes require manual approval.
         </div>
-
-        {/* Generate new code form */}
-        {showGenerator && <InviteGenerator />}
 
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -283,148 +264,5 @@ export default function AdminInviteCodes() {
         <MutationErrors mutations={[revokeMut]} />
       </main>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* InviteGenerator — inline form for creating new invite codes         */
-/* ------------------------------------------------------------------ */
-/* Persisted locally so an admin can reuse the same custom message for many
-   referrers across visits (per-browser preference, like the other kim:* keys). */
-const INVITE_MESSAGE_STORAGE_KEY = "kim:referrerInviteMessage";
-
-function InviteGenerator() {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const { user } = useAuth();
-  const [familyLimit, setFamilyLimit] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState(() => safeGetItem(INVITE_MESSAGE_STORAGE_KEY) ?? "");
-  const [invite, setInvite] = useState<ReferrerInviteResponse | null>(null);
-
-  // Persist to localStorage so the message survives navigation and browser restarts.
-  useEffect(() => {
-    safeSetItem(INVITE_MESSAGE_STORAGE_KEY, message);
-  }, [message]);
-
-  // The invite email is only sent when an email address is provided — the
-  // custom message field and preview only make sense in that case.
-  const hasEmail = email.trim().length > 0;
-
-  // Parsed limit for the email preview; null while the field is empty/invalid.
-  const parsedLimit = useMemo(() => {
-    if (familyLimit === "") return null;
-    const n = parseInt(familyLimit, 10);
-    return Number.isNaN(n) || n < 1 || n > 999 ? null : n;
-  }, [familyLimit]);
-
-  // Inviter name for the email preview — mirrors _get_inviter_name (backend/app/auth_routes.py).
-  // This route is admin-only, so only the admin branch is reachable: the display name, falling
-  // back to "Kindness Fairy" (truthy check, so an empty string falls through too).
-  const inviterName = user?.display_name || (user?.role === "admin" ? "Kindness Fairy" : null);
-
-  const createMut = useMutation({
-    mutationFn: (data: ReferrerInviteCreatePayload) => createReferrerInvite(data),
-    onSuccess: (data) => {
-      setInvite(data);
-      queryClient.invalidateQueries({ queryKey: adminInvites });
-      if (data.email_error) {
-        toast.info(data.email_error);
-      }
-    },
-    onError: (err: unknown) => {
-      toast.error(formatApiError(err, "Failed to create invite."));
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setInvite(null);
-
-    const limit = parseInt(familyLimit, 10);
-    if (Number.isNaN(limit) || limit < 1 || limit > 999) {
-      toast.error("Family limit must be between 1 and 999.");
-      return;
-    }
-
-    createMut.mutate({
-      family_limit: limit,
-      email: email.trim() || null,
-      email_message: message.trim() || null,
-    });
-  };
-
-  return (
-    <Card className="mb-6 border border-gray-200">
-      <h3 className="mb-3 text-base font-semibold text-gray-900">Generate Invite Code</h3>
-      <p className="mb-4 text-sm text-gray-500">
-        Create a one-time invite code that allows someone to self-register as a referrer. The code expires after 7 days.
-      </p>
-
-      {/* Success display */}
-      {invite && (
-        <div className="mb-4 rounded-lg border-2 border-green-200 bg-green-50/50 p-4">
-          <p className="mb-2 text-sm font-medium text-green-800">Invite Code Generated</p>
-          <div className="mb-2 text-2xl font-mono font-bold tracking-wider text-brand-dark">{invite.code}</div>
-          <div className="flex gap-4 text-sm text-green-700">
-            <span>Family limit: {invite.family_limit}</span>
-            <span>Expires: {formatDateTime(invite.expires_at)}</span>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <FormField
-            label="Family Limit"
-            type="number"
-            fieldProps={{
-              value: familyLimit,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFamilyLimit(e.target.value),
-              required: true,
-              min: 1,
-              max: 999,
-              placeholder: "e.g. 10",
-              autoComplete: "off",
-            }}
-          />
-          <FormField
-            label="Email (optional)"
-            type="email"
-            fieldProps={{
-              value: email,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
-              placeholder: "referrer@example.com",
-              autoComplete: "off",
-            }}
-          />
-          <Button type="submit" loading={createMut.isPending} className="sm:ml-auto">
-            {createMut.isPending ? "Generating\u2026" : "Generate"}
-          </Button>
-        </div>
-        {hasEmail && (
-          <FormField
-            label="Custom Message (optional)"
-            as="textarea"
-            fieldProps={{
-              value: message,
-              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value),
-              placeholder: "Leave blank to send the default message",
-              autoComplete: "off",
-              rows: 4,
-              // Keep in sync with the email_message max_length on ReferrerInviteCreate (backend/app/schemas.py)
-              maxLength: 5000,
-            }}
-          />
-        )}
-      </form>
-      <p className="mt-3 text-xs text-gray-400">Including an email locks this invite to that address</p>
-
-      {/* Live preview of the invite email as it will be sent — only when an email
-          is set, since the backend skips sending without one */}
-      {hasEmail && (
-        <InviteEmailPreview message={message} familyLimit={parsedLimit} email={email.trim() || null} inviterName={inviterName} />
-      )}
-    </Card>
   );
 }

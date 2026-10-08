@@ -8,7 +8,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { Fragment, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { ApprovalBadge } from "../components/ApprovalBadge";
@@ -20,8 +20,10 @@ import { CrudTabs } from "../components/CrudTabs";
 import { DraggableTh } from "../components/DraggableTh";
 import { defaultReferrerForm } from "../components/defaults";
 import { HeaderBar } from "../components/HeaderBar";
+import { InviteGenerator } from "../components/InviteGenerator";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
+import { PendingInvitesSection } from "../components/PendingInvitesSection";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
@@ -54,9 +56,11 @@ import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const pagination = usePagination();
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
+  // Inline invite-code generator, toggled from the header (generation is
+  // global, so the button stays available in the Deleted tab too)
+  const [showGenerator, setShowGenerator] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<number | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<number | null>(null);
@@ -178,14 +182,18 @@ export default function AdminReferrers() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
-            <Button onClick={() => navigate(route.adminInviteCodes(true))}>Invite referrers</Button>
+            <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide generator" : "Invite referrers"}</Button>
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
               </Button>
             )}
             {!isDeletedView && <ColumnToggle resourceKey="adminReferrers" />}
-            {!isDeletedView && <Button onClick={openCreate}>+ Add referrer</Button>}
+            {!isDeletedView && (
+              <Button onClick={() => (showForm && editingId == null ? cancelForm() : openCreate())}>
+                {showForm && editingId == null ? "Hide form" : "+ Add referrer"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -223,6 +231,9 @@ export default function AdminReferrers() {
 
         {/* Tab panel content */}
         <div role="tabpanel">
+          {/* Invite code generator (toggled from the header) */}
+          {showGenerator && <InviteGenerator />}
+
           {/* Create form (active tab only) */}
           {showForm && (
             <ReferrerForm
@@ -541,6 +552,9 @@ export default function AdminReferrers() {
             onPageChange={pagination.goToPage}
             onPageSizeChange={pagination.setPageSize}
           />
+
+          {/* Unredeemed invite codes we're waiting on (active tab only) */}
+          {!isDeletedView && <PendingInvitesSection />}
         </div>
 
         {/* Errors */}
