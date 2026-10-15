@@ -2,8 +2,9 @@
  * PendingInvitesSection — collapsible list of unredeemed referrer invite codes.
  *
  * Shows which codes we are still "waiting on" (including lapsed ones, flagged
- * as expired so an admin can re-send). Read-only — revocation and full
- * management live on the Invite Codes page.
+ * as expired so an admin knows to re-arm them from the Invite Codes page).
+ * Read-only — extension, revocation and full management live on the Invite
+ * Codes page.
  *
  * Collapsed by default; follows the InternalNotesSection collapse pattern
  * (button header, rotating chevron, local expanded state). A fetch failure
@@ -17,14 +18,16 @@ import { Link } from "react-router-dom";
 import { adminListInvites } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { formatDateTime } from "../lib/utils";
+import { formatDateTime, isExpiredInvite } from "../lib/utils";
+import { ExpiredBadge } from "./ExpiredBadge";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "./Table";
 
 /**
  * Single bounded fetch of unredeemed codes. The bare `adminInvites` key means
- * any page that invalidates that prefix (generator create, invite-page revoke)
- * refreshes this list too. Expired-but-unredeemed codes are deliberately
- * included (no `expired` filter) so lapsed codes prompt a re-send.
+ * any page that invalidates that prefix (generator create, invite-page revoke
+ * or extend) refreshes this list too. Expired-but-unredeemed codes are
+ * deliberately included (no `expired` filter) so lapsed codes are visible here;
+ * the fix (extend) is one click away on the Invite Codes page.
  */
 function usePendingInvites() {
   return useQuery({
@@ -39,7 +42,6 @@ export function PendingInvitesSection() {
 
   const total = data?.total ?? 0;
   const invites = data?.invites ?? [];
-  const now = Date.now();
 
   return (
     <div className="mt-6">
@@ -85,9 +87,7 @@ export function PendingInvitesSection() {
                       <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>
                       <Td className="whitespace-nowrap text-sm text-gray-500">
                         {formatDateTime(invite.expires_at)}
-                        {new Date(invite.expires_at).getTime() < now && (
-                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Expired</span>
-                        )}
+                        {isExpiredInvite(invite) && <ExpiredBadge />}
                       </Td>
                     </Tr>
                   ))}

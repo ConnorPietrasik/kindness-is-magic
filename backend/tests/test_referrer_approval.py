@@ -38,6 +38,30 @@ def _create_locked_invite(client: TestClient, email: str = "locked@test.com") ->
     return resp.json()["code"]
 
 
+def _create_expired_invite(db: Session, admin_user, code: str):
+    """Seed an expired, unredeemed invite token directly and return it."""
+    from app.models import ReferrerInviteToken
+
+    token = ReferrerInviteToken(
+        code=code,
+        family_limit=5,
+        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        created_by_admin_id=admin_user.id,
+    )
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+    return token
+
+
+def _register_referrer(client: TestClient, code: str, email: str, name: str = "Invite Ref", phone: str = "555-777-7777"):
+    """POST to /api/auth/register-referrer with an invite code."""
+    return client.post(
+        "/api/auth/register-referrer",
+        json={"code": code, "name": name, "email": email, "phone_number": phone, "password": "GoodPass1234!"},
+    )
+
+
 # ---------------------------------------------------------------------------
 # TestSelfRegApprovalStatus
 # ---------------------------------------------------------------------------
@@ -776,7 +800,7 @@ class TestAdminInviteCRUD:
         assert all(i["redeemed"] is False for i in body["invites"])
 
     def test_list_invites_filter_expired(self, test_client: TestClient, admin_user, db: Session):
-        """Filter expired=true shows only expired invites."""
+        """Filter expired=true shows only lapsed *unredeemed* invites."""
         from app.models import ReferrerInviteToken
 
         # Create an expired invite directly
@@ -796,7 +820,34 @@ class TestAdminInviteCRUD:
         resp = test_client.get("/api/admin/invites?expired=true")
         assert resp.status_code == 200
         body = resp.json()
+        assert all(i["redeemed"] is False for i in body["invites"])
         assert all(datetime.fromisoformat(i["expires_at"]) < datetime.now(timezone.utc) for i in body["invites"])
+
+    def test_redeemed_lapsed_invite_is_not_expired(self, test_client: TestClient, admin_user, db: Session):
+        """A redeemed code whose window has since closed reads as spent, not expired.
+
+        It is absent from expired=true and present in expired=false, matching the
+        Expired badge (which only marks codes an admin can still act on).
+        """
+        from app.models import ReferrerInviteToken
+
+        code = _create_unlocked_invite(test_client)
+        assert _register_referrer(test_client, code, "lapsed_redeemed@test.com", name="Lapsed Ref", phone="555-777-7781").status_code == 201
+
+        # Age the redeemed token past its window
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+        token.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+
+        _admin_login(test_client)  # self-register auto-logged the client in as the new referrer
+
+        expired_codes = [i["code"] for i in test_client.get("/api/admin/invites?expired=true").json()["invites"]]
+        assert code not in expired_codes
+
+        live = test_client.get("/api/admin/invites?expired=false").json()["invites"]
+        live_codes = [i["code"] for i in live]
+        assert code in live_codes
+        assert all(i["redeemed"] is True or datetime.fromisoformat(i["expires_at"]) >= datetime.now(timezone.utc) for i in live)
 
     def test_invite_list_includes_referrer_info_after_redemption(self, test_client: TestClient, admin_user, db: Session):
         """After redemption, invite shows referrer name and approval status."""
@@ -858,3 +909,165 @@ class TestAdminInviteCRUD:
         assert len(invites) >= 2
         # First item should have a later created_at
         assert invites[0]["created_at"] >= invites[1]["created_at"]
+
+    # -- extend ---------------------------------------------------------
+
+    def test_extend_expired_invite_extends_expiry_and_keeps_code(self, test_client: TestClient, admin_user, db: Session):
+        """Extend pushes expires_at into the future and leaves the code untouched."""
+        from app.auth import INVITE_EXPIRY_HOURS
+
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND1")
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["id"] == token.id
+        assert body["code"] == "KRI-EXTND1"
+        assert body["redeemed"] is False
+        assert body["family_limit"] == 5
+
+        db.refresh(token)
+        now = datetime.now(timezone.utc)
+        assert token.expires_at > now
+        # Re-anchored at now + the configured window (tolerance for clock skew)
+        delta = token.expires_at - now
+        assert timedelta(hours=INVITE_EXPIRY_HOURS - 1) < delta <= timedelta(hours=INVITE_EXPIRY_HOURS)
+
+    def test_extend_is_repeatable(self, test_client: TestClient, admin_user, db: Session):
+        """Each call re-anchors the window at now."""
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND2")
+
+        _admin_login(test_client)
+        assert test_client.post(f"/api/admin/invites/{token.id}/extend").status_code == 200
+        db.refresh(token)
+        first_expiry = token.expires_at
+
+        assert test_client.post(f"/api/admin/invites/{token.id}/extend").status_code == 200
+        db.refresh(token)
+        # Strictly later: an extend that only applied once would leave it equal.
+        # The two calls are milliseconds apart and expires_at stores microseconds.
+        assert token.expires_at > first_expiry
+
+    def test_expired_code_is_rejected_then_registers_after_extend(self, test_client: TestClient, admin_user, db: Session):
+        """The outcome that matters: expired → refused → extend → same code registers."""
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND3")
+
+        resp = _register_referrer(test_client, "KRI-EXTND3", "after_extend@test.com")
+        assert resp.status_code == 400
+        assert "expired" in resp.json()["detail"].lower()
+
+        _admin_login(test_client)
+        assert test_client.post(f"/api/admin/invites/{token.id}/extend").status_code == 200
+
+        resp = _register_referrer(test_client, "KRI-EXTND3", "after_extend@test.com")
+        assert resp.status_code == 201
+
+        db.refresh(token)
+        assert token.redeemed_by_user_id is not None
+
+    def test_revoked_invite_can_be_extended_and_then_redeemed(self, test_client: TestClient, admin_user, db: Session):
+        """Deliberate un-revoke: revocation collapses expires_at to now, the same stored
+        state as natural expiry, so extend re-arms a revoked code and it redeems."""
+        code = _create_unlocked_invite(test_client)
+
+        from app.models import ReferrerInviteToken
+
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+
+        _admin_login(test_client)
+        assert test_client.post(f"/api/admin/invites/{token.id}/revoke").status_code == 200
+        db.refresh(token)
+        revoked_expiry = token.expires_at
+
+        resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
+        assert resp.status_code == 200
+        assert resp.json()["code"] == code
+
+        db.refresh(token)
+        assert token.expires_at > revoked_expiry
+
+        resp = _register_referrer(test_client, code, "unrevoked@test.com", name="Unrevoked Ref", phone="555-777-7778")
+        assert resp.status_code == 201
+
+    def test_cannot_extend_redeemed_invite(self, test_client: TestClient, admin_user, db: Session):
+        """A redeemed token is refused, with its expiry left alone."""
+        code = _create_unlocked_invite(test_client)
+        registered = _register_referrer(test_client, code, "extended_redeemed@test.com", name="Redeemed Ref", phone="555-777-7779")
+        assert registered.status_code == 201
+
+        from app.models import ReferrerInviteToken
+
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+        original_expiry = token.expires_at
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Cannot extend an already-redeemed invite"
+
+        db.refresh(token)
+        assert token.expires_at == original_expiry
+
+    def test_extend_nonexistent_invite(self, test_client: TestClient, admin_user):
+        """Extending a non-existent invite returns 404."""
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/invites/99999/extend")
+        assert resp.status_code == 404
+
+    def test_extend_requires_authentication(self, test_client: TestClient, admin_user, db: Session):
+        """Unauthenticated extend returns 401."""
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND4")
+        resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
+        assert resp.status_code == 401
+
+    def test_non_admin_cannot_extend_invite(self, test_client: TestClient, admin_user, db: Session, referrer_user, family_user):
+        """Referrer and family roles get 403 on extend."""
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND5")
+
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        assert test_client.post(f"/api/admin/invites/{token.id}/extend").status_code == 403
+
+        login_as(test_client, "family@test.com", "FamPass1234!")
+        resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
+        assert resp.status_code == 403
+
+    def test_extend_moves_invite_out_of_expired_filter(self, test_client: TestClient, admin_user, db: Session):
+        """An extended token leaves ?expired=true and shows up in ?expired=false."""
+        token = _create_expired_invite(db, admin_user, code="KRI-EXTND6")
+
+        _admin_login(test_client)
+        expired = [i["code"] for i in test_client.get("/api/admin/invites?expired=true").json()["invites"]]
+        assert "KRI-EXTND6" in expired
+
+        assert test_client.post(f"/api/admin/invites/{token.id}/extend").status_code == 200
+
+        expired = [i["code"] for i in test_client.get("/api/admin/invites?expired=true").json()["invites"]]
+        assert "KRI-EXTND6" not in expired
+        live = [i["code"] for i in test_client.get("/api/admin/invites?expired=false").json()["invites"]]
+        assert "KRI-EXTND6" in live
+
+    def test_revoke_unchanged_by_extend(self, test_client: TestClient, admin_user, db: Session):
+        """Adding extend did not reword revoke: same 200 payload and same 400 detail."""
+        from app.models import ReferrerInviteToken
+
+        code = _create_unlocked_invite(test_client)
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/revoke")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == code
+        assert body["redeemed"] is False
+        assert datetime.fromisoformat(body["expires_at"]) <= datetime.now(timezone.utc)
+
+        # A redeemed (still-live) token keeps revoke's original 400 wording
+        live_code = _create_unlocked_invite(test_client)
+        live_token = db.query(ReferrerInviteToken).filter_by(code=live_code).first()
+        registered = _register_referrer(test_client, live_code, "revoked_redeemed@test.com", name="Rev Ref", phone="555-777-7780")
+        assert registered.status_code == 201
+        _admin_login(test_client)  # self-register auto-logs-in as the new referrer
+        resp = test_client.post(f"/api/admin/invites/{live_token.id}/revoke")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Cannot revoke an already-redeemed invite"

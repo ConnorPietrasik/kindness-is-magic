@@ -11,6 +11,7 @@ import {
   getPendingClaimFamilyId,
   getWishSubmitAction,
   humanize,
+  isExpiredInvite,
   isFamilyLocked,
   normalizePayload,
   normalizeUpdatePayload,
@@ -519,6 +520,27 @@ describe("isFamilyLocked", () => {
 
   it("returns true when both locked and review requested", () => {
     expect(isFamilyLocked({ wish_lock_level: "admin", wish_review_requested_at: "2025-01-01T00:00:00Z" })).toBe(true);
+  });
+});
+
+describe("isExpiredInvite", () => {
+  const past = new Date(Date.now() - 60_000).toISOString();
+  const future = new Date(Date.now() + 60_000).toISOString();
+
+  it("is true for an unredeemed code whose window has lapsed", () => {
+    expect(isExpiredInvite({ redeemed: false, expires_at: past })).toBe(true);
+  });
+
+  it("is false for an unredeemed code still inside its window", () => {
+    expect(isExpiredInvite({ redeemed: false, expires_at: future })).toBe(false);
+  });
+
+  it("is false for a redeemed code even once its window has lapsed — the code is spent", () => {
+    expect(isExpiredInvite({ redeemed: true, expires_at: past })).toBe(false);
+  });
+
+  it("is false for a redeemed code still inside its window", () => {
+    expect(isExpiredInvite({ redeemed: true, expires_at: future })).toBe(false);
   });
 });
 

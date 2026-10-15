@@ -478,6 +478,15 @@ export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
   return apiPost(`/api/admin/invites/${id}/revoke`);
 }
 
+/**
+ * Re-arm an unredeemed invite (lapsed or revoked) with a fresh expiry window.
+ * The code is unchanged, so the invitee can still register with the code in
+ * their original email. "Extend", not "refresh" — refresh is the session-token verb.
+ */
+export function adminExtendInvite(id: number): Promise<ReferrerInviteSummary> {
+  return apiPost(`/api/admin/invites/${id}/extend`);
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Sent Email Log
 // ---------------------------------------------------------------------------

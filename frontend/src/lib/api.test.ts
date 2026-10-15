@@ -278,6 +278,13 @@ describe("admin invite API functions", () => {
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/invites/3/revoke");
     expect(result).toEqual({ id: 3, code: "KMG-ABC" });
   });
+
+  it("adminExtendInvite — POST /api/admin/invites/:id/extend", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 3, code: "KMG-ABC" } });
+    const result = await apiModule.adminExtendInvite(3);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/invites/3/extend");
+    expect(result).toEqual({ id: 3, code: "KMG-ABC" });
+  });
 });
 
 // ---------------------------------------------------------------------------

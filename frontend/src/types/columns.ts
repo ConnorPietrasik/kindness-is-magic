@@ -121,6 +121,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "locked_email", label: "Locked Email", visible: true },
     { key: "created_by_admin_name", label: "Created By", visible: true },
     { key: "created_at", label: "Created", visible: true },
+    { key: "expires_at", label: "Expires", visible: true },
     { key: "redeemed", label: "Redeemed", visible: true },
     { key: "referrer_approval_status", label: "Status", visible: true },
   ],

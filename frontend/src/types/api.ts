@@ -70,6 +70,7 @@ export interface AdminPeopleListParams extends AdminListParams {
 /** Query params for the admin invites list endpoint (updated with search + sort). */
 export interface InviteListParams extends AdminListParams {
   redeemed?: boolean;
+  /** Unredeemed-and-lapsed only; a redeemed code's expiry is inert. */
   expired?: boolean;
   search?: string;
 }

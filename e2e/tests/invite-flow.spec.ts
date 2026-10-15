@@ -182,6 +182,103 @@ test.describe("Invite and self-registration", () => {
     await adminContext.close();
     await guestContext2.close();
   });
+
+  /**
+   * Re-arm an expired invite code's expiry, through the Invite Codes page.
+   *
+   * Revoked on the way in, because nothing in the stack ages a token within a
+   * test run: revocation stores the same state as natural expiry (expires_at
+   * collapsed to now), so revoke → extend is the observable stand-in for
+   * expired → re-armed. It also puts the expiry days apart in both directions,
+   * so the displayed change is never hidden by the Expires column's
+   * minute-granularity formatting — no real-time wait needed.
+   *
+   * The code stays unredeemed, so there is nothing to clean up (invite codes
+   * have no delete endpoint and lapse on their own).
+   */
+  test("admin revokes an invite code, then extends it back to life", async ({ browser }) => {
+    const adminContext = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage = await adminContext.newPage();
+
+    /* ── Generate a code (the generator lives on the Referrers page) ── */
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
+    await adminPage.getByRole("button", { name: "Invite referrers" }).click();
+    await expect(adminPage.getByRole("heading", { name: "Generate Invite Code" })).toBeVisible();
+    await adminPage.getByLabel("Family Limit").fill("3");
+    await adminPage.getByRole("button", { name: "Generate" }).click();
+    await expect(adminPage.getByText("Invite Code Generated")).toBeVisible({ timeout: 10_000 });
+
+    const inviteCode = (await adminPage.locator("div.font-mono.font-bold").textContent())!.trim();
+    expect(inviteCode).toMatch(/^KRI-/);
+
+    /* ── Find it on the Invite Codes page (search is debounced ~1s, so the
+          assertion waits on the row rather than on the keystroke) ── */
+    await adminPage.goto("/admin/invite-codes");
+    await expect(adminPage.getByRole("heading", { name: "Invite Codes" })).toBeVisible();
+    await adminPage.getByLabel("Search by code or email").fill(inviteCode);
+
+    const row = adminPage.getByRole("row").filter({ hasText: inviteCode });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+
+    /* Column order is per-admin, so locate the expiry cell by its header. */
+    const headers = await adminPage.getByRole("columnheader").allTextContents();
+    const expiresIndex = headers.findIndex((h) => h.trim() === "Expires");
+    expect(expiresIndex).toBeGreaterThan(-1);
+    const expiryCell = row.getByRole("cell").nth(expiresIndex);
+
+    /* The cell pairs the timestamp with the Expired badge — compare the date
+       text alone so each assertion is about the expiry, not the badge. */
+    const expiryText = async () => (((await expiryCell.textContent()) ?? "").replace("Expired", "").trim());
+
+    /* A freshly generated code is live: a printed expiry and no Expired badge. */
+    const expiryLived = await expiryText();
+    expect(expiryLived).not.toBe("");
+    expect(expiryLived).not.toBe("—");
+    await expect(row.getByText("Expired")).toHaveCount(0);
+
+    /* "Expired only" means unredeemed-and-lapsed, so a live code is not listed */
+    const expiredOnly = adminPage.getByLabel("Expired only");
+    await expiredOnly.check();
+    await expect(adminPage.getByText("No invite codes found.")).toBeVisible();
+    await expiredOnly.uncheck();
+    await expect(row).toBeVisible();
+
+    /* ── Revoke (the dialog is what makes it a deliberate act) ── */
+    await row.getByRole("button", { name: "Revoke" }).click();
+    await expect(adminPage.getByText("Revoke this invite code?")).toBeVisible();
+    await adminPage.getByRole("button", { name: "Yes, revoke" }).click();
+
+    /* The row badges as expired and its expiry moves to the revoke moment */
+    await expect(row.getByText("Expired")).toBeVisible();
+    const expiryRevoked = await expiryText();
+    await expect(expiryCell).not.toHaveText(expiryLived);
+
+    /* The filter agrees with the badge: revoked, so it is now in the expired set */
+    await expiredOnly.check();
+    await expect(row).toBeVisible();
+    await expiredOnly.uncheck();
+
+    /* ── Extend: same code, re-armed ── */
+    await row.getByRole("button", { name: "Extend" }).click();
+
+    /* Success toast names the code (visible effect even with Expires hidden) */
+    await expect(adminPage.getByText(`Invite ${inviteCode} extended`)).toBeVisible({ timeout: 10_000 });
+
+    /* Same row, same code — the badge clears and the expiry leaves the revoke
+       moment behind (change, not duration: the window is env-configurable) */
+    await expect(row).toContainText(inviteCode);
+    await expect(row.getByText("Expired")).toHaveCount(0);
+    await expect(expiryCell).not.toHaveText(expiryRevoked);
+
+    /* Re-armed, so it leaves the expired set again */
+    await expiredOnly.check();
+    await expect(adminPage.getByText("No invite codes found.")).toBeVisible();
+
+    await adminContext.close();
+  });
 });
 
 /**

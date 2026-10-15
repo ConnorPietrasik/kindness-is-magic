@@ -251,6 +251,23 @@ export function isFamilyLocked(family: FamilyLockFields | null | undefined): boo
 }
 
 /**
+ * isExpiredInvite — whether an invite code reads as "expired".
+ *
+ * Single source of truth for the badge in the admin invite views, mirroring the
+ * backend's `?expired=` filter (`list_invites()`): only a code that lapsed
+ * *unused* counts. A redeemed token's expiry is inert — the code is spent — so
+ * redeemed rows never read as expired.
+ */
+export interface InviteExpiryFields {
+  redeemed: boolean;
+  expires_at: string;
+}
+
+export function isExpiredInvite(invite: InviteExpiryFields): boolean {
+  return !invite.redeemed && new Date(invite.expires_at).getTime() < Date.now();
+}
+
+/**
  * getWishSubmitAction — which "submit for admin review" action a referrer can
  * take on a family. Single source of truth shared by the referrer families
  * list and detail pages:

@@ -52,7 +52,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `user_validation.py` | Shared user registration validation logic |
 | `mail.py` | Email sending (SMTP via fastapi-mail), templates, unsubscribe helpers |
 | `admin_referrers.py` | Admin CRUD for referrers + approve/reject |
-| `admin_invites.py` | Admin CRUD for referrer invite tokens (list/get/revoke) |
+| `admin_invites.py` | Admin CRUD for referrer invite tokens (list/get/revoke/extend) |
 | `admin_families.py` | Admin CRUD for families |
 | `admin_people.py` | Admin CRUD for people |
 | `admin_users.py` | Admin CRUD for users + CSV import |

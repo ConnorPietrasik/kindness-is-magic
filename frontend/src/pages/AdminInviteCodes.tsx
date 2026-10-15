@@ -1,11 +1,13 @@
 /**
  * Admin — Invite Codes Management
  *
- * List, filter, revoke invite codes. New codes are generated from the
+ * List, filter, revoke, extend invite codes. New codes are generated from the
  * Referrers page (InviteGenerator).
- * Uses useCrudManager for list query and revoke mutation.
+ * Uses useCrudManager for list query and revoke mutation; extend is a
+ * standalone mutation (non-destructive, no confirm dialog).
  */
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo, useState } from "react";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
@@ -13,20 +15,22 @@ import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
+import { ExpiredBadge } from "../components/ExpiredBadge";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminListInvites, adminRevokeInvite } from "../lib/api";
+import { adminExtendInvite, adminListInvites, adminRevokeInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
-import { formatDateTime } from "../lib/utils";
+import { formatDateTime, isExpiredInvite } from "../lib/utils";
 import type { InviteListParams } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +38,8 @@ import type { InviteListParams } from "../types";
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
   const pagination = usePagination();
+  const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
   const [showExpired, setShowExpired] = useState<boolean | undefined>(undefined);
@@ -75,12 +81,28 @@ export default function AdminInviteCodes() {
     entityName: "Invite code",
   });
 
+  // Standalone mutation (not another useCrudManager slot): re-arms an
+  // unredeemed code — lapsed or revoked — with the same code, so the invitee
+  // can still register with the code already in their email. Non-destructive
+  // and reversible, so no confirm dialog.
+  const extendMut = useMutation({
+    mutationFn: (id: number) => adminExtendInvite(id),
+    onSuccess: (invite) => {
+      toast.success(`Invite ${invite.code} extended — now expires ${formatDateTime(invite.expires_at)}`);
+      void queryClient.invalidateQueries({ queryKey: adminInvites });
+    },
+  });
+
   const pageInfo = useMemo(
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
   const invites = listData?.invites ?? [];
+
+  // "Expired" means unredeemed-and-lapsed, so it can never hold alongside
+  // "Redeemed only" — the pair would just render an empty table.
+  const expiredFilterBlocked = showRedeemed === true;
 
   if (listLoading) return <PageSpinner />;
 
@@ -91,6 +113,7 @@ export default function AdminInviteCodes() {
     locked_email: "Locked Email",
     created_by_admin_name: "Created By",
     created_at: "Created",
+    expires_at: "Expires",
     redeemed: "Redeemed",
     referrer_approval_status: "Status",
   };
@@ -115,7 +138,8 @@ export default function AdminInviteCodes() {
 
         {/* Info note */}
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
-          Email-locked codes are auto-approved when redeemed. Unlocked codes require manual approval.
+          Email-locked codes are auto-approved when redeemed. Unlocked codes require manual approval. Extend re-arms an unredeemed code —
+          lapsed or revoked — with the code unchanged, but the expiry date in the invitee's email is not resent.
         </div>
 
         {/* Filters */}
@@ -134,7 +158,11 @@ export default function AdminInviteCodes() {
               <input
                 type="checkbox"
                 checked={showRedeemed === true}
-                onChange={(e) => setShowRedeemed(e.target.checked ? true : undefined)}
+                onChange={(e) => {
+                  const redeemedOnly = e.target.checked;
+                  setShowRedeemed(redeemedOnly ? true : undefined);
+                  if (redeemedOnly) setShowExpired(undefined);
+                }}
                 className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
               />
               Redeemed only
@@ -148,12 +176,14 @@ export default function AdminInviteCodes() {
               />
               Unredeemed only
             </label>
-            <label className="flex items-center gap-1.5">
+            <label className={`flex items-center gap-1.5 ${expiredFilterBlocked ? "cursor-not-allowed text-gray-400" : ""}`}>
               <input
                 type="checkbox"
                 checked={showExpired === true}
                 onChange={(e) => setShowExpired(e.target.checked ? true : undefined)}
-                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                disabled={expiredFilterBlocked}
+                title={expiredFilterBlocked ? "Expired codes are unredeemed, so this cannot combine with Redeemed only." : undefined}
+                className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:cursor-not-allowed"
               />
               Expired only
             </label>
@@ -183,6 +213,13 @@ export default function AdminInviteCodes() {
                   locked_email: <Td>{invite.locked_email ?? <span className="text-gray-400">—</span>}</Td>,
                   created_by_admin_name: <Td>{invite.created_by_admin_name ?? <span className="text-gray-400">—</span>}</Td>,
                   created_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(invite.created_at)}</Td>,
+                  expires_at: (
+                    <Td className="whitespace-nowrap text-sm text-gray-500">
+                      {formatDateTime(invite.expires_at)}
+                      {/* Redeemed codes lapse too, but that lapse means nothing — the code is used. */}
+                      {isExpiredInvite(invite) && <ExpiredBadge />}
+                    </Td>
+                  ),
                   redeemed: (
                     <Td>
                       {invite.redeemed ? (
@@ -214,15 +251,26 @@ export default function AdminInviteCodes() {
                     ))}
                     <Td>
                       {!invite.redeemed && (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => setRevokeConfirm(invite.id)}
-                          disabled={revokeMut.isPending}
-                        >
-                          Revoke
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => extendMut.mutate(invite.id)}
+                            disabled={extendMut.isPending || revokeMut.isPending}
+                          >
+                            Extend
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => setRevokeConfirm(invite.id)}
+                            disabled={revokeMut.isPending || extendMut.isPending}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
                       )}
                     </Td>
                   </Tr>
@@ -246,7 +294,7 @@ export default function AdminInviteCodes() {
         <ConfirmDialog
           open={revokeConfirm !== null}
           title={<>Revoke this invite code?</>}
-          description="The code will expire immediately and can no longer be used."
+          description="The code will expire immediately and can no longer be used. Extend re-arms it if you change your mind."
           onConfirm={() => {
             if (revokeConfirm != null) {
               revokeMut.mutate(revokeConfirm);
@@ -261,7 +309,7 @@ export default function AdminInviteCodes() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[revokeMut]} />
+        <MutationErrors mutations={[revokeMut, extendMut]} />
       </main>
     </div>
   );

@@ -4,16 +4,18 @@ All endpoints are guarded with ``require_admin``.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_ as sql_or
 from sqlalchemy.orm import Session
 
+from app.auth import INVITE_EXPIRY_HOURS
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.models import Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
+from app.response_builders import get_or_404
 from app.schemas import InviteListResponse, ReferrerInviteSummary
 from app.search_sort import INVITE_SORT_FIELDS, build_sort_clause, escape_like
 
@@ -56,7 +58,7 @@ def _build_invite_summary(
 
 
 def _resolve_invite_relations(invite: ReferrerInviteToken, db: Session):
-    """Resolve admin and referrer lookups for a single invite (get/revoke endpoints)."""
+    """Resolve admin and referrer lookups for a single invite (get/revoke/extend endpoints)."""
     admin_map: dict[int, str] = {}
     if invite.created_by_admin_id is not None:
         admin = db.query(User).filter(User.id == invite.created_by_admin_id, User.deleted_at.is_(None)).first()
@@ -84,7 +86,12 @@ def list_invites(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> InviteListResponse:
-    """List all invite tokens with optional filters."""
+    """List all invite tokens with optional filters.
+
+    ``expired`` is about codes that lapsed *unused*: a redeemed token's expiry is
+    inert (the code is spent), so redeemed rows never read as expired — the same
+    rule the UI's ``isExpiredInvite()`` follows.
+    """
     query = db.query(ReferrerInviteToken)
 
     if redeemed is not None:
@@ -96,9 +103,17 @@ def list_invites(
     now = datetime.now(timezone.utc)
     if expired is not None:
         if expired:
-            query = query.filter(ReferrerInviteToken.expires_at < now)
+            query = query.filter(
+                ReferrerInviteToken.redeemed_by_user_id.is_(None),
+                ReferrerInviteToken.expires_at < now,
+            )
         else:
-            query = query.filter(ReferrerInviteToken.expires_at >= now)
+            query = query.filter(
+                sql_or(
+                    ReferrerInviteToken.redeemed_by_user_id.isnot(None),
+                    ReferrerInviteToken.expires_at >= now,
+                )
+            )
 
     if search is not None:
         pattern = f"%{escape_like(search)}%"
@@ -143,9 +158,7 @@ def get_invite(
     _admin: User = Depends(require_admin),
 ) -> ReferrerInviteSummary:
     """Get a single invite token by id."""
-    invite = db.query(ReferrerInviteToken).filter(ReferrerInviteToken.id == invite_id).first()
-    if invite is None:
-        raise HTTPException(status_code=404, detail="Invite not found")
+    invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
     admin_map, referrer_map = _resolve_invite_relations(invite, db)
     return _build_invite_summary(invite, admin_map, referrer_map)
 
@@ -157,9 +170,7 @@ def revoke_invite(
     _admin: User = Depends(require_admin),
 ) -> ReferrerInviteSummary:
     """Revoke an unredeemed invite by setting expires_at to now."""
-    invite = db.query(ReferrerInviteToken).filter(ReferrerInviteToken.id == invite_id).first()
-    if invite is None:
-        raise HTTPException(status_code=404, detail="Invite not found")
+    invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
 
     if invite.redeemed_by_user_id is not None:
         raise HTTPException(status_code=400, detail="Cannot revoke an already-redeemed invite")
@@ -169,5 +180,35 @@ def revoke_invite(
     db.refresh(invite)
 
     logger.info("Admin revoked invite %s (id=%s)", invite.code, invite_id)
+    admin_map, referrer_map = _resolve_invite_relations(invite, db)
+    return _build_invite_summary(invite, admin_map, referrer_map)
+
+
+@invite_admin_router.post("/{invite_id}/extend", status_code=200)
+def extend_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> ReferrerInviteSummary:
+    """Re-arm an unredeemed invite by extending ``expires_at`` to the full invite window.
+
+    The code itself is unchanged, so an invitee can still register with the code
+    already printed in their email. Any unredeemed token is eligible: revocation
+    and natural expiry are the same stored state, so this doubles as the undo for
+    a revoke. Repeatable — each call re-anchors the window at now.
+
+    Named "extend", not "refresh": nothing rotates here — the code is deliberately
+    unchanged, only its deadline moves. ("Refresh" is the session-token verb.)
+    """
+    invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
+
+    if invite.redeemed_by_user_id is not None:
+        raise HTTPException(status_code=400, detail="Cannot extend an already-redeemed invite")
+
+    invite.expires_at = datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)
+    db.commit()
+    db.refresh(invite)
+
+    logger.info("Admin extended invite %s (id=%s)", invite.code, invite_id)
     admin_map, referrer_map = _resolve_invite_relations(invite, db)
     return _build_invite_summary(invite, admin_map, referrer_map)
