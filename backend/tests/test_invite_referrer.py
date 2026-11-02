@@ -799,6 +799,58 @@ class TestFamilySelfRegister:
         assert resp.status_code == 400
         assert "invite code" in resp.json()["detail"].lower()
 
+    def _register_family_payload(self, code: str, email: str) -> dict:
+        return {
+            "code": code,
+            "family_name": "The Orphans",
+            "family_wish": "A roof",
+            "contact_name": "Orphan",
+            "email": email,
+            "password": "GoodPass1234!",
+            "address": "none",
+            "phone_number": "555-000-0000",
+        }
+
+    def test_deleted_referrer_code_rejected(self, test_client: TestClient, admin_user, db: Session):
+        """A soft-deleted referrer's family invite code must not register families."""
+        from app.models import Family, Referrer, User
+
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        ref = db.query(Referrer).filter(Referrer.family_invite_code == code).first()
+        assert ref is not None
+
+        # Admin deletes the referrer
+        resp = test_client.delete(f"/api/admin/referrers/{ref.id}")
+        assert resp.status_code == 204
+
+        resp = test_client.post("/api/auth/register-family", json=self._register_family_payload(code, "orphan1@test.com"))
+        assert resp.status_code == 400
+        assert "not active" in resp.json()["detail"].lower()
+
+        # Nothing was created
+        assert db.query(Family).filter(Family.family_name == "The Orphans").count() == 0
+        assert db.query(User).filter(User.email == "orphan1@test.com").count() == 0
+
+    def test_rejected_referrer_code_rejected(self, test_client: TestClient, admin_user, db: Session):
+        """A rejected referrer's family invite code must not register families."""
+        from app.models import Family, Referrer, User
+
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        ref = db.query(Referrer).filter(Referrer.family_invite_code == code).first()
+        assert ref is not None
+
+        # Admin rejects the referrer
+        resp = test_client.post(f"/api/admin/referrers/{ref.id}/reject")
+        assert resp.status_code == 200
+
+        resp = test_client.post("/api/auth/register-family", json=self._register_family_payload(code, "orphan2@test.com"))
+        assert resp.status_code == 400
+        assert "not active" in resp.json()["detail"].lower()
+
+        # Nothing was created
+        assert db.query(Family).filter(Family.family_name == "The Orphans").count() == 0
+        assert db.query(User).filter(User.email == "orphan2@test.com").count() == 0
+
     def test_duplicate_email(self, test_client: TestClient, admin_user, db: Session):
         code = self._create_referrer_with_code(test_client, admin_user, db)
 

@@ -626,10 +626,21 @@ async def register_family(
     db: Session = Depends(get_db),
 ):
     """Public self-registration: family registers via a referrer's family invite code."""
-    # 1. Look up referrer by family_invite_code
+    # 1. Look up referrer by family_invite_code.
+    # The lookup intentionally includes soft-deleted referrers so we can tell
+    # "code belongs to an inactive referrer" apart from "code is bogus" and
+    # show the family an actionable error.
     referrer = db.query(Referrer).filter(Referrer.family_invite_code == data.code).first()
     if not referrer:
         raise HTTPException(status_code=400, detail="Invalid invite code")
+    # A deleted referrer can never confirm the family, and a rejected
+    # referrer is locked out of the app — a family registered against either
+    # would sit in a verification queue nobody can reach.
+    if referrer.deleted_at is not None or referrer.approval_status == ReferrerApprovalStatus.rejected:
+        raise HTTPException(
+            status_code=400,
+            detail="Your referrer's account is not active. Please contact them for a new invite code.",
+        )
 
     # 2. Check for duplicate email
     existing = db.query(User).filter(User.email == data.email).first()
@@ -671,7 +682,7 @@ async def register_family(
     logger.info("Family self-registered via invite: user_id=%s (referrer_id=%s)", user.id, referrer.id)
 
     # 5. Send notification email to referrer
-    referrer_user = db.query(User).filter(User.referrer_id == referrer.id).first()
+    referrer_user = db.query(User).filter(User.referrer_id == referrer.id, User.deleted_at.is_(None)).first()
     if referrer_user:
         display_name = referrer_user.display_name or referrer.name
         html_body = build_family_pending_email(data.family_name, display_name)
