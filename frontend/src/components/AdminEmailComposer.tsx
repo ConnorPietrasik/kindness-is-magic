@@ -2,12 +2,16 @@
  * AdminEmailComposer — dialog for sending a freeform ("custom") email to any
  * recipient, with a live preview in the branded email style.
  *
- * The recipient is prefilled by the entry point (family contact email or
- * referrer email) but stays editable. Sends via POST /api/admin/emails/send,
- * which reuses the shared send path: the unsubscribe gate applies
- * (unsubscribed recipients are blocked and reported), and one SentEmail row
- * (kind custom_message) is recorded per attempt — so the sent-email log is
- * invalidated on every completed attempt.
+ * When the entry point passes `recipientOptions` (the people it knows about,
+ * e.g. the family contact and the referrer), the recipient is a select over
+ * them plus an "Other…" option that reveals a free-text field — the common
+ * case is a click, not a typed email, which guards against typos to known
+ * people. Entry points without options (e.g. the Sent Emails "+ Compose")
+ * get the plain editable field: anyone, anywhere. Sends via
+ * POST /api/admin/emails/send, which reuses the shared send path: the
+ * unsubscribe gate applies (unsubscribed recipients are blocked and
+ * reported), and one SentEmail row (kind custom_message) is recorded per
+ * attempt — so the sent-email log is invalidated on every completed attempt.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,30 +31,67 @@ import { FormField } from "./FormField";
 // blank (the server applies the same default).
 const DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨";
 
+/** Select value for the "Other…" free-text recipient option. */
+const OTHER = "other";
+
+/** A known recipient the entry point can offer in the recipient select. */
+export interface EmailRecipientOption {
+  /** The address sent to (the select option's value). */
+  email: string;
+  /** Short role shown before the address, e.g. "Family contact". */
+  label: string;
+}
+
 export interface AdminEmailComposerProps {
   open: boolean;
   /** Context line under the title, e.g. "Family 2-1 — The Johnsons". Omit for a generic compose. */
   contextLabel?: string | null;
-  /** Recipient prefilled into the (editable) Recipient field. */
+  /** Recipient preselected (a matching option) or pretyped (Other free text). */
   prefilledRecipient?: string | null;
+  /** Known recipients offered as a select (plus "Other…" free text). Omit for a plain editable field. */
+  recipientOptions?: EmailRecipientOption[] | null;
   onClose: () => void;
 }
 
-export function AdminEmailComposer({ open, contextLabel = null, prefilledRecipient = null, onClose }: AdminEmailComposerProps) {
+export function AdminEmailComposer({
+  open,
+  contextLabel = null,
+  prefilledRecipient = null,
+  recipientOptions = null,
+  onClose,
+}: AdminEmailComposerProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [recipient, setRecipient] = useState("");
+  // Recipient: one of the known options (its email) or "other" (free text)
+  const [recipientChoice, setRecipientChoice] = useState(OTHER);
+  const [otherRecipient, setOtherRecipient] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 
-  // Reset the form whenever the dialog opens (the prefill differs per entry point/row)
+  const options = recipientOptions ?? [];
+  const hasOptions = options.length > 0;
+  const isOther = recipientChoice === OTHER;
+  const recipient = isOther ? otherRecipient : recipientChoice;
+
+  // The prefill, when it matches a known recipient — its email (a stable
+  // string, so the reset effect below can depend on it directly) — else ""
+  const prefillMatch = options.find((o) => o.email === prefilledRecipient)?.email ?? "";
+
+  // Reset the form whenever the dialog opens — and when its prefill or option
+  // match changes while open (e.g. the lazy referrer fetch landing). The
+  // prefill lands in the select when it matches a known recipient, else in
+  // the Other free-text field.
   useEffect(() => {
     if (open) {
-      setRecipient(prefilledRecipient ?? "");
+      if (prefillMatch) setRecipientChoice(prefillMatch);
+      else {
+        setRecipientChoice(OTHER);
+        setOtherRecipient(prefilledRecipient ?? "");
+      }
       setSubject("");
       setMessage("");
     }
-  }, [open, prefilledRecipient]);
+  }, [open, prefilledRecipient, prefillMatch]);
 
   const trimmedRecipient = recipient.trim();
   const canSend = trimmedRecipient.length > 0 && message.trim().length > 0;
@@ -100,17 +141,51 @@ export function AdminEmailComposer({ open, contextLabel = null, prefilledRecipie
 
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-2">
           <div className="flex flex-col gap-3">
-            <FormField
-              label="Recipient"
-              type="email"
-              fieldProps={{
-                value: recipient,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setRecipient(e.target.value),
-                required: true,
-                placeholder: "recipient@example.com",
-                autoComplete: "email",
-              }}
-            />
+            {hasOptions ? (
+              <>
+                <FormField
+                  label="Recipient"
+                  as="select"
+                  fieldProps={{
+                    value: recipientChoice,
+                    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setRecipientChoice(e.target.value),
+                    autoComplete: "off",
+                  }}
+                >
+                  {options.map((o) => (
+                    <option key={o.email} value={o.email}>
+                      {o.label} — {o.email}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Other…</option>
+                </FormField>
+                {isOther && (
+                  <FormField
+                    label="Recipient email"
+                    type="email"
+                    fieldProps={{
+                      value: otherRecipient,
+                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOtherRecipient(e.target.value),
+                      required: true,
+                      placeholder: "recipient@example.com",
+                      autoComplete: "email",
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <FormField
+                label="Recipient"
+                type="email"
+                fieldProps={{
+                  value: recipient,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => setOtherRecipient(e.target.value),
+                  required: true,
+                  placeholder: "recipient@example.com",
+                  autoComplete: "email",
+                }}
+              />
+            )}
             <FormField
               label="Subject (optional)"
               fieldProps={{

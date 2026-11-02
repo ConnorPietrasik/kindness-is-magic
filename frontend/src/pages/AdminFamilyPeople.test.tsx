@@ -8,7 +8,7 @@ import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import { headerUser } from "../test/fixtures";
-import type { FamilyDetail, PersonDetail } from "../types";
+import type { FamilyDetail, PersonDetail, ReferrerDetail } from "../types";
 import AdminFamilyPeople from "./AdminFamilyPeople";
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +55,24 @@ const mockPerson: PersonDetail = {
   wishes: [],
 };
 
+// The lazy referrer fetch fires whenever the email composer opens, so this is
+// always mocked (mockFamily's referrer_id points at it)
+const mockReferrer: ReferrerDetail = {
+  id: 2,
+  name: "Referrer Ray",
+  family_limit: 10,
+  phone_number: "555-0000",
+  family_invite_code: "KRI-123456",
+  family_count: 1,
+  approval_status: "approved",
+  approved_by_admin_name: null,
+  approved_at: null,
+  created_at: "2025-11-01T00:00:00Z",
+  deleted_at: null,
+  invite_count: null,
+  email: "ray@example.com",
+};
+
 function renderPage(familyOverrides: Partial<FamilyDetail> = {}) {
   const family = { ...mockFamily, ...familyOverrides };
   vi.spyOn(api, "adminGetFamily").mockResolvedValue(family);
@@ -67,6 +85,7 @@ function renderPage(familyOverrides: Partial<FamilyDetail> = {}) {
   });
   vi.spyOn(api, "adminGetReferrersDropdown").mockResolvedValue([]);
   vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
+  vi.spyOn(api, "adminGetReferrer").mockResolvedValue(mockReferrer);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(auth, headerUser);
@@ -139,6 +158,36 @@ describe("AdminFamilyPeople", () => {
     expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
     expect(screen.getByText("Family 2-1 — The Johnsons")).toBeInTheDocument();
     expect(screen.getByLabelText("Recipient")).toHaveValue("alice@example.com");
+    // Opening the composer also lazily loads the referrer, offered as a switchable option
+    expect(await screen.findByRole("option", { name: "Referrer — ray@example.com" })).toBeInTheDocument();
+  });
+
+  it("offers the referrer as a recipient option and selects it on click", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findAllByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+
+    expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
+    // The referrer option arrives with the lazy referrer fetch
+    const referrerOption = await screen.findByRole("option", { name: "Referrer — ray@example.com" });
+    await user.selectOptions(screen.getByLabelText("Recipient"), referrerOption);
+    expect(screen.getByLabelText("Recipient")).toHaveValue("ray@example.com");
+    // The family contact is also offered in the select
+    expect(screen.getByRole("option", { name: "Family contact — alice@example.com" })).toBeInTheDocument();
+  });
+
+  it("offers no referrer option when the family has no referrer", async () => {
+    const user = userEvent.setup();
+    renderPage({ referrer_id: null, referrer_name: null });
+
+    await screen.findAllByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+    expect(await screen.findByRole("heading", { name: "Send email" })).toBeInTheDocument();
+    // Contact prefilled, no referrer option (fetch disabled for referrer_id null)
+    expect(screen.getByLabelText("Recipient")).toHaveValue("alice@example.com");
+    expect(screen.queryByRole("option", { name: /Referrer — / })).not.toBeInTheDocument();
   });
 
   it("fully approve flow confirms and calls API", async () => {

@@ -109,6 +109,42 @@ test.describe.serial("Admin custom emails", () => {
     await context.close();
   });
 
+  test("the referrer can be picked from the recipient dropdown", async ({ browser }) => {
+    test.skip(!referrerId || !familyId, "setup incomplete");
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto(`/admin/families/${familyId}/people`);
+    await expect(page.getByRole("heading", { name: "Family & People" })).toBeVisible();
+
+    /* Open the composer from the header toolbar */
+    await page.getByRole("button", { name: "Send email" }).click();
+    await expect(page.getByRole("heading", { name: "Send email" })).toBeVisible();
+
+    /* Recipient is prefilled from the family contact user's email */
+    await expect(page.getByLabel("Recipient")).toHaveValue(FAMILY_USER_EMAIL);
+
+    /* The referrer option arrives with the lazy referrer fetch */
+    const referrerEmail = `e2e-mail-ref-${suffix}@example.com`;
+    const referrerOption = page.getByRole("option", { name: `Referrer — ${referrerEmail}` });
+    await expect(referrerOption).toBeAttached();
+    await page.getByLabel("Recipient").selectOption(referrerEmail);
+
+    /* Selecting it switches the recipient to the referrer's email */
+    await expect(page.getByLabel("Recipient")).toHaveValue(referrerEmail);
+
+    /* The family contact stays offered as a switchable option too */
+    await expect(page.getByRole("option", { name: `Family contact — ${FAMILY_USER_EMAIL}` })).toBeAttached();
+    await expect(page.getByRole("option", { name: "Other…" })).toBeAttached();
+
+    /* Close without sending — keeps the sent-log assertions unambiguous */
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("heading", { name: "Send email" })).not.toBeVisible();
+
+    await context.close();
+  });
+
   test("the custom email is logged on the Sent Emails page", async ({ browser }) => {
     test.skip(!familyId, "setup incomplete");
 

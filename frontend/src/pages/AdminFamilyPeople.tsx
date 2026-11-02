@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { Fragment, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
-import { AdminEmailComposer } from "../components/AdminEmailComposer";
+import { AdminEmailComposer, type EmailRecipientOption } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
@@ -42,6 +42,7 @@ import {
   adminCreatePerson,
   adminDeletePerson,
   adminGetFamily,
+  adminGetReferrer,
   adminListDeletedPeople,
   adminListFamilyPeople,
   adminRestorePerson,
@@ -55,6 +56,7 @@ import {
   adminFamilyDetail,
   adminFamilyPeople,
   adminPackingSlips,
+  adminReferrerDetail,
   adminReferrerFamilies,
   adminWishes,
 } from "../lib/queryKeys";
@@ -85,8 +87,29 @@ export default function AdminFamilyPeople() {
   const [searchParams] = useSearchParams();
   const cameFromReferrer = searchParams.get("from") === "referrer";
 
-  // Drives the header "Send email" composer
+  // Family detail (fetch is shared with HierarchicalManage's parent query —
+  // this hook exists for the back link when coming from referrer, and also
+  // supplies the "Send email" recipient prefill via the same cache entry)
+  const { data: familyDetail } = useQuery({
+    queryKey: adminFamilyDetail(famIdStr),
+    queryFn: () => adminGetFamily(famIdNum),
+    enabled: cameFromReferrer,
+  });
+
+  // Drives the header "Send email" composer (the recipient select inside it
+  // covers the family contact and, when the family has one, its referrer)
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
+
+  // Referrer recipient option: lazy fetch while the composer is open, so the
+  // admin can pick the referrer from the recipient select. Shares the
+  // adminReferrerDetail key with the AdminReferrerFamilies page (dedupes).
+  // The "0" key is never fetched (enabled gates it).
+  const familyReferrerId = familyDetail?.referrer_id != null && familyDetail.referrer_id > 0 ? familyDetail.referrer_id : null;
+  const { data: referrerDetail } = useQuery({
+    queryKey: adminReferrerDetail(String(familyReferrerId ?? 0)),
+    queryFn: () => adminGetReferrer(familyReferrerId!),
+    enabled: sendEmailOpen && familyReferrerId != null,
+  });
 
   // Column visibility + user column order (shared with the main people
   // page — same column registry, so one order applies to both tables).
@@ -105,20 +128,19 @@ export default function AdminFamilyPeople() {
     [orderedKeys, visibleColumns]
   );
 
-  // Family detail (fetch is shared with HierarchicalManage's parent query —
-  // this hook exists for the back link when coming from referrer, and also
-  // supplies the "Send email" recipient prefill via the same cache entry)
-  const { data: familyDetail } = useQuery({
-    queryKey: adminFamilyDetail(famIdStr),
-    queryFn: () => adminGetFamily(famIdNum),
-    enabled: cameFromReferrer,
-  });
-
   // Back link: go to referrer's families page only if that's where we came from
   const backLinkTo =
     cameFromReferrer && familyDetail?.referrer_id != null && familyDetail.referrer_id > 0
       ? route.adminReferrerFamilies(familyDetail.referrer_id)
       : ROUTES.ADMIN_FAMILIES;
+
+  // Known recipients for the composer select — the people this page is about
+  const recipientOptions = useMemo(() => {
+    const options: EmailRecipientOption[] = [];
+    if (familyDetail?.contact_email) options.push({ email: familyDetail.contact_email, label: "Family contact" });
+    if (referrerDetail?.email) options.push({ email: referrerDetail.email, label: "Referrer" });
+    return options;
+  }, [familyDetail, referrerDetail]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -209,11 +231,13 @@ export default function AdminFamilyPeople() {
           }}
         />
 
-        {/* Send email — prefilled from the family contact user's email */}
+        {/* Send email — prefilled from the family contact; the recipient
+            select also offers the family's referrer ("Other…" for anyone) */}
         <AdminEmailComposer
           open={sendEmailOpen}
           contextLabel={familyDetail ? `Family ${familyDetail.display_id ?? familyDetail.id} — ${familyDetail.family_name}` : null}
           prefilledRecipient={familyDetail?.contact_email ?? null}
+          recipientOptions={recipientOptions}
           onClose={() => setSendEmailOpen(false)}
         />
       </main>
@@ -236,6 +260,7 @@ function FamilyCard(
 ) {
   const { data, isEditing, onToggleEdit, isSaving, onSave, famId, referrerMap, referrersLoading, deliveryUserMap, deliveryUsersLoading } =
     props;
+
   const queryClient = useQueryClient();
   const toast = useToast();
   const lockLevel = data?.wish_lock_level ?? "family";

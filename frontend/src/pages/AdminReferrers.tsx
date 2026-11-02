@@ -518,6 +518,7 @@ export default function AdminReferrers() {
             open={sendEmailReferrer !== null}
             contextLabel={sendEmailReferrer ? `Referrer ${sendEmailReferrer.id} — ${sendEmailReferrer.name}` : null}
             prefilledRecipient={sendEmailReferrer?.email ?? null}
+            recipientOptions={sendEmailReferrer?.email ? [{ email: sendEmailReferrer.email, label: "Referrer" }] : null}
             onClose={() => setSendEmailReferrer(null)}
           />
 

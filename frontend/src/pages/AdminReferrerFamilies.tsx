@@ -9,7 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AdminEmailComposer } from "../components/AdminEmailComposer";
+import { AdminEmailComposer, type EmailRecipientOption } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
@@ -78,6 +78,17 @@ export default function AdminReferrerFamilies() {
   // Target of the page-level composer: the referrer itself (header button) or
   // one of the row's families (row action menu)
   const [sendEmailTarget, setSendEmailTarget] = useState<{ type: "referrer" } | { type: "family"; family: FamilyDetail } | null>(null);
+
+  // Known recipients for the composer select: the referrer (always — the page
+  // subject) and the target family's contact when a family row is the target
+  const recipientOptions = useMemo(() => {
+    const options: EmailRecipientOption[] = [];
+    if (referrerDetail?.email) options.push({ email: referrerDetail.email, label: "Referrer" });
+    if (sendEmailTarget?.type === "family" && sendEmailTarget.family.contact_email) {
+      options.push({ email: sendEmailTarget.family.contact_email, label: "Family contact" });
+    }
+    return options;
+  }, [referrerDetail, sendEmailTarget]);
 
   // Wish-lock row actions (reset lock / fully approve) — also refreshes
   // this referrer's scoped family list
@@ -206,7 +217,7 @@ export default function AdminReferrerFamilies() {
         />
 
         {/* Send email — one composer for the referrer (header) and the family
-            rows (action menu), prefilled from the respective prefill field */}
+            rows (action menu); recipient select over the known recipients */}
         <AdminEmailComposer
           open={sendEmailTarget !== null}
           contextLabel={
@@ -225,6 +236,7 @@ export default function AdminReferrerFamilies() {
                 ? (referrerDetail?.email ?? null)
                 : (sendEmailTarget.family.contact_email ?? null)
           }
+          recipientOptions={recipientOptions}
           onClose={() => setSendEmailTarget(null)}
         />
       </main>

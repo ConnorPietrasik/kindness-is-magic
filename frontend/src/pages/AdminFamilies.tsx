@@ -612,6 +612,7 @@ export default function AdminFamilies() {
               sendEmailFamily ? `Family ${sendEmailFamily.display_id ?? sendEmailFamily.id} — ${sendEmailFamily.family_name}` : null
             }
             prefilledRecipient={sendEmailFamily?.contact_email ?? null}
+            recipientOptions={sendEmailFamily?.contact_email ? [{ email: sendEmailFamily.contact_email, label: "Family contact" }] : null}
             onClose={() => setSendEmailFamily(null)}
           />
 

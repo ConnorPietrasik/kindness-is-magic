@@ -173,3 +173,77 @@ describe("AdminEmailComposer", () => {
     expect(screen.getByText("Second paragraph")).toBeInTheDocument();
   });
 });
+
+describe("AdminEmailComposer with recipient options", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  const options = [
+    { email: "alice@example.com", label: "Family contact" },
+    { email: "ray@example.com", label: "Referrer" },
+  ];
+
+  it("renders a recipient select with the prefill selected, no free-text field", () => {
+    wrap({ prefilledRecipient: "ray@example.com", recipientOptions: options });
+
+    expect(screen.getByLabelText("Recipient")).toHaveValue("ray@example.com");
+    expect(screen.getByRole("option", { name: "Family contact — alice@example.com" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Referrer — ray@example.com" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Other…" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Recipient email")).not.toBeInTheDocument();
+  });
+
+  it("prefill that matches no option lands in the Other free-text field", () => {
+    wrap({ prefilledRecipient: "stranger@example.com", recipientOptions: options });
+
+    expect(screen.getByLabelText("Recipient")).toHaveValue("other");
+    expect(screen.getByLabelText("Recipient email")).toHaveValue("stranger@example.com");
+  });
+
+  it("switching the select to another known recipient sends to it", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminSendCustomEmail").mockResolvedValue({ sent: true, reason: null });
+    wrap({ prefilledRecipient: "alice@example.com", recipientOptions: options });
+
+    await user.selectOptions(screen.getByLabelText("Recipient"), "ray@example.com");
+    await user.type(screen.getByLabelText("Message"), "Body text");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => {
+      expect(api.adminSendCustomEmail).toHaveBeenCalledWith(expect.objectContaining({ recipient_email: "ray@example.com" }));
+    });
+  });
+
+  it("selecting Other… reveals the free-text field and sends to it", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminSendCustomEmail").mockResolvedValue({ sent: true, reason: null });
+    wrap({ prefilledRecipient: "alice@example.com", recipientOptions: options });
+
+    await user.selectOptions(screen.getByLabelText("Recipient"), "other");
+    await user.type(screen.getByLabelText("Recipient email"), "newperson@example.com");
+    await user.type(screen.getByLabelText("Message"), "Body text");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => {
+      expect(api.adminSendCustomEmail).toHaveBeenCalledWith(expect.objectContaining({ recipient_email: "newperson@example.com" }));
+    });
+  });
+
+  it("disables Send until the Other free-text field is filled", async () => {
+    const user = userEvent.setup();
+    wrap({ prefilledRecipient: "alice@example.com", recipientOptions: options });
+
+    await user.selectOptions(screen.getByLabelText("Recipient"), "other");
+
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(send).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Recipient email"), "newperson@example.com");
+    expect(send).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Message"), "Body text");
+    expect(send).toBeEnabled();
+  });
+});
