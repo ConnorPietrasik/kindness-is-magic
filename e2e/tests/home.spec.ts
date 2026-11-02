@@ -11,11 +11,13 @@
  *    exact external donate URL (asserted by attribute — never clicked out).
  *  - Footer legal links reach their pages; Donate and social links point at
  *    the exact external URLs (asserted by attribute — never clicked out).
- *  - An authenticated visitor still sees the brochure (no redirect away) with
- *    a Dashboard link in the header.
+ *  - An authenticated visitor still sees the brochure (no redirect away); the
+ *    header title links to their role home (no separate Dashboard link).
+ *  - Signed-in app pages carry the site footer, whose Home link returns to
+ *    the brochure (the only in-app path back to the public site).
  *
  * The wish-list header is deliberately not covered here (it would require
- * seeding an approved family): it is the same PublicHeader already covered by
+ * seeding an approved family): it is the same HeaderBar already covered by
  * the vitest gate and by /families above.
  */
 import { test, expect } from "@playwright/test";
@@ -115,12 +117,25 @@ test.describe("Home brochure (public)", () => {
     await expect(footer.getByRole("link", { name: "Facebook" })).toHaveAttribute("href", FACEBOOK_URL);
   });
 
-  test("authenticated visitor still sees the brochure, with a Dashboard link", async ({ page }) => {
+  test("authenticated visitor still sees the brochure, header links to the role home", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/home");
     await expect(page).toHaveURL(/\/home/);
     /* No redirect away — the brochure renders for everyone */
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
+    /* The centred title (not a separate Dashboard link) leads back to the role home */
+    await expect(page.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+    await expect(page.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  });
+
+  test("signed-in app pages show the footer, whose Home link returns to the brochure", async ({ page }) => {
+    await loginAsAdmin(page);
+    const footerHome = page.locator("footer").getByRole("link", { name: "Home" });
+    await expect(footerHome).toBeVisible({ timeout: 10_000 });
+
+    await footerHome.click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });

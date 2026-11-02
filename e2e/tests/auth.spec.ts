@@ -173,3 +173,40 @@ test.describe("Authentication", () => {
     expect(results).toEqual([true, true]);
   });
 });
+
+test.describe("Unified header", () => {
+  test("guest: section nav, sign in link, and title link to /home", async ({ page }) => {
+    await page.goto("/families");
+
+    await expect(page.getByRole("link", { name: "How it works" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Our mission" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  });
+
+  test("guest on /home: title is a scroll-to-top button", async ({ page }) => {
+    await page.goto("/home");
+
+    await expect(page.getByRole("button", { name: "Kindness is Magic" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  });
+
+  test("signed in: title links to the role home, sign out present, section nav hidden", async ({ page }) => {
+    await loginAsFamily(page);
+    await expect(page).toHaveURL(/\/family\/dashboard/);
+
+    await expect(page.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/family/dashboard");
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "How it works" })).toHaveCount(0);
+  });
+
+  test("signed in: sign out is available on non-dashboard app pages too", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto("/admin/deadlines");
+    await expect(page.getByRole("heading", { name: "Event Deadlines" })).toBeVisible({ timeout: 10_000 });
+
+    await logout(page);
+    await expect(page).toHaveURL(/\/login/);
+  });
+});

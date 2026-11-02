@@ -3,8 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import CsvUpload from "./CsvUpload";
 
 /* ------------------------------------------------------------------ */
@@ -27,10 +30,13 @@ const makeCsvFile = (text: string, name = "import.csv") => new File([text], name
 
 const wrap = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/admin/csv-upload"]}>
       <QueryClientProvider client={queryClient}>
-        <ToastContainer>{ui}</ToastContainer>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

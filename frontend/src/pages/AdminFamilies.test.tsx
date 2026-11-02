@@ -3,8 +3,11 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilyDetail, FamilyListResponse, ReferrerDropdownItem, UserDropdownItem } from "../types";
 import AdminFamilies from "./AdminFamilies";
 
@@ -97,10 +100,13 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 
 const wrap = (ui: React.ReactElement) => {
   const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/admin/families"]}>
       <QueryClientProvider client={queryClient}>
-        <ToastContainer>{ui}</ToastContainer>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

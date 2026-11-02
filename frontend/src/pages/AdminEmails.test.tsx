@@ -3,9 +3,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
+import { headerUser } from "../test/fixtures";
 import type { EmailKind, SentEmailSummary } from "../types";
 import AdminEmails, { KIND_LABELS } from "./AdminEmails";
 
@@ -17,11 +20,14 @@ const emptyListResponse = { emails: [], total: 0, page: 1, page_size: 50, total_
 
 const wrap = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/admin/emails"]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <AdminEmails />
+          <AuthProvider>
+            <AdminEmails />
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

@@ -203,7 +203,7 @@ export default function AdminUsers() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" />
+      <HeaderBar />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}

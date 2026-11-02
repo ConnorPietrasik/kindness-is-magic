@@ -1,3 +1,5 @@
+import type { UserRole } from "../types";
+
 /**
  * ROUTES — centralised route path constants.
  *
@@ -71,6 +73,20 @@ export const ROUTES = {
   // ── Root ──────────────────────────────────────────────────
   ROOT: "/",
 } as const;
+
+/**
+ * ROLE_HOME — each authenticated role's home route: where the user lands
+ * after login and where the header logo/title links to. Both the root
+ * redirect and the header must agree on this map.
+ */
+export const ROLE_HOME: Record<UserRole, string> = {
+  admin: ROUTES.DASHBOARD,
+  donor: ROUTES.DASHBOARD,
+  referrer: ROUTES.DASHBOARD,
+  family: ROUTES.FAMILY_DASHBOARD,
+  purchaser: ROUTES.PURCHASER_ASSIGNED_GIFTS,
+  delivery: ROUTES.DELIVERY_DASHBOARD,
+};
 
 /**
  * Dynamic route builders (return strings ready for <Navigate to=...> or

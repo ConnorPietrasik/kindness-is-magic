@@ -11,16 +11,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/Button";
 import { DeliverySlipsView } from "../components/DeliverySlips";
-import { BackLink, HeaderBar, LogoutButton } from "../components/HeaderBar";
+import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
-import { useAuth } from "../context/AuthContext";
 import { deliveryListFamilies } from "../lib/api";
 import { deliveryFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 
 export default function DeliverySlips() {
-  const { logout } = useAuth();
-
   const { data, isLoading, isError, error } = useQuery({
     queryKey: deliveryFamilies,
     queryFn: deliveryListFamilies,
@@ -31,14 +28,12 @@ export default function DeliverySlips() {
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
-        title="Kindness is Magic"
         left={<BackLink to={ROUTES.DELIVERY_DASHBOARD} label="Dashboard" />}
         right={
           <div className="no-print flex items-center gap-2">
             <Button variant="secondary" onClick={() => window.print()}>
               🖨️ Print
             </Button>
-            <LogoutButton onClick={logout} />
           </div>
         }
       />

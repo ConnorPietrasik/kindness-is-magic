@@ -123,7 +123,6 @@ export default function AdminFamilyPeople() {
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
-        title="Kindness is Magic"
         left={
           <Link to={backLinkTo} className="text-sm text-white/80 transition-colors hover:text-white">
             ← Back

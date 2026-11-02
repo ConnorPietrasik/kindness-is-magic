@@ -32,7 +32,7 @@ export default function ReferrerReviewQueue() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <WishReviewQueue
         title="Wish Review Queue"

@@ -17,9 +17,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
 import { PageError } from "../components/PageError";
-import { PublicHeader } from "../components/PublicHeader";
 import { PageSpinner } from "../components/Spinner";
 import { getFamilyWishList } from "../lib/api";
 import { familyWishList } from "../lib/queryKeys";
@@ -117,7 +117,7 @@ export default function FamilyWishCards() {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <PublicHeader className="no-print" left={<BackToWishList familyId={familyId} />} />
+        <HeaderBar className="no-print" left={<BackToWishList familyId={familyId} />} />
         <PageError
           error={error}
           heading="Unable to Load Wish Cards"
@@ -133,7 +133,7 @@ export default function FamilyWishCards() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <PublicHeader className="no-print" left={<BackToWishList familyId={familyId} />} />
+      <HeaderBar className="no-print" left={<BackToWishList familyId={familyId} />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* No-print toolbar */}

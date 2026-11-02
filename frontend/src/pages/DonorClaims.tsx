@@ -49,7 +49,7 @@ export default function DonorClaims() {
   if (isError || !claims) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" />
+        <HeaderBar />
         <PageError error={error} heading="Unable to Load Sponsorships" fallback="Something went wrong. Please try again later." />
       </div>
     );
@@ -57,7 +57,7 @@ export default function DonorClaims() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" />
+      <HeaderBar />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

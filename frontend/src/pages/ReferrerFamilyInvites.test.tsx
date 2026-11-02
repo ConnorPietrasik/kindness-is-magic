@@ -4,9 +4,12 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
+import { headerUser } from "../test/fixtures";
 import type { ReferrerDetail, ReferrerInviteEmailItem } from "../types";
 import ReferrerFamilyInvites from "./ReferrerFamilyInvites";
 
@@ -44,16 +47,22 @@ function makeInviteEmail(overrides: Partial<ReferrerInviteEmailItem>): ReferrerI
   };
 }
 
-const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const createQueryClient = () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(auth, headerUser);
+  return qc;
+};
 
 function wrap(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>
       <ToastContainer>
         <MemoryRouter initialEntries={["/referrer/family-invites"]}>
-          <Routes>
-            <Route path="/referrer/family-invites" element={children} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/referrer/family-invites" element={children} />
+            </Routes>
+          </AuthProvider>
         </MemoryRouter>
       </ToastContainer>
     </QueryClientProvider>

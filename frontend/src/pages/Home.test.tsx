@@ -139,10 +139,11 @@ describe("Home", () => {
     expect(within(footer).getByRole("link", { name: CONTACT_EMAIL })).toHaveAttribute("href", `mailto:${CONTACT_EMAIL}`);
   });
 
-  it("shows a Dashboard link for signed-in visitors", () => {
+  it("links the header to the role home for signed-in visitors (no Dashboard link)", () => {
     wrap(mockUser);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
   });
 
   it("scrolls to the section named by the URL hash", () => {

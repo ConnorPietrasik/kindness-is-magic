@@ -3,9 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import type { PurchaserWishesListParams } from "../lib/api";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { PurchaserWishListResponse, PurchaserWishSummary, WishDetail } from "../types";
 import PurchaserAssignedGifts from "./PurchaserAssignedGifts";
 
@@ -74,11 +77,14 @@ function listResponse(wishes: PurchaserWishSummary[]): PurchaserWishListResponse
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/purchaser/gifts"]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <PurchaserAssignedGifts />
+          <AuthProvider>
+            <PurchaserAssignedGifts />
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

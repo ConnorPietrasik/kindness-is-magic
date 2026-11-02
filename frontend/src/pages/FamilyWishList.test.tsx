@@ -120,7 +120,7 @@ describe("FamilyWishList header", () => {
     expect(screen.queryByRole("heading", { name: "Family Wish" })).not.toBeInTheDocument();
   });
 
-  it("shows dashboard link and sign out when logged in", async () => {
+  it("links the header to the role home and shows sign out when logged in", async () => {
     vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
 
     wrap({ user: mockUser });
@@ -128,8 +128,9 @@ describe("FamilyWishList header", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/home");
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
+    // The centre title links to the signed-in user's role home
+    expect(screen.getByRole("link", { name: "Kindness is Magic" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 });

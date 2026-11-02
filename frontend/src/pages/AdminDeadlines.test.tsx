@@ -3,9 +3,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import { deadlines } from "../lib/queryKeys";
+import { auth, deadlines } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { Deadline } from "../types";
 import AdminDeadlines from "./AdminDeadlines";
 
@@ -41,12 +43,15 @@ function renderPage(rows: Deadline[] = []) {
   vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: rows });
 
   const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, headerUser);
   render(
     <QueryClientProvider client={queryClient}>
       <ToastContainer>
         <MemoryRouter initialEntries={["/admin/deadlines"]}>
-          <PublicDeadlinesProbe />
-          <AdminDeadlines />
+          <AuthProvider>
+            <PublicDeadlinesProbe />
+            <AdminDeadlines />
+          </AuthProvider>
         </MemoryRouter>
       </ToastContainer>
     </QueryClientProvider>

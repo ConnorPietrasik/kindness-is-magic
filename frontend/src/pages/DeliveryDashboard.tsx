@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { HeaderBar, LogoutButton } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { deliveryListFamilies } from "../lib/api";
@@ -21,7 +21,7 @@ import type { DeliveryFamilySummary } from "../types";
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function DeliveryDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const {
     data: families,
@@ -37,7 +37,7 @@ export default function DeliveryDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" right={<LogoutButton onClick={logout} />} />
+      <HeaderBar />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Welcome */}

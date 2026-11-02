@@ -48,7 +48,7 @@ export default function DonorClaimDetail() {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" left={<BackToClaims />} />
+        <HeaderBar left={<BackToClaims />} />
         <PageError
           error={error}
           heading="Unable to Load Sponsorship"
@@ -65,7 +65,7 @@ export default function DonorClaimDetail() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackToClaims />} />
+      <HeaderBar left={<BackToClaims />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* Claim header */}

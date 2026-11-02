@@ -64,8 +64,9 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 
 export async function loginAsReferrer(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.referrer);
-  /* { exact: true } avoids strict-mode collision with "Referrer ID: N" */
-  await expect(page.getByText("Referrer", { exact: true })).toBeVisible();
+  /* Assert through the dashboard role badge — a bare getByText("Referrer")
+     could match other page text (strict-mode violation). */
+  await expect(page.getByTestId("role-badge")).toHaveText("Referrer");
 }
 
 export async function loginAsFamily(page: Page): Promise<void> {

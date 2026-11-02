@@ -67,6 +67,8 @@ All query keys are defined here as `as const` arrays (some as factory functions 
 
 - Use **named exports** in `src/components/`.
 - Reuse existing components before creating new ones.
+- **`HeaderBar` is the app's single header.** Its content is a function of auth state, not of the page: guests get the brochure section nav + "Sign in"; signed-in users get "Sign out" (always, on every page) and the title/logo link to the role's home (`ROLE_HOME` in `src/lib/routes.ts` — keep it in sync with `DashboardRedirect`). Pages pass only `left` (back links), `right` (page actions like print), and `className` — never the title or the auth controls.
+- **`SiteFooter` is rendered exactly once per page, by the layout — never inside a page.** Public pages get it from their own wrapper (Home and PublicFamilies render it directly; Privacy, Financials and Wish List Guide via `StaticPage`; FamilyWishList itself). Every authenticated page gets it from `ProtectedRoute`, which is also the signed-in path back to the brochure (its Home link). Don't add footers inside pages.
 
 ## Testing
 

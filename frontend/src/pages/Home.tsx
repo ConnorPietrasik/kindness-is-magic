@@ -16,8 +16,8 @@ import giftTablesPhoto from "../assets/home-gift-tables.jpg";
 import heroPhoto from "../assets/home-hero.jpg";
 import howItWorksPhoto from "../assets/home-how-it-works.jpg";
 import { Card } from "../components/Card";
+import { HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
-import { PublicHeader } from "../components/PublicHeader";
 import { Reveal } from "../components/Reveal";
 import { SiteFooter } from "../components/SiteFooter";
 import { DONATE_URL } from "../lib/links";
@@ -48,7 +48,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PublicHeader />
+      <HeaderBar />
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
       <section className="bg-gradient-to-br from-page-start to-page-end px-4 py-16 text-white sm:py-24">

@@ -154,7 +154,7 @@ export default function AdminDeadlines() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" />
+      <HeaderBar />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <h2 className="mb-2 text-xl font-bold text-violet-950">Event Deadlines</h2>

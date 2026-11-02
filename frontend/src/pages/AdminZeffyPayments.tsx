@@ -102,7 +102,7 @@ export default function AdminZeffyPayments() {
     // Includes the 503 "Zeffy not configured" dev/e2e default state
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" />
+        <HeaderBar />
         <PageError error={firstError} heading="Unable to Load Zeffy Payments" fallback="Something went wrong. Please try again later." />
       </div>
     );
@@ -125,7 +125,7 @@ export default function AdminZeffyPayments() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" />
+      <HeaderBar />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}

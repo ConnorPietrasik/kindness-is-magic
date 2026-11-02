@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DeadlineBanner } from "../components/DeadlineBanner";
 import { FormField } from "../components/FormField";
-import { HeaderBar, LogoutButton } from "../components/HeaderBar";
+import { HeaderBar } from "../components/HeaderBar";
 import { InfoRow } from "../components/InfoRow";
 import { MutationErrors } from "../components/MutationErrors";
 import { PhoneInput } from "../components/PhoneInput";
@@ -40,13 +40,7 @@ import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
 const GIFT_CLAIM_CAP = 5;
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate(ROUTES.LOGIN);
-  };
+  const { user } = useAuth();
 
   // Referrer-specific queries (only run when role is referrer)
   const { data: referrerInfo, isLoading: referrerLoading } = useQuery({
@@ -87,7 +81,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" right={<LogoutButton onClick={handleLogout} />} />
+      <HeaderBar />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Profile card — inline display name edit + password change */}

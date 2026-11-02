@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
 import type { ReferrerDetail, ReferrerListResponse, User } from "../types";
 import AdminReferrers from "./AdminReferrers";
 
@@ -85,10 +86,13 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 
 const wrap = (ui: React.ReactElement) => {
   const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, mockAdminUser);
   return render(
     <MemoryRouter initialEntries={["/admin/referrers"]}>
       <QueryClientProvider client={queryClient}>
-        <ToastContainer>{ui}</ToastContainer>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

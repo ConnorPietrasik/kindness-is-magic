@@ -9,9 +9,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
+import { HeaderBar } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
-import { PublicHeader } from "../components/PublicHeader";
 import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
@@ -134,7 +134,7 @@ export default function PublicFamilies() {
   if (isError || !data) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <PublicHeader />
+        <HeaderBar />
         <PageError
           error={error}
           heading="Unable to Load Families"
@@ -176,7 +176,7 @@ export default function PublicFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <PublicHeader />
+      <HeaderBar />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Page title */}

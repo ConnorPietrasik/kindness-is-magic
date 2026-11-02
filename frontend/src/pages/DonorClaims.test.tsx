@@ -3,8 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilyClaimSummary } from "../types";
 import DonorClaims from "./DonorClaims";
 
@@ -66,14 +69,19 @@ const mockPendingCashClaim: FamilyClaimSummary = {
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-const wrap = (ui: React.ReactElement) =>
-  render(
+const wrap = (ui: React.ReactElement) => {
+  const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, headerUser);
+  return render(
     <MemoryRouter initialEntries={["/donor/claims"]}>
-      <QueryClientProvider client={createQueryClient()}>
-        <ToastContainer>{ui}</ToastContainer>
+      <QueryClientProvider client={queryClient}>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
+};
 
 /* ------------------------------------------------------------------ */
 // Tests

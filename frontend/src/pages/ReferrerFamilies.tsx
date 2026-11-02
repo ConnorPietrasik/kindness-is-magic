@@ -116,7 +116,7 @@ export default function ReferrerFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <h2 className="mb-6 text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">My Families</h2>

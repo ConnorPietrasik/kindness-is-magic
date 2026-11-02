@@ -41,7 +41,6 @@ export default function AdminPackingSlips() {
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar
-        title="Kindness is Magic"
         left={<BackLink to={ROUTES.ADMIN_FAMILIES} label="Families" />}
         right={
           <div className="no-print flex items-center gap-2">

@@ -111,6 +111,8 @@ describe("ProtectedRoute", () => {
 
     expect(screen.getByTestId("child")).toBeInTheDocument();
     expect(screen.getByText("Admin Page")).toBeInTheDocument();
+    // Every authenticated page gets the site footer (with the brochure link)
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/home");
     expect(navigateCalls).toEqual([]);
   });
 

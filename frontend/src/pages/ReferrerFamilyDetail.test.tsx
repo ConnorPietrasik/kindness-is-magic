@@ -4,9 +4,11 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import { referrerFamilyDetail, referrerFamilyPeople } from "../lib/queryKeys";
+import { auth, referrerFamilyDetail, referrerFamilyPeople } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilyDetail } from "../types";
 import ReferrerFamilyDetail from "./ReferrerFamilyDetail";
 
@@ -64,7 +66,9 @@ const mockFamilyAwaitingAdmin: FamilyDetail = {
 };
 
 function createQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(auth, headerUser);
+  return qc;
 }
 
 function wrap(qc: QueryClient) {
@@ -72,9 +76,11 @@ function wrap(qc: QueryClient) {
     <QueryClientProvider client={qc}>
       <ToastContainer>
         <MemoryRouter initialEntries={["/referrer/families/1"]}>
-          <Routes>
-            <Route path="/referrer/families/:id" element={children} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/referrer/families/:id" element={children} />
+            </Routes>
+          </AuthProvider>
         </MemoryRouter>
       </ToastContainer>
     </QueryClientProvider>

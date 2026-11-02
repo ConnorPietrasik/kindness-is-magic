@@ -3,8 +3,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { DeliverySlipItem } from "../types";
 import AdminDeliverySlips from "./AdminDeliverySlips";
 
@@ -33,12 +36,15 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 
 const wrap = (ui: React.ReactElement, path = "/admin/delivery-slips") => {
   const queryClient = createQueryClient();
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          {ui}
-          <UrlProbe />
+          <AuthProvider>
+            {ui}
+            <UrlProbe />
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

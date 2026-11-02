@@ -3,8 +3,11 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilySelfServiceDetail, PersonDetail, WishSummary } from "../types";
 import FamilyPeople from "./FamilyPeople";
 
@@ -95,11 +98,14 @@ function renderPage({ family, people }: { family?: Partial<FamilySelfServiceDeta
   vi.spyOn(api, "deletePerson").mockResolvedValue(undefined);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/family/people"]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <FamilyPeople />
+          <AuthProvider>
+            <FamilyPeople />
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

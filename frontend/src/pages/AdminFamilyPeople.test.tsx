@@ -3,8 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilyDetail, PersonDetail } from "../types";
 import AdminFamilyPeople from "./AdminFamilyPeople";
 
@@ -66,13 +69,16 @@ function renderPage(familyOverrides: Partial<FamilyDetail> = {}) {
   vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/admin/families/5/people"]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <Routes>
-            <Route path="/admin/families/:id/people" element={<AdminFamilyPeople />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/admin/families/:id/people" element={<AdminFamilyPeople />} />
+            </Routes>
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

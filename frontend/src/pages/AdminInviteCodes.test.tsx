@@ -3,8 +3,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { InviteListResponse, ReferrerInviteSummary } from "../types";
 import AdminInviteCodes from "./AdminInviteCodes";
 
@@ -38,11 +41,14 @@ const listWith = (invites: ReferrerInviteSummary[]): InviteListResponse => ({
 
 const wrap = (path: string) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <AdminInviteCodes />
+          <AuthProvider>
+            <AdminInviteCodes />
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

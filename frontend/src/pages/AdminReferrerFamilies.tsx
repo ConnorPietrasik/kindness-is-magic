@@ -99,7 +99,7 @@ export default function AdminReferrerFamilies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.ADMIN_REFERRERS} label="Referrers" />} />
+      <HeaderBar left={<BackLink to={ROUTES.ADMIN_REFERRERS} label="Referrers" />} />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

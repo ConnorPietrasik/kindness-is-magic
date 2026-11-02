@@ -80,7 +80,7 @@ export default function FamilyPeople() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.FAMILY_DASHBOARD} label="Family Dashboard" />} />
+      <HeaderBar left={<BackLink to={ROUTES.FAMILY_DASHBOARD} label="Family Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-center justify-between">

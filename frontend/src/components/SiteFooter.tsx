@@ -11,7 +11,10 @@ import { ROUTES } from "../lib/routes";
 export const SiteFooter = memo(() => (
   <footer className="no-print bg-gray-900 px-4 py-8 text-sm text-gray-300 sm:px-6">
     <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      <nav aria-label="Site" className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Link to={ROUTES.HOME} className="hover:text-white hover:underline">
+          Home
+        </Link>
         <Link to={ROUTES.PRIVACY} className="hover:text-white hover:underline">
           Privacy Policy
         </Link>

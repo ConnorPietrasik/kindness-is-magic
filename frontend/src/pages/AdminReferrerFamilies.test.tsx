@@ -3,8 +3,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import type { FamilyDetail, ReferrerDetail } from "../types";
 import AdminReferrerFamilies from "./AdminReferrerFamilies";
 
@@ -67,13 +70,16 @@ function renderPage() {
   vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
   return render(
     <MemoryRouter initialEntries={["/admin/referrers/2/families"]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <Routes>
-            <Route path="/admin/referrers/:id/families" element={<AdminReferrerFamilies />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/admin/referrers/:id/families" element={<AdminReferrerFamilies />} />
+            </Routes>
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>

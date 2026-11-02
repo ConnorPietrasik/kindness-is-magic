@@ -265,7 +265,7 @@ export default function AdminWishes() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         {/* Header */}

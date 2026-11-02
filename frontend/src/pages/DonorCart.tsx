@@ -233,7 +233,7 @@ export default function DonorCart() {
   if (isError || !cart) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <HeaderBar title="Kindness is Magic" />
+        <HeaderBar />
         <PageError error={error} heading="Unable to Load Cart" fallback="Something went wrong. Please try again later." />
       </div>
     );
@@ -243,7 +243,7 @@ export default function DonorCart() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar title="Kindness is Magic" />
+      <HeaderBar />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h2 className="mb-6 text-xl font-bold text-violet-950">Sponsorship Cart</h2>

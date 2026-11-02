@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROUTES, route } from "./routes";
+import { ROLE_HOME, ROUTES, route } from "./routes";
 
 describe("ROUTES constants", () => {
   it("has correct public routes", () => {
@@ -45,6 +45,21 @@ describe("ROUTES constants", () => {
 
   it("has correct root route", () => {
     expect(ROUTES.ROOT).toBe("/");
+  });
+});
+
+describe("ROLE_HOME", () => {
+  it("maps every role to its post-login home", () => {
+    expect(ROLE_HOME.admin).toBe("/dashboard");
+    expect(ROLE_HOME.referrer).toBe("/dashboard");
+    expect(ROLE_HOME.donor).toBe("/dashboard");
+    expect(ROLE_HOME.family).toBe("/family/dashboard");
+    expect(ROLE_HOME.purchaser).toBe("/purchaser/assigned-gifts");
+    expect(ROLE_HOME.delivery).toBe("/delivery");
+  });
+
+  it("covers exactly the known user roles", () => {
+    expect(Object.keys(ROLE_HOME).sort()).toEqual(["admin", "delivery", "donor", "family", "purchaser", "referrer"].sort());
   });
 });
 

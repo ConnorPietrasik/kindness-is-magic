@@ -3,7 +3,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
+import { auth } from "../lib/queryKeys";
+import { headerUser } from "../test/fixtures";
 import AdminWishCards, { buildBlankCards } from "./AdminWishCards";
 
 /* ------------------------------------------------------------------ */
@@ -46,18 +49,23 @@ describe("buildBlankCards", () => {
 /* ------------------------------------------------------------------ */
 
 /** The page body is static — but the header's refresh button needs Query + Toast providers. */
-const renderPage = () =>
-  render(
+const renderPage = () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(auth, headerUser);
+  return render(
     <MemoryRouter initialEntries={["/admin/wish-cards"]}>
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <ToastContainer>
-          <Routes>
-            <Route path="/admin/wish-cards" element={<AdminWishCards />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/admin/wish-cards" element={<AdminWishCards />} />
+            </Routes>
+          </AuthProvider>
         </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
+};
 
 describe("AdminWishCards page", () => {
   afterEach(() => {

@@ -5,7 +5,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
 import { PageSpinner, Spinner } from "./components/Spinner";
 import { useAuth } from "./context/AuthContext";
-import { ROUTES } from "./lib/routes";
+import { ROLE_HOME, ROUTES } from "./lib/routes";
 import type { UserRole } from "./types";
 
 // Pages (lazy-loaded on route visit)
@@ -64,24 +64,9 @@ function DashboardRedirect() {
     return <PageSpinner />;
   }
 
-  // Route to role-specific dashboards
-  if (user?.role === "admin") {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
-  }
-  if (user?.role === "referrer") {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
-  }
-  if (user?.role === "family") {
-    return <Navigate to={ROUTES.FAMILY_DASHBOARD} replace />;
-  }
-  if (user?.role === "purchaser") {
-    return <Navigate to={ROUTES.PURCHASER_ASSIGNED_GIFTS} replace />;
-  }
-  if (user?.role === "delivery") {
-    return <Navigate to={ROUTES.DELIVERY_DASHBOARD} replace />;
-  }
-  if (user?.role === "donor") {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+  // Signed-in users go to their role home (single source of truth: ROLE_HOME).
+  if (user) {
+    return <Navigate to={ROLE_HOME[user.role]} replace />;
   }
 
   // Guests (and unknown roles) land on the public brochure.
@@ -93,7 +78,7 @@ function DashboardRedirect() {
 /* ------------------------------------------------------------------ */
 const AppLoadingFallback = () => (
   <Fragment>
-    <HeaderBar title="Kindness is Magic" />
+    <HeaderBar />
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <Spinner size="lg" />
     </div>
