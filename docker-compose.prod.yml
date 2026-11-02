@@ -16,6 +16,9 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      # Shared security-headers middleware, served by the file provider
+      # (see traefik-dynamic.yml for why a file and not Docker labels).
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # Redirect all HTTP to HTTPS
@@ -34,6 +37,9 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       # acme.json must be mode 600 (see deploy notes: create before first up)
       - "traefik_certs:/etc/traefik"
+      # Shared middleware definition — a bind file nested inside the certs
+      # volume's directory (the two mounts coexist; docker layers them).
+      - "./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro"
     environment:
       - DOCKER_API_VERSION=1.44
     restart: unless-stopped
@@ -75,6 +81,7 @@ services:
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.middlewares=security-headers@file"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
       - "traefik.docker.network=kindnet"
     restart: unless-stopped
@@ -93,6 +100,7 @@ services:
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend.middlewares=security-headers@file"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
       # www -> apex: permanent 301 (no dual-serving — auth cookies are
       # host-only). Joins the same Let's Encrypt cert (SAN); needs the www
@@ -101,7 +109,10 @@ services:
       - "traefik.http.routers.frontend-www.entrypoints=websecure"
       - "traefik.http.routers.frontend-www.tls=true"
       - "traefik.http.routers.frontend-www.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.frontend-www.middlewares=www-redirect"
+      - "traefik.http.routers.frontend-www.middlewares=security-headers@file,www-redirect"
+      # Order matters: redirectRegex answers the 301 without calling the next
+      # middleware, so security-headers must come first (outermost) to decorate
+      # the redirect response itself.
       # v3 has no redirectHost middleware (removed in v3) — redirectRegex is
       # the equivalent. Note the doubled backslash/dollar: YAML unescapes \\\\.
       # to \\., and Compose unescapes $${1} to $1 for Traefik.

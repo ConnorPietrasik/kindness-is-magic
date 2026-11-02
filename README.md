@@ -300,6 +300,11 @@ sudo docker images # running version: kindness-is-magic-{backend,frontend}:<vers
 - **Cert renewals are automatic** — Traefik re-issues ~30 days before each
   90-day expiry. No cron, no certbot. Requirements: apex A/AAAA record(s) +
   www CNAME still resolve, ports 80/443 still forwarded, Traefik running.
+- **Security headers** (HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`)
+  come from the shared `security-headers` middleware in `traefik-dynamic.yml`
+  (loaded by Traefik's file provider, applied to every router). HSTS starts at
+  30 days — ratchet `stsSeconds` up to 31536000 (1 y) after one clean ~90-day
+  renewal cycle.
 - Rate limits (login etc., 5/min per visitor) are effectively 2× looser with
   2 backend workers (per-process storage) — intentional at this scale.
 

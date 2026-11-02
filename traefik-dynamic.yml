@@ -1,0 +1,41 @@
+# Traefik dynamic configuration, loaded by the file provider
+# (--providers.file.filename in docker-compose.prod.yml, mounted read-only).
+#
+# Why a file and not Docker labels: this middleware is referenced from routers
+# on *other* containers, so its definition must outlive any single container's
+# lifecycle (a container defined on frontend, for instance, disappears during
+# every deploy cutover — and a router referencing a missing middleware is
+# disabled outright, 404ing /api). Two traps with labels:
+#  - With exposedbydefault=false, the Docker provider skips a container's
+#    labels entirely unless the container has traefik.enable=true, so the
+#    definition would have to live on the traefik container itself (or be
+#    duplicated on every service).
+#  - Enabling traefik's own container also makes the provider generate a
+#    default router/service for traefik itself, and traefik's own labels are
+#    read from the Docker API at startup — a race ~1 in 10 restarts lose,
+#    leaving the middleware missing until the next container event
+#    (traefik/traefik#9363).
+# A file read at Traefik start has neither problem. It is fail-closed: if the
+# file is missing or invalid, the referencing routers are disabled (404) and
+# the deploy smoke check fails.
+#
+# Referenced as `security-headers@file` (cross-provider suffix) from the
+# backend, frontend and frontend-www routers, so every response (SPA, /api,
+# and the www 301 redirect) carries it:
+#  - HSTS: 30 days — the initial value. Ratchet stsSeconds up to 31536000
+#    (1 y) after one clean ~90-day Let's Encrypt renewal cycle: browsers keep
+#    a non-preloaded max-age for the full period, so start modest. Deliberately
+#    no stsIncludeSubdomains (other subdomains, e.g. mail, may not serve
+#    HTTPS) and no stsPreload — preload-list submission is irrevocable. Keep
+#    the HTTP->HTTPS 301 at the web entrypoint in place while HSTS is live.
+#  - frameDeny / contentTypeNosniff / referrerPolicy: standard hardening for
+#    a cookie-authenticated app holding family PII.
+
+http:
+  middlewares:
+    security-headers:
+      headers:
+        stsSeconds: 2592000
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: no-referrer
