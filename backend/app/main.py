@@ -10,13 +10,15 @@ import uuid
 from collections.abc import Generator
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash
 from app.config import APP_BASE_URL
@@ -448,5 +450,7 @@ app.include_router(donor_router)
 
 
 @app.get("/api/health")
-async def health_check():
+def health_check(db: Session = Depends(get_db)):
+    """Liveness check that also proves the app can reach the database."""
+    db.execute(text("SELECT 1"))
     return {"status": "ok"}
