@@ -117,6 +117,12 @@ def list_families(
     user: User = Depends(require_referrer),
     db: Session = Depends(get_db),
 ) -> FamilyListResponse:
+    # A referrer without a referrer record owns no families. (Guard: with a
+    # NULL referrer_id, `Family.referrer_id == user.referrer_id` renders as
+    # `referrer_id IS NULL` and would match every unassigned family.)
+    if user.referrer_id is None:
+        return FamilyListResponse(families=[])
+
     families = (
         db.query(Family)
         .filter(
@@ -245,6 +251,9 @@ def list_pending_families(
     db: Session = Depends(get_db),
 ) -> list[PendingFamilySummary]:
     """List families awaiting this referrer's verification."""
+    if user.referrer_id is None:  # No referrer record → no families (see list_families)
+        return []
+
     families = (
         db.query(Family)
         .filter(
@@ -368,6 +377,9 @@ def list_review_queue(
     db: Session = Depends(get_db),
 ) -> list[FamilyReviewList]:
     """List families awaiting this referrer's wish review."""
+    if user.referrer_id is None:  # No referrer record → no families (see list_families)
+        return []
+
     families = (
         db.query(Family)
         .filter(

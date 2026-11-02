@@ -148,8 +148,17 @@ def require_family_owner(
     Returns both the authenticated user and the already-loaded Family object
     so route handlers don't need to re-query.
 
-    - Referrer: family.referrer_id == user.referrer_id
+    Only the referrer role may use this guard, and ownership requires
+    ``user.referrer_id`` to be set and equal to ``family.referrer_id``.
+    Unassigned families (``referrer_id IS NULL``) are owned by no one —
+    they are reachable only via the admin routes.
     """
+    if current_user.role != UserRole.referrer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Referrer access required",
+        )
+
     from app.models import Family
 
     fam_id = request.path_params.get("fam_id") or request.path_params.get("fid")
@@ -166,7 +175,7 @@ def require_family_owner(
             detail="Family not found",
         )
 
-    if fam.referrer_id != current_user.referrer_id:
+    if current_user.referrer_id is None or fam.referrer_id != current_user.referrer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access this resource",
@@ -228,7 +237,12 @@ def require_person_owner(
         )
 
     if current_user.role == UserRole.referrer:
-        if per.family and per.family.deleted_at is None and per.family.referrer_id == current_user.referrer_id:
+        if (
+            current_user.referrer_id is not None
+            and per.family
+            and per.family.deleted_at is None
+            and per.family.referrer_id == current_user.referrer_id
+        ):
             return PersonOwner(user=current_user, person=per)
 
     elif current_user.role == UserRole.family:
