@@ -23,6 +23,7 @@ const mockWishList: FamilyWishListResponse = {
   claimed_by_current_user: false,
   claim_status: null,
   claim_id: null,
+  cash_only: false,
 };
 
 const mockUser: User = {
@@ -118,6 +119,29 @@ describe("FamilyWishList header", () => {
       expect(screen.getByRole("link", { name: "Print wish cards →" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("heading", { name: "Family Wish" })).not.toBeInTheDocument();
+  });
+
+  it("shows an '(already shopping)' marker next to the family id when cash-only", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue({ ...mockWishList, cash_only: true });
+
+    wrap();
+
+    // The family id renders in both the print-only and the screen header
+    await waitFor(() => {
+      expect(screen.getAllByText("0-1").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("(already shopping)")).toBeInTheDocument();
+    });
+  });
+
+  it("omits the marker when the family is not cash-only", async () => {
+    vi.spyOn(api, "getFamilyWishList").mockResolvedValue(mockWishList);
+
+    wrap();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("0-1").length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByText("(already shopping)")).not.toBeInTheDocument();
   });
 
   it("links the header to the role home and shows sign out when logged in", async () => {

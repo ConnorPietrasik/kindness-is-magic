@@ -12,54 +12,74 @@ import { expect } from "@playwright/test";
 export async function findRowInTable(
   page: Page,
   searchText: string,
-  opts?: { maxPages?: number; pollMs?: number; timeout?: number },
+  opts?: { maxPages?: number; timeout?: number },
+): Promise<Locator | null> {
+  return findInPaginated(page, page.getByRole("row").filter({ hasText: searchText }), opts);
+}
+
+/**
+ * Turn a paginated list's pages (table rows, grid cards, …) until the given
+ * item locator matches, or we run out of pages. Returns the Locator if an
+ * item is found, or null after exhausting all pages. The item locator must
+ * be scoped to the current page (e.g. a `filter({ hasText })` on the row or
+ * card element).
+ *
+ * The list must start on page 1 and paginate with a "Next page" button.
+ */
+export async function findInPaginated(
+  page: Page,
+  item: Locator,
+  opts?: { maxPages?: number; timeout?: number },
 ): Promise<Locator | null> {
   const maxPages = opts?.maxPages ?? 20;
-  const pollMs = opts?.pollMs ?? 500;
   const timeout = opts?.timeout ?? 10_000;
 
-  // First, wait for the row to appear (handles React Query invalidation delay)
+  // First, wait for the item to appear (handles React Query invalidation delay)
   // Playwright's toHaveCount/toBeVisible with timeout handles retries
-  const row = page.getByRole("row").filter({ hasText: searchText });
   try {
-    await row.first().waitFor({ state: "visible", timeout });
-    return row;
+    await item.first().waitFor({ state: "visible", timeout });
+    return item;
   } catch {
-    // Row didn't appear within timeout — try paginating
+    // Item didn't appear within timeout — try paginating
   }
 
   // Fall back to pagination search. After each page turn, wait for the list
   // fetch it triggered to settle before judging the page — a blind sleep
   // skips pages when the fetch is slow (e.g. under parallel e2e load).
+  //
+  // The wait matches the *specific* page= param of the page we just turned
+  // to, so a coincidental concurrent GET (e.g. a window-focus refetch of the
+  // current page) can never resolve the wait early and make the loop click
+  // past the page holding the item.
+  let pageNum = 1; // page the list is on before the first turn
   for (let i = 0; i < maxPages; i++) {
-    if ((await row.count()) > 0) return row;
+    if ((await item.count()) > 0) return item;
 
     // Click "Next page" — if it doesn't exist or is disabled, we've reached the end
     const nextBtn = page.getByRole("button", { name: "Next page" });
     if ((await nextBtn.count()) === 0) break;
     if (await nextBtn.isDisabled()) break;
 
-    // The page turn fires exactly one list GET — wait for the response to that
-    // request specifically so the next iteration's row check never runs against
-    // a half-loaded page. "page=" pins the wait to the paginated list request
-    // (every list endpoint sends page/page_size; non-list GETs — detail, dropdown —
-    // carry no such param, so a coincidental concurrent GET can't resolve the
-    // wait early and make the next iteration click past the page holding the
-    // row). The startTime filter additionally excludes GETs already in flight
-    // (e.g. a window-focus refetch of the current page).
-    const clickAt = Date.now();
+    const targetPage = pageNum + 1;
     const settled = page
       .waitForResponse(
         (r) =>
           r.request().method() === "GET" &&
           r.url().includes("/api/") &&
-          r.url().includes("page=") &&
-          r.request().timing().startTime >= clickAt,
-        { timeout: pollMs * 10 }
+          r.url().includes(`page=${targetPage}&page_size=`),
+        { timeout: 15_000 }
       )
       .catch(() => {});
     await nextBtn.click();
+    pageNum = targetPage;
     await settled;
+
+    // The response has landed, but React may not have re-rendered the items
+    // yet — poll briefly before judging the page.
+    const renderDeadline = Date.now() + 2000;
+    while ((await item.count()) === 0 && Date.now() < renderDeadline) {
+      await page.waitForTimeout(100);
+    }
   }
   return null;
 }

@@ -23,6 +23,7 @@ const mockFamilies: PublicFamilySummary[] = [
     min_age: 5,
     max_age: 14,
     claim_status: null,
+    cash_only: false,
   },
   {
     id: 2,
@@ -32,6 +33,7 @@ const mockFamilies: PublicFamilySummary[] = [
     min_age: 30,
     max_age: 35,
     claim_status: null,
+    cash_only: false,
   },
   {
     id: 3,
@@ -41,6 +43,7 @@ const mockFamilies: PublicFamilySummary[] = [
     min_age: 8,
     max_age: 8,
     claim_status: null,
+    cash_only: false,
   },
 ];
 
@@ -205,6 +208,7 @@ describe("PublicFamilies", () => {
       min_age: 5,
       max_age: 14,
       claim_status: null,
+      cash_only: false,
     };
     const singleMemberResponse = {
       ...mockResponse,
@@ -230,6 +234,25 @@ describe("PublicFamilies", () => {
       // Single age (min === max): "Ages 8"
       expect(screen.getByText("Ages 8")).toBeInTheDocument();
     });
+  });
+
+  it("shows an '(already shopping)' marker on cash-only cards only", async () => {
+    const cashOnlyFamilies: PublicFamilySummary[] = [
+      { id: 1, display_id: "0-1", bio: null, person_count: 2, min_age: 5, max_age: 10, claim_status: null, cash_only: true },
+      { id: 2, display_id: "0-2", bio: null, person_count: 3, min_age: 4, max_age: 9, claim_status: null, cash_only: false },
+    ];
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: cashOnlyFamilies });
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0-1")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("(already shopping)")).toBeInTheDocument();
+    // Only one marker — the non-cash-only card (0-2) has none
+    expect(screen.getAllByText("(already shopping)").length).toBe(1);
+    expect(screen.getByText("0-2")).toBeInTheDocument();
   });
 
   it("cards link to wish-list pages", async () => {
@@ -364,9 +387,9 @@ describe("PublicFamilies", () => {
 
   it("renders claim chips from the three-state claim_status on revealed families", async () => {
     const revealed: PublicFamilySummary[] = [
-      { id: 4, display_id: "0-4", bio: null, person_count: 3, min_age: 5, max_age: 10, claim_status: "active" },
-      { id: 5, display_id: "0-5", bio: null, person_count: 2, min_age: 4, max_age: 9, claim_status: "pending" },
-      { id: 6, display_id: "0-6", bio: null, person_count: 1, min_age: 60, max_age: null, claim_status: "fulfilled" },
+      { id: 4, display_id: "0-4", bio: null, person_count: 3, min_age: 5, max_age: 10, claim_status: "active", cash_only: false },
+      { id: 5, display_id: "0-5", bio: null, person_count: 2, min_age: 4, max_age: 9, claim_status: "pending", cash_only: false },
+      { id: 6, display_id: "0-6", bio: null, person_count: 1, min_age: 60, max_age: null, claim_status: "fulfilled", cash_only: false },
     ];
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: revealed });
 
@@ -441,8 +464,17 @@ describe("PublicFamilies", () => {
   it("dedupes the user's claimed families out of the revealed grid", async () => {
     // The revealed grid contains family 20 (also in the user's claims)
     const revealed: PublicFamilySummary[] = [
-      { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12, claim_status: "active" },
-      { id: 30, display_id: "4-1", bio: null, person_count: 2, min_age: 1, max_age: 6, claim_status: null },
+      {
+        id: 20,
+        display_id: "3-1",
+        bio: "The board-game family.",
+        person_count: 4,
+        min_age: 5,
+        max_age: 12,
+        claim_status: "active",
+        cash_only: false,
+      },
+      { id: 30, display_id: "4-1", bio: null, person_count: 2, min_age: 1, max_age: 6, claim_status: null, cash_only: false },
     ];
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: revealed });
     vi.spyOn(api, "donorListClaims").mockResolvedValue(mockDonorClaims);

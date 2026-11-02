@@ -235,6 +235,11 @@ class Family(Base):
     )
     pickup_window: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
+    # Cash-only lock (admin-set): shopping for this family has started, so new
+    # gift claims are blocked while cash sponsorships stay open. Donors see an
+    # "(already shopping)" marker. Admin-write only (AdminFamilyUpdate).
+    cash_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+
     # Wish approval workflow fields
     wish_lock_level: Mapped[WishLockLevel] = mapped_column(
         SAEnum(WishLockLevel, name="wish_lock_level", create_constraint=True),

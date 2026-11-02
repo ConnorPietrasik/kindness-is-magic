@@ -68,6 +68,7 @@ const mockWishList: FamilyWishListResponse = {
   claimed_by_current_user: false,
   claim_status: null,
   claim_id: null,
+  cash_only: false,
 };
 
 /* ------------------------------------------------------------------ */

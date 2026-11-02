@@ -345,4 +345,43 @@ describe("FamilyForm", () => {
     // Character counter should show current length / 1000
     expect(screen.getByText(new RegExp(`${mockFamilyDetail.referrer_notes!.length}/1000`))).toBeInTheDocument();
   });
+
+  /* ── Cash Only (admin only) ─────────────────────────── */
+
+  it("does not show the cash-only checkbox by default", () => {
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} />));
+
+    expect(screen.queryByLabelText("Cash only")).not.toBeInTheDocument();
+  });
+
+  it("shows the cash-only checkbox when showCashOnly is true", () => {
+    render(wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showCashOnly />));
+
+    expect(screen.getByLabelText("Cash only")).toBeInTheDocument();
+    expect(screen.getByText(/already shopping/)).toBeInTheDocument();
+  });
+
+  it("pre-fills the cash-only checkbox from initial data", () => {
+    render(
+      wrap(
+        <FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={{ ...mockFamilyDetail, cash_only: true }} showCashOnly />
+      )
+    );
+
+    expect(screen.getByLabelText("Cash only")).toBeChecked();
+  });
+
+  it("sends cash_only in the submit payload when toggled", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      wrap(<FamilyForm {...defaultProps} title="Edit Family" isEdit={true} initial={mockFamilyDetail} showCashOnly onSubmit={onSubmit} />)
+    );
+
+    await user.click(screen.getByLabelText("Cash only"));
+    await user.click(screen.getByText("Update"));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cash_only: true }));
+  });
 });

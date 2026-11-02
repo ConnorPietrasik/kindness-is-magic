@@ -25,6 +25,8 @@ interface FamilyFormProps {
   showOptionalFields?: boolean;
   /** When true, show the referrer notes field (admin mode) */
   showReferrerNotes?: boolean;
+  /** When true, show the cash-only lock checkbox (admin mode) */
+  showCashOnly?: boolean;
   onSubmit: (formData: FamilyPayload) => void;
   onCancel: () => void;
   loading?: boolean;
@@ -47,6 +49,7 @@ export function FamilyForm({
   deliveryUsersLoading,
   showOptionalFields = true,
   showReferrerNotes,
+  showCashOnly,
   onSubmit,
   onCancel,
   loading,
@@ -230,6 +233,26 @@ export function FamilyForm({
                 </option>
               ))}
             </FormField>
+          )}
+
+          {/* Cash only — admin only */}
+          {showCashOnly && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="family-cash-only"
+                  checked={form.cash_only === true}
+                  onChange={(e) => setForm((prev) => ({ ...prev, cash_only: e.target.checked }))}
+                  className="h-4 w-4 accent-btn-start"
+                />
+                <span className="text-sm font-medium text-gray-900">Cash only</span>
+              </label>
+              <p className="mt-1 pl-7 text-xs text-gray-500">
+                Lock this family to cash sponsorships — new gift sponsorships are blocked and the family shows as “(already shopping)” to
+                donors.
+              </p>
+            </div>
           )}
 
           {/* Referrer Notes — admin only */}

@@ -323,6 +323,11 @@ function FamilyCard({ family }: { family: PublicFamilySummary }) {
         <div className="mb-2 flex items-center gap-2">
           <span className="text-sm font-medium text-gray-500">Family ID:</span>
           <span className="text-xl font-bold tracking-tight text-gray-900">{family.display_id}</span>
+          {family.cash_only && (
+            <span className="text-xs font-medium text-sky-700" title="Shopping has started — this family is cash-only">
+              (already shopping)
+            </span>
+          )}
           {chip && (
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${chip.cls}`}>
               {chip.label}

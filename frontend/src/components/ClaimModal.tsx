@@ -18,9 +18,11 @@ interface ClaimModalProps {
   open: boolean;
   onClose: () => void;
   currentLocation?: Location;
+  /** Admin locked the family to cash sponsorships ("already shopping"). */
+  cashOnly?: boolean;
 }
 
-export function ClaimModal({ familyId, open, onClose, currentLocation }: ClaimModalProps) {
+export function ClaimModal({ familyId, open, onClose, currentLocation, cashOnly }: ClaimModalProps) {
   if (!open) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -37,13 +39,23 @@ export function ClaimModal({ familyId, open, onClose, currentLocation }: ClaimMo
       role="presentation"
     >
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true">
-        <AuthGateContent familyId={familyId} onClose={onClose} currentLocation={currentLocation} />
+        <AuthGateContent familyId={familyId} onClose={onClose} currentLocation={currentLocation} cashOnly={cashOnly} />
       </div>
     </div>
   );
 }
 
-function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: number; onClose: () => void; currentLocation?: Location }) {
+function AuthGateContent({
+  familyId,
+  onClose,
+  currentLocation,
+  cashOnly,
+}: {
+  familyId: number;
+  onClose: () => void;
+  currentLocation?: Location;
+  cashOnly?: boolean;
+}) {
   const { user } = useAuth();
 
   if (!user) {
@@ -90,11 +102,11 @@ function AuthGateContent({ familyId, onClose, currentLocation }: { familyId: num
     );
   }
 
-  return <ClaimForm familyId={familyId} onClose={onClose} />;
+  return <ClaimForm familyId={familyId} onClose={onClose} cashOnly={cashOnly} />;
 }
 
-function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => void }) {
-  const [commitmentType, setCommitmentType] = useState<CommitmentType>("gifts");
+function ClaimForm({ familyId, onClose, cashOnly }: { familyId: number; onClose: () => void; cashOnly?: boolean }) {
+  const [commitmentType, setCommitmentType] = useState<CommitmentType>(cashOnly ? "cash" : "gifts");
   const [claimed, setClaimed] = useState<FamilyClaimSummary | null>(null);
   // Cash claims go through the checkout flow: the modal only adds the family
   // to the frontend cart — the claim is created at checkout.
@@ -132,23 +144,31 @@ function ClaimForm({ familyId, onClose }: { familyId: number; onClose: () => voi
   return (
     <>
       <h3 className="mb-2 text-lg font-semibold text-gray-900">Sponsor This Family</h3>
-      <p className="mb-4 text-sm text-gray-600">How would you like to support this family?</p>
+      {cashOnly ? (
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          This family is already being shopped for — cash sponsorships only.
+        </div>
+      ) : (
+        <p className="mb-4 text-sm text-gray-600">How would you like to support this family?</p>
+      )}
 
       <div className="mb-4 space-y-2">
-        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50">
-          <input
-            type="radio"
-            name="commitment"
-            value="gifts"
-            checked={commitmentType === "gifts"}
-            onChange={() => setCommitmentType("gifts")}
-            className="h-4 w-4 accent-btn-start"
-          />
-          <div>
-            <span className="block text-sm font-medium text-gray-900">Gifts</span>
-            <span className="block text-xs text-gray-500">I'll purchase the items on their wish list</span>
-          </div>
-        </label>
+        {!cashOnly && (
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50">
+            <input
+              type="radio"
+              name="commitment"
+              value="gifts"
+              checked={commitmentType === "gifts"}
+              onChange={() => setCommitmentType("gifts")}
+              className="h-4 w-4 accent-btn-start"
+            />
+            <div>
+              <span className="block text-sm font-medium text-gray-900">Gifts</span>
+              <span className="block text-xs text-gray-500">I'll purchase the items on their wish list</span>
+            </div>
+          </label>
+        )}
 
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50">
           <input

@@ -367,6 +367,7 @@ def create_family(
         address=body.address,
         phone_number=body.phone_number,
         pickup_window=body.pickup_window,
+        cash_only=body.cash_only,
         verification_status=FamilyVerificationStatus.verified,
     )
     db.add(fam)

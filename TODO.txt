@@ -1,5 +1,3 @@
-Unify the header so that clicking something always does the same thing per login state
-Lock certain families to cash-only (already shopping)
 Add "send email to referrer" from the family page
 Have the "send email" popup moveable or something so it doesn't block the wishes
 Size "if clothing requested" above practical wish as a label instead of just in the example

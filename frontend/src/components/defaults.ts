@@ -39,6 +39,8 @@ export interface FamilyFormState {
   phone_number: string;
   pickup_window: string | null;
   referrer_notes: string | null;
+  // Admin-only cash-only lock ("already shopping")
+  cash_only?: boolean;
   // Admin-only fields (present when initial data includes them)
   referrer_id?: number | null;
   delivery_user_id?: number | null;

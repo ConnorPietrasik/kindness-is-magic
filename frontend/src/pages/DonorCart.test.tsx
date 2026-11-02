@@ -52,6 +52,7 @@ function wishList(displayId: string, claimStatus: string | null = null): FamilyW
     claimed_by_current_user: false,
     claim_status: claimStatus,
     claim_id: claimStatus != null ? 99 : null,
+    cash_only: false,
   };
 }
 

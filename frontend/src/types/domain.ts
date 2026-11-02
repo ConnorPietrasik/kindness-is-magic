@@ -168,6 +168,9 @@ export interface FamilyDetail {
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
+  /** Admin-set cash-only lock ("already shopping"); omitted in column-filtered
+   * list responses when the column is hidden, always present in detail. */
+  cash_only?: boolean;
   referrer_notes: string | null;
   /** Admin-only recipient prefill: the family contact user's email. Populated only
    * by admin endpoints (null elsewhere, incl. referrer self-service). */
@@ -225,6 +228,8 @@ export interface FamilyPayload {
   deleted_at?: string | null;
   pickup_window?: string | null;
   referrer_notes?: string | null;
+  /** Admin-only: lock the family to cash sponsorships ("already shopping"). */
+  cash_only?: boolean;
 }
 
 /** Payload for family self-service update — no referrer_notes. */
@@ -589,6 +594,8 @@ export interface PublicFamilySummary {
    * Hidden families have no claim, so it is null for them.
    */
   claim_status: string | null;
+  /** Admin-set lock: shopping has started — cash sponsorships only. */
+  cash_only: boolean;
 }
 
 /** Mirrors backend PublicFamilyListResponse — paginated public families list. */
@@ -627,6 +634,8 @@ export interface FamilyWishListResponse {
   claimed_by_current_user: boolean;
   claim_status: string | null;
   claim_id: number | null;
+  /** Admin-set lock: shopping has started — cash sponsorships only. */
+  cash_only: boolean;
 }
 
 // ---------------------------------------------------------------------------

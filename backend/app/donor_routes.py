@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.config import CASH_CLAIM_PAYMENT_HOURS, GIFT_CLAIM_CAP, ZEFFY_FORM_URL
 from app.database import get_db
-from app.deadlines import GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
+from app.deadlines import CASH_ONLY_GIFT_BLOCKED_DETAIL, GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.display_ids import compute_display_ids
 from app.models import (
     ClaimPaymentStatus,
@@ -602,9 +602,10 @@ async def update_claim(
         applies).
       * **cash→gifts** — only possible while pending: the claim is released
         (``paid``; the donor never got a gift confirmation, so one goes out
-        now) and must pass the standard new-gift-claim checks — the gift
-        cap and the armed ``gift_dropoff`` deadline gate (a conversion is a
-        new gift claim), each with the same 400 as the claim endpoint.
+        now) and must pass the standard new-gift-claim checks (a conversion
+        is a new gift claim) — the armed ``gift_dropoff`` deadline gate,
+        the cash-only family gate, and the gift cap, each with the same
+        400 as the claim endpoint.
     """
     claim = get_claim_or_403(db, claim_id, user)
 
@@ -641,8 +642,15 @@ async def update_claim(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Commitment type can only be changed while the sponsorship is unpaid",
             )
+        fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
         if is_type_armed(db, DeadlineType.gift_dropoff):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=GIFT_CLAIM_BLOCKED_DETAIL)
+        # Cash-only family gate — a conversion is a new gift claim, and an
+        # admin-locked (shopping-started) family no longer accepts them.
+        # Runs after the deadline gate, so when both apply the deadline
+        # message wins (same order as the claim endpoint).
+        if fam.cash_only:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=CASH_ONLY_GIFT_BLOCKED_DETAIL)
         current_gift_count = (
             db.query(func.count(FamilyClaim.id))
             .filter(
@@ -667,7 +675,6 @@ async def update_claim(
         db.commit()
         db.refresh(claim)
         logger.info("User %s toggled claim %s cash→gifts (released to a gift claim)", user.id, claim_id)
-        fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
         email_error = await send_claim_confirmation(claim, fam, user, db)
     else:
         # Notes-only update, or the same type re-sent (plain no-op for the type).

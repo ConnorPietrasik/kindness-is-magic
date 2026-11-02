@@ -36,7 +36,17 @@ import {
 const STORAGE_ADMIN = "storage/admin.json";
 
 /** Default AdminFamilies header order (all columns visible by default). */
-const DEFAULT_FAMILY_HEADERS = ["ID", "Family Name", "Family Wish", "Contact", "Referrer", "Actions"];
+const DEFAULT_FAMILY_HEADERS = ["ID", "Family Name", "Family Wish", "Contact", "Referrer", "Cash Only", "Actions"];
+/** AdminFamilies header order with "Referrer" dragged before "Family Wish". */
+const REORDERED_FAMILY_HEADERS = [
+  "ID",
+  "Family Name",
+  "Referrer",
+  "Family Wish",
+  "Contact",
+  "Cash Only",
+  "Actions",
+];
 
 const familyHeaders = (page: import("@playwright/test").Page) => page.locator("thead").getByRole("columnheader");
 
@@ -71,11 +81,11 @@ test.describe("Admin families — column order", () => {
     const familyWish = page.getByRole("columnheader", { name: "Family Wish" });
     await referrer.dragTo(familyWish, { targetPosition: { x: 4, y: 8 } });
 
-    await expect(familyHeaders(page)).toHaveText(["ID", "Family Name", "Referrer", "Family Wish", "Contact", "Actions"]);
+    await expect(familyHeaders(page)).toHaveText(REORDERED_FAMILY_HEADERS);
 
     // The custom order survives a reload (persisted in localStorage).
     await page.reload({ waitUntil: "networkidle" });
-    await expect(familyHeaders(page)).toHaveText(["ID", "Family Name", "Referrer", "Family Wish", "Contact", "Actions"]);
+    await expect(familyHeaders(page)).toHaveText(REORDERED_FAMILY_HEADERS);
 
     // "Reset order" appears only when the order is customized, and restores.
     const resetOrder = page.getByRole("button", { name: "Reset order" });
@@ -226,25 +236,18 @@ test.describe("Admin referrer families — column order (shared with main famili
     const referrer = page.getByRole("columnheader", { name: "Referrer" });
     const familyWish = page.getByRole("columnheader", { name: "Family Wish" });
     await referrer.dragTo(familyWish, { targetPosition: { x: 4, y: 8 } });
-    await expect(familyHeaders(page)).toHaveText([
-      "ID",
-      "Family Name",
-      "Referrer",
-      "Family Wish",
-      "Contact",
-      "Actions",
-    ]);
+    await expect(familyHeaders(page)).toHaveText(REORDERED_FAMILY_HEADERS);
 
     // The referrer-scoped table shows the same custom order — same column
     // registry, so one order applies to both tables.
     await page.goto(`/admin/referrers/${scenario.referrerId}/families`);
     await page.waitForLoadState("networkidle");
     const scopedHeaders = page.locator("thead").getByRole("columnheader");
-    await expect(scopedHeaders).toHaveText(["ID", "Family Name", "Referrer", "Family Wish", "Contact", "Actions"]);
+    await expect(scopedHeaders).toHaveText(REORDERED_FAMILY_HEADERS);
 
     // The shared order survives a reload.
     await page.reload({ waitUntil: "networkidle" });
-    await expect(scopedHeaders).toHaveText(["ID", "Family Name", "Referrer", "Family Wish", "Contact", "Actions"]);
+    await expect(scopedHeaders).toHaveText(REORDERED_FAMILY_HEADERS);
 
     // "Reset order" (shown because the order is customized) restores the default.
     const resetOrder = page.getByRole("button", { name: "Reset order" });

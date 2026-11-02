@@ -610,6 +610,10 @@ class FamilyCreate(BaseModel):
     address: str = Field(..., min_length=1, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
     pickup_window: Optional[datetime] = None
+    # Admin-write only cash-only lock ("already shopping") — this is the admin
+    # create schema; the referrer create schema (FamilyCreateByReferrer) never
+    # carries the field.
+    cash_only: Optional[bool] = None
 
     @field_validator("family_name", "family_wish", "contact_name", "address", "phone_number")
     @classmethod
@@ -671,11 +675,17 @@ class AdminFamilyUpdate(FamilyUpdate):
     """Admin-only: extends FamilyUpdate with referrer_id, referrer_notes, and delivery_user_id.
 
     Send ``0`` to unassign a referrer or delivery person (set FK to NULL).
+
+    ``cash_only`` locks the family to cash sponsorships (new gift claims
+    blocked, donors see an "(already shopping)" marker). Admin-write only —
+    deliberately NOT on the ``FamilyUpdate`` base, so referrer/family
+    self-service payloads ignore it.
     """
 
     referrer_id: clearable_fk()
     referrer_notes: clearable_text(1000)
     delivery_user_id: clearable_fk()
+    cash_only: Optional[bool] = None
 
 
 class FamilyDetail(BaseModel):
@@ -700,6 +710,7 @@ class FamilyDetail(BaseModel):
     wish_lock_level: WishLockLevel
     wish_review_requested_at: datetime | None = None
     wish_rejection_reason: Optional[str] = None
+    cash_only: bool = False
     referrer_notes: str | None = None
     # Admin-only recipient prefill: the family contact user's email.
     # Populated only by admin endpoints (null elsewhere, incl. referrer
@@ -1376,6 +1387,9 @@ class PublicFamilySummary(BaseModel):
     min_age: int | None = None
     max_age: int | None = None
     claim_status: str | None = None
+    # Admin-set lock: shopping has started, cash sponsorships only —
+    # donors see an "(already shopping)" marker.
+    cash_only: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -1425,6 +1439,8 @@ class FamilyWishListResponse(BaseModel):
     claimed_by_current_user: bool = False
     claim_status: str | None = None
     claim_id: int | None = None
+    # Admin-set lock: shopping has started, cash sponsorships only.
+    cash_only: bool = False
 
 
 # ---------------------------------------------------------------------------

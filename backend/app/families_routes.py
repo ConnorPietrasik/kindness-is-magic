@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth import decode_access_token
 from app.config import GIFT_CLAIM_CAP
 from app.database import get_db
-from app.deadlines import GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
+from app.deadlines import CASH_ONLY_GIFT_BLOCKED_DETAIL, GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.mail import send_claim_confirmation
 from app.display_ids import compute_display_ids, wish_display_id
 from app.permissions import require_claim_capable
@@ -201,6 +201,7 @@ def list_public_families(
                 min_age=ma,
                 max_age=xa,
                 claim_status=claim_status_for(claim) if claim is not None else None,
+                cash_only=fam.cash_only,
             )
         )
 
@@ -343,6 +344,7 @@ def get_family_wish_list(
         claimed_by_current_user=claimed_by_current_user,
         claim_status=claim_status,
         claim_id=claim_id,
+        cash_only=fam.cash_only,
     )
 
 
@@ -399,6 +401,14 @@ async def claim_family(
     #     unaffected.
     if data.commitment_type == CommitmentType.gifts and is_type_armed(db, DeadlineType.gift_dropoff):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=GIFT_CLAIM_BLOCKED_DETAIL)
+
+    # 1c. Cash-only family gate — an admin locked this family to cash
+    #     sponsorships because shopping for it has started. Same shape as
+    #     the deadline gate (business rule, every claim-capable role), but
+    #     scoped to one family. Cash claims are unaffected. Runs after the
+    #     deadline gate, so when both apply the deadline message wins.
+    if data.commitment_type == CommitmentType.gifts and fam.cash_only:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=CASH_ONLY_GIFT_BLOCKED_DETAIL)
 
     # 2. Check family is not already actively claimed
     existing_claim = (

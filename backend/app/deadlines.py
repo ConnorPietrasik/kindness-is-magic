@@ -36,6 +36,12 @@ ENFORCEMENT_UTC_HOUR = (DEADLINE_ENFORCEMENT_HOUR_PACIFIC - DEADLINE_PACIFIC_UTC
 # claim-capable role and cash claims are unaffected.
 GIFT_CLAIM_BLOCKED_DETAIL = "The gift drop-off deadline has passed — new gift sponsorships are no longer accepted."
 
+# Message shown to claim-capable users (including admins) when a family is
+# locked cash-only by an admin (shopping has started). Same shape as the
+# deadline gate: a business rule blocking every claim-capable role — but for
+# one family, not the whole event — with cash claims unaffected.
+CASH_ONLY_GIFT_BLOCKED_DETAIL = "This family is already being shopped for — only cash sponsorships are accepted."
+
 
 def deadline_cutoff(due_date: date) -> datetime:
     """Enforcement cutoff for a due date: 01:00 Pacific (fixed UTC-8) on due_date + 1 day.

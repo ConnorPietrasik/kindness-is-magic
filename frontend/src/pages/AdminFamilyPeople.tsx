@@ -328,6 +328,7 @@ function FamilyCard(
           deliveryUserMap={deliveryUserMap}
           deliveryUsersLoading={deliveryUsersLoading}
           showReferrerNotes
+          showCashOnly
           onSubmit={onSave}
           onCancel={() => onToggleEdit()}
           loading={isSaving}

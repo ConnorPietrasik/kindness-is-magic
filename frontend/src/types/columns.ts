@@ -25,6 +25,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "referrer_id", label: "Referrer", visible: true },
     { key: "delivery", label: "Delivery", visible: false },
     { key: "claim", label: "Sponsorship", visible: false },
+    { key: "cash_only", label: "Cash Only", visible: true },
     { key: "phone_number", label: "Phone", visible: false },
     { key: "person_count", label: "Person Count", visible: false },
     { key: "verification_status", label: "Verification", visible: false },

@@ -283,6 +283,7 @@ export default function AdminFamilies() {
     referrer_id: "Referrer",
     delivery: "Delivery",
     claim: "Sponsorship",
+    cash_only: "Cash Only",
     phone_number: (
       <div className="flex flex-col gap-1">
         <span>Phone</span>
@@ -419,6 +420,7 @@ export default function AdminFamilies() {
               deliveryUserMap={deliveryUserMap}
               deliveryUsersLoading={deliveryUsersLoading}
               showReferrerNotes
+              showCashOnly
               onSubmit={handleCreate}
               onCancel={cancelForm}
               loading={!!createMut?.isPending}
@@ -486,6 +488,7 @@ export default function AdminFamilies() {
                                 deliveryUserMap={deliveryUserMap}
                                 deliveryUsersLoading={deliveryUsersLoading}
                                 showReferrerNotes
+                                showCashOnly
                                 onSubmit={handleUpdate}
                                 onCancel={cancelForm}
                                 loading={!!updateMut?.isPending}

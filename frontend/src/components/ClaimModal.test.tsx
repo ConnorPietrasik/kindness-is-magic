@@ -119,7 +119,7 @@ const giftsClaim: FamilyClaimSummary = {
   includes_groceries: false,
 };
 
-function renderAuthedClaim(claim: FamilyClaimSummary, deadlines: Deadline[] = []) {
+function renderAuthedClaim(claim: FamilyClaimSummary, deadlines: Deadline[] = [], cashOnly = false) {
   vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(mockDonorUser);
   vi.spyOn(api, "claimFamily").mockResolvedValue(claim);
   vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines });
@@ -131,7 +131,7 @@ function renderAuthedClaim(claim: FamilyClaimSummary, deadlines: Deadline[] = []
           <AuthProvider>
             <CartProvider>
               <LocationProbe />
-              <ClaimModal familyId={5} open onClose={() => {}} />
+              <ClaimModal familyId={5} open onClose={() => {}} cashOnly={cashOnly} />
             </CartProvider>
           </AuthProvider>
         </ToastContainer>
@@ -269,5 +269,50 @@ describe("ClaimModal success view", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("heading", { name: /You made Family 12-3/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/families/5/wish-list");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Cash-only mode (admin locked the family: "already shopping")
+/* ------------------------------------------------------------------ */
+
+describe("ClaimModal cash-only mode", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+    cleanup();
+  });
+
+  it("hides the gifts option and defaults to cash when cashOnly", async () => {
+    renderAuthedClaim(giftsClaim, [], true);
+
+    await screen.findByRole("button", { name: "Add to cart" });
+    expect(screen.getByText("This family is already being shopped for — cash sponsorships only.")).toBeInTheDocument();
+    // The gifts radio is gone; cash is the only (checked) option
+    expect(screen.queryByRole("radio", { name: /purchase the items/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /monetary support/ })).toBeChecked();
+    expect(screen.queryByText("How would you like to support this family?")).not.toBeInTheDocument();
+  });
+
+  it("cash-only submit adds to the cart without calling the claim API", async () => {
+    const user = userEvent.setup();
+    const claimSpy = vi.spyOn(api, "claimFamily");
+    renderAuthedClaim(giftsClaim, [], true);
+
+    await user.click(await screen.findByRole("button", { name: "Add to cart" }));
+
+    expect(screen.getByRole("heading", { name: "Added to your cart" })).toBeInTheDocument();
+    expect(claimSpy).not.toHaveBeenCalled();
+    const stored = JSON.parse(localStorage.getItem("kim:cart:4") ?? "[]") as { family_id: number; includes_groceries: boolean }[];
+    expect(stored).toEqual([{ family_id: 5, includes_groceries: false }]);
+  });
+
+  it("shows both options when cashOnly is not set", async () => {
+    renderAuthedClaim(giftsClaim);
+
+    await screen.findByRole("button", { name: "Sponsor family" });
+    expect(screen.getByRole("radio", { name: /purchase the items/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /monetary support/ })).toBeInTheDocument();
+    expect(screen.queryByText(/already being shopped for — cash sponsorships only/)).not.toBeInTheDocument();
   });
 });

@@ -421,6 +421,30 @@ class TestFamiliesSort:
         names = [f["family_name"] for f in resp.json()["families"]]
         assert names == ["Charlie", "Bob", "Alice"]
 
+    def test_sort_created_at_desc(self, test_client: TestClient, admin_user, db: Session):
+        from app.models import FamilyVerificationStatus
+
+        # Explicit timestamps to avoid same-second collision
+        now = datetime.now(timezone.utc)
+        for i, name in enumerate(["First", "Second", "Third"]):
+            make_family(
+                db,
+                family_wish="A wish",
+                family_name=name,
+                contact_name=f"Contact {i}",
+                phone_number=f"555-111-{i:04d}",
+                verification_status=FamilyVerificationStatus.verified,
+                created_at=now + timedelta(seconds=i),
+            )
+        db.commit()
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/families", params={"sort": "-created_at"})
+        assert resp.status_code == 200
+        names = [f["family_name"] for f in resp.json()["families"]]
+        # Most recently created first
+        assert names == ["Third", "Second", "First"]
+
 
 # =========================================================================
 # People — search, sort

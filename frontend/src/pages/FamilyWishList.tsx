@@ -104,6 +104,11 @@ export default function FamilyWishList() {
             <h2 className="flex items-baseline gap-2 text-2xl font-bold tracking-tight text-gray-900">
               <span className="text-base font-medium text-gray-500">Family ID:</span>
               {data.display_id}
+              {data.cash_only && (
+                <span className="text-sm font-medium text-sky-700" title="Shopping has started — this family is cash-only">
+                  (already shopping)
+                </span>
+              )}
             </h2>
             <Link to={route.familyWishCards(familyId)} className="shrink-0 text-sm font-medium text-violet-600 hover:underline">
               Print wish cards →
@@ -213,7 +218,13 @@ export default function FamilyWishList() {
       <SiteFooter />
 
       {/* Claim modal */}
-      <ClaimModal familyId={familyId} open={showClaimModal} onClose={closeClaimModal} currentLocation={location} />
+      <ClaimModal
+        familyId={familyId}
+        open={showClaimModal}
+        onClose={closeClaimModal}
+        currentLocation={location}
+        cashOnly={data.cash_only}
+      />
 
       {/* Print styles */}
       <style>{`

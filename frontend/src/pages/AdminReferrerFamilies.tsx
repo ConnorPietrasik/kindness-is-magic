@@ -137,7 +137,7 @@ export default function AdminReferrerFamilies() {
             updateNormaliseFn: (formData, original) => normalizeUpdatePayload(formData, original) as FamilyPayload,
             formDefault: defaultFamilyForm as unknown as FamilyPayload,
             formComponent: FamilyForm,
-            formExtra: { showReferrerNotes: true, deliveryUserMap, deliveryUsersLoading } as Partial<
+            formExtra: { showReferrerNotes: true, showCashOnly: true, deliveryUserMap, deliveryUsersLoading } as Partial<
               React.ComponentProps<typeof FamilyForm>
             >,
             render: (rows, callbacks, ctx) => (
@@ -291,6 +291,7 @@ const familyHeaders: Record<string, React.ReactNode> = {
   referrer_id: "Referrer",
   delivery: "Delivery",
   claim: "Sponsorship",
+  cash_only: "Cash Only",
   phone_number: "Phone",
   person_count: "People",
   verification_status: "Verification",

@@ -130,6 +130,17 @@ export function FamilyTableRow({
         )}
       </Td>
     ),
+    cash_only: (
+      <Td>
+        {f.cash_only ? (
+          <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800">
+            Cash only
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </Td>
+    ),
     phone_number: <Td>{f.phone_number || "—"}</Td>,
     person_count: <Td className="whitespace-nowrap">{f.person_count ?? 0}</Td>,
     verification_status: (
