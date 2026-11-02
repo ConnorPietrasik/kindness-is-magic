@@ -1,4 +1,3 @@
-Have the "send email" popup moveable or something so it doesn't block the wishes
 Size "if clothing requested" above practical wish as a label instead of just in the example
 Add user guides for each role
 Add a "send reminder" button to email invited referrers
