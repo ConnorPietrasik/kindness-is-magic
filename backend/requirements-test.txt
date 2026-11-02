@@ -1,7 +1,13 @@
 -r requirements.txt
 pytest>=7.4
 httpx>=0.28
-httpx2>=2.0
+# Pinned exactly: starlette (unpinned, via fastapi>=0.46.0) switched its
+# TestClient to httpx2, and httpx2 2.16's IndexedCookieJar orders duplicate
+# cookies by domain instead of insertion order — test behavior must be
+# identical in the local venv and CI, so pin both to the same versions.
+# Bump together, then re-run the backend suite.
+httpx2==2.16.0
+starlette==1.10.0
 pytest-asyncio>=0.21
 pytest-xdist>=3.6
 # Pinned exactly: ruff changed its default lint rule set in 0.16 (adds B/I/S/UP

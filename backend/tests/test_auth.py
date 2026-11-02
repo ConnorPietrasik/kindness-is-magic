@@ -560,12 +560,18 @@ class TestRefresh:
         resp1 = test_client.post("/api/auth/refresh")
         assert resp1.status_code == 200
 
-        # Replay the old token immediately
+        # Replay the old token immediately. The rotation response also stored
+        # a *new* token in the jar — clear all entries first, so the replay
+        # sends exactly the old token: with both in the request, which one the
+        # server sees depends on the cookie jar's ordering and duplicate
+        # resolution (e.g. httpx2's IndexedCookieJar orders by domain, not
+        # insertion), and a 200 from the new token would not test the grace
+        # window at all.
+        test_client.cookies.delete("refresh_token")
         test_client.cookies.set("refresh_token", old_refresh)
         resp2 = test_client.post("/api/auth/refresh")
         assert resp2.status_code == 200
-        # A fresh token was issued (read from the response, not the client
-        # jar — the jar holds both the old and new entries after the set above)
+        # A fresh token was issued (read from the response, not the client jar)
         new_token = resp2.cookies.get("refresh_token")
         assert new_token != old_refresh
 
@@ -586,6 +592,12 @@ class TestRefresh:
         row.rotated_at = datetime.now(timezone.utc) - timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS + 1)
         db.commit()
 
+        # Replay with only the old token (see the note in
+        # test_refresh_replay_within_grace_window_succeeds — the rotation
+        # response left a valid new token in the jar too, and a request
+        # carrying both would succeed via the new token on jars that order it
+        # last in the Cookie header).
+        test_client.cookies.delete("refresh_token")
         test_client.cookies.set("refresh_token", old_refresh)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
