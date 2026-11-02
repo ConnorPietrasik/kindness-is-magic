@@ -74,6 +74,7 @@ export default function AdminFamilies() {
   const [minPersonCount, setMinPersonCount] = useState("");
   const [maxPersonCount, setMaxPersonCount] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
+  const [newestFirst, setNewestFirst] = useState(false);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   // Row whose "Send email" action was chosen (drives the page-level composer)
   const [sendEmailFamily, setSendEmailFamily] = useState<FamilyDetail | null>(null);
@@ -97,11 +98,20 @@ export default function AdminFamilies() {
 
   // Cycle sort: null → "person_count" → "-person_count" → null
   function handleSortToggle() {
+    setNewestFirst(false);
     setSortField((prev) => {
       if (prev === null) return "person_count";
       if (prev === "person_count") return "-person_count";
       return null;
     });
+    pagination.goToPage(1);
+  }
+
+  // "Newest first" and the column sort share the single `sort` param — enabling
+  // one clears the other.
+  function handleNewestToggle() {
+    setNewestFirst((prev) => !prev);
+    setSortField(null);
     pagination.goToPage(1);
   }
 
@@ -119,7 +129,7 @@ export default function AdminFamilies() {
       wish_lock_level: lockLevelFilter || undefined,
       min_person_count: debouncedMinPersonCount !== "" ? parseInt(debouncedMinPersonCount, 10) : undefined,
       max_person_count: debouncedMaxPersonCount !== "" ? parseInt(debouncedMaxPersonCount, 10) : undefined,
-      sort: sortField || undefined,
+      sort: newestFirst ? "-created_at" : sortField || undefined,
     }),
     [
       pagination.params,
@@ -134,6 +144,7 @@ export default function AdminFamilies() {
       verificationFilter,
       lockLevelFilter,
       sortField,
+      newestFirst,
     ]
   );
 
@@ -328,6 +339,9 @@ export default function AdminFamilies() {
         {/* Filters */}
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button type="button" variant={newestFirst ? "primary" : "secondary"} aria-pressed={newestFirst} onClick={handleNewestToggle}>
+              Newest first
+            </Button>
             <select
               aria-label="Verification status filter"
               value={verificationFilter}

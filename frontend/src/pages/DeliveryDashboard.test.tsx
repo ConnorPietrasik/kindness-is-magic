@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { DeliveryFamilySummary } from "../types";
 import DeliveryDashboard from "./DeliveryDashboard";
@@ -37,7 +38,9 @@ const wrap = (ui: React.ReactElement) =>
   render(
     <MemoryRouter initialEntries={["/delivery/dashboard"]}>
       <QueryClientProvider client={createQueryClient()}>
-        <AuthProvider>{ui}</AuthProvider>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

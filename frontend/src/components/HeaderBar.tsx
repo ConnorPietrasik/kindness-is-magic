@@ -2,6 +2,7 @@ import { memo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../lib/routes";
 import { Logo } from "./Logo";
+import { RefreshButton } from "./RefreshButton";
 
 interface HeaderBarProps {
   title: string;
@@ -42,7 +43,10 @@ export const HeaderBar = memo(({ title, titleTo = ROUTES.DASHBOARD, onTitleClick
         {title}
       </Link>
     )}
-    <div className="z-10">{right}</div>
+    <div className="z-10 flex items-center gap-3">
+      <RefreshButton />
+      {right}
+    </div>
   </header>
 ));
 

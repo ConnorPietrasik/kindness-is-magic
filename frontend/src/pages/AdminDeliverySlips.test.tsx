@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { DeliverySlipItem } from "../types";
 import AdminDeliverySlips from "./AdminDeliverySlips";
@@ -35,8 +36,10 @@ const wrap = (ui: React.ReactElement, path = "/admin/delivery-slips") => {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
-        {ui}
-        <UrlProbe />
+        <ToastContainer>
+          {ui}
+          <UrlProbe />
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

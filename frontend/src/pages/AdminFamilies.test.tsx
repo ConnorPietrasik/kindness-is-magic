@@ -497,6 +497,93 @@ describe("AdminFamilies", () => {
     });
   });
 
+  it("newest first toggle sends sort=-created_at and clears it when toggled off", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    const toggle = screen.getByRole("button", { name: "Newest first" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    // The sort change swaps the query key, so the page's spinner gate unmounts
+    // and remounts the filter bar — re-query the button after each toggle.
+    await user.click(toggle);
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+    expect(await screen.findByRole("button", { name: "Newest first" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      const lastCall = vi.mocked(api.adminListFamilies).mock.lastCall?.[0];
+      expect(lastCall?.sort).toBeUndefined();
+    });
+  });
+
+  it("newest first and the person count column sort are mutually exclusive", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    // Person Count column is hidden by default — seed column visibility
+    localStorage.setItem(
+      "kim:columns:adminFamilies",
+      JSON.stringify(["display_id", "family_name", "family_wish", "contact_name", "referrer_id", "person_count"])
+    );
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    // Newest first is on — the column sort takes over. Each toggle swaps the
+    // query key and remounts the filter bar, so re-query (findByRole) before
+    // every dependent click.
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Person Count/ }));
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "person_count" }));
+    });
+
+    // Column sort is on — newest first takes over
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+  });
+
+  it("toggling newest first resets to page 1", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ ...mockListResponse, total: 40 });
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+    });
+
+    // The page-2 key change remounts the section — re-query the toggle.
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, sort: "-created_at" }));
+    });
+  });
+
   it("create family flow calls API with form values", async () => {
     const user = userEvent.setup();
     mockListApis();

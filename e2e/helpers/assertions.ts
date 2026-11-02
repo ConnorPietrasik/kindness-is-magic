@@ -28,7 +28,9 @@ export async function findRowInTable(
     // Row didn't appear within timeout — try paginating
   }
 
-  // Fall back to pagination search
+  // Fall back to pagination search. After each page turn, wait for the list
+  // fetch it triggered to settle before judging the page — a blind sleep
+  // skips pages when the fetch is slow (e.g. under parallel e2e load).
   for (let i = 0; i < maxPages; i++) {
     if ((await row.count()) > 0) return row;
 
@@ -36,8 +38,28 @@ export async function findRowInTable(
     const nextBtn = page.getByRole("button", { name: "Next page" });
     if ((await nextBtn.count()) === 0) break;
     if (await nextBtn.isDisabled()) break;
+
+    // The page turn fires exactly one list GET — wait for the response to that
+    // request specifically so the next iteration's row check never runs against
+    // a half-loaded page. "page=" pins the wait to the paginated list request
+    // (every list endpoint sends page/page_size; non-list GETs — detail, dropdown —
+    // carry no such param, so a coincidental concurrent GET can't resolve the
+    // wait early and make the next iteration click past the page holding the
+    // row). The startTime filter additionally excludes GETs already in flight
+    // (e.g. a window-focus refetch of the current page).
+    const clickAt = Date.now();
+    const settled = page
+      .waitForResponse(
+        (r) =>
+          r.request().method() === "GET" &&
+          r.url().includes("/api/") &&
+          r.url().includes("page=") &&
+          r.request().timing().startTime >= clickAt,
+        { timeout: pollMs * 10 }
+      )
+      .catch(() => {});
     await nextBtn.click();
-    await page.waitForTimeout(pollMs);
+    await settled;
   }
   return null;
 }

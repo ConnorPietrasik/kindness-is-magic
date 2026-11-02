@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import type { User } from "../types";
@@ -40,9 +41,11 @@ const wrap = ({ user = null, left, path = "/home" }: WrapOptions = {}) => {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <PublicHeader left={left} />
-        </AuthProvider>
+        <ToastContainer>
+          <AuthProvider>
+            <PublicHeader left={left} />
+          </AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -106,12 +109,14 @@ describe("PublicHeader", () => {
     render(
       <MemoryRouter initialEntries={["/home"]}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/home" element={<PublicHeader />} />
-              <Route path="/login" element={<div data-testid="login-page">Login page</div>} />
-            </Routes>
-          </AuthProvider>
+          <ToastContainer>
+            <AuthProvider>
+              <Routes>
+                <Route path="/home" element={<PublicHeader />} />
+                <Route path="/login" element={<div data-testid="login-page">Login page</div>} />
+              </Routes>
+            </AuthProvider>
+          </ToastContainer>
         </QueryClientProvider>
       </MemoryRouter>
     );

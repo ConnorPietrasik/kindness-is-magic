@@ -222,6 +222,64 @@ describe("AdminPeople", () => {
     });
   });
 
+  it("newest first toggle sends sort=-created_at and clears it when toggled off", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const toggle = screen.getByRole("button", { name: "Newest first" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    // The sort change swaps the query key, so the page's spinner gate unmounts
+    // and remounts the filter bar — re-query the button after each toggle.
+    await user.click(toggle);
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+    expect(await screen.findByRole("button", { name: "Newest first" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      const lastCall = vi.mocked(api.adminListPeople).mock.lastCall?.[0];
+      expect(lastCall?.sort).toBeUndefined();
+    });
+  });
+
+  it("newest first and the age column sort are mutually exclusive", async () => {
+    const user = userEvent.setup();
+    mockListApis();
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Newest first is on — the column sort takes over. Each toggle swaps the
+    // query key and remounts the filter bar, so re-query (findByRole) before
+    // every dependent click.
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Age/ }));
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "age" }));
+    });
+
+    // Column sort is on — newest first takes over
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" }));
+    });
+  });
+
   it("delete flow confirms and calls API", async () => {
     const user = userEvent.setup();
     mockListApis();

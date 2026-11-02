@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import type { DonorWishSummary, FamilyWishListResponse, PersonWishItem } from "../types";
@@ -148,11 +149,13 @@ const wrap = () => {
   return render(
     <MemoryRouter initialEntries={["/families/1/wish-cards"]}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/families/:id/wish-cards" element={<FamilyWishCards />} />
-          </Routes>
-        </AuthProvider>
+        <ToastContainer>
+          <AuthProvider>
+            <Routes>
+              <Route path="/families/:id/wish-cards" element={<FamilyWishCards />} />
+            </Routes>
+          </AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );

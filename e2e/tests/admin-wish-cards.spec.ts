@@ -35,6 +35,10 @@ test.describe("Admin Blank Wish Cards", () => {
 
     await page.goto("/admin/wish-cards");
 
+    /* Static page (no queries) — the header's refresh button only appears
+       where data is loaded */
+    await expect(page.getByRole("button", { name: "Refresh data" })).not.toBeVisible();
+
     const cards = page.locator("article.wish-card");
     await expect(cards).toHaveCount(4, { timeout: 10_000 });
     const personCards = page.locator("article.wish-card:not(.wish-card--family)");

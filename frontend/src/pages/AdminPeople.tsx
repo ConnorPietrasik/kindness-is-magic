@@ -66,6 +66,7 @@ export default function AdminPeople() {
   const [minAge, setMinAge] = useState("");
   const [maxAge, setMaxAge] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
+  const [newestFirst, setNewestFirst] = useState(false);
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
@@ -85,11 +86,20 @@ export default function AdminPeople() {
 
   // Cycle sort: null → "age" → "-age" → null
   function handleSortToggle() {
+    setNewestFirst(false);
     setSortField((prev) => {
       if (prev === null) return "age";
       if (prev === "age") return "-age";
       return null;
     });
+    pagination.goToPage(1);
+  }
+
+  // "Newest first" and the column sort share the single `sort` param — enabling
+  // one clears the other.
+  function handleNewestToggle() {
+    setNewestFirst((prev) => !prev);
+    setSortField(null);
     pagination.goToPage(1);
   }
 
@@ -106,7 +116,7 @@ export default function AdminPeople() {
       search_wish: debouncedSearchWish || undefined,
       min_age: debouncedMinAge !== "" ? parseInt(debouncedMinAge, 10) : undefined,
       max_age: debouncedMaxAge !== "" ? parseInt(debouncedMaxAge, 10) : undefined,
-      sort: sortField || undefined,
+      sort: newestFirst ? "-created_at" : sortField || undefined,
     }),
     [
       pagination.params,
@@ -120,6 +130,7 @@ export default function AdminPeople() {
       debouncedMinAge,
       debouncedMaxAge,
       sortField,
+      newestFirst,
     ]
   );
 
@@ -307,6 +318,9 @@ export default function AdminPeople() {
         {/* Filters */}
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button type="button" variant={newestFirst ? "primary" : "secondary"} aria-pressed={newestFirst} onClick={handleNewestToggle}>
+              Newest first
+            </Button>
             <select
               aria-label="Family filter"
               value={familyFilter ?? ""}

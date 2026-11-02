@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import AdminWishCards, { buildBlankCards } from "./AdminWishCards";
 
 /* ------------------------------------------------------------------ */
@@ -43,13 +45,17 @@ describe("buildBlankCards", () => {
 /* Page rendering                                                      */
 /* ------------------------------------------------------------------ */
 
-/** The page is static — no auth or Query providers needed, just a router. */
+/** The page body is static — but the header's refresh button needs Query + Toast providers. */
 const renderPage = () =>
   render(
     <MemoryRouter initialEntries={["/admin/wish-cards"]}>
-      <Routes>
-        <Route path="/admin/wish-cards" element={<AdminWishCards />} />
-      </Routes>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ToastContainer>
+          <Routes>
+            <Route path="/admin/wish-cards" element={<AdminWishCards />} />
+          </Routes>
+        </ToastContainer>
+      </QueryClientProvider>
     </MemoryRouter>
   );
 

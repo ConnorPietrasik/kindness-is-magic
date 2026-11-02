@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import type { FamilyClaimSummary, PublicFamilySummary, User } from "../types";
@@ -133,7 +134,9 @@ const wrap = (ui: React.ReactElement, path = "/families", user: User | null = nu
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{ui}</AuthProvider>
+        <ToastContainer>
+          <AuthProvider>{ui}</AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -238,12 +241,14 @@ describe("PublicFamilies", () => {
     render(
       <MemoryRouter initialEntries={["/families"]}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/families" element={<PublicFamilies />} />
-              <Route path="/families/:id/wish-list" element={<div data-testid="wish-list-page">Wish List</div>} />
-            </Routes>
-          </AuthProvider>
+          <ToastContainer>
+            <AuthProvider>
+              <Routes>
+                <Route path="/families" element={<PublicFamilies />} />
+                <Route path="/families/:id/wish-list" element={<div data-testid="wish-list-page">Wish List</div>} />
+              </Routes>
+            </AuthProvider>
+          </ToastContainer>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -549,12 +554,14 @@ describe("PublicFamilies", () => {
     render(
       <MemoryRouter initialEntries={["/families"]}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/families" element={<PublicFamilies />} />
-              <Route path="/login" element={<div data-testid="login-page">Login page</div>} />
-            </Routes>
-          </AuthProvider>
+          <ToastContainer>
+            <AuthProvider>
+              <Routes>
+                <Route path="/families" element={<PublicFamilies />} />
+                <Route path="/login" element={<div data-testid="login-page">Login page</div>} />
+              </Routes>
+            </AuthProvider>
+          </ToastContainer>
         </QueryClientProvider>
       </MemoryRouter>
     );

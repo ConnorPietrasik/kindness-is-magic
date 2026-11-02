@@ -25,13 +25,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { formatApiError } from "../lib/utils";
-import type { PaginationParams } from "../types";
+import type { AdminListParams } from "../types";
 import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -141,8 +141,13 @@ export interface HierarchicalManageChildConfig<
 > {
   /** React Query key for the children list query (active tab) */
   queryKey: readonly string[];
-  /** Fetches the children list. Receives optional pagination params. */
-  listFn: (params?: PaginationParams) => Promise<ListResponse>;
+  /**
+   * Fetches the children list. Receives the pagination params (when controls
+   * are enabled) plus the sort toggle's value — with pagination off only
+   * `sort` is forwarded, so every field is optional. Omitted fields are left
+   * to the endpoint's defaults.
+   */
+  listFn: (params?: Partial<AdminListParams>) => Promise<ListResponse>;
   /** Fetches a single child by id (for editing) */
   detailFn: (id: number) => Promise<ChildDetail>;
   /** Creates a new child */
@@ -179,14 +184,22 @@ export interface HierarchicalManageChildConfig<
   entityName?: string;
   /** If true, disable create/edit/delete operations (read-only mode). */
   isReadonly?: boolean;
+  /**
+   * Optional sort toggle in the children header (e.g. { label: "Newest first",
+   * value: "-created_at" }). When enabled, `sort: value` is merged into the
+   * children list params — and thus the query key — so on/off are separate
+   * cache entries. The list resets to page 1 when toggled. Hidden on the
+   * deleted tab (its endpoint has no sort param).
+   */
+  sortToggle?: { label: string; value: string };
 }
 
 /** Optional deleted tab configuration. */
 export interface HierarchicalManageTabsDeletedConfig<ListResponse> {
   /** React Query key for the deleted list query */
   queryKey: readonly string[];
-  /** Fetches the deleted items list. Receives optional pagination params. */
-  listFn: (params?: PaginationParams) => Promise<ListResponse>;
+  /** Fetches the deleted items list. Receives the list params (see the child `listFn`). */
+  listFn: (params?: Partial<AdminListParams>) => Promise<ListResponse>;
   /** If true, disable create/edit/delete in deleted view (restore-only) */
   readonly?: boolean;
 }
@@ -280,6 +293,17 @@ export function HierarchicalManage<
     usePaginationControls ? { pagination: { goToPage: paginationCtrl.goToPage } } : undefined
   );
 
+  /* ── Sort toggle (optional, children header) ───────────── */
+  const [sortOn, setSortOn] = useState(false);
+  const sortValue = !isDeletedView && sortOn && childConfig.sortToggle ? childConfig.sortToggle.value : undefined;
+
+  // Toggling the sort changes the list query key — reset to page 1 so the new
+  // ordering is visible (tab switches already reset pagination via useCrudTabs).
+  const handleSortToggle = useCallback(() => {
+    setSortOn((v) => !v);
+    if (usePaginationControls) paginationCtrl.goToPage(1);
+  }, [usePaginationControls, paginationCtrl.goToPage]);
+
   /* ── Derived CRUD config based on active tab ───────────── */
   const deletedTab = tabs?.deleted;
   const currentRootKey = isDeletedView && deletedTab ? deletedTab.queryKey : childConfig.queryKey;
@@ -314,9 +338,21 @@ export function HierarchicalManage<
   const [showEditParent, setShowEditParent] = useState(false);
 
   /* ── Children CRUD ─────────────────────────────────────── */
+  // The sort toggle is folded into the list params (and thus the query key) so
+  // on/off are separate cache entries. The page's listFn forwards whatever is
+  // present to the endpoint — with pagination off that's just `sort`, and the
+  // endpoint applies its own page defaults.
+  const childListParams = usePaginationControls
+    ? sortValue
+      ? { ...paginationCtrl.params, sort: sortValue }
+      : paginationCtrl.params
+    : sortValue
+      ? { sort: sortValue }
+      : undefined;
+
   const crud = useCrudManager({
     rootKey: currentRootKey as string[],
-    listParams: usePaginationControls ? paginationCtrl.params : undefined,
+    listParams: childListParams,
     listFn: currentListFn,
     detailFn: childConfig.detailFn,
     createFn: isReadonly ? undefined : childConfig.createApi,
@@ -432,7 +468,14 @@ export function HierarchicalManage<
       {/* ── Children section header ───────────────────────── */}
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-900">{childConfig.title}</h3>
-        {!isReadonly && <Button onClick={crud.openCreate}>{childConfig.createButtonLabel}</Button>}
+        <div className="flex items-center gap-3">
+          {childConfig.sortToggle && !isDeletedView && (
+            <Button type="button" variant={sortOn ? "primary" : "secondary"} aria-pressed={sortOn} onClick={handleSortToggle}>
+              {childConfig.sortToggle.label}
+            </Button>
+          )}
+          {!isReadonly && <Button onClick={crud.openCreate}>{childConfig.createButtonLabel}</Button>}
+        </div>
       </div>
 
       {/* ── Tabs (optional) ───────────────────────────────── */}

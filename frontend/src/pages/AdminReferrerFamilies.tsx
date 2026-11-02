@@ -54,7 +54,7 @@ import {
 } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
-import type { AdminListParams, FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
+import type { FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -127,8 +127,7 @@ export default function AdminReferrerFamilies() {
           }}
           child={{
             queryKey: familiesKey,
-            listFn: (params) =>
-              adminListReferrerFamilies(refIdNum, params ? ({ ...params, columns: apiColumns } as AdminListParams) : undefined),
+            listFn: (params) => adminListReferrerFamilies(refIdNum, params ? { ...params, columns: apiColumns } : undefined),
             detailFn: adminGetFamily,
             createApi: (data) => adminCreateFamily(data),
             updateApi: adminUpdateFamily,
@@ -160,6 +159,7 @@ export default function AdminReferrerFamilies() {
             ),
             title: "Families",
             createButtonLabel: "+ Add family",
+            sortToggle: { label: "Newest first", value: "-created_at" },
             invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies, adminWishes],
             entityName: "Family",
           }}

@@ -743,3 +743,105 @@ describe("HierarchicalManage", () => {
     });
   });
 });
+
+/* --------------------------------------------------------------------------- */
+/* sortToggle                                                                  */
+/* --------------------------------------------------------------------------- */
+
+describe("HierarchicalManage sortToggle", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    if (queryClient) queryClient.clear();
+    cleanup();
+  });
+
+  function sortToggleProps(fns: ReturnType<typeof makeApiFns>) {
+    const props = baseProps(fns);
+    return {
+      ...props,
+      child: { ...props.child, sortToggle: { label: "Newest first", value: "-created_at" } },
+    };
+  }
+
+  it("does not render a toggle when not configured", async () => {
+    const fns = makeApiFns();
+    render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
+
+    await waitFor(() => expect(fns.childList).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Newest first" })).not.toBeInTheDocument();
+  });
+
+  it("sends the sort param when enabled and stops when disabled", async () => {
+    const user = userEvent.setup();
+    const fns = makeApiFns();
+    render(<HierarchicalManage {...sortToggleProps(fns)} />, { wrapper: wrap() });
+
+    // Wait for the loaded UI (not just the fetch call) — the spinner gate
+    // renders until both parent and child fetches have settled.
+    const toggle = await screen.findByRole("button", { name: "Newest first" });
+    expect(fns.childList.mock.calls[0]?.[0]).toBeUndefined();
+
+    // The toggle changes the query key, so the page's spinner gate unmounts and
+    // remounts the section — always re-query the button after a toggle.
+    await user.click(toggle);
+    await waitFor(() => expect(fns.childList).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" })));
+    expect(await screen.findByRole("button", { name: "Newest first" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => {
+      const lastCall = fns.childList.mock.lastCall?.[0];
+      expect(lastCall?.sort).toBeUndefined();
+    });
+  });
+
+  it("resets to page 1 when toggled on from another page", async () => {
+    const user = userEvent.setup();
+    const fns = makeApiFns();
+    fns.childList.mockResolvedValue({
+      items: [{ id: 10, name: "Child A" }],
+      total: 40,
+      page: 1,
+      page_size: 20,
+      total_pages: 2,
+    } as TestListResponse);
+    const props = sortToggleProps(fns);
+    const overrideProps = { ...props, pagination: { enabled: true } };
+    render(<HierarchicalManage {...overrideProps} />, { wrapper: wrap() });
+
+    await user.click(await screen.findByRole("button", { name: "Page 2" }));
+    await waitFor(() => expect(fns.childList).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+
+    // Page + sort key change remounts the section — re-query the toggle.
+    await user.click(await screen.findByRole("button", { name: "Newest first" }));
+    await waitFor(() => expect(fns.childList).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, sort: "-created_at" })));
+  });
+
+  it("is hidden on the deleted tab and its param is not sent there", async () => {
+    const user = userEvent.setup();
+    const fns = makeApiFns();
+    const props = sortToggleProps(fns);
+    const overrideProps = {
+      ...props,
+      tabs: {
+        deleted: {
+          queryKey: ["testDeletedChildren", "1"] as const,
+          listFn: fns.childListDeleted,
+        },
+      },
+    };
+    render(<HierarchicalManage {...overrideProps} />, { wrapper: wrap() });
+
+    const toggle = await screen.findByRole("button", { name: "Newest first" });
+    await user.click(toggle);
+    await waitFor(() => expect(fns.childList).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "-created_at" })));
+
+    await user.click(screen.getByRole("tab", { name: "Deleted" }));
+
+    // Wait for the deleted list to actually render (not just be called).
+    await screen.findByText("Deleted Child");
+    expect(screen.queryByRole("button", { name: "Newest first" })).not.toBeInTheDocument();
+    for (const call of fns.childListDeleted.mock.calls) {
+      expect(call[0]?.sort).toBeUndefined();
+    }
+  });
+});

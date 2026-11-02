@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { FamilyClaimSummary } from "../types";
 import DonorClaims from "./DonorClaims";
@@ -68,7 +69,9 @@ const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { r
 const wrap = (ui: React.ReactElement) =>
   render(
     <MemoryRouter initialEntries={["/donor/claims"]}>
-      <QueryClientProvider client={createQueryClient()}>{ui}</QueryClientProvider>
+      <QueryClientProvider client={createQueryClient()}>
+        <ToastContainer>{ui}</ToastContainer>
+      </QueryClientProvider>
     </MemoryRouter>
   );
 

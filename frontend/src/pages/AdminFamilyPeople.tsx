@@ -60,7 +60,7 @@ import {
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { AdminListParams, FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
+import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
 import { personRoleLabel } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -169,8 +169,7 @@ export default function AdminFamilyPeople() {
           }}
           child={{
             queryKey: peopleKey,
-            listFn: (params) =>
-              adminListFamilyPeople(famIdNum, params ? ({ ...params, columns: apiColumns } as AdminListParams) : undefined),
+            listFn: (params) => adminListFamilyPeople(famIdNum, params ? { ...params, columns: apiColumns } : undefined),
             detailFn: getPerson,
             createNormaliseFn: (formData) => ({ ...formData, family_id: famIdNum }) as PersonPayload,
             createApi: (data) => adminCreatePerson(data),
@@ -192,6 +191,7 @@ export default function AdminFamilyPeople() {
             ),
             title: "People",
             createButtonLabel: "+ Add person",
+            sortToggle: { label: "Newest first", value: "-created_at" },
             invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips, adminWishes],
             entityName: "Person",
           }}

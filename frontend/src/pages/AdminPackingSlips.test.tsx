@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import type { PackingSlipItem } from "../types";
 import AdminPackingSlips from "./AdminPackingSlips";
@@ -85,7 +86,9 @@ const wrap = (ui: React.ReactElement, path = "/admin/packing-slips") => {
   const queryClient = createQueryClient();
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastContainer>{ui}</ToastContainer>
+      </QueryClientProvider>
     </MemoryRouter>
   );
 };

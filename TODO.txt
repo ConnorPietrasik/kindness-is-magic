@@ -1,6 +1,10 @@
+Unify the header so that clicking something always does the same thing per login state
+Lock certain families to cash-only (already shopping)
+Add "send email to referrer" from the family page
+Have the "send email" popup moveable or something so it doesn't block the wishes
+Size "if clothing requested" above practical wish as a label instead of just in the example
 Add user guides for each role
 Add a "send reminder" button to email invited referrers
-Unify the header so that clicking something always does the same thing, and probably make sign out always the right
 Gift-claims should have a "$100 Walmart gift card for Christmas dinner" optional
 Add a note to the public family list that it costs $500 to sponsor a family directly and include standard donate link with a "100% of your donation goes to gifts" message
 Automated failure checks and admin emails

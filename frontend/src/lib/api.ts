@@ -349,7 +349,7 @@ export function adminRestoreFamily(id: number): Promise<FamilyDetail> {
   return apiPost(`/api/admin/families/${id}/restore`);
 }
 
-export function adminListReferrerFamilies(rid: number, params?: AdminFamiliesListParams): Promise<FamilyListResponse> {
+export function adminListReferrerFamilies(rid: number, params?: Partial<AdminFamiliesListParams>): Promise<FamilyListResponse> {
   const p: Record<string, unknown> = { referrer_id: rid };
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
@@ -445,7 +445,7 @@ export function adminRestorePerson(id: number): Promise<PersonDetail> {
   return apiPost(`/api/admin/people/${id}/restore`);
 }
 
-export function adminListFamilyPeople(fid: number, params?: AdminPeopleListParams): Promise<PersonListResponse> {
+export function adminListFamilyPeople(fid: number, params?: Partial<AdminPeopleListParams>): Promise<PersonListResponse> {
   const p: Record<string, unknown> = { family_id: fid };
   if (params) {
     Object.entries(params).forEach(([k, v]) => {

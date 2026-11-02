@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastContainer } from "../context/ToastContext";
 import { CONTACT_EMAIL, DONATE_URL, FACEBOOK_URL, INSTAGRAM_URL } from "../lib/links";
 import { auth } from "../lib/queryKeys";
 import type { User } from "../types";
@@ -44,10 +45,12 @@ const wrap = (user: User | null = null, path = "/home") => {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Home />
-          <HashProbe />
-        </AuthProvider>
+        <ToastContainer>
+          <AuthProvider>
+            <Home />
+            <HashProbe />
+          </AuthProvider>
+        </ToastContainer>
       </QueryClientProvider>
     </MemoryRouter>
   );
