@@ -22,7 +22,7 @@ export const SiteFooter = memo(() => (
           Financials
         </Link>
         <Link to={ROUTES.WISH_LIST_GUIDE} className="hover:text-white hover:underline">
-          Wish list guide
+          Wish List Guide
         </Link>
       </nav>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

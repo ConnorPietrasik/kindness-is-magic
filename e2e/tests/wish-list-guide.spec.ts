@@ -65,7 +65,7 @@ test.describe("Wish list guide (public)", () => {
 
   test("footer link from /home reaches the guide", async ({ page }) => {
     await page.goto("/home");
-    await page.locator("footer").getByRole("link", { name: "Wish list guide" }).click();
+    await page.locator("footer").getByRole("link", { name: "Wish List Guide" }).click();
     await expect(page).toHaveURL("/wish-list-guide");
     await expect(page.getByRole("heading", { name: "Writing Your Wish List", level: 1 })).toBeVisible();
   });
