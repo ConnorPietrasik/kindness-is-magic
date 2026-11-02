@@ -90,7 +90,9 @@ test.describe.serial("Admin custom emails", () => {
     await expect(page.getByRole("heading", { name: "Send email" })).toBeVisible();
 
     /* Recipient is prefilled from the family contact user's email */
-    await expect(page.getByLabel("Recipient")).toHaveValue(FAMILY_USER_EMAIL);
+    /* exact: true — the "Recipient email" free-text field (shown when "Other…"
+       is selected) shares a prefix of this label and would violate strict mode */
+    await expect(page.getByLabel("Recipient", { exact: true })).toHaveValue(FAMILY_USER_EMAIL);
 
     /* Fill subject + message and check the live preview mirrors them */
     await page.getByLabel("Subject (optional)").fill(SUBJECT);
@@ -123,16 +125,16 @@ test.describe.serial("Admin custom emails", () => {
     await expect(page.getByRole("heading", { name: "Send email" })).toBeVisible();
 
     /* Recipient is prefilled from the family contact user's email */
-    await expect(page.getByLabel("Recipient")).toHaveValue(FAMILY_USER_EMAIL);
+    await expect(page.getByLabel("Recipient", { exact: true })).toHaveValue(FAMILY_USER_EMAIL);
 
     /* The referrer option arrives with the lazy referrer fetch */
     const referrerEmail = `e2e-mail-ref-${suffix}@example.com`;
     const referrerOption = page.getByRole("option", { name: `Referrer — ${referrerEmail}` });
     await expect(referrerOption).toBeAttached();
-    await page.getByLabel("Recipient").selectOption(referrerEmail);
+    await page.getByLabel("Recipient", { exact: true }).selectOption(referrerEmail);
 
     /* Selecting it switches the recipient to the referrer's email */
-    await expect(page.getByLabel("Recipient")).toHaveValue(referrerEmail);
+    await expect(page.getByLabel("Recipient", { exact: true })).toHaveValue(referrerEmail);
 
     /* The family contact stays offered as a switchable option too */
     await expect(page.getByRole("option", { name: `Family contact — ${FAMILY_USER_EMAIL}` })).toBeAttached();
@@ -141,6 +143,42 @@ test.describe.serial("Admin custom emails", () => {
     /* Close without sending — keeps the sent-log assertions unambiguous */
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByRole("heading", { name: "Send email" })).not.toBeVisible();
+
+    await context.close();
+  });
+
+  test("the panel parks into a rail and restores without losing the draft", async ({ browser }) => {
+    test.skip(!familyId, "setup incomplete");
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto(`/admin/families/${familyId}/people`);
+    await expect(page.getByRole("heading", { name: "Family & People" })).toBeVisible();
+    await page.getByRole("button", { name: "Send email" }).click();
+    await expect(page.getByRole("heading", { name: "Send email" })).toBeVisible();
+
+    await page.getByLabel("Message").fill("A draft worth keeping");
+
+    /* Drag the left edge past the 380px min, beyond the 16px park grace */
+    const handle = page.getByRole("slider", { name: "Resize panel" });
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const viewport = page.viewportSize()!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(viewport.width - 350, box.y + box.height / 2, { steps: 8 });
+    await expect(page.getByText("Release to park")).toBeVisible();
+    await page.mouse.up();
+
+    /* Parked: slim rail, form hidden */
+    await expect(page.getByRole("dialog")).toHaveCSS("width", "56px");
+    expect(await page.getByLabel("Message").count()).toBe(0);
+
+    /* Double-click the edge to restore — previous width and draft intact */
+    await handle.dblclick();
+    await expect(page.getByRole("dialog")).toHaveCSS("width", "520px");
+    await expect(page.getByLabel("Message")).toHaveValue("A draft worth keeping");
 
     await context.close();
   });

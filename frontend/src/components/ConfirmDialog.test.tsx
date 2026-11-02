@@ -6,6 +6,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 describe("ConfirmDialog", () => {
   afterEach(() => {
     cleanup();
+    defaultProps.onConfirm.mockClear();
+    defaultProps.onCancel.mockClear();
   });
   const defaultProps = {
     open: true,
@@ -27,6 +29,7 @@ describe("ConfirmDialog", () => {
     render(<ConfirmDialog {...defaultProps} />);
 
     expect(screen.getByText("Delete this item?")).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 
   /* ── Content rendering ──────────────────────────────────── */
@@ -67,6 +70,64 @@ describe("ConfirmDialog", () => {
 
     await user.click(screen.getByText("Cancel"));
     expect(defaultProps.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  /* ── Escape ─────────────────────────────────────────────── */
+
+  it("cancels on Escape", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmDialog {...defaultProps} />);
+
+    await user.keyboard("{Escape}");
+    expect(defaultProps.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape while closed", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmDialog {...defaultProps} open={false} />);
+
+    await user.keyboard("{Escape}");
+    expect(defaultProps.onCancel).not.toHaveBeenCalled();
+  });
+
+  it("with two stacked dialogs, Escape closes only the topmost", async () => {
+    const user = userEvent.setup();
+    const bottomCancel = vi.fn();
+    const topCancel = vi.fn();
+    render(<ConfirmDialog {...defaultProps} title="Bottom dialog?" onCancel={bottomCancel} />);
+    const top = render(<ConfirmDialog {...defaultProps} title="Top dialog?" onCancel={topCancel} />);
+
+    await user.keyboard("{Escape}");
+    expect(topCancel).toHaveBeenCalledTimes(1);
+    expect(bottomCancel).not.toHaveBeenCalled();
+
+    // Simulate the parent closing the top dialog — Escape then reaches the bottom one
+    top.unmount();
+    await user.keyboard("{Escape}");
+    expect(bottomCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("a bottom dialog re-rendered with a fresh handler keeps its stack position", async () => {
+    const user = userEvent.setup();
+    const bottomCancel = vi.fn();
+    const bottomCancelFresh = vi.fn();
+    const bottom = render(<ConfirmDialog {...defaultProps} title="Bottom dialog?" onCancel={bottomCancel} />);
+    const topCancel = vi.fn();
+    const top = render(<ConfirmDialog {...defaultProps} title="Top dialog?" onCancel={topCancel} />);
+
+    // A parent re-render passes a fresh (inline) handler — the stack order must not change
+    bottom.rerender(<ConfirmDialog {...defaultProps} title="Bottom dialog?" onCancel={bottomCancelFresh} />);
+
+    await user.keyboard("{Escape}");
+    expect(topCancel).toHaveBeenCalledTimes(1);
+    expect(bottomCancel).not.toHaveBeenCalled();
+    expect(bottomCancelFresh).not.toHaveBeenCalled();
+
+    // When the top closes, Escape reaches the bottom — via its latest handler
+    top.unmount();
+    await user.keyboard("{Escape}");
+    expect(bottomCancelFresh).toHaveBeenCalledTimes(1);
+    expect(bottomCancel).not.toHaveBeenCalled();
   });
 
   /* ── Loading state ──────────────────────────────────────── */

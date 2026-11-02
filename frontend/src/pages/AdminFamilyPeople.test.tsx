@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import { headerUser } from "../test/fixtures";
-import type { FamilyDetail, PersonDetail, ReferrerDetail } from "../types";
+import type { FamilyDetail, PersonDetail, ReferrerDetail, WishSummary } from "../types";
 import AdminFamilyPeople from "./AdminFamilyPeople";
 
 /* ------------------------------------------------------------------ */
@@ -73,11 +73,29 @@ const mockReferrer: ReferrerDetail = {
   email: "ray@example.com",
 };
 
-function renderPage(familyOverrides: Partial<FamilyDetail> = {}) {
+function makeWish(overrides: Partial<WishSummary> & { type: WishSummary["type"] }): WishSummary {
+  return {
+    id: 0,
+    display_id: null,
+    description: "A wish",
+    size: null,
+    color: null,
+    assigned_to_id: null,
+    purchased_at: null,
+    purchased_where: null,
+    received_at: null,
+    purchaser_note: null,
+    deleted_at: null,
+    ...overrides,
+  };
+}
+
+function renderPage(familyOverrides: Partial<FamilyDetail> = {}, personOverrides: Partial<PersonDetail> = {}) {
   const family = { ...mockFamily, ...familyOverrides };
+  const person = { ...mockPerson, ...personOverrides };
   vi.spyOn(api, "adminGetFamily").mockResolvedValue(family);
   vi.spyOn(api, "adminListFamilyPeople").mockResolvedValue({
-    people: [mockPerson],
+    people: [person],
     total: 1,
     page: 1,
     page_size: 50,
@@ -188,6 +206,49 @@ describe("AdminFamilyPeople", () => {
     // Contact prefilled, no referrer option (fetch disabled for referrer_id null)
     expect(screen.getByLabelText("Recipient")).toHaveValue("alice@example.com");
     expect(screen.queryByRole("option", { name: /Referrer — / })).not.toBeInTheDocument();
+  });
+
+  it("shows the family's wishes in the composer's context block", async () => {
+    const user = userEvent.setup();
+    renderPage(
+      { family_wish: "A new blanket fort" },
+      {
+        wishes: [
+          makeWish({ id: 21, type: "practical", description: "Sweater", size: "M", color: "Blue" }),
+          makeWish({ id: 22, type: "fun", description: "Trampoline" }),
+        ],
+      }
+    );
+
+    await screen.findAllByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+
+    const dialog = await screen.findByRole("dialog");
+    // The context block shows the family wish plus one line per person
+    expect(within(dialog).getByText("Family wishes")).toBeInTheDocument();
+    expect(within(dialog).getByText("A new blanket fort")).toBeInTheDocument();
+    expect(within(dialog).getByText("Sam (8):")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Practical: Sweater \(M, Blue\) · Fun: Trampoline/)).toBeInTheDocument();
+  });
+
+  it("Escape on the delete confirm dismisses the confirm, not the composer", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findAllByText("The Johnsons");
+    await user.click(screen.getByRole("button", { name: "Send email" }));
+    await screen.findByRole("heading", { name: "Send email" });
+
+    // The page stays interactive under the non-modal drawer — open the row's
+    // delete confirm from the kebab menu
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+
+    // Escape goes to the confirm first — the composer stays open
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Send email" })).toBeInTheDocument();
   });
 
   it("fully approve flow confirms and calls API", async () => {

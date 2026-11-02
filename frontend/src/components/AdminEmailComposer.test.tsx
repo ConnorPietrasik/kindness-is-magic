@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
+import { MIN_PANEL_WIDTH, PARKED_PANEL_WIDTH } from "../hooks/useResizablePanel";
 import * as api from "../lib/api";
 import { AdminEmailComposer } from "./AdminEmailComposer";
 
@@ -171,6 +172,216 @@ describe("AdminEmailComposer", () => {
     expect(screen.getByText("To: rec@example.com — Subject: A message from Kindness Is Magic ✨")).toBeInTheDocument();
     expect(screen.getByText("First paragraph")).toBeInTheDocument();
     expect(screen.getByText("Second paragraph")).toBeInTheDocument();
+  });
+});
+
+describe("AdminEmailComposer drawer behavior", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    const { onClose } = wrap();
+
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes via the close button", async () => {
+    const user = userEvent.setup();
+    const { onClose } = wrap();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("yields Escape to a popup stacked on top (e.g. a confirm dialog)", async () => {
+    const user = userEvent.setup();
+    const { onClose } = wrap();
+    const popup = render(<div role="alertdialog">Delete person?</div>);
+
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Once the popup is gone, Escape closes the drawer again
+    popup.unmount();
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a read-only context block under the title when provided", () => {
+    wrap({ context: <p>Family wishes</p> });
+    expect(screen.getByText("Family wishes")).toBeInTheDocument();
+  });
+
+  it("omits the context block when none is provided", () => {
+    wrap();
+    expect(screen.queryByText("Family wishes")).not.toBeInTheDocument();
+  });
+
+  // jsdom's default viewport is 1024px wide (at the lg breakpoint, so the
+  // px width applies).
+  function dragToWidth(px: number) {
+    const handle = screen.getByRole("slider", { name: "Resize panel" });
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 1024 - px });
+    fireEvent.pointerUp(window);
+  }
+
+  it("dragging the left edge resizes the drawer and persists the width", () => {
+    wrap();
+    const panel = screen.getByRole("dialog");
+    // The default width is applied explicitly (single source of truth in the hook)
+    expect(panel).toHaveStyle({ width: "520px" });
+
+    dragToWidth(700);
+
+    expect(panel).toHaveStyle({ width: "700px" });
+    expect(localStorage.getItem("kim:emailComposerWidth")).toBe("700");
+  });
+
+  it("switches the form to two columns once the panel is wide enough", () => {
+    wrap();
+    const form = screen.getByRole("dialog").querySelector("form")!;
+    expect(form).not.toHaveClass("grid-cols-2");
+
+    dragToWidth(700);
+
+    expect(form).toHaveClass("grid-cols-2");
+  });
+
+  it("double-clicking the handle resets to the default width", () => {
+    wrap();
+    const panel = screen.getByRole("dialog");
+
+    dragToWidth(700);
+    expect(panel).toHaveStyle({ width: "700px" });
+
+    fireEvent.doubleClick(screen.getByRole("slider", { name: "Resize panel" }));
+
+    expect(panel).toHaveStyle({ width: "520px" });
+    expect(localStorage.getItem("kim:emailComposerWidth")).toBeNull();
+  });
+
+  it("arrow keys nudge the width when the handle is focused", () => {
+    wrap();
+    const panel = screen.getByRole("dialog");
+
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Resize panel" }), { key: "ArrowRight" });
+
+    expect(panel).toHaveStyle({ width: `${520 + 16}px` });
+  });
+
+  /* ── Parking ──────────────────────────────────────────── */
+
+  // Widen to 700 in its own drag, then park with a second gesture — so the
+  // park keeps a non-default width to restore.
+  function parkDrag() {
+    const handle = screen.getByRole("slider", { name: "Resize panel" });
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 1024 - 700 });
+    fireEvent.pointerUp(window, { clientX: 1024 - 700 });
+    const armedX = 1024 - (MIN_PANEL_WIDTH - 24);
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: armedX });
+    fireEvent.pointerUp(window, { clientX: armedX });
+  }
+
+  it("hints while dragging past the min, then parks into the rail on release", () => {
+    wrap();
+    const panel = screen.getByRole("dialog");
+    const handle = screen.getByRole("slider", { name: "Resize panel" });
+
+    // Widen to 700 first, so the park gesture keeps a non-default width
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 1024 - 700 });
+    fireEvent.pointerUp(window, { clientX: 1024 - 700 });
+
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 1024 - (MIN_PANEL_WIDTH - 8) }); // past the edge, inside the grace
+    expect(screen.queryByText("Release to park")).not.toBeInTheDocument();
+
+    fireEvent.pointerMove(window, { clientX: 1024 - (MIN_PANEL_WIDTH - 24) }); // armed
+    expect(screen.getByText("Release to park")).toBeInTheDocument();
+    expect(panel).toHaveStyle({ width: `${MIN_PANEL_WIDTH}px` }); // clamped while armed
+
+    fireEvent.pointerUp(window, { clientX: 1024 - (MIN_PANEL_WIDTH - 24) });
+    expect(panel).toHaveStyle({ width: `${PARKED_PANEL_WIDTH}px` });
+    expect(screen.queryByText("Release to park")).not.toBeInTheDocument();
+    // Focus moved to the handle so an arrow key restores immediately
+    expect(handle).toHaveFocus();
+    // The rail offers restore (its label) and close
+    expect(screen.getByText("Send email")).toBeInTheDocument();
+    // …and restoring brings back the pre-gesture width
+    fireEvent.doubleClick(handle);
+    expect(panel).toHaveStyle({ width: "700px" });
+  });
+
+  it("double-clicking the rail restores the pre-park width", () => {
+    wrap();
+    parkDrag();
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: `${PARKED_PANEL_WIDTH}px` });
+
+    fireEvent.doubleClick(screen.getByRole("slider", { name: "Resize panel" }));
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: "700px" });
+  });
+
+  it("clicking the rail body restores the panel", async () => {
+    const user = userEvent.setup();
+    wrap();
+    parkDrag();
+
+    await user.click(screen.getByText("Send email"));
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: "700px" });
+  });
+
+  it("pulling the edge from the rail opens the panel following the pointer", () => {
+    wrap();
+    parkDrag();
+
+    const handle = screen.getByRole("slider", { name: "Resize panel" });
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 1024 - 200 });
+    fireEvent.pointerMove(window, { clientX: 1024 - 500 });
+    fireEvent.pointerUp(window, { clientX: 1024 - 500 });
+
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: "500px" });
+  });
+
+  it("keeps the draft across park and restore", async () => {
+    const user = userEvent.setup();
+    wrap();
+
+    await user.type(screen.getByLabelText("Message"), "Half finished");
+    parkDrag();
+    expect(screen.queryByLabelText("Message")).not.toBeInTheDocument();
+
+    fireEvent.doubleClick(screen.getByRole("slider", { name: "Resize panel" }));
+    expect(screen.getByLabelText("Message")).toHaveValue("Half finished");
+  });
+
+  it("parks via the header button and closes from the rail", async () => {
+    const user = userEvent.setup();
+    const { onClose } = wrap();
+
+    await user.click(screen.getByRole("button", { name: "Park panel" }));
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: `${PARKED_PANEL_WIDTH}px` });
+    // Focus moved to the handle so a keyboard user can restore with an arrow key
+    expect(screen.getByRole("slider", { name: "Resize panel" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("arrow keys restore the panel when focused on the rail", () => {
+    wrap();
+    parkDrag();
+
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Resize panel" }), { key: "ArrowRight" });
+    expect(screen.getByRole("dialog")).toHaveStyle({ width: "700px" });
   });
 });
 

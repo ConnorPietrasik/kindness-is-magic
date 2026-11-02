@@ -193,6 +193,9 @@ describe("AdminFamilies", () => {
     expect(await screen.findByText("Send email")).toBeInTheDocument();
     expect(screen.getByText("Family F-101 — The Johnsons")).toBeInTheDocument();
     expect(screen.getByLabelText("Recipient")).toHaveValue("jane@example.com");
+    // The family's wish is shown in the context block (scoped to the dialog —
+    // the Family Wish column shows the same text in the table row)
+    expect(within(screen.getByRole("dialog")).getByText("A new bed")).toBeInTheDocument();
   });
 
   it("switches to Deleted tab and fetches deleted families", async () => {

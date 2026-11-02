@@ -611,6 +611,13 @@ export default function AdminFamilies() {
             contextLabel={
               sendEmailFamily ? `Family ${sendEmailFamily.display_id ?? sendEmailFamily.id} — ${sendEmailFamily.family_name}` : null
             }
+            context={
+              sendEmailFamily?.family_wish ? (
+                <p>
+                  <span className="font-medium text-gray-900">Family wish:</span> {sendEmailFamily.family_wish}
+                </p>
+              ) : null
+            }
             prefilledRecipient={sendEmailFamily?.contact_email ?? null}
             recipientOptions={sendEmailFamily?.contact_email ? [{ email: sendEmailFamily.contact_email, label: "Family contact" }] : null}
             onClose={() => setSendEmailFamily(null)}

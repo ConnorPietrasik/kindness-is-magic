@@ -30,7 +30,7 @@ import { MutationErrors } from "../components/MutationErrors";
 import { PersonForm } from "../components/PersonForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
-import { WishCellAdult, WishCellType } from "../components/WishCell";
+import { WishCellAdult, WishCellType, wishText } from "../components/WishCell";
 import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
@@ -62,7 +62,7 @@ import {
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
-import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload } from "../types";
+import type { FamilyDetail, FamilyPayload, PersonDetail, PersonPayload, WishSummary } from "../types";
 import { personRoleLabel } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -99,6 +99,25 @@ export default function AdminFamilyPeople() {
   // Drives the header "Send email" composer (the recipient select inside it
   // covers the family contact and, when the family has one, its referrer)
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
+
+  // The composer's context block: the family's wishes, so the admin can read
+  // them without hunting for them behind the drawer. Fetched only while the
+  // composer is open; people CRUD invalidations hit the root key, so it stays
+  // fresh while the drawer is open.
+  //
+  // Note: this shares the table's cache entry. With no pagination on this
+  // page and the sort toggle off (the default), the table's list query also
+  // uses the bare peopleKey, so the last-rendered observer's queryFn owns the
+  // shared entry (a page_size: 100 fetch vs. the endpoint's default-50).
+  // Harmless while families stay well under 50 people — both fetches return
+  // the same rows. If this page ever gains pagination (the table's key would
+  // then append its page params) or large families become realistic, give
+  // this query its own key segment (e.g. [...peopleKey, "emailContext"]).
+  const { data: peopleForContext } = useQuery({
+    queryKey: peopleKey,
+    queryFn: () => adminListFamilyPeople(famIdNum, { page: 1, page_size: 100 }),
+    enabled: sendEmailOpen,
+  });
 
   // Referrer recipient option: lazy fetch while the composer is open, so the
   // admin can pick the referrer from the recipient select. Shares the
@@ -141,6 +160,33 @@ export default function AdminFamilyPeople() {
     if (referrerDetail?.email) options.push({ email: referrerDetail.email, label: "Referrer" });
     return options;
   }, [familyDetail, referrerDetail]);
+
+  // Read-only wishes summary shown inside the composer while it's open.
+  const emailContext = useMemo(() => {
+    if (!familyDetail) return null;
+    const familyWish = familyDetail.family_wish ?? "";
+    const people = peopleForContext?.people ?? [];
+    if (!familyWish && people.length === 0) return null;
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Family wishes</p>
+        {familyWish && (
+          <p>
+            <span className="font-medium text-gray-900">Family:</span> {familyWish}
+          </p>
+        )}
+        {people.map((p) => (
+          <p key={p.id}>
+            <span className="font-medium text-gray-900">
+              {p.given_name}
+              {p.age > 0 ? ` (${p.age})` : ""}:
+            </span>{" "}
+            {personWishText(p.wishes)}
+          </p>
+        ))}
+      </div>
+    );
+  }, [familyDetail, peopleForContext]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -236,6 +282,7 @@ export default function AdminFamilyPeople() {
         <AdminEmailComposer
           open={sendEmailOpen}
           contextLabel={familyDetail ? `Family ${familyDetail.display_id ?? familyDetail.id} — ${familyDetail.family_name}` : null}
+          context={emailContext}
           prefilledRecipient={familyDetail?.contact_email ?? null}
           recipientOptions={recipientOptions}
           onClose={() => setSendEmailOpen(false)}
@@ -243,6 +290,19 @@ export default function AdminFamilyPeople() {
       </main>
     </div>
   );
+}
+
+/**
+ * One compact line per person for the composer's context block:
+ * "Practical: Sweater (M, Blue) · Fun: Trampoline" (adults' single wish is
+ * bare; "—" when the person has no active wishes).
+ */
+function personWishText(wishes: WishSummary[]): string {
+  const active = wishes.filter((w) => !w.deleted_at);
+  if (active.length === 0) return "—";
+  return active
+    .map((w) => (w.type === "fun" ? `Fun: ${wishText(w)}` : w.type === "practical" ? `Practical: ${wishText(w)}` : wishText(w)))
+    .join(" · ");
 }
 
 /* ------------------------------------------------------------------ */
