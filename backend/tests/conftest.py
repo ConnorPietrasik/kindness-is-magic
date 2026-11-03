@@ -10,6 +10,7 @@ Run with:
 
 import os
 import sys
+import uuid
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -38,34 +39,41 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 
-def _get_worker_schema():
-    """Return a per-worker schema name when running under xdist, else None."""
+def _get_test_schema():
+    """Return a unique per-run schema name.
+
+    The uuid suffix makes every run's schema distinct, so two concurrent
+    runs against the same test DB can never drop or deadlock on each
+    other's tables. Under xdist each worker gets its own schema on top
+    of that, so parallel tests don't collide on unique constraints.
+    """
+    run_suffix = uuid.uuid4().hex[:8]
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
     if worker_id:
-        return f"test_{worker_id}"
-    return None
+        return f"test_{worker_id}_{run_suffix}"
+    return f"test_{run_suffix}"
 
 
-_engine_schema = _get_worker_schema()
+_engine_schema = _get_test_schema()
 
 engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
 
-# Use event listener to set search_path on every connection so xdist
-# workers each operate on their own schema and don't collide on unique
-# constraints.
+# Use event listener to set search_path on every connection so each run
+# (and each xdist worker within a run) operates on its own schema, and
+# concurrent runs never collide on tables or unique constraints.
 if _engine_schema:
     from sqlalchemy import event
 
     @event.listens_for(engine, "connect")
     def _set_search_path(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
+        # Create the schema lazily on first connect (idempotent, cheap) so
+        # the xdist master — which imports this module but never connects —
+        # doesn't leak an empty schema per run.
+        cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{_engine_schema}"')
         cursor.execute(f'SET search_path TO "{_engine_schema}"')
         cursor.close()
 
-    # Pre-create the schema so the first connection doesn't fail
-    with engine.connect() as conn:
-        conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{_engine_schema}"'))
-        conn.commit()
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -131,8 +139,11 @@ def _setup_test_schema() -> Generator[None, None, None]:
     """Create all tables and seed required data once at the start of the test
     session, then tear everything down at the end.
 
-    When running under xdist, each worker gets its own schema (set via
-    search_path) so parallel tests don't collide on unique constraints.
+    Every run gets its own unique schema (see _get_test_schema) so
+    concurrent runs against the same test DB can't drop or deadlock on
+    each other's tables. Under xdist, each worker additionally gets its
+    own schema (set via search_path) so parallel tests don't collide on
+    unique constraints.
     """
     from app.models import Base
     from app import models  # noqa: F401 — register all model metadata
