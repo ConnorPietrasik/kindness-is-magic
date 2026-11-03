@@ -614,7 +614,9 @@ async def invite_referrer(
     response_model=ReferrerSelfRegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("5/minute")
 def register_referrer(
+    request: Request,
     data: ReferrerSelfRegister,
     response: Response,
     db: Session = Depends(get_db),
@@ -706,7 +708,9 @@ def register_referrer(
     response_model=FamilySelfRegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("5/minute")
 async def register_family(
+    request: Request,
     data: FamilySelfRegister,
     response: Response,
     db: Session = Depends(get_db),
@@ -815,7 +819,9 @@ async def register_family(
     response_model=DonorSelfRegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("5/minute")
 def register_donor(
+    request: Request,
     data: DonorSelfRegister,
     response: Response,
     db: Session = Depends(get_db),
