@@ -315,9 +315,6 @@ if [ "$1" = "clear" ]; then
   fi
   sudo docker compose down -v --remove-orphans
   sudo docker compose --profile test down -v --remove-orphans 2>/dev/null || true
-  # Also remove the named db volume (compose down -v may miss it if no service
-  # is using it at that point)
-  sudo docker volume rm kindness_is_magic 2>/dev/null || true
   # Remove the project network if it still exists
   sudo docker network rm kindness-is-magic_kindnet 2>/dev/null || true
   # Prune any leftover anonymous/orphan volumes (e.g. from interrupted builds)
