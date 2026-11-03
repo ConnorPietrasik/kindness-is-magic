@@ -1,6 +1,6 @@
 """Tests for mail infrastructure (Phase 1): mail helpers, unsubscribe endpoint, EmailPreference model."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 import jwt
@@ -28,13 +28,17 @@ class TestUnsubscribeUrl:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["email"] == "test@example.com"
 
-    def test_token_has_no_expiry(self):
+    def test_token_is_purpose_scoped_and_expiring(self):
+        """Tokens carry type=unsubscribe and an exp ~30 days out."""
         from app.mail import _unsubscribe_url
 
         url = _unsubscribe_url("test@example.com")
         token = url.split("token=")[1]
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
-        assert "exp" not in payload
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        assert payload["type"] == "unsubscribe"
+        assert payload["exp"] > datetime.now(timezone.utc).timestamp()
+        ttl_days = (payload["exp"] - datetime.now(timezone.utc).timestamp()) / 86400
+        assert 29 < ttl_days <= 30
 
     def test_url_uses_app_base_url(self, monkeypatch):
         from app import mail as mail_mod
@@ -422,30 +426,62 @@ class TestEmailTemplates:
 
 
 class TestUnsubscribeEndpoint:
-    def _make_token(self, email: str) -> str:
-        """Create a valid unsubscribe JWT token for a given email."""
-        return jwt.encode({"email": email}, SECRET_KEY, algorithm=ALGORITHM)
+    def _make_token(
+        self,
+        email: str,
+        token_type: str | None = "unsubscribe",
+        exp_delta: timedelta = timedelta(days=30),
+    ) -> str:
+        """Create an unsubscribe JWT token for a given email (default: valid)."""
+        claims: dict = {"email": email, "exp": datetime.now(timezone.utc) + exp_delta}
+        if token_type is not None:
+            claims["type"] = token_type
+        return jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)
 
-    def test_unsubscribe_success(self, test_client: TestClient, db: Session):
+    # -- GET /unsubscribe: confirmation page, no mutation -------------------
+
+    def test_get_returns_confirm_page(self, test_client: TestClient, db: Session):
         token = self._make_token("user@example.com")
         resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
         assert resp.status_code == 200
-        body = resp.json()
-        assert "unsubscribed" in body["message"].lower()
-        assert "user@example.com" in body["message"]
+        assert "text/html" in resp.headers["content-type"]
+        assert resp.headers["cache-control"] == "no-store"  # credential + PII page, never cache
+        assert "user@example.com" in resp.text
+        # The page posts to the confirm endpoint carrying the token
+        assert f"/api/auth/unsubscribe/confirm?token={token}" in resp.text
 
-    def test_unsubscribe_creates_preference(self, test_client: TestClient, db: Session):
+    def test_get_does_not_write_preference(self, test_client: TestClient, db: Session):
+        """A bare GET (prefetcher / scanner) must never unsubscribe anyone."""
+        from app.models import EmailPreference
+
+        token = self._make_token("prefetched@example.com")
+        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
+        assert resp.status_code == 200
+        assert db.query(EmailPreference).count() == 0
+
+    def test_get_no_auth_required(self, test_client: TestClient):
+        """The confirm page should render without authentication."""
+        token = self._make_token("noauth@example.com")
+        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
+        assert resp.status_code == 200
+
+    # -- POST /unsubscribe/confirm: performs the unsubscribe ----------------
+
+    def test_confirm_creates_preference(self, test_client: TestClient, db: Session):
         from app.models import EmailPreference
 
         token = self._make_token("new@example.com")
-        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
+        resp = test_client.post(f"/api/auth/unsubscribe/confirm?token={token}")
         assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        assert resp.headers["cache-control"] == "no-store"  # credential + PII page, never cache
+        assert "new@example.com" in resp.text
 
         pref = db.query(EmailPreference).filter(EmailPreference.email == "new@example.com").first()
         assert pref is not None
         assert pref.unsubscribed_at is not None
 
-    def test_unsubscribe_updates_existing(self, test_client: TestClient, db: Session):
+    def test_confirm_updates_existing(self, test_client: TestClient, db: Session):
         from app.models import EmailPreference
         import time
 
@@ -458,63 +494,80 @@ class TestUnsubscribeEndpoint:
         time.sleep(0.1)  # Ensure different timestamp
 
         token = self._make_token("existing@example.com")
-        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
+        resp = test_client.post(f"/api/auth/unsubscribe/confirm?token={token}")
         assert resp.status_code == 200
 
         db.refresh(pref)
         assert pref.unsubscribed_at > old_time
 
-    def test_unsubscribe_invalid_token(self, test_client: TestClient):
-        resp = test_client.get("/api/auth/unsubscribe?token=invalid-token-value")
-        assert resp.status_code == 400
-        assert "invalid" in resp.json()["detail"].lower() or "malformed" in resp.json()["detail"].lower()
+    def test_confirm_no_auth_required(self, test_client: TestClient, db: Session):
+        """Unsubscribe should work without authentication."""
+        token = self._make_token("noauth2@example.com")
+        resp = test_client.post(f"/api/auth/unsubscribe/confirm?token={token}")
+        assert resp.status_code == 200
 
-    def test_unsubscribe_missing_token(self, test_client: TestClient):
-        resp = test_client.get("/api/auth/unsubscribe")
-        assert resp.status_code in (400, 422)
-
-    def test_unsubscribe_email_normalised(self, test_client: TestClient, db: Session):
+    def test_confirm_email_normalised(self, test_client: TestClient, db: Session):
         from app.models import EmailPreference
 
         token = self._make_token("UPPER@EXAMPLE.COM")
-        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
+        resp = test_client.post(f"/api/auth/unsubscribe/confirm?token={token}")
         assert resp.status_code == 200
 
         pref = db.query(EmailPreference).filter(EmailPreference.email == "upper@example.com").first()
         assert pref is not None
 
-    def test_unsubscribe_no_auth_required(self, test_client: TestClient):
-        """Unsubscribe should work without authentication."""
-        token = self._make_token("noauth@example.com")
-        # No login, no cookies
-        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
-        assert resp.status_code == 200
+    # -- Token validation ----------------------------------------------------
 
-    def test_unsubscribe_token_expired_still_works(self, test_client: TestClient):
-        """Unsubscribe tokens have no expiry, so even an 'expired' token should work
-        as long as the signature is valid. Our tokens don't include exp, so this
-        is inherently true, but let's verify by decoding with verify_exp=True."""
-        token = self._make_token("noexp@example.com")
-        # This should not raise ExpiredSignatureError since there's no exp claim
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        assert "exp" not in payload
-        assert payload["email"] == "noexp@example.com"
+    def test_get_invalid_token(self, test_client: TestClient):
+        resp = test_client.get("/api/auth/unsubscribe?token=invalid-token-value")
+        assert resp.status_code == 400
+        assert "invalid" in resp.json()["detail"].lower() or "malformed" in resp.json()["detail"].lower()
+
+    def test_get_missing_token(self, test_client: TestClient):
+        resp = test_client.get("/api/auth/unsubscribe")
+        assert resp.status_code in (400, 422)
+
+    def test_confirm_invalid_token(self, test_client: TestClient, db: Session):
+        from app.models import EmailPreference
+
+        resp = test_client.post("/api/auth/unsubscribe/confirm?token=invalid-token-value")
+        assert resp.status_code == 400
+        assert db.query(EmailPreference).count() == 0
+
+    def test_confirm_missing_token(self, test_client: TestClient):
+        resp = test_client.post("/api/auth/unsubscribe/confirm")
+        assert resp.status_code in (400, 422)
+
+    def test_expired_token_rejected(self, test_client: TestClient):
+        """Expired tokens are rejected with a distinct message on both steps."""
+        token = self._make_token("old@example.com", exp_delta=timedelta(hours=-1))
 
         resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
+        assert "expired" in resp.json()["detail"].lower()
+
+        resp = test_client.post(f"/api/auth/unsubscribe/confirm?token={token}")
+        assert resp.status_code == 400
+        assert "expired" in resp.json()["detail"].lower()
+
+    def test_token_without_type_rejected(self, test_client: TestClient):
+        """A valid session-style token (sub claim, no type) is not an unsubscribe token."""
+        token = jwt.encode({"sub": "123", "role": "donor"}, SECRET_KEY, algorithm=ALGORITHM)
+        assert test_client.get(f"/api/auth/unsubscribe?token={token}").status_code == 400
+        assert test_client.post(f"/api/auth/unsubscribe/confirm?token={token}").status_code == 400
+
+    def test_token_without_email_rejected(self, test_client: TestClient):
+        """A valid unsubscribe-typed JWT but without the email claim should be rejected."""
+        token = jwt.encode({"type": "unsubscribe", "exp": datetime.now(timezone.utc) + timedelta(days=1)}, SECRET_KEY, algorithm=ALGORITHM)
+        assert test_client.get(f"/api/auth/unsubscribe?token={token}").status_code == 400
+        assert test_client.post(f"/api/auth/unsubscribe/confirm?token={token}").status_code == 400
 
     @pytest.mark.filterwarnings("ignore:The HMAC key is \\d+ bytes long")
-    def test_unsubscribe_tampered_token_rejected(self, test_client: TestClient):
+    def test_tampered_token_rejected(self, test_client: TestClient):
         """A token signed with a different key should be rejected."""
-        bad_token = jwt.encode({"email": "hacker@example.com"}, "wrong-secret", algorithm=ALGORITHM)
-        resp = test_client.get(f"/api/auth/unsubscribe?token={bad_token}")
-        assert resp.status_code == 400
-
-    def test_unsubscribe_token_without_email_rejected(self, test_client: TestClient):
-        """A valid JWT but without the email claim should be rejected."""
-        token = jwt.encode({"sub": "123"}, SECRET_KEY, algorithm=ALGORITHM)
-        resp = test_client.get(f"/api/auth/unsubscribe?token={token}")
-        assert resp.status_code == 400
+        bad_token = jwt.encode({"email": "hacker@example.com", "type": "unsubscribe"}, "wrong-secret", algorithm=ALGORITHM)
+        assert test_client.get(f"/api/auth/unsubscribe?token={bad_token}").status_code == 400
+        assert test_client.post(f"/api/auth/unsubscribe/confirm?token={bad_token}").status_code == 400
 
 
 class TestSendEmailLogging:

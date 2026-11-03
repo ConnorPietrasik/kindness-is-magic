@@ -3,9 +3,12 @@
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
+from html import escape
+from urllib.parse import urlencode
 
 import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.config import APP_BASE_URL, REFRESH_ROTATION_GRACE_SECONDS
@@ -118,39 +121,122 @@ def _get_inviter_name(user: User, db: Session) -> str | None:
 
 # ---------------------------------------------------------------------------
 # Unsubscribe (public, no auth)
+#
+# Two-step: GET renders a confirmation page, and the page's form POSTs to
+# /unsubscribe/confirm, which performs the actual unsubscribe. A bare GET —
+# mail-client link prefetchers, corporate URL scanners, forwarded-email
+# preview bots — never writes the preference.
 # ---------------------------------------------------------------------------
 
 
-@router.get("/unsubscribe")
-@limiter.limit("5/minute")
-def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
-    """Unsubscribe an email address from marketing emails.
+def _decode_unsubscribe_token(token: str) -> str:
+    """Validate an unsubscribe token and return its normalized email.
 
-    No authentication required. Rate-limited to 5/minute.
-    Accepts a signed JWT token (no expiry) embedding the email.
+    The token must be signed with the app key, be unexpired, and carry
+    ``type: "unsubscribe"`` (so e.g. a session token replayed here is
+    rejected as well).
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="This unsubscribe link has expired")
     except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+
+    if payload.get("type") != "unsubscribe":
         raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
 
     email: str | None = payload.get("email")
     if not email or not isinstance(email, str):
         raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+    return email.strip().lower()
 
-    email_lower = email.strip().lower()
+
+def _unsubscribe_page_shell(title: str, content_html: str) -> str:
+    """Minimal branded HTML shell for the unsubscribe pages (standalone — no SPA, no assets)."""
+    return f"""<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escape(title)} — Kindness Is Magic</title>
+</head>
+<body style="margin:0;padding:32px 16px;background-color:#f9f9f9;font-family:Arial,Helvetica,sans-serif;color:#333333;">
+<div style="max-width:480px;margin:0 auto;background-color:#ffffff;border:1px solid #eeeeee;border-radius:8px;overflow:hidden;">
+<div style="background-color:#4c1d95;color:#ffffff;padding:16px 24px;text-align:center;font-size:18px;font-weight:bold;">Kindness Is Magic</div>
+<div style="padding:24px;">
+<h1 style="font-size:18px;margin:0 0 16px;">{escape(title)}</h1>
+{content_html}
+</div>
+</div>
+</body>
+</html>"""
+
+
+def _unsubscribe_confirm_page(email: str, token: str) -> str:
+    """Confirmation page shown for a valid, unexpired unsubscribe token."""
+    confirm_url = f"{APP_BASE_URL}/api/auth/unsubscribe/confirm?{urlencode({'token': token})}"
+    return _unsubscribe_page_shell(
+        "Unsubscribe from Kindness Is Magic?",
+        f"""<p>You're about to stop receiving program emails from Kindness Is Magic for <strong>{escape(email)}</strong>.</p>
+<form method="post" action="{confirm_url}" style="text-align:center;margin:24px 0;">
+  <button type="submit" style="padding:12px 24px;background-color:#4c1d95;color:#ffffff;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">Yes, unsubscribe me</button>
+</form>
+<p style="font-size:13px;color:#666666;margin:16px 0 0;">Security emails (such as password resets) will still be delivered.</p>
+<p style="font-size:13px;margin:16px 0 0;"><a href="{APP_BASE_URL}" style="color:#4c1d95;">No — keep receiving emails</a></p>""",
+    )
+
+
+def _unsubscribe_done_page(email: str) -> str:
+    """Confirmation page shown after a successful unsubscribe."""
+    return _unsubscribe_page_shell(
+        "You're unsubscribed",
+        f"""<p><strong>{escape(email)}</strong> will no longer receive program emails from Kindness Is Magic.</p>
+<p style="font-size:13px;color:#666666;margin:16px 0 0;">Security emails (such as password resets) will still be delivered. If this was a mistake, contact us and we'll restore your subscription.</p>
+<p style="font-size:13px;margin:16px 0 0;"><a href="{APP_BASE_URL}" style="color:#4c1d95;">Go to the website</a></p>""",
+    )
+
+
+@router.get("/unsubscribe")
+@limiter.limit("5/minute")
+def unsubscribe(request: Request, token: str):
+    """Render the unsubscribe confirmation page (public, no auth, rate-limited 5/minute).
+
+    A valid token shows a page with the email address and a confirm button.
+    The page's form is the only thing that POSTs to /unsubscribe/confirm —
+    this endpoint itself never writes the preference.
+    """
+    email = _decode_unsubscribe_token(token)
+    # no-store: the page shows the recipient's address and carries their
+    # live credential — it must never sit in a browser or proxy cache.
+    return HTMLResponse(_unsubscribe_confirm_page(email, token), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/unsubscribe/confirm")
+@limiter.limit("5/minute")
+def unsubscribe_confirm(
+    request: Request,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Perform the unsubscribe after the user confirms on the GET page.
+
+    The confirmation form POSTs here carrying the same token in the query
+    string; it is re-validated before the EmailPreference row is upserted.
+    """
+    email = _decode_unsubscribe_token(token)
     now = datetime.now(timezone.utc)
 
     # Upsert: insert or update unsubscribed_at
-    existing = db.query(EmailPreference).filter(EmailPreference.email == email_lower).first()
+    existing = db.query(EmailPreference).filter(EmailPreference.email == email).first()
     if existing:
         existing.unsubscribed_at = now
     else:
-        db.add(EmailPreference(email=email_lower, unsubscribed_at=now))
+        db.add(EmailPreference(email=email, unsubscribed_at=now))
     db.commit()
 
-    logger.info("Email unsubscribed: %s", email_lower)
-    return {"message": f"Email {email_lower} has been unsubscribed."}
+    logger.info("Email unsubscribed: %s", email)
+    # no-store: the page shows the recipient's address (see above).
+    return HTMLResponse(_unsubscribe_done_page(email), headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------------------

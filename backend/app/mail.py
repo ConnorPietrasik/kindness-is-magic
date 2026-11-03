@@ -3,7 +3,7 @@
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from html import escape
 from urllib.parse import urlencode
 
@@ -73,12 +73,29 @@ mail_manager: FastMail = FastMail(conf)
 # ---------------------------------------------------------------------------
 
 
+# How long an unsubscribe link stays valid — a forwarded email shouldn't
+# be able to mute someone indefinitely.
+UNSUBSCRIBE_TOKEN_TTL_DAYS = 30
+
+
 def _unsubscribe_url(email: str) -> str:
-    """Generate a signed JWT token embedding the email (no expiry).
+    """Generate a signed, purpose-scoped JWT token embedding the email.
+
+    The token carries ``type: "unsubscribe"`` (the endpoint rejects tokens
+    of any other type) and a 30-day ``exp`` so an old forwarded email can't
+    unsubscribe forever.
 
     Produces a URL like ``GET /api/auth/unsubscribe?token=...``.
     """
-    token = jwt.encode({"email": email}, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(
+        {
+            "email": email,
+            "type": "unsubscribe",
+            "exp": datetime.now(timezone.utc) + timedelta(days=UNSUBSCRIBE_TOKEN_TTL_DAYS),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
     base = APP_BASE_URL
     path = "/api/auth/unsubscribe"
     params = urlencode({"token": token})

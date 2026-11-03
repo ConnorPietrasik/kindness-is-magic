@@ -1,4 +1,8 @@
 line-length = 140
 
+# Match the production runtime (backend/Dockerfile: python:3.11-slim) so the
+# formatter never emits 3.12+ syntax (e.g. same-quoted nested f-strings).
+target-version = "py311"
+
 [lint]
 ignore = ["E712"]
