@@ -1,6 +1,6 @@
 """Tests for /api/auth/* endpoints."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -202,7 +202,7 @@ class TestChangePassword:
         reset = PasswordResetToken(
             user_id=admin_user.id,
             token="test-reset-token-xyz",
-            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(reset)
         db.commit()
@@ -319,6 +319,32 @@ class TestForgotPassword:
         assert resp.status_code == 200
         mock_fn.assert_not_called()
 
+    def test_forgot_password_no_email_for_disabled_user(self, test_client: TestClient, db: Session):
+        """A disabled (soft-deleted) account is treated like an unknown
+        email: generic 200, no reset email sent."""
+        from unittest.mock import patch
+
+        from app.auth import get_password_hash
+        from app.models import User, UserRole
+
+        user = User(
+            email="disabled-reset@test.com",
+            hashed_password=get_password_hash("Pass12345!"),
+            role=UserRole.donor,
+            display_name=None,
+            deleted_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        with patch("app.auth_routes.send_email", return_value={"sent": True, "reason": None}) as mock_fn:
+            resp = test_client.post(
+                "/api/auth/forgot-password",
+                json={"email": "disabled-reset@test.com"},
+            )
+        assert resp.status_code == 200
+        mock_fn.assert_not_called()
+
     def test_forgot_password_unsubscribe_exempt(self, test_client: TestClient, admin_user, db: Session):
         """Unsubscribed users still receive password reset emails."""
         from unittest.mock import patch
@@ -368,7 +394,7 @@ class TestResetPassword:
         reset = PasswordResetToken(
             user_id=admin_user.id,
             token=raw_token,
-            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(reset)
         db.commit()
@@ -389,6 +415,48 @@ class TestResetPassword:
             json={"email": "admin@test.com", "password": "ResetPass1234!"},
         )
         assert login_resp.status_code == 200
+
+    def test_reset_password_disabled_user_rejected(self, test_client: TestClient, db: Session):
+        """A reset token cannot rewrite the password of a disabled account.
+
+        Mirrors login: 403. The token is left unconsumed (so a restored
+        account can still finish the flow) and the password is untouched.
+        """
+        from app.auth import get_password_hash
+        from app.models import PasswordResetToken, User, UserRole
+
+        old_hash = get_password_hash("Disabled123!")
+        user = User(
+            email="disabled-reset2@test.com",
+            hashed_password=old_hash,
+            role=UserRole.donor,
+            display_name=None,
+            deleted_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        raw_token = "disabled-user-token"
+        reset = PasswordResetToken(
+            user_id=user.id,
+            token=raw_token,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        )
+        db.add(reset)
+        db.commit()
+
+        resp = test_client.post(
+            "/api/auth/reset-password",
+            json={"token": raw_token, "new_password": "NewPass1234!"},
+        )
+        assert resp.status_code == 403
+        assert "disabled" in resp.json()["detail"].lower()
+
+        db.expire_all()
+        user = db.query(User).filter(User.id == user.id).first()
+        assert user.hashed_password == old_hash
+        assert reset.used_at is None
 
     def test_reset_password_invalid_token(self, test_client: TestClient, admin_user):
         resp = test_client.post(
@@ -429,7 +497,7 @@ class TestResetPassword:
         reset = PasswordResetToken(
             user_id=admin_user.id,
             token=raw_token,
-            expires_at=datetime.now(timezone.utc).replace(hour=23),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(reset)
         db.commit()
@@ -462,7 +530,7 @@ class TestResetPassword:
         reset_a = PasswordResetToken(
             user_id=admin_user.id,
             token=raw_token_a,
-            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(reset_a)
         db.commit()
@@ -472,7 +540,7 @@ class TestResetPassword:
         reset_b = PasswordResetToken(
             user_id=user_b.id,
             token=raw_token_b,
-            expires_at=datetime.now(timezone.utc).replace(hour=23, minute=59),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(reset_b)
         db.commit()

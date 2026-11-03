@@ -450,7 +450,9 @@ def change_password(
 @limiter.limit("5/minute")
 async def forgot_password(request: Request, data: ForgotPassword, db: Session = Depends(get_db)):
     """Generate a password-reset token and send a reset email."""
-    user = db.query(User).filter(User.email == data.email).first()
+    # Disabled (soft-deleted) accounts are treated like unknown emails:
+    # the same generic 200, no reset email — enumeration stays safe.
+    user = db.query(User).filter(User.email == data.email, User.deleted_at.is_(None)).first()
 
     # Always return 200 to avoid email enumeration
     if not user:
@@ -522,6 +524,10 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
     user = db.get(User, reset.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # A disabled account cannot complete the reset (mirrors login). The
+    # token is left unconsumed so a restored account can still finish.
+    if user.deleted_at is not None:
+        raise HTTPException(status_code=403, detail="Account is disabled")
 
     user.hashed_password = get_password_hash(data.new_password)
     reset.used_at = datetime.now(timezone.utc)

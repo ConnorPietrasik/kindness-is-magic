@@ -1,6 +1,6 @@
 """Tests for SQLAlchemy models."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
@@ -346,7 +346,7 @@ class TestPasswordResetToken:
         token = PasswordResetToken(
             user_id=user.id,
             token="raw-token",
-            expires_at=datetime.now(timezone.utc).replace(hour=23),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(token)
         db.commit()
@@ -372,7 +372,7 @@ class TestPasswordResetToken:
         token = PasswordResetToken(
             user_id=user.id,
             token="raw",
-            expires_at=datetime.now(timezone.utc).replace(hour=23),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(token)
         db.commit()
