@@ -384,6 +384,53 @@ class TestClaimConfirmationEmailTemplate:
         # Lego set should not have empty parens
         assert "Lego set ()" not in html
 
+    def test_email_escapes_family_wish_and_bio(self):
+        """Family wish/bio come from unauthenticated self-registration, so
+        unterminated payloads pass the input rejector — they must render escaped."""
+        from app.mail import build_claim_confirmation_email
+
+        html = build_claim_confirmation_email(
+            donor_name="Jane Doe",
+            family_display_id="1-3",
+            family_wish='Warm clothes <a href="https://evil.example"',
+            family_bio="<img src=x onerror=alert(1)",
+            people=[],
+            claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
+        )
+        assert "<img" not in html
+        assert '<a href="https://evil.example"' not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+        assert "&lt;a href=&quot;https://evil.example&quot;" in html
+
+    def test_email_escapes_person_names_and_wish_text(self):
+        from app.mail import build_claim_confirmation_email
+
+        people = [
+            {
+                "given_name": "<svg/onload=alert(1)",
+                "age": 8,
+                "wishes": [
+                    {"type": "practical", "description": "<img src=x onerror=alert(2)", "size": "<b", "color": None},
+                    {"type": "fun", "description": "A doll", "size": None, "color": None},
+                ],
+            },
+        ]
+        html = build_claim_confirmation_email(
+            donor_name="Jane Doe",
+            family_display_id="1-3",
+            family_wish="Warm clothes",
+            family_bio=None,
+            people=people,
+            claim_detail_url="http://localhost/donor/claims/1",
+            wish_cards_url="http://localhost/families/7/wish-cards",
+        )
+        assert "<svg" not in html
+        assert "<img" not in html
+        assert "&lt;svg/onload=alert(1)" in html
+        assert "&lt;img src=x onerror=alert(2)" in html
+        assert "&lt;b" in html
+
 
 # =========================================================================
 # Admin notification template tests

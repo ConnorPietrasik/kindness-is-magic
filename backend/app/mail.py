@@ -202,6 +202,12 @@ def _wrap_email(body_html: str, unsubscribe_url: str | None) -> str:
 
 # ---------------------------------------------------------------------------
 # Template helpers
+#
+# User-provided values (names, bios, wish text) reach these builders after
+# ``sanitize_plain_text``, which only rejects *terminated* tags — an
+# unterminated payload like ``<img src=x onerror=...`` slips through and is
+# completed by the template's own ``>``. So every user-provided
+# interpolation below is HTML-escaped.
 # ---------------------------------------------------------------------------
 
 
@@ -276,7 +282,7 @@ def build_invite_email(
 {_invite_email_functional_block(code, expires_at, email, "")}"""
 
     from_line = (
-        f"<p>You've been invited by <strong>{from_name}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
+        f"<p>You've been invited by <strong>{escape(from_name)}</strong> to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
         if from_name
         else "<p>You're invited to help make a difference with <strong>Kindness Is Magic</strong> ✨</p>"
     )
@@ -299,8 +305,8 @@ def build_password_reset_email(reset_link: str) -> str:
 def build_family_pending_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "new family pending verification" notification to the referrer."""
     base = APP_BASE_URL
-    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
-<p>A new family, <strong>{family_name}</strong>, has registered using your family invite code. Please confirm this is a family you intended to refer.</p>
+    return f"""<p>Hi <strong>{escape(referrer_name)}</strong>,</p>
+<p>A new family, <strong>{escape(family_name)}</strong>, has registered using your family invite code. Please confirm this is a family you intended to refer.</p>
 <p style="text-align:center;"><a href="{base}/referrer/pending-families" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Verify Pending Families</a></p>
 <p>They can start adding family members while they wait for your confirmation. You can confirm or reject them from your dashboard.</p>"""
 
@@ -308,16 +314,16 @@ def build_family_pending_email(family_name: str, referrer_name: str) -> str:
 def build_family_verified_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "family verified" notification to the family contact."""
     base = APP_BASE_URL
-    return f"""<p>Great news, <strong>{family_name}</strong>!</p>
-<p>Your family has been <strong>confirmed</strong> by <strong>{referrer_name}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
+    return f"""<p>Great news, <strong>{escape(family_name)}</strong>!</p>
+<p>Your family has been <strong>confirmed</strong> by <strong>{escape(referrer_name)}</strong> ✨ You're now fully connected on Kindness Is Magic.</p>
 <p style="text-align:center;"><a href="{base}/family" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>"""
 
 
 def build_family_rejected_email(family_name: str, referrer_name: str) -> str:
     """Build the HTML body for a "family rejected by referrer" notification to the family contact."""
-    return f"""<p>Hi <strong>{family_name}</strong>,</p>
-<p><strong>{referrer_name}</strong> did not recognize you, so your family has not been confirmed on Kindness Is Magic.</p>
-<p>If you believe this was a mistake, please contact <strong>{referrer_name}</strong> to sort it out.</p>"""
+    return f"""<p>Hi <strong>{escape(family_name)}</strong>,</p>
+<p><strong>{escape(referrer_name)}</strong> did not recognize you, so your family has not been confirmed on Kindness Is Magic.</p>
+<p>If you believe this was a mistake, please contact <strong>{escape(referrer_name)}</strong> to sort it out.</p>"""
 
 
 def build_family_invite_email(code: str, referrer_name: str, email: str) -> str:
@@ -330,7 +336,7 @@ def build_family_invite_email(code: str, referrer_name: str, email: str) -> str:
     base = APP_BASE_URL
     register_path = f"{base}/register-family?{urlencode({'code': code, 'email': email})}"
     return f"""<p>Hi there,</p>
-<p>This is an invitation to join <strong>Kindness Is Magic</strong>, a program where supporters give holiday gifts to families. <strong>{referrer_name}</strong> has invited your family to take part.</p>
+<p>This is an invitation to join <strong>Kindness Is Magic</strong>, a program where supporters give holiday gifts to families. <strong>{escape(referrer_name)}</strong> has invited your family to take part.</p>
 <p>Use the invite code below to register:</p>
 <p style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:2px;padding:16px;background-color:#f0f4f0;border:1px dashed {_BRAND_COLOR};">{code}</p>
 <p style="text-align:center;"><a href="{register_path}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Get Started</a></p>
@@ -340,7 +346,7 @@ def build_family_invite_email(code: str, referrer_name: str, email: str) -> str:
 def build_referrer_approved_email(referrer_name: str) -> str:
     """Build the HTML body for a referrer approval notification."""
     base = APP_BASE_URL
-    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(referrer_name)}</strong>,</p>
 <p>Great news — your Kindness Is Magic account has been <strong>approved</strong> ✨</p>
 <p>You can now send family invite emails and connect families in need with the support and joy they deserve.</p>
 <p style="text-align:center;"><a href="{base}/referrer" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Dashboard</a></p>
@@ -349,7 +355,7 @@ def build_referrer_approved_email(referrer_name: str) -> str:
 
 def build_referrer_rejected_email(referrer_name: str) -> str:
     """Build the HTML body for a referrer rejection notification."""
-    return f"""<p>Hi <strong>{referrer_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(referrer_name)}</strong>,</p>
 <p>Thank you for your interest in helping with Kindness Is Magic.</p>
 <p>After review, we've decided not to move forward with your account at this time. We appreciate your willingness to contribute and wish you the best.</p>"""
 
@@ -365,8 +371,9 @@ def _format_wish_text(desc: str, size: str | None, color: str | None) -> str:
     Present parts are joined with ``", "`` inside the parentheses; the
     parentheses are omitted when both size and color are empty.
     """
-    parts = [p for p in (size, color) if p]
-    return f"{desc} ({', '.join(parts)})" if parts else desc
+    parts = [escape(p) for p in (size, color) if p]
+    text = escape(desc)
+    return f"{text} ({', '.join(parts)})" if parts else text
 
 
 def _build_wish_table_rows(people: list[dict]) -> str:
@@ -379,7 +386,7 @@ def _build_wish_table_rows(people: list[dict]) -> str:
     """
     rows = ""
     for person in people:
-        name = person["given_name"]
+        name = escape(person["given_name"])
         age = person["age"]
         wishes = {w["type"]: w for w in person.get("wishes", [])}
 
@@ -444,9 +451,9 @@ def build_claim_confirmation_email(
     """
     has_children = any(p["age"] < 18 for p in people)
 
-    bio_line = f"<p>{family_bio}</p>" if family_bio else ""
+    bio_line = f"<p>{escape(family_bio)}</p>" if family_bio else ""
 
-    family_wish_html = f"""<div style="background-color:#f5f0fc;padding:12px 16px;border-radius:4px;margin-bottom:12px;"><strong>Family wish:</strong> {family_wish}</div>"""
+    family_wish_html = f"""<div style="background-color:#f5f0fc;padding:12px 16px;border-radius:4px;margin-bottom:12px;"><strong>Family wish:</strong> {escape(family_wish)}</div>"""
 
     if people:
         table_html = f"""<table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -456,7 +463,7 @@ def build_claim_confirmation_email(
     else:
         table_html = """<p style="color:#666666;font-style:italic;">No family members have been added to this family yet. You can check back later or contact the organization for details.</p>"""
 
-    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(donor_name)}</strong>,</p>
 <p>Thank you for sponsoring <strong>Family {family_display_id}</strong> on Kindness Is Magic ✨</p>
 {bio_line}
 <h2 style="font-size:16px;color:{_BRAND_COLOR};margin-top:20px;">Wish List</h2>
@@ -693,7 +700,7 @@ def build_payment_request_email(
     expires_str = expires_at.strftime("%B %d, %Y at %I:%M %p UTC") if expires_at else "the end of the payment window"
     n = len(lines)
     family_word = "family" if n == 1 else "families"
-    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(donor_name)}</strong>,</p>
 <p>Thank you for sponsoring {n} {family_word} on Kindness Is Magic ✨ Your sponsorship is reserved, but the {family_word} are only yours once payment lands.</p>
 {_build_payment_table(lines, total_usd)}
 <p style="text-align:center;margin-top:24px;"><a href="{cart_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to your cart &amp; pay</a></p>
@@ -721,7 +728,7 @@ def build_payment_confirmed_email(
     (off by default — Zeffy already emails the donor its receipt). Notes the
     groceries add-ons and that Zeffy itself sends the tax receipt.
     """
-    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(donor_name)}</strong>,</p>
 <p>Your payment of <strong>{_format_usd(total_usd)}</strong> has been received — your sponsorship is confirmed ✨</p>
 {_build_payment_table(lines, total_usd)}
 <p>What happens next: the organization will purchase the families' wishes. <strong>Zeffy will email your tax receipt separately</strong> — no action is needed from you.</p>
@@ -738,7 +745,7 @@ def build_payment_expired_email(
     auto-match watches their claim expire and must be told the money is being
     handled, not lost.
     """
-    return f"""<p>Hi <strong>{donor_name}</strong>,</p>
+    return f"""<p>Hi <strong>{escape(donor_name)}</strong>,</p>
 <p>The following sponsorships in your cart were still unpaid when the payment window closed, so they have been released back to the browse list:</p>
 {_payment_cart_table(lines)}
 <p>If you paid but your payment didn't match automatically, <strong>your money has not been lost</strong> — it is being handled.</p>

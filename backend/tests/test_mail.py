@@ -419,6 +419,85 @@ class TestEmailTemplates:
         assert 'href="http://custom.example.com/wish-list-guide"' in html
         assert "wish list guide" in html
 
+    # --- HTML escaping ---
+    # Names/text reach the builders from self-registration through a rejector
+    # that only catches *terminated* tags, so unterminated payloads pass
+    # validation — the builders must escape before interpolating into HTML.
+
+    IMG_PAYLOAD = "<img src=x onerror=alert(1)"
+
+    def test_invite_email_escapes_from_name(self):
+        from app.mail import build_invite_email
+
+        html = build_invite_email(
+            code="KMG-ESC",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            from_name=self.IMG_PAYLOAD,
+        )
+        assert "<img" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+
+    def test_family_invite_email_escapes_referrer_name(self):
+        from app.mail import build_family_invite_email
+
+        html = build_family_invite_email(code="KFI-ESC", referrer_name=self.IMG_PAYLOAD, email="family@example.com")
+        assert "<img" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+
+    def test_family_pending_email_escapes_names(self):
+        from app.mail import build_family_pending_email
+
+        html = build_family_pending_email(self.IMG_PAYLOAD, "Ref <svg/onload=alert(2)")
+        assert "<img" not in html
+        assert "<svg" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+        assert "&lt;svg/onload=alert(2)" in html
+
+    def test_family_verified_email_escapes_names(self):
+        from app.mail import build_family_verified_email
+
+        html = build_family_verified_email(self.IMG_PAYLOAD, "Ref <svg/onload=alert(2)")
+        assert "<img" not in html
+        assert "<svg" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+        assert "&lt;svg/onload=alert(2)" in html
+
+    def test_family_rejected_email_escapes_names(self):
+        from app.mail import build_family_rejected_email
+
+        html = build_family_rejected_email(self.IMG_PAYLOAD, "Ref <svg/onload=alert(2)")
+        assert "<img" not in html
+        assert "<svg" not in html
+        assert html.count("&lt;svg/onload=alert(2)") == 2  # referrer name appears twice
+
+    def test_referrer_approved_email_escapes_name(self):
+        from app.mail import build_referrer_approved_email
+
+        html = build_referrer_approved_email(self.IMG_PAYLOAD)
+        assert "<img" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+
+    def test_referrer_rejected_email_escapes_name(self):
+        from app.mail import build_referrer_rejected_email
+
+        html = build_referrer_rejected_email(self.IMG_PAYLOAD)
+        assert "<img" not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+
+    def test_payment_request_email_escapes_donor_name(self):
+        from app.mail import build_payment_request_email
+
+        html = build_payment_request_email(
+            donor_name=self.IMG_PAYLOAD,
+            lines=[{"display_id": "1-1", "includes_groceries": False, "line_total_usd": 100}],
+            total_usd=100,
+            expires_at=datetime(2026, 12, 25, tzinfo=timezone.utc),
+            cart_url="http://localhost/donor/cart",
+        )
+        assert self.IMG_PAYLOAD not in html
+        assert "&lt;img src=x onerror=alert(1)" in html
+
 
 # ---------------------------------------------------------------------------
 # Unsubscribe endpoint tests
