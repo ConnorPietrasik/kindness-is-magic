@@ -127,6 +127,11 @@ export interface AdminEmailsListParams extends AdminListParams {
   status?: EmailStatus;
 }
 
+/** Query params for the admin unsubscribe-blocklist endpoint. */
+export interface EmailUnsubscribesListParams extends AdminListParams {
+  search?: string;
+}
+
 /** Query params for the admin Zeffy payment list (cursor-based Zeffy pagination, not page-based). */
 export interface AdminZeffyPaymentsParams {
   /** Cursor from the previous page's next_cursor. */

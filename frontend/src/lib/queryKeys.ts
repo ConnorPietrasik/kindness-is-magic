@@ -84,6 +84,9 @@ export const adminInvites = ["adminInvites"] as const;
 /** Admin sent-email log list */
 export const adminSentEmails = ["adminSentEmails"] as const;
 
+/** Admin unsubscribe blocklist */
+export const adminEmailUnsubscribes = ["adminEmailUnsubscribes"] as const;
+
 // ---------------------------------------------------------------------------
 // Admin — Dropdown lookups
 // ---------------------------------------------------------------------------

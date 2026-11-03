@@ -38,6 +38,8 @@ import type {
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   EmailListResponse,
+  EmailPreferenceListResponse,
+  EmailUnsubscribesListParams,
   FamilyClaimDetail,
   FamilyClaimSummary,
   FamilyClaimUpdate,
@@ -505,6 +507,20 @@ export function adminListSentEmails(params?: AdminEmailsListParams): Promise<Ema
  */
 export function adminSendCustomEmail(data: AdminSendEmailPayload): Promise<AdminSendEmailResult> {
   return apiPost("/api/admin/emails/send", { ...data, subject: data.subject ? data.subject : null });
+}
+
+/** List the unsubscribe blocklist (people who clicked an unsubscribe link). */
+export function adminListEmailUnsubscribes(params?: EmailUnsubscribesListParams): Promise<EmailPreferenceListResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/emails/unsubscribes", p);
+}
+
+/**
+ * Admin re-subscribes a recipient — removes their unsubscribe record and
+ * restores all app emails for that address. The endpoint returns 204 (no body).
+ */
+export function adminResubscribeEmail(email: string): Promise<void> {
+  return apiPost("/api/admin/emails/unsubscribes/resubscribe", { email });
 }
 
 // ---------------------------------------------------------------------------

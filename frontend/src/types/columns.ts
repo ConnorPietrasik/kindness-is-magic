@@ -133,6 +133,10 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "sender_name", label: "Sender", visible: true },
     { key: "sent_at", label: "Sent", visible: true },
   ],
+  adminEmailUnsubscribes: [
+    { key: "email", label: "Email", visible: true },
+    { key: "unsubscribed_at", label: "Unsubscribed", visible: true },
+  ],
   adminZeffyPayments: [
     { key: "created_at", label: "Date", visible: true },
     { key: "buyer_name", label: "Buyer", visible: true },

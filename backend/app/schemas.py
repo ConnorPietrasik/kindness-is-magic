@@ -596,6 +596,39 @@ class AdminSendEmailResult(BaseModel):
     reason: str | None = None
 
 
+class EmailPreferenceSummary(BaseModel):
+    """One row of the unsubscribe blocklist for the admin view."""
+
+    email: str
+    unsubscribed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EmailPreferenceListResponse(BaseModel):
+    preferences: list[EmailPreferenceSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+class AdminResubscribeRequest(BaseModel):
+    """Admin re-subscribes a recipient (removes their unsubscribe record).
+
+    The email is validated and normalized (strip + lower) to match
+    ``check_unsubscribed``. It travels in the body — never the URL — so
+    addresses don't leak into request access logs.
+    """
+
+    email: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        return validate_email(v)
+
+
 # ---------------------------------------------------------------------------
 # Admin CRUD schemas — Families
 # ---------------------------------------------------------------------------

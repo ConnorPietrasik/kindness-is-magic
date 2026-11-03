@@ -576,6 +576,21 @@ export interface AdminSendEmailResult {
   reason: "unsubscribed" | "smtp_error" | null;
 }
 
+/** One row of the unsubscribe blocklist. Mirrors EmailPreferenceSummary. */
+export interface EmailPreferenceSummary {
+  email: string;
+  unsubscribed_at: string;
+}
+
+/** Response envelope for the unsubscribe-blocklist list. Mirrors EmailPreferenceListResponse. */
+export interface EmailPreferenceListResponse {
+  preferences: EmailPreferenceSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 // ---------------------------------------------------------------------------
 // Public Families (donor browse)
 // ---------------------------------------------------------------------------

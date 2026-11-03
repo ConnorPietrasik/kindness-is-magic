@@ -291,3 +291,182 @@ class TestAdminEmailsList:
         item = resp.json()["emails"][0]
         assert "sender_name" not in item
         assert item["recipient_email"] == "x@example.com"
+
+
+def _seed_pref(db: Session, email: str, unsubscribed_at: datetime | None = None):
+    """Insert an EmailPreference row and return it."""
+    from app.models import EmailPreference
+
+    row = EmailPreference(email=email.lower(), unsubscribed_at=unsubscribed_at or datetime.now(timezone.utc))
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+class TestEmailUnsubscribesAuth:
+    """Unsubscribe-blocklist endpoints — access control."""
+
+    def test_list_401_unauthenticated(self, test_client: TestClient, admin_user):
+        resp = test_client.get("/api/admin/emails/unsubscribes")
+        assert resp.status_code == 401
+
+    def test_list_403_non_admin(self, test_client: TestClient, admin_user, referrer_user):
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        resp = test_client.get("/api/admin/emails/unsubscribes")
+        assert resp.status_code == 403
+
+    def test_resubscribe_401_unauthenticated(self, test_client: TestClient, admin_user):
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "a@example.com"})
+        assert resp.status_code == 401
+
+    def test_resubscribe_403_non_admin(self, test_client: TestClient, admin_user, referrer_user):
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "a@example.com"})
+        assert resp.status_code == 403
+
+
+class TestEmailUnsubscribesList:
+    """GET /api/admin/emails/unsubscribes — list behaviour."""
+
+    def test_empty_list(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body == {"preferences": [], "total": 0, "page": 1, "page_size": 50, "total_pages": 0}
+
+    def test_rows_and_default_sort_newest_first(self, test_client: TestClient, admin_user, db: Session):
+        now = datetime.now(timezone.utc)
+        _seed_pref(db, "old@example.com", now - timedelta(hours=2))
+        _seed_pref(db, "new@example.com", now)
+        _seed_pref(db, "mid@example.com", now - timedelta(hours=1))
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 3
+        assert [p["email"] for p in body["preferences"]] == ["new@example.com", "mid@example.com", "old@example.com"]
+        assert set(body["preferences"][0].keys()) == {"email", "unsubscribed_at"}
+
+    def test_pagination(self, test_client: TestClient, admin_user, db: Session):
+        for i in range(5):
+            _seed_pref(db, f"page{i}@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"page": 2, "page_size": 2})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 5
+        assert body["page"] == 2
+        assert body["page_size"] == 2
+        assert body["total_pages"] == 3
+        assert len(body["preferences"]) == 2
+
+    def test_page_size_capped_at_200(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"page_size": 500})
+        assert resp.status_code == 422
+
+    def test_search_ilike(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "alice@family.org")
+        _seed_pref(db, "bob@family.org")
+        _seed_pref(db, "carol@other.org")
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"search": "FAMILY"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 2
+        assert {p["email"] for p in body["preferences"]} == {"alice@family.org", "bob@family.org"}
+
+    def test_sort_email_asc(self, test_client: TestClient, admin_user, db: Session):
+        for name in ("charlie", "alice", "bob"):
+            _seed_pref(db, f"{name}@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"sort": "email"})
+        assert resp.status_code == 200
+        assert [p["email"] for p in resp.json()["preferences"]] == [
+            "alice@example.com",
+            "bob@example.com",
+            "charlie@example.com",
+        ]
+
+    def test_sort_unsubscribed_at_desc(self, test_client: TestClient, admin_user, db: Session):
+        now = datetime.now(timezone.utc)
+        _seed_pref(db, "new@example.com", now)
+        _seed_pref(db, "old@example.com", now - timedelta(hours=1))
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"sort": "-unsubscribed_at"})
+        assert resp.status_code == 200
+        assert [p["email"] for p in resp.json()["preferences"]] == ["new@example.com", "old@example.com"]
+
+    def test_sort_invalid_field_uses_default(self, test_client: TestClient, admin_user, db: Session):
+        now = datetime.now(timezone.utc)
+        _seed_pref(db, "b@example.com", now)
+        _seed_pref(db, "a@example.com", now - timedelta(hours=1))
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"sort": "bogus"})
+        assert resp.status_code == 200
+        # Default: unsubscribed_at desc
+        assert [p["email"] for p in resp.json()["preferences"]] == ["b@example.com", "a@example.com"]
+
+    def test_columns_filters_response_fields(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "a@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"columns": "unsubscribed_at"})
+        assert resp.status_code == 200
+        item = resp.json()["preferences"][0]
+        # Requested column + always-include email
+        assert set(item.keys()) == {"email", "unsubscribed_at"}
+
+    def test_columns_unknown_field_400(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "a@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/emails/unsubscribes", params={"columns": "nope"})
+        assert resp.status_code == 400
+        assert "nope" in resp.json()["detail"]
+
+
+class TestEmailUnsubscribesResubscribe:
+    """POST /api/admin/emails/unsubscribes/resubscribe."""
+
+    def test_removes_record(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "gone@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "gone@example.com"})
+        assert resp.status_code == 204
+
+        from app.mail import check_unsubscribed
+
+        assert check_unsubscribed("gone@example.com", db) is False
+
+    def test_case_insensitive_and_trims(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "MIXED@Example.COM")
+
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "mixed@example.com"})
+        assert resp.status_code == 204
+
+    def test_404_when_no_record(self, test_client: TestClient, admin_user, db: Session):
+        _seed_pref(db, "someone-else@example.com")
+
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "nobody@example.com"})
+        assert resp.status_code == 404
+        # The other record is untouched
+        from app.mail import check_unsubscribed
+
+        assert check_unsubscribed("someone-else@example.com", db) is True
+
+    def test_422_invalid_email(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/emails/unsubscribes/resubscribe", json={"email": "not-an-email"})
+        assert resp.status_code == 422

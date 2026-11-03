@@ -65,7 +65,8 @@ export function useColumnVisibility(resourceKey: string) {
       if (fields) fields.forEach((f) => resolved.add(f));
       else resolved.add(key);
     }
-    resolved.add("id"); // always needed for mutations
+    // "id" always needed for mutations — except resources keyed by email (no numeric id)
+    if (resourceKey !== "adminEmailUnsubscribes") resolved.add("id");
     // "wishes" always sent for people — needed for wish cells AND detail/edit
     if (resourceKey === "adminPeople") resolved.add("wishes");
     // "family_count" always sent for referrers — needed for "X / Y" display in family_limit column

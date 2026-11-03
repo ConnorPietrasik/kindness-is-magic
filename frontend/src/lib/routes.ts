@@ -36,6 +36,7 @@ export const ROUTES = {
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
   ADMIN_EMAILS: "/admin/emails",
+  ADMIN_EMAIL_UNSUBSCRIBES: "/admin/email-unsubscribes",
   ADMIN_ZEFFY_PAYMENTS: "/admin/zeffy-payments",
 
   // ── Referrer self-service ─────────────────────────────────

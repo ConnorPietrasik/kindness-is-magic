@@ -110,6 +110,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "email-unsubscribes",
+      route: ROUTES.ADMIN_EMAIL_UNSUBSCRIBES,
+      icon: "🔕",
+      label: "Unsubscribed Emails",
+      desc: "Restore emails for people who clicked unsubscribe",
+      visible: true,
+    },
+    {
       key: "zeffy-payments",
       route: ROUTES.ADMIN_ZEFFY_PAYMENTS,
       icon: "💳",

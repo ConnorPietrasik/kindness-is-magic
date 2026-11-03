@@ -7,5 +7,5 @@ Automated failure checks and admin emails
 Donor reminder emails before deadline
 Anonymous donors - accept payments for families without requiring a donor account
 EVENTUALLY - Email families a week before their pickup window
-EVENTUALLY - fine-tune a 1B model or something for automatically classifying wishes
-EVENTUALLY - Email "opened" tracking via a logo?
+EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
+EVENTUALLY - Referrer "change code" button in case of leak

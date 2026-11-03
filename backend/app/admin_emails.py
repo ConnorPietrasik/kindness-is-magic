@@ -5,17 +5,25 @@ All endpoints are guarded with ``require_admin``.
 
 import logging
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.mail import render_custom_message_html, send_email
-from app.models import EmailKind, EmailStatus, SentEmail, User
+from app.models import EmailKind, EmailPreference, EmailStatus, SentEmail, User
 from app.permissions import require_admin
 from app.rate_limit import limiter
-from app.schemas import AdminSendEmailRequest, AdminSendEmailResult, EmailListResponse, SentEmailSummary
-from app.search_sort import EMAIL_SORT_FIELDS, build_sort_clause, escape_like
+from app.schemas import (
+    AdminResubscribeRequest,
+    AdminSendEmailRequest,
+    AdminSendEmailResult,
+    EmailListResponse,
+    EmailPreferenceListResponse,
+    EmailPreferenceSummary,
+    SentEmailSummary,
+)
+from app.search_sort import EMAIL_PREFERENCE_SORT_FIELDS, EMAIL_SORT_FIELDS, build_sort_clause, escape_like
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +124,54 @@ async def send_custom_email(
         user_id=admin.id,
     )
     return AdminSendEmailResult(**result)
+
+
+# ---------------------------------------------------------------------------
+# Unsubscribe blocklist
+# ---------------------------------------------------------------------------
+
+
+@email_admin_router.get("/unsubscribes", response_model_exclude_unset=True)
+def list_unsubscribes(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    columns: str | None = Query(None),
+    search: str | None = Query(None),
+    sort: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> EmailPreferenceListResponse:
+    """List the unsubscribe blocklist (newest first by default)."""
+    query = db.query(EmailPreference)
+
+    if search is not None:
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(EmailPreference.email.ilike(pattern, escape="\\"))
+
+    total = query.count()
+
+    sort_clause = build_sort_clause(sort, EMAIL_PREFERENCE_SORT_FIELDS, EmailPreference.unsubscribed_at.desc())
+    preferences = query.order_by(sort_clause, EmailPreference.email).offset((page - 1) * page_size).limit(page_size).all()
+
+    items = [EmailPreferenceSummary(email=p.email, unsubscribed_at=p.unsubscribed_at) for p in preferences]
+
+    return column_filtered_page(items, columns, key="preferences", total=total, page=page, page_size=page_size, always_include={"email"})
+
+
+@email_admin_router.post("/unsubscribes/resubscribe", status_code=204)
+def resubscribe(
+    body: AdminResubscribeRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Remove a recipient's unsubscribe record, restoring all app emails.
+
+    Hard delete (the table has no soft-delete column). The acting admin is
+    captured by the request log; if the recipient unsubscribes again they
+    simply reappear. 404 when the address has no record.
+    """
+    pref = db.query(EmailPreference).filter(EmailPreference.email == body.email).first()
+    if pref is None:
+        raise HTTPException(status_code=404, detail="No unsubscribe record for this email")
+    db.delete(pref)
+    db.commit()

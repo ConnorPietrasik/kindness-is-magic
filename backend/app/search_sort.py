@@ -11,7 +11,7 @@ from sqlalchemy import ColumnElement, String, case, func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.util import AliasedClass
 
-from app.models import Family, Person, Referrer, ReferrerInviteToken, SentEmail, User, Wish, WishType
+from app.models import EmailPreference, Family, Person, Referrer, ReferrerInviteToken, SentEmail, User, Wish, WishType
 
 
 # ---------------------------------------------------------------------------
@@ -308,4 +308,9 @@ EMAIL_SORT_FIELDS: dict[str, ColumnElement] = {
     "status": SentEmail.status,
     "sent_at": SentEmail.sent_at,
     "id": SentEmail.id,
+}
+
+EMAIL_PREFERENCE_SORT_FIELDS: dict[str, ColumnElement] = {
+    "email": EmailPreference.email,
+    "unsubscribed_at": EmailPreference.unsubscribed_at,
 }
