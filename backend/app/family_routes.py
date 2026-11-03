@@ -175,7 +175,7 @@ def create_person(
     db.refresh(per)
     logger.info(
         "Family user %s created person '%s' (id=%s) in family %s",
-        user.email,
+        user.id,
         per.given_name,
         per.id,
         family_id,

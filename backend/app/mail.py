@@ -592,9 +592,9 @@ async def send_claim_confirmation(claim: FamilyClaim, fam: Family, user: User, d
 
         # SMTP failure or other send failure
         logger.error(
-            "Claim confirmation email failed: claim_id=%s donor_email=%s family_display_id=%s reason=%s",
+            "Claim confirmation email failed: claim_id=%s donor_id=%s family_display_id=%s reason=%s",
             claim.id,
-            user.email,
+            user.id,
             display_id,
             result.get("reason"),
         )

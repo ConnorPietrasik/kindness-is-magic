@@ -342,7 +342,7 @@ def batch_assign(
 
     logger.info(
         "Admin %s batch-assigned %d wishes to user %s",
-        admin.email,
+        admin.id,
         count,
         "(unassigned)" if is_unassign else body.assigned_to_id,
     )

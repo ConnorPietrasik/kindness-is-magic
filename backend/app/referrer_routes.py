@@ -624,8 +624,7 @@ async def send_family_invite(
     )
     if existing:
         logger.info(
-            "Invite to %s blocked (already sent in last 7 days by referrer %s)",
-            recipient,
+            "Family invite blocked (already sent in last 7 days by referrer %s)",
             existing.user_id,
         )
         raise HTTPException(
@@ -677,11 +676,7 @@ async def send_family_invite(
             detail="Failed to send email. Please try again later.",
         )
 
-    logger.info(
-        "Referrer %s sent family invite to %s",
-        user.email,
-        body.email,
-    )
+    logger.info("Referrer %s sent family invite", user.id)
 
     return SendFamilyInviteResponse()
 

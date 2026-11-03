@@ -106,7 +106,7 @@ async def import_csv_data(
     summary = do_import(db, content, admin_id=_admin.id)
     logger.info(
         "Admin %s imported CSV — R:%d F:%d P:%d U:%d (errors: R:%d F:%d P:%d U:%d)",
-        _admin.email,
+        _admin.id,
         summary.referrers_created,
         summary.families_created,
         summary.people_created,

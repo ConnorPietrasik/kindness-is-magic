@@ -327,7 +327,7 @@ def create_person_wish(
     if old_deleted:
         logger.info(
             "Admin %s replacing soft-deleted wish (id=%s, type=%s, desc='%s', size=%s) for person (id=%s)",
-            _admin.email,
+            _admin.id,
             old_deleted.id,
             old_deleted.type.value,
             old_deleted.description,

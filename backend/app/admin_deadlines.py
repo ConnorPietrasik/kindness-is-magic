@@ -62,7 +62,7 @@ def create_deadline(
     db.refresh(deadline)
     logger.info(
         "Admin %s created deadline (id=%s, type=%s, mode=%s, due=%s)",
-        _admin.email,
+        _admin.id,
         deadline.id,
         body.type.value,
         body.mode.value,
