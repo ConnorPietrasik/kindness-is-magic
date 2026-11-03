@@ -11,7 +11,7 @@ from sqlalchemy import ColumnElement, String, case, func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.util import AliasedClass
 
-from app.models import EmailPreference, Family, Person, Referrer, ReferrerInviteToken, SentEmail, User, Wish, WishType
+from app.models import EmailPreference, Family, FamilyClaim, Person, Referrer, ReferrerInviteToken, SentEmail, User, Wish, WishType
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +156,16 @@ FAMILY_SORT_FIELDS: dict[str, ColumnElement] = {
     "wish_lock_level": Family.wish_lock_level,
     "referrer_id": func.coalesce(Family.referrer_id, 0),
     "person_count": FAMILY_PERSON_COUNT,
+}
+
+CLAIM_SORT_FIELDS: dict[str, ColumnElement] = {
+    "donor_email": User.email,
+    "family_name": Family.family_name,
+    "commitment_type": FamilyClaim.commitment_type,
+    "created_at": FamilyClaim.created_at,
+    "paid_at": FamilyClaim.paid_at,
+    "deleted_at": FamilyClaim.deleted_at,
+    "id": FamilyClaim.id,
 }
 
 INVITE_SORT_FIELDS: dict[str, ColumnElement] = {

@@ -126,6 +126,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "sponsorships",
+      route: ROUTES.ADMIN_SPONSORSHIPS,
+      icon: "💝",
+      label: "Sponsorships",
+      desc: "View active and cancelled sponsorships",
+      visible: false, // ops path — keep out of the way by default
+    },
+    {
       key: "browse-families",
       route: ROUTES.PUBLIC_FAMILIES,
       icon: "🎯",

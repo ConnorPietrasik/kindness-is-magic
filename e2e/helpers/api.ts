@@ -105,13 +105,17 @@ export async function deleteUserViaApi(
 
 /**
  * Cancel (soft-delete) a claim via the donor API (owner or admin).
+ *
+ * A 400 is expected, not a failure: paid claims are not cancellable by
+ * design (money was taken — no refunds), so they stay in the DB as audit
+ * rows on the admin Sponsorships page. Warn on anything else.
  */
 export async function deleteClaimViaApi(
   request: APIRequestContext,
   claimId: number,
 ): Promise<void> {
   const resp = await request.delete(`/api/donor/claims/${claimId}`);
-  if (!resp.ok()) {
+  if (!resp.ok() && resp.status() !== 400) {
     console.warn(`[api] deleteClaimViaApi(${claimId}) returned ${resp.status()}`);
   }
 }

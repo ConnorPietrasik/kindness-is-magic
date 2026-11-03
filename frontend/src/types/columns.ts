@@ -146,6 +146,12 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "receipt_url", label: "Receipt", visible: false },
     { key: "matched", label: "Matched", visible: true },
   ],
+  adminSponsorships: [
+    { key: "donor_email", label: "Donor", visible: true },
+    { key: "family", label: "Family", visible: true },
+    { key: "commitment", label: "Commitment", visible: true },
+    { key: "sponsorship_status", label: "Status", visible: true },
+  ],
   // Donor tables — order only (no visibility toggle on these pages).
   donorClaims: [
     { key: "family", label: "Family", visible: true },
@@ -196,4 +202,11 @@ export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   assigned_to: ["assigned_to_id", "assigned_to_name"],
   redeemed: ["redeemed", "redeemed_by_referrer_name"],
   status: ["status", "failure_reason"],
+  // Admin sponsorships — the Family column also shows the display ID under
+  // the name, and Commitment also shows the paid date, and the sponsorship
+  // status is derived from the payment/fulfillment timestamps
+  // ("sponsorship_status" avoids colliding with adminSentEmails' "status").
+  family: ["family", "family_name"],
+  commitment: ["commitment_type", "paid_at"],
+  sponsorship_status: ["payment_status", "deleted_at", "fulfilled_at"],
 };

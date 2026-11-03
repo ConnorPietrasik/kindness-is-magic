@@ -85,7 +85,7 @@ const mockQueueItem: FamilyReviewQueueItem = {
 };
 
 const claimBase = {
-  family: { id: 5, display_id: "2-1", bio: null, person_count: 3, min_age: null, max_age: null },
+  family: { id: 5, display_id: "2-1", bio: null, person_count: 3, min_age: null, max_age: null, deleted: false },
   notes: null,
   created_at: "2025-11-01T00:00:00Z",
   payment_status: "paid" as const,

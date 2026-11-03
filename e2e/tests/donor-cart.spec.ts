@@ -40,6 +40,7 @@ import {
   deleteFamilyViaApi,
   deleteReferrerViaApi,
   deleteUserViaApi,
+  deleteClaimViaApi,
   loginViaApi,
 } from "../helpers/api";
 import { getBaseUrl } from "../helpers/env";
@@ -73,7 +74,11 @@ const data: {
   gate: string | null;
 } = { d1: null, d2: null, personIds: [], gate: null };
 
-/** Cancel every one of a donor's claims (cleanup path). */
+/** Cancel every one of a donor's claims (cleanup path).
+ *
+ * Paid claims are not cancellable (by design — the money row stays as an
+ * audit record), so those remain; deleteClaimViaApi treats their 400 as
+ * expected and warns on anything else. */
 async function cancelAllClaims(donor: Donor): Promise<void> {
   const ctx = await playwrightRequest.newContext({ baseURL: getBaseUrl() });
   try {
@@ -81,7 +86,7 @@ async function cancelAllClaims(donor: Donor): Promise<void> {
     const resp = await ctx.get("/api/donor/claims");
     if (resp.ok()) {
       const claims = (await resp.json()) as Array<{ id: number }>;
-      for (const claim of claims) await ctx.delete(`/api/donor/claims/${claim.id}`);
+      for (const claim of claims) await deleteClaimViaApi(ctx, claim.id);
     }
   } finally {
     await ctx.dispose();

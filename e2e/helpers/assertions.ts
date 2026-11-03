@@ -17,6 +17,43 @@ export async function findRowInTable(
   return findInPaginated(page, page.getByRole("row").filter({ hasText: searchText }), opts);
 }
 
+/** 1-based offset of the first item on the current page ("Showing X–Y of Z"). */
+async function listPageStart(page: Page): Promise<number | null> {
+  // Absent on single-page lists (pagination isn't rendered) — keep it bounded.
+  const text = await page
+    .getByText(/Showing \d+\D+\d+ of \d+/)
+    .first()
+    .textContent({ timeout: 500 })
+    .catch(() => null);
+  const m = text?.match(/Showing (\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Wait for the list container to be rendered (a full-page refetch spinner unmounts it). */
+async function waitListVisible(page: Page): Promise<void> {
+  await expect(page.locator("table, div.grid").first()).toBeVisible({ timeout: 10_000 }).catch(() => {});
+}
+
+/**
+ * Settle on the page a page turn just landed on: the list re-renders in a
+ * single commit, so the container being visible AND the "Showing X–Y of Z"
+ * offset having moved from `beforeStart` means the new page's rows are
+ * readable. Without this, a render delayed under parallel e2e load leaves
+ * the walk reading the previous page's DOM and clicking through pages it
+ * never actually reads.
+ */
+async function waitPageRendered(page: Page, beforeStart: number | null): Promise<void> {
+  await waitListVisible(page);
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const now = await listPageStart(page);
+    // Offset moved (new page rendered) or pagination vanished (list shrank
+    // to a single page) — either way the current page is settled.
+    if (now == null || (beforeStart != null && now !== beforeStart)) return;
+    await page.waitForTimeout(100);
+  }
+}
+
 /**
  * Turn a paginated list's pages (table rows, grid cards, …) until the given
  * item locator matches, or we run out of pages. Returns the Locator if an
@@ -25,6 +62,15 @@ export async function findRowInTable(
  * card element).
  *
  * The list must start on page 1 and paginate with a "Next page" button.
+ *
+ * Two hazards on the shared e2e stack, both handled here:
+ *  - every list refetch renders a FULL-PAGE spinner (rows + pagination
+ *    unmounted until the data lands), so the pagination is only read after
+ *    the list container is visible — an absent "Next page" button during a
+ *    spinner is NOT the end of the list;
+ *  - renders can be delayed under parallel load, so after each turn the
+ *    walk waits for the new page to actually render (offset moved) before
+ *    judging it.
  */
 export async function findInPaginated(
   page: Page,
@@ -35,7 +81,6 @@ export async function findInPaginated(
   const timeout = opts?.timeout ?? 10_000;
 
   // First, wait for the item to appear (handles React Query invalidation delay)
-  // Playwright's toHaveCount/toBeVisible with timeout handles retries
   try {
     await item.first().waitFor({ state: "visible", timeout });
     return item;
@@ -43,45 +88,61 @@ export async function findInPaginated(
     // Item didn't appear within timeout — try paginating
   }
 
-  // Fall back to pagination search. After each page turn, wait for the list
-  // fetch it triggered to settle before judging the page — a blind sleep
-  // skips pages when the fetch is slow (e.g. under parallel e2e load).
-  //
-  // The wait matches the *specific* page= param of the page we just turned
-  // to, so a coincidental concurrent GET (e.g. a window-focus refetch of the
-  // current page) can never resolve the wait early and make the loop click
-  // past the page holding the item.
   let pageNum = 1; // page the list is on before the first turn
   for (let i = 0; i < maxPages; i++) {
     if ((await item.count()) > 0) return item;
 
-    // Click "Next page" — if it doesn't exist or is disabled, we've reached the end
+    // Settle before reading pagination: a refetch spinner unmounts the
+    // buttons and would be misread as "single-page list".
+    await waitListVisible(page);
+
+    // Click "Next page" — if it doesn't exist or is disabled, we've reached the end.
+    // The click is time-boxed and re-checked: a concurrent refetch can
+    // re-render the list between the disabled-check and the click, and an
+    // unbounded click would then hang on the now-disabled element until the
+    // test timeout.
     const nextBtn = page.getByRole("button", { name: "Next page" });
     if ((await nextBtn.count()) === 0) break;
-    if (await nextBtn.isDisabled()) break;
 
-    const targetPage = pageNum + 1;
-    const settled = page
-      .waitForResponse(
-        (r) =>
-          r.request().method() === "GET" &&
-          r.url().includes("/api/") &&
-          r.url().includes(`page=${targetPage}&page_size=`),
-        { timeout: 15_000 }
-      )
-      .catch(() => {});
-    await nextBtn.click();
-    pageNum = targetPage;
-    await settled;
-
-    // The response has landed, but React may not have re-rendered the items
-    // yet — poll briefly before judging the page.
-    const renderDeadline = Date.now() + 2000;
-    while ((await item.count()) === 0 && Date.now() < renderDeadline) {
-      await page.waitForTimeout(100);
+    const beforeStart = await listPageStart(page);
+    let clicked = false;
+    for (let attempt = 0; attempt < 3 && !clicked; attempt++) {
+      if (await nextBtn.isDisabled()) break;
+      const targetPage = pageNum + 1;
+      const settled = page
+        .waitForResponse(
+          (r) =>
+            r.request().method() === "GET" &&
+            r.url().includes("/api/") &&
+            r.url().includes(`page=${targetPage}&page_size=`),
+          { timeout: 15_000 }
+        )
+        .catch(() => {});
+      try {
+        await nextBtn.click({ timeout: 3000 });
+        clicked = true;
+        pageNum = targetPage;
+        await settled;
+      } catch {
+        // State changed under us — re-check
+      }
     }
+    if (!clicked) break;
+
+    // Wait for the new page to actually render before judging it (see above).
+    await waitPageRendered(page, beforeStart);
   }
-  return null;
+
+  // The walk ended without finding the item. On a single-page list it broke
+  // out immediately — while the list's own fetch (invalidated by the
+  // mutation, possibly slow under parallel e2e load) may still be in flight:
+  // the one-shot wait above already consumed its full budget. Give the
+  // current page's pending fetch the same budget again before giving up.
+  const finalDeadline = Date.now() + timeout;
+  while ((await item.count()) === 0 && Date.now() < finalDeadline) {
+    await page.waitForTimeout(100);
+  }
+  return (await item.count()) > 0 ? item : null;
 }
 
 /**

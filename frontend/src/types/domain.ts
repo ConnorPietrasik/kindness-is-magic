@@ -1,5 +1,7 @@
 /** Domain entities derived from backend/app/schemas.py */
 
+import type { AdminListParams } from "./api";
+
 // ---------------------------------------------------------------------------
 // User / Auth
 // ---------------------------------------------------------------------------
@@ -795,6 +797,8 @@ export interface ClaimFamilyInfo {
   person_count: number;
   min_age: number | null;
   max_age: number | null;
+  /** True when the family has been soft-deleted — the claim stays readable for audit. */
+  deleted: boolean;
 }
 
 /**
@@ -841,6 +845,32 @@ export interface FamilyClaimDetail {
   /** The family's family wish — part of the claim. Null if none exists. */
   family_wish: DonorWishSummary | null;
   people: PersonWishItem[];
+}
+
+/** Claim row for the admin sponsorships view (active or cancelled). */
+export interface AdminClaim extends FamilyClaimSummary {
+  donor_email: string;
+  /** Family name — admin-only field; the claim's FamilyInfo is deliberately PII-free. */
+  family_name: string;
+  /** Soft-delete timestamp; null while the sponsorship is active. */
+  deleted_at: string | null;
+}
+
+/** Query params for the admin sponsorships list. */
+export interface AdminClaimsListParams extends AdminListParams {
+  /** active = not soft-deleted, cancelled = soft-deleted. Omitted = all. */
+  status?: "active" | "cancelled";
+  /** Donor email or family name. */
+  search?: string;
+}
+
+/** Envelope for the admin sponsorships list. */
+export interface AdminClaimsResponse {
+  claims: AdminClaim[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -1633,6 +1633,10 @@ class FamilyInfo(BaseModel):
     person_count: int
     min_age: int | None = None
     max_age: int | None = None
+    # Soft-deleted families stay readable on claims (e.g. an active claim whose
+    # family was deleted) — this flag lets the UI say so instead of showing a
+    # bare "no members" page.
+    deleted: bool = False
 
 
 class FamilyClaimSummary(BaseModel):
@@ -1687,6 +1691,30 @@ class FamilyClaimDetail(BaseModel):
     people: list[PersonWishItem] = []
 
     model_config = {"from_attributes": True}
+
+
+class AdminClaim(FamilyClaimSummary):
+    """A claim row for the admin sponsorships view.
+
+    Adds the donor's email (operator contact point), the family name
+    (searchable here — ``FamilyInfo`` is deliberately PII-free for donors,
+    but admins see names elsewhere) and the deletion timestamp (null while
+    the sponsorship is active) to the standard claim summary. Covers active
+    and cancelled (soft-deleted) claims — the only admin surface where
+    cancelled sponsorships are readable.
+    """
+
+    donor_email: str
+    family_name: str
+    deleted_at: datetime | None
+
+
+class AdminClaimListResponse(BaseModel):
+    claims: list[AdminClaim]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
 
 
 class FamilyClaimCreate(BaseModel):

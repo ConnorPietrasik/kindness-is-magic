@@ -39,6 +39,7 @@ const AdminAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() 
 const AdminEmails: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmails"));
 const AdminEmailUnsubscribes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmailUnsubscribes"));
 const AdminZeffyPayments: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminZeffyPayments"));
+const AdminSponsorships: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminSponsorships"));
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 const FamilyWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishCards"));
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
@@ -236,6 +237,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={["admin"] as UserRole[]}>
               <AdminZeffyPayments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN_SPONSORSHIPS}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <AdminSponsorships />
             </ProtectedRoute>
           }
         />

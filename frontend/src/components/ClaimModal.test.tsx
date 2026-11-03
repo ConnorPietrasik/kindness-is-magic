@@ -107,7 +107,7 @@ const giftDeadline: Deadline = {
 
 const giftsClaim: FamilyClaimSummary = {
   id: 77,
-  family: { id: 5, display_id: "12-3", bio: null, person_count: 4, min_age: 2, max_age: 39 },
+  family: { id: 5, display_id: "12-3", bio: null, person_count: 4, min_age: 2, max_age: 39, deleted: false },
   commitment_type: "gifts",
   payment_status: "paid",
   notes: null,

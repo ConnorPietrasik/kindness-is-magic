@@ -57,7 +57,14 @@ test.describe("Admin Referrers", () => {
     await page.getByRole("button", { name: "Create" }).click();
     await expect(page.getByLabel("Name", { exact: true })).not.toBeVisible({ timeout: 15_000 });
 
-    /* Verify it appears in the table (may need to paginate) */
+    /* Verify it appears in the table. Narrow to it by name first: the list
+       sorts by ID and concurrent specs create referrers with interleaved
+       IDs, so the row's page can shift while we look — and the shared
+       pagination walk is one-directional (a slow refetch past the first
+       10s wait leaves page 1 and never returns). A search hit is a single
+       row on page 1 with no pagination. */
+    await page.getByLabel("Search by name").fill(TEST_REFERRER);
+
     const referrerRow = await findRowInTable(page, TEST_REFERRER);
     expect(referrerRow).not.toBeNull();
 

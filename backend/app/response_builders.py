@@ -101,6 +101,7 @@ def batch_build_family_info(db: Session, families: list[Family]) -> dict[int, Fa
             person_count=agg_map.get(fid, (0, None, None))[0],
             min_age=agg_map.get(fid, (0, None, None))[1],
             max_age=agg_map.get(fid, (0, None, None))[2],
+            deleted=fam_map[fid].deleted_at is not None,
         )
         for fid in family_ids
     }

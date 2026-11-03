@@ -1,5 +1,7 @@
 """Tests for donor claims: self-registration, claim CRUD, fulfill."""
 
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -452,6 +454,7 @@ class TestClaimCRUD:
         assert resp.status_code == 200
         body = resp.json()
         assert body["id"] == claim_id
+        assert body["family"]["deleted"] is False
         # The family wish is part of the claim
         assert body["family_wish"] is not None
         assert body["family_wish"]["type"] == "family"
@@ -467,6 +470,33 @@ class TestClaimCRUD:
         for person in body["people"]:
             for wish in person["wishes"]:
                 assert not (purchase_keys & wish.keys())
+
+    def test_get_claim_detail_family_soft_deleted(self, test_client: TestClient, db: Session, admin_user):
+        """Claim detail stays readable after its family is soft-deleted."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        # Admin deletes the family out from under the active claim
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        # The claim still resolves — people/wishes are cascade-deleted
+        resp = test_client.get(f"/api/donor/claims/{claim_id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["id"] == claim_id
+        assert body["family"]["id"] == fam.id
+        assert body["family"]["deleted"] is True
+        assert body["family_wish"] is None
+        assert body["people"] == []
 
     def test_get_another_user_claim(self, test_client: TestClient, db: Session):
         """View another user's claim → 403."""
@@ -530,6 +560,35 @@ class TestClaimCRUD:
         )
         assert resp.status_code == 200
         assert resp.json()["notes"] == "Updated notes"
+
+    def test_update_own_claim_notes_family_soft_deleted(self, test_client: TestClient, db: Session, admin_user):
+        """Family deleted out from under the claim: notes still save (no
+        post-commit 404) and the response flags the family as deleted."""
+        _create_donor(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(
+            f"/api/families/{fam.id}/claim",
+            json={"commitment_type": "gifts"},
+        )
+        claim_id = resp.json()["id"]
+
+        # Admin deletes the family out from under the active claim
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        # The claim outlives the family — notes still save as admin
+        resp = test_client.patch(
+            f"/api/donor/claims/{claim_id}",
+            json={"notes": "Orphaned but editable"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["notes"] == "Orphaned but editable"
+        assert body["family"]["id"] == fam.id
+        assert body["family"]["deleted"] is True
 
     def test_update_own_claim_notes_junk_rejected(self, test_client: TestClient, db: Session):
         """Non-string junk on notes 422s (previously slipped through to the DB)."""
@@ -972,3 +1031,260 @@ class TestMultiRoleClaims:
         _admin_login(test_client)
         resp = test_client.delete(f"/api/donor/claims/{claim_id}")
         assert resp.status_code == 204
+
+
+# =========================================================================
+# Cancel guard — paid claims
+# =========================================================================
+
+
+class TestCancelPaidClaim:
+    def _paid_cash_claim(self, test_client: TestClient, db: Session) -> int:
+        """Admin creates a cash claim (recovery path) and marks it paid."""
+        _admin_login(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "cash"})
+        assert resp.status_code == 201
+        claim_id = resp.json()["id"]
+
+        resp = test_client.post(f"/api/donor/claims/{claim_id}/mark-paid", json={})
+        assert resp.status_code == 200
+        assert resp.json()["paid_at"] is not None
+        return claim_id
+
+    def test_cancel_paid_claim_forbidden(self, test_client: TestClient, db: Session, admin_user):
+        """Cancelling a paid cash claim → 400, claim stays active."""
+        claim_id = self._paid_cash_claim(test_client, db)
+
+        resp = test_client.delete(f"/api/donor/claims/{claim_id}")
+        assert resp.status_code == 400
+        assert "cannot be cancelled" in resp.json()["detail"]
+
+        # Still active: GET-by-id works and the row is not soft-deleted
+        resp = test_client.get(f"/api/donor/claims/{claim_id}")
+        assert resp.status_code == 200
+        from app.models import FamilyClaim
+
+        assert db.query(FamilyClaim).filter_by(id=claim_id).first().deleted_at is None
+
+    def test_cancel_unpaid_cash_claim_still_allowed(self, test_client: TestClient, db: Session, admin_user):
+        """Unpaid (pending) cash claims can still be cancelled."""
+        _admin_login(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "cash"})
+        assert resp.status_code == 201
+        claim_id = resp.json()["id"]
+
+        resp = test_client.delete(f"/api/donor/claims/{claim_id}")
+        assert resp.status_code == 204
+
+
+# =========================================================================
+# Admin — sponsorships list (all claims, active + cancelled)
+# =========================================================================
+
+
+class TestAdminClaimsList:
+    def _gift_claim(self, test_client: TestClient, db: Session, cancel: bool = False) -> tuple[int, int]:
+        """Donor creates a gift claim (optionally cancels it).
+
+        Returns (claim_id, family_id).
+        """
+        resp = test_client.post(
+            "/api/auth/register-donor",
+            json={"display_name": DONOR_DISPLAY_NAME, "email": DONOR_EMAIL, "password": DONOR_PASSWORD},
+        )
+        assert resp.status_code in (201, 409)  # 409 when an earlier claim in this test registered the donor
+        data = _create_claimed_family(db)
+        fam = data["family"]
+
+        resp = test_client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "gifts"})
+        assert resp.status_code == 201
+        claim_id = resp.json()["id"]
+
+        if cancel:
+            resp = test_client.delete(f"/api/donor/claims/{claim_id}")
+            assert resp.status_code == 204
+        return claim_id, fam.id
+
+    def test_unauthenticated(self, test_client: TestClient, db: Session):
+        resp = test_client.get("/api/admin/claims")
+        assert resp.status_code == 401
+
+    def test_non_admin_forbidden(self, test_client: TestClient, db: Session, admin_user):
+        _create_donor(test_client)
+        resp = test_client.get("/api/admin/claims")
+        assert resp.status_code == 403
+
+    def test_empty(self, test_client: TestClient, db: Session, admin_user):
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/claims")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["claims"] == []
+        assert body["total"] == 0
+        assert body["total_pages"] == 0
+
+    def test_status_filter_splits_active_and_cancelled(self, test_client: TestClient, db: Session, admin_user):
+        """No filter → both; status=active / status=cancelled split them.
+        Cancelled rows carry donor email + deleted_at, active rows null."""
+        active_id, _ = self._gift_claim(test_client, db, cancel=False)
+        cancelled_id, fam_id = self._gift_claim(test_client, db, cancel=True)
+
+        _admin_login(test_client)
+
+        all_body = test_client.get("/api/admin/claims").json()
+        assert all_body["total"] == 2
+        assert {c["id"] for c in all_body["claims"]} == {active_id, cancelled_id}
+
+        active_body = test_client.get("/api/admin/claims", params={"status": "active"}).json()
+        assert active_body["total"] == 1
+        assert active_body["claims"][0]["id"] == active_id
+        assert active_body["claims"][0]["deleted_at"] is None
+
+        cancelled_body = test_client.get("/api/admin/claims", params={"status": "cancelled"}).json()
+        assert cancelled_body["total"] == 1
+        item = cancelled_body["claims"][0]
+        assert item["id"] == cancelled_id
+        assert item["donor_email"] == DONOR_EMAIL
+        assert item["family_name"] == "Claimed Family"
+        assert item["family"]["id"] == fam_id
+        assert item["commitment_type"] == "gifts"
+        assert item["paid_at"] is None
+        assert item["deleted_at"] is not None
+
+        # The cancelled claim is still invisible everywhere else
+        assert test_client.get(f"/api/donor/claims/{cancelled_id}").status_code == 404
+
+    def test_lapsed_cash_claim_visible(self, test_client: TestClient, db: Session, admin_user):
+        """A cash claim soft-deleted by the expiry sweep is findable here."""
+        from app.models import FamilyClaim
+
+        _admin_login(test_client)
+        data = _create_claimed_family(db)
+        fam = data["family"]
+        resp = test_client.post(f"/api/families/{fam.id}/claim", json={"commitment_type": "cash"})
+        claim_id = resp.json()["id"]
+
+        # Simulate the hourly sweep
+        claim = db.query(FamilyClaim).filter_by(id=claim_id).first()
+        claim.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        body = test_client.get("/api/admin/claims", params={"status": "cancelled"}).json()
+        item = next(c for c in body["claims"] if c["id"] == claim_id)
+        assert item["commitment_type"] == "cash"
+        assert item["payment_status"] == "pending"
+        assert item["paid_at"] is None
+
+    def test_ordering_newest_first(self, test_client: TestClient, db: Session, admin_user):
+        from app.models import FamilyClaim
+
+        claim1, _ = self._gift_claim(test_client, db)
+        # Rewind the first claim's creation so the second is unambiguously newer
+        c1 = db.query(FamilyClaim).filter_by(id=claim1).first()
+        c1.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        db.commit()
+        claim2, _ = self._gift_claim(test_client, db)
+
+        _admin_login(test_client)
+        body = test_client.get("/api/admin/claims").json()
+        assert [c["id"] for c in body["claims"]] == [claim2, claim1]
+
+    def test_pagination(self, test_client: TestClient, db: Session, admin_user):
+        for _ in range(3):
+            self._gift_claim(test_client, db, cancel=True)
+
+        _admin_login(test_client)
+        page1 = test_client.get("/api/admin/claims", params={"page_size": 2, "status": "cancelled"}).json()
+        assert page1["total"] == 3
+        assert page1["total_pages"] == 2
+        assert len(page1["claims"]) == 2
+
+        page2 = test_client.get("/api/admin/claims", params={"page": 2, "page_size": 2, "status": "cancelled"}).json()
+        assert len(page2["claims"]) == 1
+
+    def test_columns_param(self, test_client: TestClient, db: Session, admin_user):
+        """The columns param trims optional fields (required fields stay)."""
+        claim_id, _ = self._gift_claim(test_client, db, cancel=True)
+
+        _admin_login(test_client)
+        resp = test_client.get("/api/admin/claims", params={"columns": "id,deleted_at"})
+        assert resp.status_code == 200
+        item = resp.json()["claims"][0]
+        assert item["id"] == claim_id
+        assert item["deleted_at"] is not None
+        assert "notes" not in item
+        assert "zeffy_payment_id" not in item
+
+    def test_search_matches_donor_email_and_family_name(self, test_client: TestClient, db: Session, admin_user):
+        """Search hits the donor's email or the family name."""
+        claim_id, _ = self._gift_claim(test_client, db)
+        _admin_login(test_client)
+
+        by_email = test_client.get("/api/admin/claims", params={"search": DONOR_EMAIL}).json()
+        assert by_email["total"] == 1
+        assert by_email["claims"][0]["id"] == claim_id
+
+        by_family = test_client.get("/api/admin/claims", params={"search": "Claimed Family"}).json()
+        assert by_family["total"] == 1
+        assert by_family["claims"][0]["id"] == claim_id
+        assert by_family["claims"][0]["family_name"] == "Claimed Family"
+
+    def test_search_no_match(self, test_client: TestClient, db: Session, admin_user):
+        self._gift_claim(test_client, db)
+        _admin_login(test_client)
+
+        body = test_client.get("/api/admin/claims", params={"search": "nobody@example.com"}).json()
+        assert body["total"] == 0
+        assert body["claims"] == []
+
+    def test_sort_created_at(self, test_client: TestClient, db: Session, admin_user):
+        from app.models import FamilyClaim
+
+        claim1, _ = self._gift_claim(test_client, db)
+        # Rewind the first claim's creation so the ordering is unambiguous
+        c1 = db.query(FamilyClaim).filter_by(id=claim1).first()
+        c1.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        db.commit()
+        claim2, _ = self._gift_claim(test_client, db)
+
+        _admin_login(test_client)
+        asc = test_client.get("/api/admin/claims", params={"sort": "created_at"}).json()
+        assert [c["id"] for c in asc["claims"]] == [claim1, claim2]
+        desc = test_client.get("/api/admin/claims", params={"sort": "-created_at"}).json()
+        assert [c["id"] for c in desc["claims"]] == [claim2, claim1]
+
+    def test_sort_donor_email(self, test_client: TestClient, db: Session, admin_user):
+        """Join-based sort: orders across different donors by donor email."""
+        donor_claim, _ = self._gift_claim(test_client, db)
+
+        _admin_login(test_client)
+        data = _create_claimed_family(db)
+        resp = test_client.post(f"/api/families/{data['family'].id}/claim", json={"commitment_type": "cash"})
+        assert resp.status_code == 201
+        admin_claim = resp.json()["id"]
+
+        assert ADMIN_EMAIL < DONOR_EMAIL
+        asc = test_client.get("/api/admin/claims", params={"sort": "donor_email"}).json()
+        assert [c["id"] for c in asc["claims"]] == [admin_claim, donor_claim]
+        desc = test_client.get("/api/admin/claims", params={"sort": "-donor_email"}).json()
+        assert [c["id"] for c in desc["claims"]] == [donor_claim, admin_claim]
+
+    def test_sort_unknown_field_falls_back_to_default(self, test_client: TestClient, db: Session, admin_user):
+        from app.models import FamilyClaim
+
+        claim1, _ = self._gift_claim(test_client, db)
+        c1 = db.query(FamilyClaim).filter_by(id=claim1).first()
+        c1.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        db.commit()
+        claim2, _ = self._gift_claim(test_client, db)
+
+        _admin_login(test_client)
+        body = test_client.get("/api/admin/claims", params={"sort": "bogus"}).json()
+        # Default: newest first, like no sort at all
+        assert [c["id"] for c in body["claims"]] == [claim2, claim1]

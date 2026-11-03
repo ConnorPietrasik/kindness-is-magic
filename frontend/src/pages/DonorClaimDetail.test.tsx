@@ -42,6 +42,7 @@ const mockClaim: FamilyClaimDetail = {
     person_count: 2,
     min_age: 5,
     max_age: 10,
+    deleted: false,
   },
   commitment_type: "gifts",
   payment_status: "paid",
@@ -116,6 +117,109 @@ describe("DonorClaimDetail", () => {
     cleanup();
     vi.restoreAllMocks();
     localStorage.clear();
+  });
+
+  it("an orphaned claim (family soft-deleted) renders with a Family #id heading", async () => {
+    const orphan: FamilyClaimDetail = {
+      ...mockClaim,
+      family: {
+        ...mockClaim.family,
+        display_id: "0",
+        bio: "Board game fans",
+        person_count: 0,
+        min_age: null,
+        max_age: null,
+        deleted: true,
+      },
+      family_wish: null,
+      people: [],
+    };
+
+    renderClaim(mockAdminUser, orphan);
+
+    expect(await screen.findByRole("heading", { name: "Family #5" })).toBeInTheDocument();
+  });
+
+  it("shows a deleted-family notice instead of a bare empty list", async () => {
+    const orphan: FamilyClaimDetail = {
+      ...mockClaim,
+      family: { ...mockClaim.family, display_id: "0", person_count: 0, min_age: null, max_age: null, deleted: true },
+      family_wish: null,
+      people: [],
+    };
+
+    renderClaim(mockAdminUser, orphan);
+
+    expect(await screen.findByText("This family has been deleted.")).toBeInTheDocument();
+    expect(screen.getByText("Its members and wishes are no longer shown. The sponsorship is kept for the record.")).toBeInTheDocument();
+    expect(screen.getByText("No members shown — this family has been deleted.")).toBeInTheDocument();
+    expect(screen.queryByText("No family members added yet.")).not.toBeInTheDocument();
+  });
+
+  it("hides the deleted-family notice for an active family with no members", async () => {
+    const empty: FamilyClaimDetail = {
+      ...mockClaim,
+      family: { ...mockClaim.family, person_count: 0, min_age: null, max_age: null },
+      people: [],
+    };
+
+    renderClaim(mockAdminUser, empty);
+
+    expect(await screen.findByText("No family members added yet.")).toBeInTheDocument();
+    expect(screen.queryByText("This family has been deleted.")).not.toBeInTheDocument();
+  });
+
+  // Orphaned claims — the actions menu must only offer what still works on a
+  // deleted family: Edit details and Mark fulfilled 404 on the family lookup,
+  // Cancel never touches the family, so it stays.
+  const orphanGiftClaim: FamilyClaimDetail = {
+    ...mockClaim,
+    family: { ...mockClaim.family, display_id: "0", person_count: 0, min_age: null, max_age: null, deleted: true },
+    family_wish: null,
+    people: [],
+  };
+
+  const orphanPaidCashClaim: FamilyClaimDetail = {
+    ...orphanGiftClaim,
+    commitment_type: "cash",
+    payment_status: "paid",
+    paid_at: "2025-11-20T00:00:00Z",
+  };
+
+  it("hides Mark fulfilled for an orphaned claim but keeps Cancel (admin)", async () => {
+    const user = userEvent.setup();
+    renderClaim(mockAdminUser, orphanGiftClaim);
+
+    expect(await screen.findByRole("heading", { name: "Family #5" })).toBeInTheDocument();
+
+    await openActionsMenu(user);
+    expect(screen.queryByRole("menuitem", { name: "Mark fulfilled" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Cancel sponsorship" })).toBeInTheDocument();
+  });
+
+  it("hides Edit details for an orphaned claim but keeps Cancel (owner)", async () => {
+    const user = userEvent.setup();
+    renderClaim(mockDonorUser, orphanGiftClaim);
+
+    expect(await screen.findByRole("heading", { name: "Family #5" })).toBeInTheDocument();
+
+    await openActionsMenu(user);
+    expect(screen.queryByRole("menuitem", { name: "Edit details" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Cancel sponsorship" })).toBeInTheDocument();
+  });
+
+  it("hides the whole actions menu on an orphaned paid claim (owner)", async () => {
+    renderClaim(mockDonorUser, orphanPaidCashClaim);
+
+    expect(await screen.findByRole("heading", { name: "Family #5" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+  });
+
+  it("hides the whole actions menu on an orphaned paid claim (admin)", async () => {
+    renderClaim(mockAdminUser, orphanPaidCashClaim);
+
+    expect(await screen.findByRole("heading", { name: "Family #5" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
   });
 
   const pendingCashClaim: FamilyClaimDetail = {
@@ -227,6 +331,32 @@ describe("DonorClaimDetail", () => {
       expect(cancelSpy).toHaveBeenCalledWith(1);
     });
     expect(await screen.findByText("Sponsorship cancelled")).toBeInTheDocument();
+  });
+
+  it("hides Cancel sponsorship from the owner of a paid cash claim", async () => {
+    const user = userEvent.setup();
+    renderClaim(mockDonorUser, paidCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    await openActionsMenu(user);
+    expect(await screen.findByRole("menuitem", { name: "Edit details" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Cancel sponsorship" })).not.toBeInTheDocument();
+  });
+
+  it("hides Cancel sponsorship from admins for a paid cash claim", async () => {
+    const user = userEvent.setup();
+    renderClaim(mockAdminUser, paidCashClaim);
+
+    await waitFor(() => {
+      expect(screen.getByText("2-1")).toBeInTheDocument();
+    });
+
+    await openActionsMenu(user);
+    expect(await screen.findByRole("menuitem", { name: "Mark fulfilled" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Cancel sponsorship" })).not.toBeInTheDocument();
   });
 
   it("offers Mark fulfilled to admins instead of Edit details", async () => {

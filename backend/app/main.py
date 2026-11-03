@@ -439,9 +439,10 @@ app.include_router(delivery_router)
 # ---------------------------------------------------------------------------
 # Include donor / claim-capable routes
 # ---------------------------------------------------------------------------
-from app.donor_routes import router as donor_router  # noqa: E402
+from app.donor_routes import claims_admin_router, router as donor_router  # noqa: E402
 
 app.include_router(donor_router)
+app.include_router(claims_admin_router)
 
 
 # ---------------------------------------------------------------------------

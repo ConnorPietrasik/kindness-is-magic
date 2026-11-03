@@ -7,14 +7,17 @@ Endpoints for managing family claims — available to any claim-capable role
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import CASH_CLAIM_PAYMENT_HOURS, GIFT_CLAIM_CAP, ZEFFY_FORM_URL
+from app.column_filter import column_filtered_page
+from app.search_sort import CLAIM_SORT_FIELDS, build_sort_clause, escape_like
 from app.database import get_db
 from app.deadlines import CASH_ONLY_GIFT_BLOCKED_DETAIL, GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.display_ids import compute_display_ids
@@ -57,6 +60,8 @@ from app.response_builders import (
     partial_update,
 )
 from app.schemas import (
+    AdminClaim,
+    AdminClaimListResponse,
     AdminClaimMarkPaid,
     CartCheckoutRequest,
     CartCheckoutResponse,
@@ -78,6 +83,10 @@ from app.mail import send_claim_confirmation
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/donor", tags=["donor"])
+
+# Admin sponsorships list (separate router — /api/admin/claims, like the
+# other admin list endpoints). Kept here with the rest of the claim routes.
+claims_admin_router = APIRouter(prefix="/api/admin/claims", tags=["admin-claims"])
 
 
 def get_claim_or_403(db: Session, claim_id: int, user: User) -> FamilyClaim:
@@ -200,7 +209,10 @@ def toggle_cart_groceries(
     db.commit()
     db.refresh(claim)
 
-    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
+    # The family may be soft-deleted (deleted out from under the claim) —
+    # tolerated here for the same reason as GET claim detail: the toggle is
+    # already applied, and the claim record stays readable with family.deleted set.
+    fam = get_or_404(db, Family, claim.family_id, "Family not found")
     return CartItem(
         claim_id=claim.id,
         family=build_family_info(fam, db),
@@ -511,6 +523,73 @@ def list_claims(
 
 
 # ---------------------------------------------------------------------------
+# GET /api/admin/claims (admin only)
+# ---------------------------------------------------------------------------
+
+
+@claims_admin_router.get("", response_model=AdminClaimListResponse, response_model_exclude_unset=True)
+def list_admin_claims(
+    status: Literal["active", "cancelled"] | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    columns: str | None = Query(None),
+    search: str | None = Query(None),
+    sort: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """List sponsorships (claims) for admins, newest first.
+
+    ``status`` narrows to ``active`` (not soft-deleted) or ``cancelled``
+    (soft-deleted: donor/admin cancels and lapsed payment windows); omitted
+    means all. ``search`` matches the donor's email or the family name.
+    ``sort`` orders by any field in ``CLAIM_SORT_FIELDS`` (``-`` prefix for
+    descending); the default is newest first.
+
+    Cancelled sponsorships are invisible to every other surface — GET-by-id
+    404s them, and the donor list, family pages and Zeffy reconciliation
+    filter them out — so this list is also the audit view for cancellations
+    after money was taken and the lookup for the restore endpoint.
+    """
+    query = db.query(FamilyClaim).join(User, User.id == FamilyClaim.donor_user_id).join(Family, Family.id == FamilyClaim.family_id)
+    if status == "active":
+        query = query.filter(FamilyClaim.deleted_at.is_(None))
+    elif status == "cancelled":
+        query = query.filter(FamilyClaim.deleted_at.isnot(None))
+
+    if search is not None:
+        pattern = f"%{escape_like(search)}%"
+        query = query.filter(or_(User.email.ilike(pattern, escape="\\"), Family.family_name.ilike(pattern, escape="\\")))
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    sort_clause = build_sort_clause(sort, CLAIM_SORT_FIELDS, FamilyClaim.created_at.desc())
+    claims = query.order_by(sort_clause, FamilyClaim.id.desc()).offset(offset).limit(page_size).all()
+
+    donor_ids = {c.donor_user_id for c in claims}
+    donors = {u.id: u for u in db.query(User).filter(User.id.in_(donor_ids)).all()} if donor_ids else {}
+
+    family_ids = {c.family_id for c in claims}
+    families = {f.id: f for f in db.query(Family).filter(Family.id.in_(family_ids)).all()} if family_ids else {}
+
+    family_info_map = batch_build_family_info(db, list(families.values()))
+
+    items = [
+        AdminClaim(
+            **build_claim_summary(
+                c, family_info_map.get(c.family_id, FamilyInfo(id=c.family_id, display_id="0", bio=None, person_count=0))
+            ).model_dump(),
+            donor_email=donors[c.donor_user_id].email,
+            family_name=families[c.family_id].family_name,
+            deleted_at=c.deleted_at,
+        )
+        for c in claims
+    ]
+
+    return column_filtered_page(items, columns, key="claims", total=total, page=page, page_size=page_size, always_include={"id"})
+
+
+# ---------------------------------------------------------------------------
 # GET /api/donor/claims/{claim_id}
 # ---------------------------------------------------------------------------
 
@@ -524,7 +603,9 @@ def get_claim(
     """Get claim detail with wish list. Owner or admin only."""
     claim = get_claim_or_403(db, claim_id, user)
 
-    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
+    # The family may be soft-deleted (a family can be deleted out from under an
+    # active sponsorship) — the claim record stays readable for audit.
+    fam = get_or_404(db, Family, claim.family_id, "Family not found")
 
     # Active people ordered by id
     people = (
@@ -682,7 +763,10 @@ async def update_claim(
         db.commit()
         db.refresh(claim)
 
-    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
+    # The family may be soft-deleted (deleted out from under the claim) —
+    # tolerated here for the same reason as GET claim detail: the update is
+    # already committed, and the claim record stays readable with family.deleted set.
+    fam = get_or_404(db, Family, claim.family_id, "Family not found")
     return build_claim_summary(claim, build_family_info(fam, db), email_error=email_error)
 
 
@@ -697,8 +781,18 @@ def cancel_claim(
     db: Session = Depends(get_db),
     user: User = Depends(require_claim_capable),
 ):
-    """Soft-delete (cancel) a claim. Owner or admin only."""
+    """Soft-delete (cancel) a claim. Owner or admin only.
+
+    400 for paid claims — money was taken, so cancellation (which makes the
+    claim invisible and unrestorable) is not a self-serve action.
+    """
     claim = get_claim_or_403(db, claim_id, user)
+
+    if claim.paid_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Paid sponsorships cannot be cancelled — reverse the payment first",
+        )
 
     claim.deleted_at = datetime.now(timezone.utc)
     db.commit()
@@ -764,6 +858,11 @@ async def mark_claim_paid(
     re-email), and 400 for non-cash claims. Sends the payment-confirmed
     email when enabled (``SEND_PAYMENT_CONFIRMED_EMAIL``, off by default),
     keeping the 1 payment ↔ 1 confirmation story for the offline path.
+
+    A family soft-deleted out from under the claim does NOT block this
+    (unlike restore): the money was taken, and the shared apply path never
+    gates on family liveness — the response's family info just flags
+    ``deleted``.
     """
     claim = get_active_or_404(db, FamilyClaim, claim_id, "Claim not found")
     if claim.commitment_type != CommitmentType.cash:
@@ -782,7 +881,10 @@ async def mark_claim_paid(
 
     await send_payment_confirmation_email(db, [claim])
 
-    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
+    # The family may be soft-deleted (deleted out from under the claim) —
+    # tolerated here for the same reason as in GET claim detail: the claim
+    # record stays complete and readable for audit, with family.deleted set.
+    fam = get_or_404(db, Family, claim.family_id, "Family not found")
     return build_claim_summary(claim, build_family_info(fam, db))
 
 
@@ -798,8 +900,9 @@ def restore_claim(
     window — a stale ``created_at`` would be swept again immediately). No
     email: in the recovery flow the donor already paid and the confirmation
     at match is their email. 400 unless soft-deleted, cash, and unpaid;
-    409 if the family was re-claimed in the meantime (the reservation index
-    refuses the revive).
+    404 if the family was soft-deleted in the meantime (checked before the
+    revive, so the claim stays cancelled); 409 if the family was re-claimed
+    in the meantime (the reservation index refuses the revive).
     """
     claim = get_or_404(db, FamilyClaim, claim_id, "Claim not found")
     if claim.deleted_at is None:
@@ -808,6 +911,11 @@ def restore_claim(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only cash sponsorships can be restored")
     if claim.paid_at is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paid sponsorships cannot be restored")
+
+    # Family liveness checked before the revive commit — a family deleted
+    # out from under the cancelled claim is not sponsorable again, so the
+    # restore is refused and the claim stays cancelled (no half-revive).
+    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
 
     taken = db.query(FamilyClaim.id).filter(FamilyClaim.family_id == claim.family_id, FamilyClaim.deleted_at.is_(None)).first()
     if taken is not None:
@@ -821,5 +929,4 @@ def restore_claim(
     db.refresh(claim)
     logger.info("Admin %s restored cash claim %s (new payment window)", admin.id, claim_id)
 
-    fam = get_active_or_404(db, Family, claim.family_id, "Family not found")
     return build_claim_summary(claim, build_family_info(fam, db))

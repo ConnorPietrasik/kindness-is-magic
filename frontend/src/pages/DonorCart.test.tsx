@@ -27,7 +27,7 @@ const mockDonor: User = {
 
 const committedItem: DonorCartItem = {
   claim_id: 31,
-  family: { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12 },
+  family: { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12, deleted: false },
   includes_groceries: false,
   line_total_usd: 500,
   payment_expires_at: "2099-12-04T00:00:00Z",
@@ -155,7 +155,7 @@ describe("DonorCart", () => {
 
     const newItem: DonorCartItem = {
       claim_id: 32,
-      family: { id: 10, display_id: "3-2", bio: "A family in need.", person_count: 2, min_age: 3, max_age: 8 },
+      family: { id: 10, display_id: "3-2", bio: "A family in need.", person_count: 2, min_age: 3, max_age: 8, deleted: false },
       includes_groceries: true,
       line_total_usd: 600,
       payment_expires_at: "2099-12-04T00:00:00Z",
@@ -232,7 +232,7 @@ describe("DonorCart", () => {
     // Refetch lands with the committed item → committed row, still no success
     const newItem: DonorCartItem = {
       claim_id: 33,
-      family: { id: 10, display_id: "3-2", bio: "A family in need.", person_count: 2, min_age: 3, max_age: 8 },
+      family: { id: 10, display_id: "3-2", bio: "A family in need.", person_count: 2, min_age: 3, max_age: 8, deleted: false },
       includes_groceries: false,
       line_total_usd: 500,
       payment_expires_at: "2099-12-04T00:00:00Z",

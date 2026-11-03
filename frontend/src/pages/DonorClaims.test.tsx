@@ -22,6 +22,7 @@ const familyBase = {
   person_count: 3,
   min_age: 5,
   max_age: 12,
+  deleted: false,
 };
 
 const mockActiveClaim: FamilyClaimSummary = {

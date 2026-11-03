@@ -71,7 +71,9 @@ export default function DonorClaimDetail() {
         {/* Claim header */}
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900">{data.family.display_id}</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+              {data.family.display_id === "0" ? `Family #${data.family.id}` : data.family.display_id}
+            </h2>
             {data.family.bio && <p className="mt-1 text-gray-600">{data.family.bio}</p>}
             <div className="mt-2 flex items-center gap-3 text-sm text-gray-500">
               <span>
@@ -83,6 +85,18 @@ export default function DonorClaimDetail() {
 
           {canAct && <ClaimActionsMenu claim={data} isOwner={isOwner} isAdmin={isAdmin} />}
         </div>
+
+        {/* The claim outlives its family: if the family was deleted, its
+            members/wishes were cascade-deleted with it — say so instead of
+            leaving a bare empty list. */}
+        {data.family.deleted && (
+          <div className="mb-6 rounded-xl border border-gray-300 bg-gray-100 p-4">
+            <p className="text-sm font-semibold text-gray-800">This family has been deleted.</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Its members and wishes are no longer shown. The sponsorship is kept for the record.
+            </p>
+          </div>
+        )}
 
         {/* ── Gift drop-off deadline banner ──────────────────── */}
         <DeadlineBanner result={giftDropoffDeadline} />
@@ -155,7 +169,9 @@ export default function DonorClaimDetail() {
           )}
         </div>
         {data.people.length === 0 ? (
-          <Card className="py-8 text-center text-gray-400">No family members added yet.</Card>
+          <Card className="py-8 text-center text-gray-400">
+            {data.family.deleted ? "No members shown — this family has been deleted." : "No family members added yet."}
+          </Card>
         ) : (
           <WishTable people={data.people} columnOrder={columnOrder} />
         )}
@@ -255,6 +271,15 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
   const queryClient = useQueryClient();
   const toast = useToast();
 
+  // Paid sponsorships cannot be cancelled (the backend rejects it) — don't offer it.
+  const canCancel = claim.paid_at == null;
+
+  // The family was deleted out from under this claim: "Edit details" and
+  // "Mark fulfilled" 404 on their (deleted) family lookup — don't offer them.
+  // Cancel never touches the family, so it stays available (and is the only
+  // way to close the claim); an all-hidden menu renders no trigger at all.
+  const familyDeleted = claim.family.deleted;
+
   const cancelMut = useMutation({
     mutationFn: () => donorCancelClaim(claim.id),
     onSuccess: () => {
@@ -291,7 +316,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
     <>
       <ActionsDropdown
         items={[
-          ...(isOwner
+          ...(isOwner && !familyDeleted
             ? ([
                 {
                   label: "Edit details",
@@ -301,6 +326,10 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
                     setShowEditNotes(true);
                   },
                 },
+              ] as const)
+            : []),
+          ...(isOwner && canCancel
+            ? ([
                 {
                   label: "Cancel sponsorship",
                   variant: "danger" as const,
@@ -308,12 +337,16 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
                 },
               ] as const)
             : []),
-          ...(isAdmin && !isOwner
+          ...(isAdmin && !isOwner && !familyDeleted
             ? ([
                 {
                   label: "Mark fulfilled",
                   onClick: () => setShowFulfillConfirm(true),
                 },
+              ] as const)
+            : []),
+          ...(isAdmin && !isOwner && canCancel
+            ? ([
                 {
                   label: "Cancel sponsorship",
                   variant: "danger" as const,

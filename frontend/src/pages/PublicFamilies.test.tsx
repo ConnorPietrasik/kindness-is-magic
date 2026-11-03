@@ -50,7 +50,7 @@ const mockFamilies: PublicFamilySummary[] = [
 const mockDonorClaims: FamilyClaimSummary[] = [
   {
     id: 100,
-    family: { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12 },
+    family: { id: 20, display_id: "3-1", bio: "The board-game family.", person_count: 4, min_age: 5, max_age: 12, deleted: false },
     commitment_type: "gifts",
     payment_status: "paid",
     notes: null,
@@ -63,7 +63,7 @@ const mockDonorClaims: FamilyClaimSummary[] = [
   },
   {
     id: 101,
-    family: { id: 21, display_id: "3-2", bio: null, person_count: 2, min_age: 3, max_age: 8 },
+    family: { id: 21, display_id: "3-2", bio: null, person_count: 2, min_age: 3, max_age: 8, deleted: false },
     commitment_type: "cash",
     payment_status: "pending",
     notes: null,
@@ -76,7 +76,7 @@ const mockDonorClaims: FamilyClaimSummary[] = [
   },
   {
     id: 102,
-    family: { id: 22, display_id: "3-3", bio: null, person_count: 3, min_age: 10, max_age: 15 },
+    family: { id: 22, display_id: "3-3", bio: null, person_count: 3, min_age: 10, max_age: 15, deleted: false },
     commitment_type: "gifts",
     payment_status: "paid",
     notes: null,

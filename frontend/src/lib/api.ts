@@ -11,6 +11,8 @@
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 import type {
+  AdminClaimsListParams,
+  AdminClaimsResponse,
   AdminEmailsListParams,
   AdminFamiliesListParams,
   AdminPeopleListParams,
@@ -811,6 +813,21 @@ export function donorCancelClaim(claimId: number): Promise<void> {
 /** Admin: fulfill a claim. */
 export function donorFulfillClaim(claimId: number): Promise<FamilyClaimSummary> {
   return apiPost(`/api/donor/claims/${claimId}/fulfill`);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Sponsorships (claims: active + cancelled)
+// ---------------------------------------------------------------------------
+
+/** Admin: list sponsorships — active and cancelled (soft-deleted). */
+export function adminListClaims(params?: AdminClaimsListParams): Promise<AdminClaimsResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/claims", p);
+}
+
+/** Admin: restore a cancelled (soft-deleted) unpaid cash claim (fresh payment window). */
+export function adminRestoreClaim(claimId: number): Promise<FamilyClaimSummary> {
+  return apiPost(`/api/donor/claims/${claimId}/restore`);
 }
 
 // ---------------------------------------------------------------------------

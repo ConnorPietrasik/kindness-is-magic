@@ -257,3 +257,10 @@ export const donorClaim = (id: number) => ["donorClaim", id] as const;
 export const adminZeffyPayments = ["adminZeffyPayments"] as const;
 /** Admin Zeffy pending claims (match-modal grouped data) */
 export const adminZeffyPendingClaims = ["adminZeffyPendingClaims"] as const;
+
+// ---------------------------------------------------------------------------
+// Admin — Sponsorships (claims: active + cancelled)
+// ---------------------------------------------------------------------------
+
+/** Admin sponsorships list (status + pagination params passed at call site) */
+export const adminClaims = ["adminClaims"] as const;

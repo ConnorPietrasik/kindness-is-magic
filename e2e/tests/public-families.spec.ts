@@ -12,7 +12,7 @@
  * and ages; all data is API-created and cleaned up in afterAll.
  */
 import { test, expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
   createReferrerWithUserAndCredentials,
   createFamilyViaApi,
@@ -47,16 +47,141 @@ async function cardTexts(page: Page): Promise<string[]> {
   return page.locator("div.grid > a").evaluateAll((els) => els.map((el) => el.textContent ?? ""));
 }
 
-/** Index of the card containing the given bio (-1 if absent). */
-async function cardIndex(page: Page, bio: string): Promise<number> {
-  const texts = await cardTexts(page);
-  return texts.findIndex((t) => t.includes(bio));
+/**
+ * The families sharing a filtered list with our scenario families depend on
+ * what concurrently-running e2e specs have alive on this shared stack, so
+ * card assertions must never assume page 1 (page size 12). These helpers
+ * walk the grid's pages instead.
+ *
+ * Two more hazards on this shared stack: (1) every filter/sort/page change
+ * re-fetches and renders a FULL-PAGE spinner (grid + pagination unmounted
+ * until the data lands), and (2) background refetches (window focus) plus
+ * parallel specs' create/delete churn can re-render the list between any
+ * two steps — page number, total, even which families are listed. So the
+ * walks never trust their own bookkeeping: the list is settled before every
+ * read/click, each page turn is verified against the "Showing X–Y of Z"
+ * offset text, and positions are computed from that offset.
+ */
+
+/** Heading visible = the full-page spinner is gone = current data rendered. */
+async function waitHeading(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 15_000 });
 }
 
-/** A filter/sort change re-fetches and briefly renders a full-page spinner,
-    so re-wait for the heading (list loaded) before asserting on cards. */
-async function waitListLoaded(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+/** 1-based offset of the first card on the current page ("Showing X–Y of Z"). */
+async function pageStart(page: Page): Promise<number> {
+  // The text is absent on single-page lists (pagination isn't rendered) — keep it bounded.
+  const text = await page
+    .getByText(/Showing \d+\D+\d+ of \d+/)
+    .first()
+    .textContent({ timeout: 500 })
+    .catch(() => null);
+  const m = text?.match(/Showing (\d+)/);
+  return m ? parseInt(m[1], 10) : 1;
+}
+
+/**
+ * Click a pagination button and settle on the re-fetch it triggers. The
+ * response latch is armed before the click so a slow fetch can't be missed;
+ * the click is time-boxed because a concurrent re-render can detach or
+ * disable the button between check and click.
+ */
+async function turnPage(page: Page, buttonName: string): Promise<void> {
+  const resp = page
+    .waitForResponse((r) => r.request().method() === "GET" && r.url().includes("/api/families"), {
+      timeout: 15_000,
+    })
+    .catch(() => null);
+  try {
+    await page.getByRole("button", { name: buttonName }).click({ timeout: 3000 });
+  } catch {
+    // The list re-rendered under us — settle on the new state
+    await waitHeading(page);
+    return;
+  }
+  await resp;
+  await waitHeading(page);
+}
+
+/** Jump to page 1 of the browse grid (no-op when already there / single page). */
+async function gotoFirstPage(page: Page): Promise<void> {
+  await waitHeading(page);
+  const firstBtn = page.getByRole("button", { name: "First page" });
+  // Only readable after settling: a missing button means a single-page list
+  // (the pagination component isn't rendered), not a spinner.
+  if ((await firstBtn.count()) === 0) return;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await firstBtn.isDisabled()) return; // already on page 1
+    const before = await pageStart(page);
+    await turnPage(page, "First page");
+    const now = await pageStart(page);
+    if (now === 1 || now !== before) return;
+  }
+}
+
+/** Turn to the next page if one exists; returns false at the end of the list. */
+async function gotoNextPage(page: Page): Promise<boolean> {
+  await waitHeading(page);
+  const nextBtn = page.getByRole("button", { name: "Next page" });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if ((await nextBtn.count()) === 0 || (await nextBtn.isDisabled())) return false;
+    const before = await pageStart(page);
+    await turnPage(page, "Next page");
+    if ((await pageStart(page)) !== before) return true;
+    // The turn lost to a background re-render — re-check the new state
+  }
+  return false;
+}
+
+/** Read the current page's cards into the positions map (1-based offset → 0-based index). */
+async function readPageInto(page: Page, pos: Record<string, number | null>, bios: string[]): Promise<void> {
+  const start = await pageStart(page);
+  const texts = await cardTexts(page);
+  for (const bio of bios) {
+    if (pos[bio] == null) {
+      const idx = texts.findIndex((t) => t.includes(bio));
+      if (idx >= 0) pos[bio] = start - 1 + idx;
+    }
+  }
+}
+
+/** Return the card locator for the bio, walking pages to it (from page 1). */
+async function findCard(page: Page, bio: string): Promise<Locator> {
+  await gotoFirstPage(page);
+  const card = page.locator("div.grid > a").filter({ hasText: bio });
+  for (let turns = 0; turns <= 5; turns++) {
+    if ((await card.count()) > 0) return card;
+    if (turns === 5 || !(await gotoNextPage(page))) {
+      throw new Error(`browse card "${bio}" not found (walked ${turns + 1} page(s))`);
+    }
+  }
+  throw new Error(`browse card "${bio}" not found after 5 page turns`);
+}
+
+/**
+ * Absolute (0-based) position of each bio across the grid's pages — one
+ * forward walk from page 1, so it also covers cards on different pages.
+ * Absent cards get null (only after every page was checked).
+ */
+async function cardPositions(page: Page, bios: string[]): Promise<Record<string, number | null>> {
+  await gotoFirstPage(page);
+  const pos: Record<string, number | null> = Object.fromEntries(bios.map((b) => [b, null]));
+  for (let turns = 0; turns <= 5; turns++) {
+    await readPageInto(page, pos, bios);
+    if (bios.every((b) => pos[b] != null)) return pos;
+    if (turns === 5 || !(await gotoNextPage(page))) {
+      // End of the list — re-read once: a background refetch may have
+      // re-rendered this page with different content after the last read.
+      await readPageInto(page, pos, bios);
+      return pos;
+    }
+  }
+  return pos;
+}
+
+/** The filter inputs debounce 300ms before triggering a re-fetch. */
+async function pastDebounce(page: Page): Promise<void> {
+  await page.waitForTimeout(400);
 }
 
 test.describe.serial("Public Families Browse", () => {
@@ -162,72 +287,78 @@ test.describe.serial("Public Families Browse", () => {
       timeout: 10_000,
     });
 
-    /* The demo CSV has more fully-approved families than fit on one browse
-       page (page size 12), so narrow to ≤3-member families: our A (3) and B (1)
-       then share page 1 with at most a handful of demo families. */
+    /* Narrow to ≤3-member families (demo CSV alone has more fully-approved
+       families than one page holds). */
     await page.getByLabel("Max Family Members").fill("3");
-    await waitListLoaded(page);
+    await pastDebounce(page);
 
-    /* Approved families appear as cards with member count + age range */
-    const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
+    /* Approved A + B appear as cards (found by walking pages — concurrent
+       e2e families may share the filtered list and push them past page 1);
+       unapproved C is absent from every page. */
+    const pos = await cardPositions(page, [BIO_A, BIO_B, BIO_C]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_C]).toBeNull();
+
+    /* Cards show member count + age range */
+    const cardA = await findCard(page, BIO_A);
     await expect(cardA).toContainText("3 members");
     await expect(cardA).toContainText("Ages 3–40");
 
-    const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
-    await expect(cardB).toBeVisible();
+    const cardB = await findCard(page, BIO_B);
     await expect(cardB).toContainText("1 member");
     await expect(cardB).toContainText("Ages 25");
-
-    /* Unapproved family is not listed */
-    await expect(page.locator("div.grid > a").filter({ hasText: BIO_C })).toHaveCount(0);
   });
 
   test("member-count filters narrow the card list", async ({ page }) => {
     await page.goto("/families");
-    const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
-    const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
 
     /* Start from a narrowed list (demo CSV has more approved families than
-       one page holds) so both scenario cards are on page 1. */
+       one page holds). Positions are absolute across pages — concurrent e2e
+       families may share the filtered list. */
     await page.getByLabel("Max Family Members").fill("3");
-    await waitListLoaded(page);
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toBeVisible();
+    await pastDebounce(page);
+    let pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).not.toBeNull();
 
     /* Min Family Members = 3 → only 3-member families: A stays, B (1 member) drops */
     await page.getByLabel("Min Family Members").fill("3");
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toHaveCount(0);
+    await pastDebounce(page);
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).toBeNull();
 
     /* Clearing just the min restores B (Max Family Members = 3 still applies) */
     await page.getByLabel("Min Family Members").fill("");
-    await waitListLoaded(page);
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    await expect(cardB).toBeVisible();
+    await pastDebounce(page);
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).not.toBeNull();
 
     /* Max Family Members = 1 → only the 1-member family B */
     await page.getByLabel("Max Family Members").fill("1");
-    await expect(cardB).toBeVisible({ timeout: 10_000 });
-    await expect(cardA).toHaveCount(0);
+    await pastDebounce(page);
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_A]).toBeNull();
 
     /* Clear resets the filter inputs */
     await page.getByRole("button", { name: "Clear" }).click();
-    await waitListLoaded(page);
+    await pastDebounce(page);
+    await waitHeading(page);
     expect(await page.getByLabel("Min Family Members").inputValue()).toBe("");
     expect(await page.getByLabel("Max Family Members").inputValue()).toBe("");
   });
 
   test("sort button cycles options and persists the choice in the URL", async ({ page }) => {
     await page.goto("/families");
-    /* Start from a narrowed list so A and B share page 1 under every sort
-       (demo CSV has more approved families than one page holds). */
+    /* Start from a narrowed list (demo CSV has more approved families than
+       one page holds). Order is checked with absolute positions across
+       pages — concurrent e2e families may share the filtered list. */
     await page.getByLabel("Max Family Members").fill("3");
-    await waitListLoaded(page);
+    await pastDebounce(page);
     await expect(page.getByRole("button", { name: "Sort: Default" })).toBeVisible({ timeout: 10_000 });
-
-    const cardA = page.locator("div.grid > a").filter({ hasText: BIO_A });
-    const cardB = page.locator("div.grid > a").filter({ hasText: BIO_B });
 
     /* Family Size ↑ — 1-member B before 3-member A */
     await page.getByRole("button", { name: "Sort: Default" }).click();
@@ -235,33 +366,37 @@ test.describe.serial("Public Families Browse", () => {
       timeout: 10_000,
     });
     await expect(page).toHaveURL(/sort=person_count/);
-    await expect(cardA).toBeVisible();
-    await expect(cardB).toBeVisible();
-    expect(await cardIndex(page, BIO_B)).toBeLessThan(await cardIndex(page, BIO_A));
+    let pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]!).toBeLessThan(pos[BIO_A]!);
 
     /* Family Size ↓ — A first */
     await page.getByRole("button", { name: "Sort: Family Size ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Family Size ↓" })).toBeVisible();
     await expect(page).toHaveURL(/sort=-person_count/);
-    await expect(cardA).toBeVisible();
-    await expect(cardB).toBeVisible();
-    expect(await cardIndex(page, BIO_A)).toBeLessThan(await cardIndex(page, BIO_B));
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_A]!).toBeLessThan(pos[BIO_B]!);
 
     /* Youngest ↑ — A (youngest 3) before B (25) */
     await page.getByRole("button", { name: "Sort: Family Size ↓" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↑" })).toBeVisible();
     await expect(page).toHaveURL(/sort=min_age/);
-    await expect(cardA).toBeVisible();
-    await expect(cardB).toBeVisible();
-    expect(await cardIndex(page, BIO_A)).toBeLessThan(await cardIndex(page, BIO_B));
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_A]!).toBeLessThan(pos[BIO_B]!);
 
     /* Youngest ↓ — B first */
     await page.getByRole("button", { name: "Sort: Youngest ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↓" })).toBeVisible();
     await expect(page).toHaveURL(/sort=-min_age/);
-    await expect(cardA).toBeVisible();
-    await expect(cardB).toBeVisible();
-    expect(await cardIndex(page, BIO_B)).toBeLessThan(await cardIndex(page, BIO_A));
+    pos = await cardPositions(page, [BIO_A, BIO_B]);
+    expect(pos[BIO_B]).not.toBeNull();
+    expect(pos[BIO_A]).not.toBeNull();
+    expect(pos[BIO_B]!).toBeLessThan(pos[BIO_A]!);
 
     /* Back to Default — sort param removed from the URL */
     await page.getByRole("button", { name: "Sort: Youngest ↓" }).click();

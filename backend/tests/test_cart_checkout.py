@@ -412,6 +412,26 @@ class TestToggleGroceries:
         resp = test_client.patch(f"/api/donor/cart/items/{claim.id}", json={"includes_groceries": True})
         assert resp.status_code == 403
 
+    def test_toggle_with_soft_deleted_family(self, test_client: TestClient, db: Session, admin_user):
+        """Family deleted out from under the claim: the toggle still applies
+        (no post-commit 404) and the response flags the family as deleted."""
+        _, fam, claim = self._donor_with_pending_claim(test_client, db, admin_user)
+
+        _create_admin(test_client)
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        login_as(test_client, DONOR_EMAIL, DONOR_PASSWORD)
+        resp = test_client.patch(f"/api/donor/cart/items/{claim.id}", json={"includes_groceries": True})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["includes_groceries"] is True
+        assert body["family"]["id"] == fam.id
+        assert body["family"]["deleted"] is True
+
+        db.refresh(claim)
+        assert claim.includes_groceries is True
+
 
 # ---------------------------------------------------------------------------
 # POST /api/donor/cart/checkout

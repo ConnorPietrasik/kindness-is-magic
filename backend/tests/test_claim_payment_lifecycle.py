@@ -342,6 +342,30 @@ class TestAdminMarkPaid:
         resp = test_client.post(f"/api/donor/claims/{claim.id}/mark-paid")
         assert resp.status_code == 403
 
+    def test_mark_paid_with_soft_deleted_family(self, test_client: TestClient, db: Session, admin_user):
+        """A family deleted out from under a pending cash claim doesn't block
+        recording the payment (same tolerance as the shared apply path — the
+        money was taken); the response flags the family as deleted."""
+        _login_donor(test_client)
+        fam = _eligible_family(db, "Paid Orphan Family")
+        claim = _pending_cash_claim(db, fam)
+
+        self._admin(test_client)
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        resp = test_client.post(f"/api/donor/claims/{claim.id}/mark-paid")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["payment_status"] == "paid"
+        assert body["paid_at"] is not None
+        assert body["family"]["id"] == fam.id
+        assert body["family"]["deleted"] is True
+
+        db.refresh(claim)
+        assert claim.payment_status == ClaimPaymentStatus.paid
+        assert claim.paid_at is not None
+
 
 # ---------------------------------------------------------------------------
 # Admin restore (revive a soft-deleted unpaid cash claim)
@@ -397,6 +421,25 @@ class TestAdminRestore:
 
         db.refresh(claim)
         assert claim.deleted_at is not None  # still soft-deleted
+
+    def test_restore_deleted_family_rejected(self, test_client: TestClient, db: Session, admin_user):
+        """A family deleted out from under a cancelled claim blocks the restore."""
+        _login_donor(test_client)
+        fam = _eligible_family(db, "Deleted Under Claim")
+        claim = _pending_cash_claim(db, fam)
+        claim.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # Admin deletes the family out from under the cancelled claim
+        self._admin(test_client)
+        resp = test_client.delete(f"/api/admin/families/{fam.id}")
+        assert resp.status_code == 204
+
+        resp = test_client.post(f"/api/donor/claims/{claim.id}/restore")
+        assert resp.status_code == 404
+
+        db.refresh(claim)
+        assert claim.deleted_at is not None  # still soft-deleted — no half-revive
 
     def test_restore_non_cash_rejected(self, test_client: TestClient, db: Session, admin_user):
         _login_donor(test_client)
