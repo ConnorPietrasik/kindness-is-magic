@@ -174,9 +174,11 @@ def claim_status_for(claim: FamilyClaim, now: datetime | None = None) -> str:
 # ---------------------------------------------------------------------------
 
 
-def get_or_404(db: Session, model: Type[T], id: int, detail: str = "Not found") -> T:
+def get_or_404(db: Session, model: Type[T], id: int | None, detail: str = "Not found") -> T:
     """Fetch a record by id or raise 404."""
-    obj = db.query(model).filter(model.id == id).first()
+    if id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+    obj = db.get(model, id)
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
     return obj
@@ -250,7 +252,7 @@ def build_referrer_detail(
         if admin_map is not None:
             approved_by_name = admin_map.get(ref.approved_by_admin_id)
         else:
-            admin = db.query(User).filter(User.id == ref.approved_by_admin_id).first()
+            admin = db.get(User, ref.approved_by_admin_id)
             if admin and admin.deleted_at is None:
                 approved_by_name = admin.display_name
 
@@ -737,8 +739,8 @@ def build_family_detail(
     # Resolve referrer name
     referrer_name: str | None = None
     if fam.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref:
+        ref = db.get(Referrer, fam.referrer_id)
+        if ref is not None and ref.deleted_at is None:
             referrer_name = ref.name
 
     # Resolve family contact email (admin-only prefill; skip otherwise)
@@ -751,8 +753,8 @@ def build_family_detail(
     # Resolve delivery user name (skip for self-service views)
     delivery_user_name: str | None = None
     if include_delivery and fam.delivery_user_id is not None:
-        del_user = db.query(User).filter(User.id == fam.delivery_user_id, User.deleted_at.is_(None)).first()
-        if del_user:
+        del_user = db.get(User, fam.delivery_user_id)
+        if del_user is not None and del_user.deleted_at is None:
             delivery_user_name = del_user.display_name
 
     # Resolve active claim info
@@ -777,11 +779,7 @@ def build_family_detail(
             claim_status = claim_status_for(active_claim)
             claim_commitment_type = active_claim.commitment_type.value
             claim_id = active_claim.id
-            donor = (
-                donor_map.get(active_claim.donor_user_id)
-                if donor_map is not None
-                else (db.query(User).filter(User.id == active_claim.donor_user_id).first())
-            )
+            donor = donor_map.get(active_claim.donor_user_id) if donor_map is not None else (db.get(User, active_claim.donor_user_id))
             if donor and (donor.deleted_at if isinstance(donor, User) else False) is None:
                 claim_donor_name = donor.display_name if isinstance(donor, User) else donor
 
@@ -986,8 +984,8 @@ def build_family_review_summary(
         if referrer_map is not None:
             referrer_name = referrer_map.get(fam.referrer_id)
         else:
-            ref = db.query(Referrer).filter(Referrer.id == fam.referrer_id, Referrer.deleted_at.is_(None)).first()
-            if ref:
+            ref = db.get(Referrer, fam.referrer_id)
+            if ref is not None and ref.deleted_at is None:
                 referrer_name = ref.name
 
     return {
@@ -1020,7 +1018,7 @@ def build_user_detail(
         if referrer_map is not None:
             referrer_name = referrer_map.get(user.referrer_id)
         else:
-            ref = db.query(Referrer).filter(Referrer.id == user.referrer_id).first()
+            ref = db.get(Referrer, user.referrer_id)
             if ref and ref.deleted_at is None:
                 referrer_name = ref.name
 
@@ -1029,7 +1027,7 @@ def build_user_detail(
         if family_map is not None:
             family_name = family_map.get(user.family_id)
         else:
-            fam = db.query(Family).filter(Family.id == user.family_id).first()
+            fam = db.get(Family, user.family_id)
             if fam and fam.deleted_at is None:
                 family_name = fam.family_name
 

@@ -168,7 +168,7 @@ def require_family_owner(
             detail="Missing family id path parameter",
         )
 
-    fam = db.query(Family).filter(Family.id == int(fam_id)).first()
+    fam = db.get(Family, int(fam_id))
     if fam is None or fam.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -224,7 +224,7 @@ def require_person_owner(
         )
 
     # Use joinedload to get Family in the same query — avoids the separate Family lookup
-    per = db.query(Person).options(joinedload(Person.family)).filter(Person.id == int(per_id)).first()
+    per = db.get(Person, int(per_id), options=[joinedload(Person.family)])
     if per is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

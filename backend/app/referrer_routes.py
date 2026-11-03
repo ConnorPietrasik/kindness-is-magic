@@ -398,8 +398,8 @@ def list_review_queue(
     # All families in this queue belong to the current referrer — single lookup
     referrer_map: dict[int, str] = {}
     if user.referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref:
+        ref = db.get(Referrer, user.referrer_id)
+        if ref is not None and ref.deleted_at is None:
             referrer_map[user.referrer_id] = ref.name
 
     # Scoped view — display_id is the family position within this referrer

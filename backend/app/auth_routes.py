@@ -98,8 +98,8 @@ def _assert_referrer_login_allowed(user: User, db: Session) -> None:
     """
     if user.role != UserRole.referrer or user.referrer_id is None:
         return
-    ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
-    if ref is not None and ref.approval_status == ReferrerApprovalStatus.rejected:
+    ref = db.get(Referrer, user.referrer_id)
+    if ref is not None and ref.deleted_at is None and ref.approval_status == ReferrerApprovalStatus.rejected:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Your account has been rejected.",
@@ -113,8 +113,8 @@ def _get_inviter_name(user: User, db: Session) -> str | None:
     if user.role == UserRole.admin:
         return "Kindness Fairy"
     if user.role == UserRole.referrer and user.referrer_id:
-        ref = db.query(Referrer).filter(Referrer.id == user.referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref and ref.deleted_at is None:
+        ref = db.get(Referrer, user.referrer_id)
+        if ref is not None and ref.deleted_at is None:
             return ref.name
     return None
 
@@ -334,8 +334,8 @@ def refresh(
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    user = db.query(User).filter(User.id == int(user_id), User.deleted_at.is_(None)).first()
-    if not user:
+    user = db.get(User, int(user_id))
+    if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
     # Rejected referrers cannot refresh tokens
@@ -519,7 +519,7 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
     if reset.expires_at and reset.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Reset token has expired")
 
-    user = db.query(User).filter(User.id == reset.user_id).first()
+    user = db.get(User, reset.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

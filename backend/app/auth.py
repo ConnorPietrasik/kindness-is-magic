@@ -223,7 +223,7 @@ async def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = db.get(User, int(user_id))
     if user is None or user.deleted_at is not None:
         raise credentials_exception
 

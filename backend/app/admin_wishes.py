@@ -318,7 +318,7 @@ def batch_assign(
     is_unassign = body.assigned_to_id == 0
 
     if not is_unassign:
-        target_user = db.query(User).filter(User.id == body.assigned_to_id).first()
+        target_user = db.get(User, body.assigned_to_id)
         if target_user is None:
             raise HTTPException(status_code=400, detail="Assigned user not found")
 
@@ -438,7 +438,7 @@ def update_wish(
     # Validate assigned_to_id target if set
     if body.assigned_to_id is not None and body.assigned_to_id is not _CLEAR:
         # It's an int — validate user exists
-        target_user = db.query(User).filter(User.id == body.assigned_to_id).first()
+        target_user = db.get(User, body.assigned_to_id)
         if target_user is None:
             raise HTTPException(status_code=400, detail="Assigned user not found")
 

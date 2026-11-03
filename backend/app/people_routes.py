@@ -62,7 +62,7 @@ def update_person(
         per = get_active_or_404(db, Person, per_id, "Person not found")
 
     # Resolve family for lock check
-    family = per.family if per.family else db.query(Family).get(per.family_id)
+    family = per.family if per.family else db.get(Family, per.family_id)
     if family is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
     check_wish_edit_lock(owner.user, family)
@@ -97,7 +97,7 @@ def delete_person(
         per = get_active_or_404(db, Person, per_id, "Person not found")
 
     # Resolve family for lock check
-    family = per.family if per.family else db.query(Family).get(per.family_id)
+    family = per.family if per.family else db.get(Family, per.family_id)
     if family is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
     check_wish_edit_lock(owner.user, family)

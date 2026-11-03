@@ -227,8 +227,8 @@ def _resolve_ref_id(name_or_id: str, db: Session) -> int | None:
     # Try integer ID
     try:
         ref_id = int(name_or_id)
-        ref = db.query(Referrer).filter(Referrer.id == ref_id, Referrer.deleted_at.is_(None)).first()
-        if ref:
+        ref = db.get(Referrer, ref_id)
+        if ref is not None and ref.deleted_at is None:
             return ref_id
     except ValueError:
         pass
@@ -245,8 +245,8 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
         return None
     try:
         fid = int(name_or_id)
-        fam = db.query(Family).filter(Family.id == fid, Family.deleted_at.is_(None)).first()
-        if fam:
+        fam = db.get(Family, fid)
+        if fam is not None and fam.deleted_at is None:
             return fid
     except ValueError:
         pass
@@ -820,7 +820,7 @@ def _process_users(
                 continue
         if display_name is None:
             if role == UserRole.referrer and referrer_id:
-                ref = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+                ref = db.get(Referrer, referrer_id)
                 if ref:
                     display_name = ref.name
         if display_name is None:

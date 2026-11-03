@@ -198,8 +198,8 @@ async def send_payment_confirmation_email(db: Session, claims: list[FamilyClaim]
     for claim in claims:
         by_donor.setdefault(claim.donor_user_id, []).append(claim)
     for donor_id, donor_claims in by_donor.items():
-        donor = db.query(User).filter(User.id == donor_id, User.deleted_at.is_(None)).first()
-        if donor is None:
+        donor = db.get(User, donor_id)
+        if donor is None or donor.deleted_at is not None:
             continue
         families = [c.family for c in donor_claims]
         family_info_map = batch_build_family_info(db, families)
@@ -299,8 +299,8 @@ async def run_claim_expiry(db: Session) -> int:
     for claim in affected:
         by_donor.setdefault(claim.donor_user_id, []).append(claim)
     for donor_id, donor_claims in by_donor.items():
-        donor = db.query(User).filter(User.id == donor_id, User.deleted_at.is_(None)).first()
-        if donor is None:
+        donor = db.get(User, donor_id)
+        if donor is None or donor.deleted_at is not None:
             continue
         families = [c.family for c in donor_claims]
         family_info_map = batch_build_family_info(db, families)

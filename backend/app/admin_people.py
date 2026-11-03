@@ -238,7 +238,7 @@ def restore_person(
     per = get_or_404(db, Person, per_id, "Person not found")
     if per.deleted_at is None:
         raise HTTPException(status_code=400, detail="Person is not deleted")
-    family = db.query(Family).filter(Family.id == per.family_id).first()
+    family = db.get(Family, per.family_id)
     if family and family.deleted_at is not None:
         raise HTTPException(status_code=400, detail="family_deleted")
     per.deleted_at = None

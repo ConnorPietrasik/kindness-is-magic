@@ -308,7 +308,7 @@ def create_user(
 
     # Override with referrer name if this is a referrer user and no explicit display_name
     if body.role == UserRole.referrer and body.referrer_id and not body.display_name:
-        ref = db.query(Referrer).filter(Referrer.id == body.referrer_id).first()
+        ref = db.get(Referrer, body.referrer_id)
         if ref:
             user.display_name = ref.name
 

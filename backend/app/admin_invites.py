@@ -61,14 +61,14 @@ def _resolve_invite_relations(invite: ReferrerInviteToken, db: Session):
     """Resolve admin and referrer lookups for a single invite (get/revoke/extend endpoints)."""
     admin_map: dict[int, str] = {}
     if invite.created_by_admin_id is not None:
-        admin = db.query(User).filter(User.id == invite.created_by_admin_id, User.deleted_at.is_(None)).first()
-        if admin:
+        admin = db.get(User, invite.created_by_admin_id)
+        if admin is not None and admin.deleted_at is None:
             admin_map[invite.created_by_admin_id] = admin.display_name
 
     referrer_map: dict[int, tuple[str, "Referrer.approval_status"]] = {}
     if invite.redeemed_by_referrer_id is not None:
-        ref = db.query(Referrer).filter(Referrer.id == invite.redeemed_by_referrer_id, Referrer.deleted_at.is_(None)).first()
-        if ref:
+        ref = db.get(Referrer, invite.redeemed_by_referrer_id)
+        if ref is not None and ref.deleted_at is None:
             referrer_map[invite.redeemed_by_referrer_id] = (ref.name, ref.approval_status)
 
     return admin_map, referrer_map
