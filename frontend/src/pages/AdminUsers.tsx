@@ -268,6 +268,7 @@ export default function AdminUsers() {
               type="text"
               placeholder="Search email or name…"
               aria-label="Search email or name"
+              autoComplete="off"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
