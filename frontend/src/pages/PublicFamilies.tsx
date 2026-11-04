@@ -17,6 +17,8 @@ import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { donorListClaims, listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
+import { CASH_CLAIM_AMOUNT_USD } from "../lib/constants";
+import { DONATE_URL } from "../lib/links";
 import { donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { type FamilyClaimSummary, isPendingCash, type PublicFamilySummary } from "../types";
@@ -184,6 +186,18 @@ export default function PublicFamilies() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Families Needing Gifts</h1>
           <p className="mt-1 text-sm text-gray-500">Browse families and view their wish lists to help this holiday season.</p>
         </div>
+
+        {/* How to help — two paths: direct sponsorship or a general donation */}
+        <section aria-label="Two ways to help" className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-sm leading-relaxed text-gray-700">
+            <strong className="font-semibold text-gray-900">Two ways to help:</strong> sponsor a family directly for $
+            {CASH_CLAIM_AMOUNT_USD}, or make a{" "}
+            <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-btn-start hover:underline">
+              general donation
+            </a>{" "}
+            — 100% of your donation goes to gifts.
+          </p>
+        </section>
 
         {/* Sponsored by me — the claimant's own claims, above the grid */}
         {myClaims && myClaims.length > 0 && (

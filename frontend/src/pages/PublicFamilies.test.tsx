@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
+import { DONATE_URL } from "../lib/links";
 import { auth } from "../lib/queryKeys";
 import type { FamilyClaimSummary, PublicFamilySummary, User } from "../types";
 import PublicFamilies from "./PublicFamilies";
@@ -486,6 +487,26 @@ describe("PublicFamilies", () => {
     expect(screen.getAllByText("3-1").length).toBe(1);
     // Other revealed families still render
     expect(screen.getByText("4-1")).toBeInTheDocument();
+  });
+
+  /* How-to-help note (direct sponsorship cost + standard donate link) */
+
+  it("notes the direct sponsorship cost and links to the standard donate page", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+
+    const note = screen.getByRole("region", { name: "Two ways to help" });
+    expect(within(note).getByText(/sponsor a family directly for \$500/)).toBeInTheDocument();
+    expect(within(note).getByText(/100% of your donation goes to gifts/i)).toBeInTheDocument();
+
+    // The donate link is the shared standard donate URL, opening in a new tab
+    const donateLink = within(note).getByRole("link", { name: "general donation" });
+    expect(donateLink).toHaveAttribute("href", DONATE_URL);
+    expect(donateLink).toHaveAttribute("target", "_blank");
+    expect(donateLink).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   /* Fully-sponsored milestone banner */
