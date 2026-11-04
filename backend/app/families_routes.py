@@ -10,11 +10,12 @@ import math
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import decode_access_token
 from app.config import GIFT_CLAIM_CAP
-from app.database import get_db
+from app.database import get_db, is_active_claim_race
 from app.deadlines import CASH_ONLY_GIFT_BLOCKED_DETAIL, GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.mail import send_claim_confirmation
 from app.display_ids import compute_display_ids, wish_display_id
@@ -453,7 +454,20 @@ async def claim_family(
         payment_status=ClaimPaymentStatus.pending if data.commitment_type == CommitmentType.cash else ClaimPaymentStatus.paid,
     )
     db.add(claim)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Roll back first — the session is broken after a DBAPI error either
+        # way. A genuine race on the one-active-claim-per-family index is
+        # reported as the same 409 the check above would have; anything else
+        # re-raises into the 500 handler.
+        db.rollback()
+        if is_active_claim_race(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This family is already sponsored",
+            )
+        raise
     db.refresh(claim)
 
     logger.info("User %s claimed family %s (commitment=%s)", user.id, family_id, data.commitment_type.value)

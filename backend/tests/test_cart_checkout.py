@@ -11,10 +11,12 @@ import hmac
 import json
 import time
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.zeffy as zeffy
@@ -592,6 +594,77 @@ class TestCheckout:
         detail = resp.json()["detail"]
         assert "was just sponsored" in detail
         assert f"(id {fam.id})" in detail
+
+    def test_checkout_race_losing_unique_index_conflict(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """Simulated double-checkout race: a rival claim commits between our
+        check and insert, so the partial unique index fires at commit time.
+        The loser gets the 409, not the catch-all 500."""
+        from app.models import User
+
+        _create_donor(test_client)
+        fam = _eligible_family(db, "Race Family")
+        _configure_zeffy(monkeypatch)
+
+        class _UniqueViolation(Exception):
+            """Stand-in for psycopg's UniqueViolation: pgcode + diag.constraint_name
+            exactly as the driver fills them for a real index violation."""
+
+            pgcode = "23505"  # SQLSTATE unique_violation
+
+            def __init__(self):
+                super().__init__('duplicate key value violates unique constraint "uq_family_claims_family_active"')
+                self.diag = SimpleNamespace(constraint_name="uq_family_claims_family_active")
+
+        def _commit_losing_race():
+            # Flush like a real commit so the claim lands in the savepoint,
+            # then fail the way Postgres would once the rival row commits.
+            db.flush()
+            raise IntegrityError(
+                "INSERT INTO family_claims (family_id) VALUES (%(family_id)s)",
+                {"family_id": fam.id},
+                _UniqueViolation(),
+            )
+
+        monkeypatch.setattr(db, "commit", _commit_losing_race)
+
+        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam.id}]})
+        assert resp.status_code == 409
+        assert "was just sponsored" in resp.json()["detail"]
+
+        # The flushed claim is gone — the handler rolled the session back.
+        user = db.query(User).filter(User.email == DONOR_EMAIL).first()
+        assert db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).first() is None
+
+    def test_checkout_commit_unrelated_integrity_error_500s(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A commit failure that isn't the one-active-claim unique index
+        (e.g. an FK violation) must not be mislabelled as a lost race — the
+        global SQLAlchemy handler turns it into a generic 500."""
+        from app.models import User
+
+        _create_donor(test_client)
+        fam = _eligible_family(db, "FK Family")
+        _configure_zeffy(monkeypatch)
+
+        def _commit_fk_failure():
+            # Flush so the claim lands in the savepoint, then fail the way
+            # Postgres would for a foreign key violation.
+            db.flush()
+            raise IntegrityError(
+                "INSERT INTO family_claims (donor_user_id) VALUES (%(donor_user_id)s)",
+                {"donor_user_id": 1},
+                Exception('insert or update on table "family_claims" violates foreign key constraint ...'),
+            )
+
+        monkeypatch.setattr(db, "commit", _commit_fk_failure)
+
+        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam.id}]})
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "An internal database error occurred"
+
+        # The session was rolled back before re-raising: the flushed claim
+        # is gone and the session is still usable.
+        user = db.query(User).filter(User.email == DONOR_EMAIL).first()
+        assert db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).first() is None
 
     def test_expired_unswept_claim_still_conflicts(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         """Accepted lag: a claim that expired but hasn't been swept yet (the

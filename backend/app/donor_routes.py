@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import CASH_CLAIM_PAYMENT_HOURS, GIFT_CLAIM_CAP, ZEFFY_FORM_URL
 from app.column_filter import column_filtered_page
 from app.search_sort import CLAIM_SORT_FIELDS, build_sort_clause, escape_like
-from app.database import get_db
+from app.database import get_db, is_active_claim_race
 from app.deadlines import CASH_ONLY_GIFT_BLOCKED_DETAIL, GIFT_CLAIM_BLOCKED_DETAIL, is_type_armed
 from app.display_ids import compute_display_ids
 from app.models import (
@@ -313,10 +313,14 @@ async def cart_checkout(
         db.add_all(new_claims)
         try:
             db.commit()
-        except IntegrityError:
-            # Two checkouts raced on the reservation index — the loser is
-            # this request. Roll back and name the family that got taken.
+        except IntegrityError as exc:
+            # Roll back first — the session is broken after a DBAPI error
+            # either way. A genuine race on the one-active-claim-per-family
+            # index gets the 409 naming the family that was taken; anything
+            # else re-raises into the 500 handler.
             db.rollback()
+            if not is_active_claim_race(exc):
+                raise
             taken_now = {
                 family_id
                 for (family_id,) in db.query(FamilyClaim.family_id)

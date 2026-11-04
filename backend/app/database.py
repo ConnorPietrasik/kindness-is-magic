@@ -2,6 +2,7 @@ import logging
 import os
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -75,3 +76,22 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def is_active_claim_race(exc: IntegrityError) -> bool:
+    """Whether a failed commit lost a double-claim race on the
+    one-active-claim-per-family index (uq_family_claims_family_active).
+
+    Both claim-creation paths — POST /api/families/{id}/claim and the cart
+    checkout — commit into that partial unique index, and only a violation
+    of exactly this constraint is a lost race. Any other IntegrityError is a
+    genuine surprise and should be re-raised to the 500 handler rather than
+    mislabelled as "already sponsored".
+
+    Detection is duck-typed on the driver error: ``pgcode`` is the SQLSTATE
+    (23505 = unique_violation) and ``diag`` is psycopg's error diagnostics,
+    so a missing ``orig`` (programmatically raised) simply isn't a race.
+    """
+    orig = exc.orig
+    diag = getattr(orig, "diag", None)
+    return getattr(orig, "pgcode", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_family_claims_family_active"
