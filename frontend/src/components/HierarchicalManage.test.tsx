@@ -165,7 +165,8 @@ function baseProps(fns: ReturnType<typeof makeApiFns>) {
         </table>
       ),
       title: "Children",
-      createButtonLabel: "+ Add Child",
+      createButtonLabel: "+ Add child",
+      entityName: "Child",
       invalidationKeys: [["testChildren", "1"]],
     },
   } as const;
@@ -306,13 +307,62 @@ describe("HierarchicalManage", () => {
     render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "+ Add Child" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add child" })).toBeInTheDocument();
     });
 
     expect(screen.queryByTestId("mock-form")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "+ Add Child" }));
+    await user.click(screen.getByRole("button", { name: "+ Add child" }));
     expect(screen.getByTestId("mock-form")).toBeInTheDocument();
+    // Form title uses the entity name ("Add Child"), not the button label
+    expect(screen.getByText("Add Child")).toBeInTheDocument();
+  });
+
+  it("titles the child edit form with the entity name", async () => {
+    const user = userEvent.setup();
+    const fns = makeApiFns();
+    const props = baseProps(fns);
+    const overrideProps = {
+      ...props,
+      child: {
+        ...props.child,
+        render: (children: TestChild[], callbacks: HierarchicalManageChildCallbacks, _ctx: HierarchicalManageRenderContext) => (
+          <table data-testid="children-table">
+            <tbody>
+              {children.map((c) => (
+                <tr key={c.id} data-testid={`child-row-${c.id}`}>
+                  <td>{c.name}</td>
+                  <td>
+                    <button type="button" data-testid={`edit-${c.id}`} onClick={() => callbacks.onEdit(c.id)}>
+                      Edit
+                    </button>
+                  </td>
+                  {callbacks.editingId === c.id &&
+                    (callbacks.detailLoading ? (
+                      <td>Loading…</td>
+                    ) : callbacks.editFormComponent && callbacks.editFormProps ? (
+                      <td>
+                        <callbacks.editFormComponent {...callbacks.editFormProps} />
+                      </td>
+                    ) : null)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      },
+    };
+
+    render(<HierarchicalManage {...overrideProps} />, { wrapper: wrap() });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("child-row-10")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("edit-10"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Child")).toBeInTheDocument();
+    });
   });
 
   it("calls children.createApi when create form is submitted", async () => {
@@ -321,10 +371,10 @@ describe("HierarchicalManage", () => {
     render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "+ Add Child" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add child" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Child" }));
+    await user.click(screen.getByRole("button", { name: "+ Add child" }));
     await user.click(screen.getByRole("button", { name: "Submit" }));
 
     await waitFor(() => {
@@ -338,10 +388,10 @@ describe("HierarchicalManage", () => {
     render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "+ Add Child" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add child" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Child" }));
+    await user.click(screen.getByRole("button", { name: "+ Add child" }));
     expect(screen.getByTestId("mock-form")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
@@ -673,14 +723,14 @@ describe("HierarchicalManage", () => {
     render(<HierarchicalManage {...overrideProps} />, { wrapper: wrap() });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "+ Add Child" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add child" })).toBeInTheDocument();
     });
 
     // Switch to deleted tab
     await user.click(screen.getByRole("tab", { name: "Deleted" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "+ Add Child" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Add child" })).not.toBeInTheDocument();
     });
   });
 
@@ -732,10 +782,10 @@ describe("HierarchicalManage", () => {
     render(<HierarchicalManage {...baseProps(fns)} />, { wrapper: wrap() });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "+ Add Child" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add child" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "+ Add Child" }));
+    await user.click(screen.getByRole("button", { name: "+ Add child" }));
     await user.click(screen.getByRole("button", { name: "Submit" }));
 
     await waitFor(() => {

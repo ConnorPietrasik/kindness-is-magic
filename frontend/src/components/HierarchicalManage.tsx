@@ -180,7 +180,11 @@ export interface HierarchicalManageChildConfig<
   createButtonLabel: string;
   /** Additional query keys to invalidate after child mutations */
   invalidationKeys: ReadonlyArray<string | readonly string[]>;
-  /** Entity name for child success toast messages (e.g. "Family"). Omit to disable. */
+  /**
+   * Entity name used in child toast messages and child form titles
+   * (e.g. "Family"). Omit to disable toasts; form titles then fall back to
+   * the button label ("Edit" for the edit form).
+   */
   entityName?: string;
   /** If true, disable create/edit/delete operations (read-only mode). */
   isReadonly?: boolean;
@@ -391,7 +395,10 @@ export function HierarchicalManage<
 
   /* ── Child form props (built internally) ───────────────── */
   const childCreateFormProps: ChildFormProps = {
-    title: childConfig.createButtonLabel.replace(/^\+ /, "Add "),
+    // "Add <entity>" (e.g. "Add Person") — same naming as the flat CRUD pages
+    // ("Add Person" / "Edit Person"); the button label stands in when the
+    // config omits entityName.
+    title: childConfig.entityName ? `Add ${childConfig.entityName}` : childConfig.createButtonLabel.replace(/^\+ /, ""),
     initial: childConfig.formDefault as unknown as Record<string, unknown>,
     isEdit: false,
     onSubmit: (formData: unknown) => handleChildCreate(formData as ChildPayload),
@@ -403,7 +410,8 @@ export function HierarchicalManage<
   const childEditFormProps: ChildFormProps =
     crud.detail != null
       ? ({
-          title: "Edit",
+          // "Edit <entity>" (e.g. "Edit Person") — same naming as parent form titles
+          title: childConfig.entityName ? `Edit ${childConfig.entityName}` : "Edit",
           initial: crud.detail as unknown as Record<string, unknown>,
           isEdit: true,
           onSubmit: (formData: unknown) => handleChildUpdate(formData as ChildPayload),
