@@ -4,6 +4,9 @@ type AsElement = "input" | "select" | "textarea";
 
 interface FormFieldProps {
   label?: string;
+  /** Small gray qualifier rendered inside the label, e.g. "(optional)" or "(if clothing requested)".
+   *   Part of the field's accessible name. Requires `label`. */
+  labelSuffix?: ReactNode;
   htmlFor?: string;
   type?: string;
   as?: AsElement;
@@ -18,6 +21,7 @@ interface FormFieldProps {
  */
 export function FormField({
   label,
+  labelSuffix,
   htmlFor,
   type = "text",
   as = "input",
@@ -38,6 +42,7 @@ export function FormField({
       {label && (
         <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700">
           {label}
+          {labelSuffix != null && <span className="font-normal text-gray-400"> {labelSuffix}</span>}
         </label>
       )}
       <Component

@@ -422,7 +422,7 @@ describe("AdminPeople", () => {
     // Child (age < 18): separate practical + fun wish fields.
     // Size and color are required even when not applicable — "0" normalizes to null.
     await user.type(screen.getByLabelText("Practical Wish"), "Jumper");
-    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "0");
     await user.type(screen.getByLabelText("Color"), "0");
     await user.type(screen.getByLabelText("Fun Wish"), "Board game");
 
@@ -475,7 +475,7 @@ describe("AdminPeople", () => {
 
     // Adult (age >= 18): single wish field + size + color
     await user.type(screen.getByLabelText("Wish"), "Coffee");
-    await user.type(screen.getByLabelText("Size"), "M");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "M");
     await user.type(screen.getByLabelText("Color"), "0");
 
     await user.click(screen.getByRole("button", { name: "Create" }));

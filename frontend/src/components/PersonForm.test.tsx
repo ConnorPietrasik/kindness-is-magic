@@ -187,7 +187,7 @@ describe("PersonForm", () => {
 
     expect(screen.getByLabelText("Practical Wish")).toBeInTheDocument();
     expect(screen.getByLabelText("Fun Wish")).toBeInTheDocument();
-    expect(screen.getByLabelText("Size")).toBeInTheDocument();
+    expect(screen.getByLabelText("Size (if clothing requested)")).toBeInTheDocument();
     expect(screen.getByLabelText("Color")).toBeInTheDocument();
   });
 
@@ -234,7 +234,7 @@ describe("PersonForm", () => {
     render(<PersonForm {...defaultProps} title="Edit Person" isEdit={true} initial={mockChildPerson} />);
 
     expect(screen.getByLabelText("Practical Wish")).toHaveValue("A backpack");
-    expect(screen.getByLabelText("Size")).toHaveValue("M");
+    expect(screen.getByLabelText("Size (if clothing requested)")).toHaveValue("M");
     expect(screen.getByLabelText("Color")).toHaveValue("Blue");
     expect(screen.getByLabelText("Fun Wish")).toHaveValue("A doll");
   });
@@ -257,7 +257,7 @@ describe("PersonForm", () => {
     await user.selectOptions(screen.getByLabelText("Role"), "son");
     await user.type(screen.getByLabelText("Given Name"), "Charlie");
     await user.type(screen.getByLabelText("Practical Wish"), "Bike");
-    await user.type(screen.getByLabelText("Size"), "S");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "S");
     await user.type(screen.getByLabelText("Color"), "Red");
     await user.type(screen.getByLabelText("Fun Wish"), "Lego set");
     await user.click(screen.getByText("Create"));
@@ -285,7 +285,7 @@ describe("PersonForm", () => {
     await user.selectOptions(screen.getByLabelText("Role"), "daughter");
     await user.type(screen.getByLabelText("Given Name"), "Frank");
     await user.type(screen.getByLabelText("Practical Wish"), "Bike");
-    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "0");
     await user.type(screen.getByLabelText("Color"), "N/A");
     await user.type(screen.getByLabelText("Fun Wish"), "Lego set");
     await user.click(screen.getByText("Create"));
@@ -309,7 +309,7 @@ describe("PersonForm", () => {
     await user.selectOptions(screen.getByLabelText("Role"), "father");
     await user.type(screen.getByLabelText("Given Name"), "Grace");
     await user.type(screen.getByLabelText("Wish"), "Headphones");
-    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "0");
     // Quoted "0" is a frontend-only N/A marker (the backend only knows "")
     await user.type(screen.getByLabelText("Color"), '"0"');
     await user.click(screen.getByText("Create"));
@@ -330,7 +330,7 @@ describe("PersonForm", () => {
     await user.selectOptions(screen.getByLabelText("Role"), "mother");
     await user.type(screen.getByLabelText("Given Name"), "Diana");
     await user.type(screen.getByLabelText("Wish"), "Headphones");
-    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "0");
     await user.type(screen.getByLabelText("Color"), "0");
     await user.click(screen.getByText("Create"));
 
@@ -355,7 +355,7 @@ describe("PersonForm", () => {
     await user.selectOptions(screen.getByLabelText("Role"), "daughter");
     await user.type(screen.getByLabelText("Given Name"), "Eve");
     await user.type(screen.getByLabelText("Practical Wish"), "Book");
-    await user.type(screen.getByLabelText("Size"), "0");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "0");
     await user.type(screen.getByLabelText("Color"), "0");
     await user.type(screen.getByLabelText("Fun Wish"), "Puzzle");
     await user.click(screen.getByText("Create"));

@@ -260,7 +260,7 @@ test.describe("Core Flow", () => {
       await expect(familyPage.getByLabel("Practical Wish")).toBeVisible({ timeout: 5_000 });
 
       await familyPage.getByLabel("Practical Wish").fill("Warm winter coat");
-      await familyPage.getByLabel("Size").fill("7");
+      await familyPage.getByLabel("Size (if clothing requested)").fill("7");
       await familyPage.getByLabel("Color").fill("Navy");
       await familyPage.getByLabel("Fun Wish").fill("LEGO set");
       await familyPage.getByRole("button", { name: "Create" }).click();

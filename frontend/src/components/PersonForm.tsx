@@ -278,6 +278,7 @@ export function PersonForm({ title, initial, isEdit, familyMap, familyOptionsLoa
 
               <FormField
                 label="Size"
+                labelSuffix="(if clothing requested)"
                 fieldProps={{
                   value: form.wish_size,
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("wish_size", e.target.value),

@@ -160,7 +160,7 @@ describe("FamilyPeople", () => {
     await user.type(screen.getByLabelText("Age"), "5");
     await user.selectOptions(screen.getByLabelText("Role"), "daughter");
     await user.type(screen.getByLabelText("Practical Wish"), "Jacket");
-    await user.type(screen.getByLabelText("Size"), "100");
+    await user.type(screen.getByLabelText("Size (if clothing requested)"), "100");
     await user.type(screen.getByLabelText("Color"), "Red");
     await user.type(screen.getByLabelText("Fun Wish"), "Story books");
 
