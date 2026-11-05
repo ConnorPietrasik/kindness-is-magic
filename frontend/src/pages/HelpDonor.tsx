@@ -69,7 +69,7 @@ export default function HelpDonor() {
               </p>
               <HelpImage
                 src={donorBrowse}
-                alt="The public family list with a Two ways to help banner, filters, and family cards"
+                alt="The public family list with a Three ways to help banner, filters, and family cards"
                 caption="Each card shows a family's ID, its story, its size, and the ages of its members."
               />
               <h3>Filtering</h3>

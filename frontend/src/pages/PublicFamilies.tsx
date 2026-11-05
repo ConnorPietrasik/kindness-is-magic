@@ -187,15 +187,15 @@ export default function PublicFamilies() {
           <p className="mt-1 text-sm text-gray-500">Browse families and view their wish lists to help this holiday season.</p>
         </div>
 
-        {/* How to help — two paths: direct sponsorship or a general donation */}
-        <section aria-label="Two ways to help" className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        {/* How to help — three paths: gift sponsorship, cash sponsorship, or a general donation */}
+        <section aria-label="Three ways to help" className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-sm leading-relaxed text-gray-700">
-            <strong className="font-semibold text-gray-900">Two ways to help:</strong> sponsor a family directly for $
-            {CASH_CLAIM_AMOUNT_USD}, or make a{" "}
+            <strong className="font-semibold text-gray-900">Three ways to help:</strong> sponsor a family with gifts you buy yourself,
+            sponsor with ${CASH_CLAIM_AMOUNT_USD} that our volunteers use to buy the family's gifts, or make a{" "}
             <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-btn-start hover:underline">
               general donation
             </a>{" "}
-            — 100% of your donation goes to gifts.
+            that goes 100% to gifts.
           </p>
         </section>
 

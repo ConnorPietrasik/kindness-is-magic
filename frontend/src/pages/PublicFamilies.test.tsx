@@ -489,18 +489,19 @@ describe("PublicFamilies", () => {
     expect(screen.getByText("4-1")).toBeInTheDocument();
   });
 
-  /* How-to-help note (direct sponsorship cost + standard donate link) */
+  /* How-to-help note (gift + cash sponsorships + standard donate link) */
 
-  it("notes the direct sponsorship cost and links to the standard donate page", async () => {
+  it("notes the three ways to help and links to the standard donate page", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
     wrap(<PublicFamilies />);
 
     await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
 
-    const note = screen.getByRole("region", { name: "Two ways to help" });
-    expect(within(note).getByText(/sponsor a family directly for \$500/)).toBeInTheDocument();
-    expect(within(note).getByText(/100% of your donation goes to gifts/i)).toBeInTheDocument();
+    const note = screen.getByRole("region", { name: "Three ways to help" });
+    expect(within(note).getByText(/sponsor a family with gifts you buy yourself/)).toBeInTheDocument();
+    expect(within(note).getByText(/\$500 that our volunteers use to buy the family's gifts/)).toBeInTheDocument();
+    expect(within(note).getByText(/goes 100% to gifts/i)).toBeInTheDocument();
 
     // The donate link is the shared standard donate URL, opening in a new tab
     const donateLink = within(note).getByRole("link", { name: "general donation" });
