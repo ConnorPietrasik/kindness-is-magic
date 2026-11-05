@@ -156,7 +156,7 @@ export default function AdminDeadlines() {
     <div className="min-h-screen bg-slate-50">
       <HeaderBar />
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <h2 className="mb-2 text-xl font-bold text-violet-950">Event Deadlines</h2>
 
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">

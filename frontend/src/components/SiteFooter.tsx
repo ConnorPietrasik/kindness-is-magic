@@ -24,6 +24,9 @@ export const SiteFooter = memo(() => (
         <Link to={ROUTES.WISH_LIST_GUIDE} className="hover:text-white hover:underline">
           Wish List Guide
         </Link>
+        <Link to={ROUTES.HELP_DONOR} className="hover:text-white hover:underline">
+          Sponsor Guide
+        </Link>
       </nav>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-white hover:underline">

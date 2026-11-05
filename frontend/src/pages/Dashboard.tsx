@@ -169,6 +169,9 @@ export default function Dashboard() {
               <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🏠" label="Browse Families" desc="Find families needing gifts" />
             </>
           )}
+
+          {/* Every role gets the help guide */}
+          <NavCard to={ROUTES.HELP} icon="❓" label="Help" desc="Step-by-step guide for your role" />
         </div>
       </main>
     </div>

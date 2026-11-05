@@ -1,6 +1,7 @@
 import { type ComponentType, Fragment, type LazyExoticComponent, lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { HeaderBar } from "./components/HeaderBar";
+import { HelpRedirect } from "./components/HelpRedirect";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
 import { PageSpinner, Spinner } from "./components/Spinner";
@@ -55,6 +56,12 @@ const DonorSelfRegister: LazyExoticComponent<ComponentType<unknown>> = lazy(() =
 const DonorClaims: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaims"));
 const DonorClaimDetail: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorClaimDetail"));
 const DonorCart: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DonorCart"));
+const HelpAdmin: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpAdmin"));
+const HelpReferrer: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpReferrer"));
+const HelpFamily: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpFamily"));
+const HelpPurchaser: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpPurchaser"));
+const HelpDelivery: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpDelivery"));
+const HelpDonor: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/HelpDonor"));
 
 /* ------------------------------------------------------------------ */
 /* Role-based redirect after login                                     */
@@ -419,11 +426,63 @@ export default function App() {
           }
         />
 
+        {/* ── Help (per-role user guides) ───────────────────────── */}
+        <Route
+          path={ROUTES.HELP}
+          element={
+            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
+              <HelpRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_ADMIN}
+          element={
+            <ProtectedRoute roles={["admin"] as UserRole[]}>
+              <HelpAdmin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_REFERRER}
+          element={
+            <ProtectedRoute roles={["admin", "referrer"] as UserRole[]}>
+              <HelpReferrer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_FAMILY}
+          element={
+            <ProtectedRoute roles={["admin", "family"] as UserRole[]}>
+              <HelpFamily />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_PURCHASER}
+          element={
+            <ProtectedRoute roles={["admin", "purchaser"] as UserRole[]}>
+              <HelpPurchaser />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.HELP_DELIVERY}
+          element={
+            <ProtectedRoute roles={["admin", "delivery"] as UserRole[]}>
+              <HelpDelivery />
+            </ProtectedRoute>
+          }
+        />
+
         {/* ── Public (no auth required) ─────────────────────────── */}
         <Route path={ROUTES.HOME} element={<Home />} />
         <Route path={ROUTES.PRIVACY} element={<PrivacyPolicy />} />
         <Route path={ROUTES.FINANCIALS} element={<Financials />} />
         <Route path={ROUTES.WISH_LIST_GUIDE} element={<WishListGuide />} />
+        {/* The donor guide is public so prospects can read it before registering */}
+        <Route path={ROUTES.HELP_DONOR} element={<HelpDonor />} />
         <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
         <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
         <Route path={ROUTES.FAMILY_WISH_CARDS} element={<FamilyWishCards />} />

@@ -407,6 +407,22 @@ describe("Dashboard — admin tiles", () => {
     );
   });
 
+  it.each([
+    ["admin", adminUser],
+    ["referrer", referrerUser],
+    ["family", { ...donorUser, role: "family" } as User],
+    ["purchaser", { ...donorUser, role: "purchaser" } as User],
+    ["delivery", { ...donorUser, role: "delivery" } as User],
+    ["donor", donorUser],
+  ] as Array<[string, User]>)("shows the help guide card for the %s role", async (_role, user) => {
+    renderDashboard(user);
+
+    /* Match on the card's unique description: the header's Help link also
+       matches /Help/ once the auth query resolves */
+    const helpCard = await screen.findByRole("link", { name: /Step-by-step guide for your role/ });
+    expect(helpCard).toHaveAttribute("href", "/help");
+  });
+
   it("does not show the tile toggle for non-admin roles", async () => {
     vi.spyOn(api, "getReferrerMe").mockResolvedValue(mockReferrerDetail);
     vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);

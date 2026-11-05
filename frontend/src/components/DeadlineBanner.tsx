@@ -28,7 +28,10 @@ export function DeadlineBanner({ result, extra, className = "" }: DeadlineBanner
 
   const upcoming = result.status === "upcoming";
   return (
-    <div className={`mb-6 rounded-xl border px-6 py-4 shadow-sm ${BANNER_TONES[upcoming ? "upcoming" : "past"]} ${className}`}>
+    <div
+      data-testid="deadline-banner"
+      className={`mb-6 rounded-xl border px-6 py-4 shadow-sm ${BANNER_TONES[upcoming ? "upcoming" : "past"]} ${className}`}
+    >
       <p className="text-sm">
         {upcoming ? (
           <>

@@ -81,7 +81,7 @@ export function DeliverySlipsView({ data, isError, error, emptyMessage }: Delive
                 says, tracks shrink toward 0 and text wraps instead of
                 overflowing */}
             <div
-              className="delivery-slip-list grid gap-x-4 gap-y-8"
+              className="delivery-slip-list grid justify-center gap-x-4 gap-y-8"
               style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, max-content))` }}
             >
               {data.map((family) => (

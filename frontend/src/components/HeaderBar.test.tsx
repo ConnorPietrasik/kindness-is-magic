@@ -97,6 +97,12 @@ describe("HeaderBar", () => {
       expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
     });
 
+    it("hides the help link (guests would bounce from /help to login)", () => {
+      wrap();
+
+      expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
+    });
+
     it("title and logo are buttons that scroll to the top on /home", async () => {
       const event = userEvent.setup();
       const scrollToSpy = vi.fn();
@@ -130,6 +136,12 @@ describe("HeaderBar", () => {
       expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "How it works" })).not.toBeInTheDocument();
+    });
+
+    it("shows a help link to /help for signed-in users", () => {
+      wrap({ user: headerUser });
+
+      expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "/help");
     });
 
     it("clicking sign out logs out and navigates to login", async () => {

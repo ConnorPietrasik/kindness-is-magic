@@ -109,6 +109,13 @@ export const HeaderBar = memo(({ left, right, className = "" }: HeaderBarProps) 
       <div className="z-10 flex items-center gap-3">
         <RefreshButton />
         {right}
+        {/* The help guides are for signed-in visitors; guests would just bounce
+            from /help to the login screen */}
+        {signedIn && (
+          <Link to={ROUTES.HELP} className="text-sm text-white/90 transition-colors hover:text-white">
+            Help
+          </Link>
+        )}
         {authControls}
       </div>
     </header>

@@ -63,6 +63,17 @@ export const ROUTES = {
   DONOR_CLAIM_DETAIL: "/donor/claims/:id",
   DONOR_CART: "/donor/cart",
 
+  // ── Help (per-role user guides) ───────────────────────────────
+  // /help is authenticated (redirects to the visitor's own guide); the
+  // donor guide is public so prospects can read it before registering.
+  HELP: "/help",
+  HELP_ADMIN: "/help/admin",
+  HELP_REFERRER: "/help/referrer",
+  HELP_FAMILY: "/help/family",
+  HELP_PURCHASER: "/help/purchaser",
+  HELP_DELIVERY: "/help/delivery",
+  HELP_DONOR: "/help/donor",
+
   // ── Public ────────────────────────────────────────────────
   HOME: "/home",
   PRIVACY: "/privacy",
@@ -88,6 +99,19 @@ export const ROLE_HOME: Record<UserRole, string> = {
   family: ROUTES.FAMILY_DASHBOARD,
   purchaser: ROUTES.PURCHASER_ASSIGNED_GIFTS,
   delivery: ROUTES.DELIVERY_DASHBOARD,
+};
+
+/**
+ * ROLE_GUIDE — each role's help page (the destination /help redirects to).
+ * Single source of truth for the /help redirect (HelpRedirect).
+ */
+export const ROLE_GUIDE: Record<UserRole, string> = {
+  admin: ROUTES.HELP_ADMIN,
+  donor: ROUTES.HELP_DONOR,
+  referrer: ROUTES.HELP_REFERRER,
+  family: ROUTES.HELP_FAMILY,
+  purchaser: ROUTES.HELP_PURCHASER,
+  delivery: ROUTES.HELP_DELIVERY,
 };
 
 /**

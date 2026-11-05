@@ -31,7 +31,28 @@ npx playwright test tests/role-*.spec.ts
 
 Each test file is self-contained and creates its own data. Tests that need authenticated sessions create their own browser contexts with storageState files — do not rely on project-level storageState. The five storageState accounts (admin, referrer, family, purchaser, delivery) exist before any test runs, even with `--grep` — the admin is the bootstrap admin from `.env` (`ADMIN_EMAIL`/`ADMIN_PASSWORD`); the other four are CSV-seeded.
 
-Unlike those five, there is no `donor.json` storageState (the CSV does seed a donor account, but tests don't use it). Donor users are created dynamically per-test via API and log in through the UI.
+Unlike those five, there is no `donor.json` storageState. The CSV seeds a donor account (`olivia.reynolds@example.com`) that only the help work uses: `tests/help.spec.ts` logs in as it read-only, and the `scripts/help-screenshots.spec.ts` capture script uses it for the donor captures. Every other donor test creates its own user via API and logs in through the UI.
+
+## Help screenshots (capture script, not part of the suite)
+
+`scripts/help-screenshots.spec.ts` + `playwright.screenshots.config.ts` capture
+the screens referenced by the per-role help guides into
+`frontend/src/assets/help/` (committed). It is deliberately **outside** the
+default config's `testDir`, so CI never runs it.
+
+Run from `e2e/` with the dev stack up (standard `.env` values; the zeffy-mock
+wiring is needed for the donor cart capture):
+
+```bash
+npx playwright test --config=playwright.screenshots.config.ts
+```
+
+- Run on a freshly-wiped stack for clean captures
+- Captures are deterministic: fresh contexts (default tiles/columns), fixed
+  1440x1000 viewport, locale `en-US`, timezone `America/Los_Angeles`, deadline
+  banners hidden. Run with the normal suite idle so concurrent tests don't
+  pollute shared lists (the sponsorships and emails shots filter their own
+  scenario rows, but not everything can be filtered).
 
 ## Zeffy-dependent tests
 

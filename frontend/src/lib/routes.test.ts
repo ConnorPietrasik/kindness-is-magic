@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROLE_HOME, ROUTES, route } from "./routes";
+import { ROLE_GUIDE, ROLE_HOME, ROUTES, route } from "./routes";
 
 describe("ROUTES constants", () => {
   it("has correct public routes", () => {
@@ -46,6 +46,16 @@ describe("ROUTES constants", () => {
   it("has correct root route", () => {
     expect(ROUTES.ROOT).toBe("/");
   });
+
+  it("has correct help routes", () => {
+    expect(ROUTES.HELP).toBe("/help");
+    expect(ROUTES.HELP_ADMIN).toBe("/help/admin");
+    expect(ROUTES.HELP_REFERRER).toBe("/help/referrer");
+    expect(ROUTES.HELP_FAMILY).toBe("/help/family");
+    expect(ROUTES.HELP_PURCHASER).toBe("/help/purchaser");
+    expect(ROUTES.HELP_DELIVERY).toBe("/help/delivery");
+    expect(ROUTES.HELP_DONOR).toBe("/help/donor");
+  });
 });
 
 describe("ROLE_HOME", () => {
@@ -60,6 +70,21 @@ describe("ROLE_HOME", () => {
 
   it("covers exactly the known user roles", () => {
     expect(Object.keys(ROLE_HOME).sort()).toEqual(["admin", "delivery", "donor", "family", "purchaser", "referrer"].sort());
+  });
+});
+
+describe("ROLE_GUIDE", () => {
+  it("maps every role to its help page", () => {
+    expect(ROLE_GUIDE.admin).toBe("/help/admin");
+    expect(ROLE_GUIDE.referrer).toBe("/help/referrer");
+    expect(ROLE_GUIDE.family).toBe("/help/family");
+    expect(ROLE_GUIDE.purchaser).toBe("/help/purchaser");
+    expect(ROLE_GUIDE.delivery).toBe("/help/delivery");
+    expect(ROLE_GUIDE.donor).toBe("/help/donor");
+  });
+
+  it("covers exactly the known user roles", () => {
+    expect(Object.keys(ROLE_GUIDE).sort()).toEqual(["admin", "delivery", "donor", "family", "purchaser", "referrer"].sort());
   });
 });
 
