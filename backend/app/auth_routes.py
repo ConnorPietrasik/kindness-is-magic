@@ -805,7 +805,6 @@ async def register_family(
             contact_name=family.contact_name,
             referrer_id=family.referrer_id,
             verification_status=family.verification_status,
-            pickup_window=family.pickup_window,
             deleted_at=family.deleted_at,
             person_count=person_count,
             wish_lock_level=family.wish_lock_level,

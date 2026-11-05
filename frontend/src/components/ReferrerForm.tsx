@@ -10,6 +10,7 @@ import { validatePhoneNumber } from "../lib/validators";
 import type { ReferrerDetail, ReferrerPayload } from "../types";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { DatePicker } from "./DatePicker";
 import { FormField } from "./FormField";
 import { PhoneInput } from "./PhoneInput";
 
@@ -44,6 +45,7 @@ export function ReferrerForm({ title, initial, isEdit = false, onSubmit, onCance
     name: initial.name,
     phone_number: initial.phone_number,
     family_limit: initial.family_limit,
+    pickup_window: initial.pickup_window,
   }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
@@ -54,7 +56,12 @@ export function ReferrerForm({ title, initial, isEdit = false, onSubmit, onCance
   useEffect(() => {
     if (referrerId === loadedId) return;
     setLoadedId(referrerId);
-    setForm({ name: initial.name, phone_number: initial.phone_number, family_limit: initial.family_limit });
+    setForm({
+      name: initial.name,
+      phone_number: initial.phone_number,
+      family_limit: initial.family_limit,
+      pickup_window: initial.pickup_window,
+    });
   }, [initial, referrerId, loadedId]);
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));
@@ -109,6 +116,8 @@ export function ReferrerForm({ title, initial, isEdit = false, onSubmit, onCance
             error={phoneError}
           />
         </div>
+
+        <DatePicker label="Pickup Window" isOptional value={form.pickup_window} onChange={(val) => update("pickup_window", val)} />
 
         <div className="mt-4 flex gap-2">
           <Button type="submit" loading={loading}>

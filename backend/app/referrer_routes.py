@@ -278,7 +278,6 @@ def list_pending_families(
             family_wish=family_wish_map.get(f.id, ""),
             contact_name=f.contact_name,
             verification_status=f.verification_status,
-            pickup_window=f.pickup_window,
             person_count=count_map.get(f.id, 0),
             created_at=f.created_at,
         )

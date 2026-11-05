@@ -103,6 +103,7 @@ describe("ColumnToggle", () => {
       "name",
       "family_limit",
       "phone_number",
+      "pickup_window",
       "family_invite_code",
       "approval_status",
       "approved_by_admin_name",

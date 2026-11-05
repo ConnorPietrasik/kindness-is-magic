@@ -103,8 +103,8 @@ def list_wishes(
     received_at_to: date | None = Query(None),
     created_at_from: date | None = Query(None),
     created_at_to: date | None = Query(None),
-    family_pickup_window_from: date | None = Query(None),
-    family_pickup_window_to: date | None = Query(None),
+    referrer_pickup_window_from: date | None = Query(None),
+    referrer_pickup_window_to: date | None = Query(None),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> WishListResponse:
@@ -205,7 +205,7 @@ def list_wishes(
         "purchased_at": (purchased_at_from, purchased_at_to),
         "received_at": (received_at_from, received_at_to),
         "created_at": (created_at_from, created_at_to),
-        "family_pickup_window": (family_pickup_window_from, family_pickup_window_to),
+        "referrer_pickup_window": (referrer_pickup_window_from, referrer_pickup_window_to),
     }.items():
         if from_day is not None:
             query = query.filter(WISH_DATE_RANGE_FIELDS[field] >= _utc_day_start(from_day))
@@ -257,7 +257,7 @@ def list_wishes(
         # Batch-collect the page's owner-family referrers (conditional;
         # soft-deleted referrers display as None)
         referrer_map: dict[int, Referrer] = {}
-        if cols.needs("referrer_name", "referrer_phone_number"):
+        if cols.needs("referrer_name", "referrer_phone_number", "referrer_pickup_window"):
             owner_referrer_ids: set[int] = set()
             for w in wishes_with_context:
                 owner_family = w.person.family if w.person is not None else w.family

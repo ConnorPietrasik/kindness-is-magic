@@ -6,7 +6,6 @@ import { validatePhoneNumber } from "../lib/validators";
 import type { FamilyDetail, FamilyPayload } from "../types/domain";
 import { Button } from "./Button";
 import { Card } from "./Card";
-import { DatePicker } from "./DatePicker";
 import { defaultFamilyForm, type FamilyFormState } from "./defaults";
 import { FormField } from "./FormField";
 import { OptionalLabel } from "./OptionalLabel";
@@ -54,8 +53,6 @@ export function FamilyForm({
   onCancel,
   loading,
 }: FamilyFormProps) {
-  // Store pickup_window as ISO (matching backend format). Convert to/from
-  // datetime-local only for the <input> value attribute.
   const [form, setForm] = useState<FamilyFormState>(() => ({ ...defaultFamilyForm, ...initial }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
@@ -201,11 +198,6 @@ export function FamilyForm({
                 }}
               />
             </div>
-          )}
-
-          {/* Pickup Window — admin only */}
-          {hasReferrerMap && (
-            <DatePicker label="Pickup Window" isOptional value={form.pickup_window} onChange={(val) => update("pickup_window", val)} />
           )}
 
           {/* Delivery person select (edit only, admin mode) */}

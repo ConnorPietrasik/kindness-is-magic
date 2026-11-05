@@ -1,5 +1,7 @@
 """Tests for referrer self-service endpoints: /api/referrer/me, /api/referrer/families, /api/referrer/families/{fid}/people."""
 
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -40,6 +42,7 @@ class TestReferrerGetSelf:
         assert body["name"] == "Tree Referrer"
         assert body["family_limit"] == 5
         assert body["phone_number"] == "555-100-1000"
+        assert body["pickup_window"] is None
         assert body["family_count"] == 1
 
     def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
@@ -102,6 +105,18 @@ class TestReferrerUpdateSelf:
         assert body["name"] == "Updated Tree Referrer"
         assert body["phone_number"] == "555-999-9999"
         assert body["family_limit"] == 5  # unchanged
+
+    def test_200_pickup_window_is_ignored(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Referrers can't set a pickup window (it's admin-set) — the field is ignored, not a 422."""
+        ref = referrer_with_full_tree["referrer"]
+        ref.pickup_window = datetime(2025, 12, 20, 10, 0, 0, tzinfo=timezone.utc)
+        db.commit()
+        _tree_referrer_login(test_client)
+        resp = test_client.patch("/api/referrer/me", json={"pickup_window": "2026-01-15T09:00:00Z"})
+        assert resp.status_code == 200
+        body = resp.json()
+        # The admin-set value is preserved — referrers only see it
+        assert body["pickup_window"] == "2025-12-20T10:00:00Z"
 
     def test_404_missing_referrer_record(self, test_client: TestClient, db: Session):
         """A referrer-role User whose linked Referrer row is gone should 404

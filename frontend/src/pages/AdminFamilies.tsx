@@ -309,7 +309,6 @@ export default function AdminFamilies() {
       </button>
     ),
     verification_status: "Verification",
-    pickup_window: "Pickup Window",
     wish_lock_level: "Lock Level",
     wish_review_requested_at: "Review Requested",
     wish_rejection_reason: "Rejection Reason",

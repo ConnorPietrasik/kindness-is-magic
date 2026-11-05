@@ -402,6 +402,7 @@ class ReferrerCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
     family_limit: int = Field(..., ge=1, le=999)
     phone_number: str = Field(..., min_length=1, max_length=20)
+    pickup_window: Optional[datetime] = None
 
     @field_validator("name")
     @classmethod
@@ -416,7 +417,7 @@ class ReferrerCreate(BaseModel):
 
 
 class ReferrerUpdate(BaseModel):
-    """Referrer self-service update — family_limit is not allowed."""
+    """Referrer self-service update — family_limit and pickup_window are admin-only."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=60)
     phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
@@ -437,9 +438,10 @@ class ReferrerUpdate(BaseModel):
 
 
 class AdminReferrerUpdate(ReferrerUpdate):
-    """Admin-only: extends ReferrerUpdate with family_limit."""
+    """Admin-only: extends ReferrerUpdate with family_limit and pickup_window."""
 
     family_limit: Optional[int] = Field(None, ge=1, le=999)
+    pickup_window: clearable_datetime()
 
 
 class ReferrerDetail(BaseModel):
@@ -447,6 +449,7 @@ class ReferrerDetail(BaseModel):
     name: str
     family_limit: int
     phone_number: str
+    pickup_window: datetime | None = None
     family_invite_code: str
     family_count: int
     invite_count: int | None = None
@@ -642,7 +645,6 @@ class FamilyCreate(BaseModel):
     bio: Optional[str] = None
     address: str = Field(..., min_length=1, max_length=200)
     phone_number: str = Field(..., min_length=1, max_length=20)
-    pickup_window: Optional[datetime] = None
     # Admin-write only cash-only lock ("already shopping") — this is the admin
     # create schema; the referrer create schema (FamilyCreateByReferrer) never
     # carries the field.
@@ -674,7 +676,6 @@ class FamilyUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = Field(None, min_length=1, max_length=200)
     phone_number: Optional[str] = Field(None, max_length=20)
-    pickup_window: clearable_datetime()
 
     @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
     @classmethod
@@ -737,7 +738,6 @@ class FamilyDetail(BaseModel):
     family_wish: str | None = None
     contact_name: str
     verification_status: FamilyVerificationStatus
-    pickup_window: datetime | None = None
     deleted_at: datetime | None = None
     person_count: int | None = None
     wish_lock_level: WishLockLevel
@@ -772,7 +772,6 @@ class FamilySelfServiceDetail(BaseModel):
     family_wish: str
     contact_name: str
     verification_status: FamilyVerificationStatus
-    pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int
     wish_lock_level: WishLockLevel
@@ -792,7 +791,6 @@ class FamilySummary(BaseModel):
     delivery_user_id: int | None = None
     delivery_user_name: Optional[str] = None
     verification_status: FamilyVerificationStatus
-    pickup_window: datetime | None = None
     deleted_at: datetime | None
     person_count: int = 0
     wish_lock_level: WishLockLevel
@@ -837,7 +835,6 @@ class PendingFamilySummary(BaseModel):
     family_wish: str
     contact_name: str
     verification_status: FamilyVerificationStatus
-    pickup_window: datetime | None = None
     person_count: int = 0
     created_at: datetime
 
@@ -1060,10 +1057,10 @@ class WishListSummary(BaseModel):
     family_phone_number: str | None = None
     family_address: str | None = None
     family_verification_status: FamilyVerificationStatus | None = None
-    family_pickup_window: datetime | None = None
     family_bio: str | None = None
     referrer_name: str | None = None
     referrer_phone_number: str | None = None
+    referrer_pickup_window: datetime | None = None
     assigned_to_id: int | None = None
     assigned_to_name: str | None = None
     purchased_at: datetime | None = None

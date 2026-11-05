@@ -47,9 +47,6 @@ export default function HelpFamily() {
                   <strong>My Family Profile</strong>: your family's details. Use <strong>Edit</strong> to update the name, contact, family
                   wish, bio, address, or phone.
                 </li>
-                <li>
-                  The <strong>Pickup Window</strong> row fills in once the program schedules your delivery.
-                </li>
               </ul>
             </>
           ),

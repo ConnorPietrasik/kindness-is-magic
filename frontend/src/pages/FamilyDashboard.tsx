@@ -31,7 +31,7 @@ import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { cancelFamilyReview, getFamilyMe, patchFamilyMe, requestFamilyReview } from "../lib/api";
 import { familyMe } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { formatDateTime, isFamilyLocked, normalizeUpdatePayload } from "../lib/utils";
+import { isFamilyLocked, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, FamilySelfPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -182,7 +182,6 @@ export default function FamilyDashboard() {
                 <InfoRow label="Bio" value={familyInfo.bio} truncate />
                 <InfoRow label="Address" value={familyInfo.address} truncate />
                 <InfoRow label="Phone" value={familyInfo.phone_number} truncate />
-                <InfoRow label="Pickup Window" value={formatDateTime(familyInfo.pickup_window)} truncate />
                 <InfoRow label="People Count" value={familyInfo.person_count ?? 0} isLast truncate />
               </div>
             )

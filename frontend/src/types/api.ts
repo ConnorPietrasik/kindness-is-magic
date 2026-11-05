@@ -116,8 +116,8 @@ export interface AdminWishesListParams extends AdminListParams {
   received_at_to?: string;
   created_at_from?: string;
   created_at_to?: string;
-  family_pickup_window_from?: string;
-  family_pickup_window_to?: string;
+  referrer_pickup_window_from?: string;
+  referrer_pickup_window_to?: string;
 }
 
 /** Query params for the admin sent-email log endpoint. */

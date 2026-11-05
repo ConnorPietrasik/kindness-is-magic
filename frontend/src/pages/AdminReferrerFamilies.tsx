@@ -53,7 +53,7 @@ import {
   adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
 import type { FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -282,6 +282,7 @@ function ReferrerCard(props: HierarchicalManageParentRenderProps<ReferrerDetail>
           <div className="space-y-0">
             <InfoRow label="Name" value={data.name} truncate />
             <InfoRow label="Phone" value={data.phone_number} truncate />
+            <InfoRow label="Pickup Window" value={formatDateTime(data.pickup_window)} truncate />
             <InfoRow label="Family Limit" value={`${data.family_count ?? 0} / ${data.family_limit}`} isLast truncate />
           </div>
         )
@@ -307,7 +308,6 @@ const familyHeaders: Record<string, React.ReactNode> = {
   phone_number: "Phone",
   person_count: "People",
   verification_status: "Verification",
-  pickup_window: "Pickup Window",
   wish_lock_level: "Lock Level",
   wish_review_requested_at: "Review Requested",
   wish_rejection_reason: "Rejection Reason",

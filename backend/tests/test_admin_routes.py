@@ -53,6 +53,7 @@ class TestAdminListReferrers:
         body = resp.json()
         assert len(body["referrers"]) == 1
         assert body["referrers"][0]["name"] == "Test Referrer"
+        assert body["referrers"][0]["pickup_window"] is None
         assert body["total"] == 1
         assert body["total_pages"] == 1
 
@@ -122,10 +123,26 @@ class TestAdminCreateReferrer:
         assert body["name"] == "New Referrer"
         assert body["family_limit"] == 5
         assert body["phone_number"] == "555-123-1234"
+        assert body["pickup_window"] is None
         assert body["family_count"] == 0
         assert body["approval_status"] == "approved"
         assert body["approved_by_admin_name"] is not None
         assert body["approved_at"] is not None
+
+    def test_201_with_pickup_window(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/referrers",
+            json={
+                "name": "New Referrer",
+                "family_limit": 5,
+                "phone_number": "555-123-1234",
+                "pickup_window": "2025-08-15T10:30:00Z",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["pickup_window"] == "2025-08-15T10:30:00Z"
 
 
 class TestAdminUpdateReferrer:
@@ -163,6 +180,61 @@ class TestAdminUpdateReferrer:
             json={"name": "Nope"},
         )
         assert resp.status_code == 404
+
+    def test_200_update_pickup_window(self, test_client: TestClient, admin_user, referrer_record):
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/referrers/{referrer_record.id}",
+            json={"pickup_window": "2025-09-01T14:00:00Z"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["pickup_window"] == "2025-09-01T14:00:00Z"
+
+    def test_200_update_pickup_window_to_null_is_noop(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Sending null for pickup_window is a no-op (per partial_update convention)."""
+        referrer_record.pickup_window = datetime(2025, 8, 15, 10, 30, 0, tzinfo=timezone.utc)
+        db.commit()
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/referrers/{referrer_record.id}",
+            json={"pickup_window": None},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        # null means no-op, so the value should be preserved
+        assert body["pickup_window"] == "2025-08-15T10:30:00Z"
+
+    def test_200_clear_pickup_window_with_empty_string(self, test_client: TestClient, admin_user, referrer_record, db: Session):
+        """Sending empty string for pickup_window clears it to null."""
+        referrer_record.pickup_window = datetime(2025, 8, 15, 10, 30, 0, tzinfo=timezone.utc)
+        db.commit()
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/referrers/{referrer_record.id}",
+            json={"pickup_window": ""},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["pickup_window"] is None
+
+    def test_422_invalid_pickup_window(self, test_client: TestClient, admin_user, referrer_record):
+        """A malformed datetime is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/referrers/{referrer_record.id}",
+            json={"pickup_window": "not-a-date"},
+        )
+        assert resp.status_code == 422
+
+    def test_422_pickup_window_junk_type(self, test_client: TestClient, admin_user, referrer_record):
+        """Non-string junk is rejected with 422 (previously slipped through to the DB)."""
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/referrers/{referrer_record.id}",
+            json={"pickup_window": [1]},
+        )
+        assert resp.status_code == 422
 
 
 class TestAdminDeleteReferrer:
@@ -432,42 +504,6 @@ class TestAdminCreateFamily:
         )
         assert resp.status_code == 422
 
-    def test_201_with_pickup_window(self, test_client: TestClient, admin_user, referrer_record):
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/families",
-            json={
-                "referrer_id": referrer_record.id,
-                "family_name": "New Family",
-                "family_wish": "A bicycle",
-                "contact_name": "New Contact",
-                "address": "none",
-                "phone_number": "555-000-0000",
-                "pickup_window": "2025-08-15T10:30:00Z",
-            },
-        )
-        assert resp.status_code == 201
-        body = resp.json()
-        assert body["pickup_window"] == "2025-08-15T10:30:00Z"
-
-    def test_201_pickup_window_omitted(self, test_client: TestClient, admin_user, referrer_record):
-        """Omitting pickup_window should default to null."""
-        _admin_login(test_client)
-        resp = test_client.post(
-            "/api/admin/families",
-            json={
-                "referrer_id": referrer_record.id,
-                "family_name": "New Family",
-                "family_wish": "A bicycle",
-                "contact_name": "New Contact",
-                "address": "none",
-                "phone_number": "555-000-0000",
-            },
-        )
-        assert resp.status_code == 201
-        body = resp.json()
-        assert body["pickup_window"] is None
-
 
 class TestAdminUpdateFamily:
     def test_200_partial_update(self, test_client: TestClient, admin_user, family_record):
@@ -671,72 +707,6 @@ class TestAdminUpdateFamily:
             json={"family_name": "Nope"},
         )
         assert resp.status_code == 404
-
-    def test_200_update_pickup_window(self, test_client: TestClient, admin_user, family_record):
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"pickup_window": "2025-09-01T14:00:00Z"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["pickup_window"] == "2025-09-01T14:00:00Z"
-
-    def test_200_update_pickup_window_to_null_is_noop(self, test_client: TestClient, admin_user, family_record, db: Session):
-        """Sending null for pickup_window is a no-op (per partial_update convention)."""
-        family_record.pickup_window = datetime(2025, 8, 15, 10, 30, 0, tzinfo=timezone.utc)
-        db.commit()
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"pickup_window": None},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        # null means no-op, so the value should be preserved
-        assert body["pickup_window"] == "2025-08-15T10:30:00Z"
-
-    def test_200_clear_pickup_window_with_empty_string(self, test_client: TestClient, admin_user, family_record, db: Session):
-        """Sending empty string for pickup_window clears it to null."""
-        family_record.pickup_window = datetime(2025, 8, 15, 10, 30, 0, tzinfo=timezone.utc)
-        db.commit()
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"pickup_window": ""},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["pickup_window"] is None
-
-    def test_422_invalid_pickup_window(self, test_client: TestClient, admin_user, family_record):
-        """A malformed datetime is rejected with 422, not a 500 from the DB."""
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"pickup_window": "not-a-date"},
-        )
-        assert resp.status_code == 422
-
-    def test_422_pickup_window_junk_type(self, test_client: TestClient, admin_user, family_record):
-        """Non-string junk is rejected with 422 (previously slipped through to the DB)."""
-        _admin_login(test_client)
-        resp = test_client.patch(
-            f"/api/admin/families/{family_record.id}",
-            json={"pickup_window": [1]},
-        )
-        assert resp.status_code == 422
-
-    def test_200_pickup_window_in_list_response(self, test_client: TestClient, admin_user, family_record, db: Session):
-        """pickup_window should appear in the list response."""
-        family_record.pickup_window = datetime(2025, 10, 1, 9, 0, 0, tzinfo=timezone.utc)
-        db.commit()
-        _admin_login(test_client)
-        resp = test_client.get("/api/admin/families")
-        assert resp.status_code == 200
-        body = resp.json()
-        fam = body["families"][0]
-        assert fam["pickup_window"] == "2025-10-01T09:00:00Z"
 
 
 class TestAdminDeleteFamily:

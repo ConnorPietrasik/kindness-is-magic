@@ -87,6 +87,7 @@ export interface ReferrerDetail {
   name: string;
   family_limit: number;
   phone_number: string;
+  pickup_window: string | null;
   family_invite_code: string;
   family_count: number;
   approval_status: ReferrerApprovalStatus;
@@ -138,7 +139,6 @@ export interface FamilySummary {
   deleted_at: string | null;
   person_count: number;
   verification_status: FamilyVerificationStatus;
-  pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
@@ -166,7 +166,6 @@ export interface FamilyDetail {
   deleted_at: string | null;
   person_count?: number;
   verification_status: FamilyVerificationStatus;
-  pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
@@ -199,7 +198,6 @@ export interface FamilySelfServiceDetail {
   deleted_at: string | null;
   person_count: number;
   verification_status: FamilyVerificationStatus;
-  pickup_window: string | null;
   wish_lock_level: WishLockLevel;
   wish_review_requested_at: string | null;
   wish_rejection_reason: string | null;
@@ -214,6 +212,8 @@ export interface ReferrerPayload {
   name?: string;
   phone_number?: string;
   family_limit?: number;
+  /** Admin-only: referrers see their pickup window but can't change it. */
+  pickup_window?: string | null;
   deleted_at?: string | null;
 }
 
@@ -228,7 +228,6 @@ export interface FamilyPayload {
   family_wish?: string;
   contact_name?: string;
   deleted_at?: string | null;
-  pickup_window?: string | null;
   referrer_notes?: string | null;
   /** Admin-only: lock the family to cash sponsorships ("already shopping"). */
   cash_only?: boolean;
@@ -319,11 +318,11 @@ export interface WishListSummary {
   family_phone_number: string | null;
   family_address: string | null;
   family_verification_status: FamilyVerificationStatus | null;
-  family_pickup_window: string | null;
   family_bio: string | null;
   /** Null when the owner family has no referrer (or it is soft-deleted). */
   referrer_name: string | null;
   referrer_phone_number: string | null;
+  referrer_pickup_window: string | null;
   assigned_to_id: number | null;
   assigned_to_name: string | null;
   purchased_at: string | null;
@@ -502,7 +501,6 @@ export interface PendingFamilySummary {
   verification_status: FamilyVerificationStatus;
   person_count: number;
   created_at: string | null;
-  pickup_window: string | null;
 }
 
 /** Item in the review queue list (referrer and admin queues). Mirrors backend FamilyReviewList. */

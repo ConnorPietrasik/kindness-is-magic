@@ -33,7 +33,7 @@ import {
   referrerReviewQueue,
 } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
-import { humanize, normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, humanize, normalizeUpdatePayload } from "../lib/utils";
 import { validatePhoneNumber } from "../lib/validators";
 import type { ReferrerDetail, ReferrerPayload, UserRole } from "../types";
 
@@ -337,6 +337,7 @@ function ReferrerInfoCard({ referrerInfo }: ReferrerInfoCardProps) {
         <div className="space-y-0">
           <InfoRow label="Name" value={referrerInfo.name} truncate={false} />
           <InfoRow label="Phone" value={referrerInfo.phone_number} truncate={false} />
+          <InfoRow label="Pickup Window" value={formatDateTime(referrerInfo.pickup_window)} truncate={false} />
           <CopyableRow label="Family Invite Code" value={referrerInfo.family_invite_code} />
           <InfoRow label="Family Limit" value={`${familyCount} / ${familyLimit}`} isLast truncate={false} />
         </div>
@@ -358,11 +359,16 @@ interface ReferrerSelfFormProps {
 }
 
 function ReferrerSelfForm({ initial, onSubmit, onCancel, loading }: ReferrerSelfFormProps) {
-  const [form, setForm] = useState<ReferrerPayload>(() => ({ ...initial }));
+  // State tracks only the fields this form edits — never the whole detail, so
+  // unmanaged fields (id, pickup_window, ...) can't leak into the PATCH.
+  const [form, setForm] = useState<ReferrerPayload>(() => ({
+    name: initial.name,
+    phone_number: initial.phone_number,
+  }));
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
-    setForm({ ...initial });
+    setForm({ name: initial.name, phone_number: initial.phone_number });
   }, [initial]);
 
   const update = (key: string, val: unknown) => setForm((p) => ({ ...p, [key]: val }));

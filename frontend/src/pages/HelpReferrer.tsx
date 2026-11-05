@@ -40,9 +40,10 @@ export default function HelpReferrer() {
               />
               <h3>The referrer profile card</h3>
               <p>
-                The welcome card at the top shows your Referrer ID. Below it, the Referrer Profile card holds your name and phone number
-                (use the Edit button to update either), your family invite code with a copy button, and your family limit, shown as used
-                over the cap (for example 8 / 10).
+                The welcome card at the top shows your Referrer ID. Below it, the Referrer Profile card holds your name, phone number, and
+                pickup window — use the Edit button to update your name or phone. The pickup window (when to pick up your families' gifts)
+                is set by the program and shown here for reference. The card also shows your family invite code with a copy button, and your
+                family limit, shown as used over the cap (for example 8 / 10).
               </p>
               <h3>Queue alerts</h3>
               <p>

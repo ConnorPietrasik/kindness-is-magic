@@ -11,6 +11,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "name", label: "Name", visible: true },
     { key: "family_limit", label: "Family Limit", visible: true },
     { key: "phone_number", label: "Phone", visible: false },
+    { key: "pickup_window", label: "Pickup Window", visible: false },
     { key: "family_invite_code", label: "Invite Code", visible: false },
     { key: "approval_status", label: "Approval", visible: false },
     { key: "approved_by_admin_name", label: "Approved By", visible: false },
@@ -29,7 +30,6 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "phone_number", label: "Phone", visible: false },
     { key: "person_count", label: "Person Count", visible: false },
     { key: "verification_status", label: "Verification", visible: false },
-    { key: "pickup_window", label: "Pickup Window", visible: false },
     { key: "wish_lock_level", label: "Lock Level", visible: false },
     { key: "wish_review_requested_at", label: "Review Requested", visible: false },
     { key: "wish_rejection_reason", label: "Rejection Reason", visible: false },
@@ -68,11 +68,11 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "family_phone_number", label: "Phone", visible: false },
     { key: "family_address", label: "Address", visible: false },
     { key: "family_verification_status", label: "Verification", visible: false },
-    { key: "family_pickup_window", label: "Pickup Window", visible: false },
     { key: "family_bio", label: "Bio", visible: false },
     // Referrer fields
     { key: "referrer_name", label: "Referrer", visible: false },
     { key: "referrer_phone_number", label: "Referrer Phone", visible: false },
+    { key: "referrer_pickup_window", label: "Pickup Window", visible: false },
     // Wish's own attributes
     { key: "type", label: "Type", visible: true },
     { key: "description", label: "Description", visible: true },

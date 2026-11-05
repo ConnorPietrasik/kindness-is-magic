@@ -37,6 +37,8 @@ class TestFamilyGetSelf:
         assert body["contact_name"] == "Contact Person"
         assert body["family_wish"] == "World peace"
         assert body["person_count"] == 0
+        # The pickup window is a referrer-level setting — families never see it
+        assert "pickup_window" not in body
 
     def test_404_missing_family_record(self, test_client: TestClient, db: Session):
         """Create a family user whose family_id points to a deleted/missing family."""
@@ -102,6 +104,18 @@ class TestFamilyUpdateSelf:
         assert body["contact_name"] == "Updated Contact"
         assert body["phone_number"] == "555-999-9999"
         assert body["family_wish"] == "World peace"  # unchanged
+
+    def test_200_pickup_window_is_ignored(self, test_client: TestClient, family_user):
+        """Families can't set a pickup window — the field is ignored, not a 422."""
+        _family_login(test_client)
+        resp = test_client.patch(
+            "/api/family/me",
+            json={"family_name": "Updated Family", "pickup_window": "2025-12-20T10:00:00Z"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["family_name"] == "Updated Family"
+        assert "pickup_window" not in body
 
     def test_404_missing_family_record(self, test_client: TestClient, db: Session):
         from app.models import User, UserRole

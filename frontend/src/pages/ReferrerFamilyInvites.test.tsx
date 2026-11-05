@@ -23,6 +23,7 @@ function makeReferrer(overrides: Partial<ReferrerDetail> = {}): ReferrerDetail {
     name: "Jane Smith",
     family_limit: 5,
     phone_number: "",
+    pickup_window: null,
     family_invite_code: "KFI-ABC123",
     family_count: 0,
     approval_status: "approved",

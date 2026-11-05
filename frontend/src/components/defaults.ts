@@ -21,7 +21,6 @@ export const defaultFamilyForm: FamilyFormState = {
   bio: null,
   address: "",
   phone_number: "",
-  pickup_window: null,
   referrer_notes: null,
 };
 
@@ -37,7 +36,6 @@ export interface FamilyFormState {
   bio: string | null;
   address: string;
   phone_number: string;
-  pickup_window: string | null;
   referrer_notes: string | null;
   // Admin-only cash-only lock ("already shopping")
   cash_only?: boolean;
@@ -51,4 +49,5 @@ export const defaultReferrerForm = {
   name: "",
   family_limit: 1,
   phone_number: "",
+  pickup_window: null,
 } as const;

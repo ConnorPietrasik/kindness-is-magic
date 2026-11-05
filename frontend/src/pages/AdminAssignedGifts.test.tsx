@@ -33,7 +33,7 @@ const wishBase = {
   family_phone_number: null,
   family_address: null,
   family_verification_status: null,
-  family_pickup_window: null,
+  referrer_pickup_window: null,
   family_bio: null,
   referrer_name: null,
   referrer_phone_number: null,

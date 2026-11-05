@@ -32,7 +32,6 @@ const mockFamily: FamilyDetail = {
   deleted_at: null,
   person_count: 3,
   verification_status: "verified",
-  pickup_window: null,
   wish_lock_level: "family",
   wish_review_requested_at: null,
   wish_rejection_reason: null,

@@ -554,10 +554,10 @@ class TestListWishesNewFields:
             "family_phone_number",
             "family_address",
             "family_verification_status",
-            "family_pickup_window",
             "family_bio",
             "referrer_name",
             "referrer_phone_number",
+            "referrer_pickup_window",
         ):
             assert field in item
 
@@ -822,12 +822,12 @@ class TestDateRangeSearch:
         assert resp.status_code == 200
         assert [w["id"] for w in resp.json()["wishes"]] == [wish_tree["wishes"][0].id]
 
-    def test_family_pickup_window_both_owner_paths(self, logged_in_admin, wish_tree, db):
+    def test_referrer_pickup_window_both_owner_paths(self, logged_in_admin, wish_tree, db):
         """The pickup-window range resolves on both the person and direct family paths."""
-        wish_tree["family"].pickup_window = datetime(2026, 4, 5, 12, 0, 0, tzinfo=timezone.utc)
+        wish_tree["referrer"].pickup_window = datetime(2026, 4, 5, 12, 0, 0, tzinfo=timezone.utc)
         db.commit()
 
-        resp = logged_in_admin.get("/api/admin/wishes?family_pickup_window_from=2026-04-05&family_pickup_window_to=2026-04-05")
+        resp = logged_in_admin.get("/api/admin/wishes?referrer_pickup_window_from=2026-04-05&referrer_pickup_window_to=2026-04-05")
         assert resp.status_code == 200
         ids = {w["id"] for w in resp.json()["wishes"]}
         # Person wishes (owner family via person) + the family wish (direct family)
@@ -849,7 +849,7 @@ class TestDateRangeSearch:
     def test_malformed_date_422(self, logged_in_admin, wish_tree):
         resp = logged_in_admin.get("/api/admin/wishes?purchased_at_from=not-a-date")
         assert resp.status_code == 422
-        resp = logged_in_admin.get("/api/admin/wishes?family_pickup_window_to=2026-13-45")
+        resp = logged_in_admin.get("/api/admin/wishes?referrer_pickup_window_to=2026-13-45")
         assert resp.status_code == 422
 
 
@@ -922,17 +922,29 @@ class TestWishSorting:
         names = [w["family_name"] for w in resp.json()["wishes"]]
         assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
 
-    def test_sort_family_pickup_window(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
-        wish_tree["family"].pickup_window = datetime(2026, 4, 1, 9, 0, 0, tzinfo=timezone.utc)
-        second_family_with_wishes["family"].pickup_window = datetime(2026, 3, 1, 9, 0, 0, tzinfo=timezone.utc)
+    def test_sort_referrer_pickup_window(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        # Two families need distinct referrers to carry distinct windows —
+        # reassign the second family to a fresh referrer for this test only.
+        second_ref = Referrer(
+            name="Second Referrer",
+            family_limit=10,
+            phone_number="555-000-0099",
+            family_invite_code="KFI-SECO01",
+            approval_status=ReferrerApprovalStatus.approved,
+        )
+        db.add(second_ref)
+        db.flush()
+        second_family_with_wishes["family"].referrer_id = second_ref.id
+        wish_tree["referrer"].pickup_window = datetime(2026, 4, 1, 9, 0, 0, tzinfo=timezone.utc)
+        second_ref.pickup_window = datetime(2026, 3, 1, 9, 0, 0, tzinfo=timezone.utc)
         db.commit()
 
-        resp = logged_in_admin.get("/api/admin/wishes?sort=family_pickup_window")
+        resp = logged_in_admin.get("/api/admin/wishes?sort=referrer_pickup_window")
         assert resp.status_code == 200
         names = [w["family_name"] for w in resp.json()["wishes"]]
         assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
 
-        resp = logged_in_admin.get("/api/admin/wishes?sort=-family_pickup_window")
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-referrer_pickup_window")
         assert resp.status_code == 200
         names = [w["family_name"] for w in resp.json()["wishes"]]
         assert names == ["Wish Family"] * 3 + ["Second Family"] * 3

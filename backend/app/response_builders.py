@@ -261,6 +261,7 @@ def build_referrer_detail(
         "name": ref.name,
         "family_limit": ref.family_limit,
         "phone_number": ref.phone_number,
+        "pickup_window": ref.pickup_window,
         "family_invite_code": ref.family_invite_code,
         "family_count": family_count,
         "email": email,
@@ -632,8 +633,8 @@ def build_wish_list_item(
     *person* is ``None`` for family wishes, which resolve their family
     directly from ``wish.family_id``; person-wishes resolve it through the
     person. The owner family's fields (name, contact, phone, address,
-    verification status, pickup window, bio) and its referrer's fields come
-    from that family.
+    verification status, bio) come from that family; the referrer's fields
+    (name, phone, pickup window) come from its referrer.
 
     Pass *display_id* as the pre-computed wish display id (the owner's flat
     display id + type suffix); it stays None when the caller did not
@@ -677,10 +678,10 @@ def build_wish_list_item(
         "family_phone_number": owner_family.phone_number if owner_family is not None else None,
         "family_address": owner_family.address if owner_family is not None else None,
         "family_verification_status": owner_family.verification_status if owner_family is not None else None,
-        "family_pickup_window": owner_family.pickup_window if owner_family is not None else None,
         "family_bio": owner_family.bio if owner_family is not None else None,
         "referrer_name": referrer.name if referrer is not None else None,
         "referrer_phone_number": referrer.phone_number if referrer is not None else None,
+        "referrer_pickup_window": referrer.pickup_window if referrer is not None else None,
         "assigned_to_id": wish.assigned_to_id,
         "assigned_to_name": assigned_to_name,
         "purchased_at": wish.purchased_at,
@@ -798,7 +799,6 @@ def build_family_detail(
         "contact_name": fam.contact_name,
         "contact_email": contact_email,
         "verification_status": fam.verification_status,
-        "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": person_count,
         "wish_lock_level": fam.wish_lock_level,
@@ -946,7 +946,6 @@ def build_family_list_item(fam: Family, ctx: FamilyListContext, *, display_id: s
         "address": fam.address,
         "phone_number": fam.phone_number,
         "verification_status": fam.verification_status,
-        "pickup_window": fam.pickup_window,
         "deleted_at": fam.deleted_at,
         "person_count": ctx.count_map.get(fam.id, 0),
         "wish_lock_level": fam.wish_lock_level,

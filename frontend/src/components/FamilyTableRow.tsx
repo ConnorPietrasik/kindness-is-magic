@@ -148,7 +148,6 @@ export function FamilyTableRow({
         <ApprovalBadge status={f.verification_status} />
       </Td>
     ),
-    pickup_window: <Td className="text-xs">{f.pickup_window || "—"}</Td>,
     wish_lock_level: (
       <Td>
         <span className="text-xs capitalize">{f.wish_lock_level}</span>

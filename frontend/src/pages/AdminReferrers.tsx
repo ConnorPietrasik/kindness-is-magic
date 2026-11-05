@@ -48,7 +48,7 @@ import {
 } from "../lib/api";
 import { adminDeletedReferrers, adminReferrers, adminReferrersDropdown } from "../lib/queryKeys";
 import { route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -166,6 +166,7 @@ export default function AdminReferrers() {
     name: "Name",
     family_limit: "Family Limit",
     phone_number: "Phone",
+    pickup_window: "Pickup Window",
     family_invite_code: "Invite Code",
     approval_status: "Approval",
     approved_by_admin_name: "Approved By",
@@ -272,6 +273,7 @@ export default function AdminReferrers() {
                       </Td>
                     ),
                     phone_number: <Td>{r.phone_number || "—"}</Td>,
+                    pickup_window: <Td className="text-xs">{formatDateTime(r.pickup_window)}</Td>,
                     family_invite_code: <Td className="font-mono text-xs">{r.family_invite_code}</Td>,
                     approval_status: (
                       <Td>

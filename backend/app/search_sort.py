@@ -189,6 +189,7 @@ REFERRER_SORT_FIELDS: dict[str, ColumnElement] = {
     "created_at": Referrer.created_at,
     "approved_at": Referrer.approved_at,
     "approval_status": Referrer.approval_status,
+    "pickup_window": Referrer.pickup_window,
 }
 
 USER_SORT_FIELDS: dict[str, ColumnElement] = {
@@ -219,10 +220,10 @@ WISH_SORT_FIELDS: dict[str, ColumnElement] = {
     "family_phone_number": _owner_family_column("phone_number"),
     "family_address": _owner_family_column("address"),
     "family_verification_status": _owner_family_column("verification_status"),
-    "family_pickup_window": _owner_family_column("pickup_window"),
     "family_bio": _owner_family_column("bio"),
     "referrer_name": WISH_REFERRER.name,
     "referrer_phone_number": WISH_REFERRER.phone_number,
+    "referrer_pickup_window": WISH_REFERRER.pickup_window,
     "assigned_to_name": ASSIGNED_USER.display_name,
 }
 
@@ -283,7 +284,7 @@ WISH_DATE_RANGE_FIELDS: dict[str, ColumnElement] = {
     "purchased_at": Wish.purchased_at,
     "received_at": Wish.received_at,
     "created_at": Wish.created_at,
-    "family_pickup_window": _owner_family_column("pickup_window"),
+    "referrer_pickup_window": WISH_REFERRER.pickup_window,
 }
 
 

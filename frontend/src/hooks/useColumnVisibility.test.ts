@@ -119,7 +119,7 @@ describe("useColumnVisibility", () => {
   it("exposes defs matching the column registry", () => {
     const { result } = renderHook(() => useColumnVisibility("adminReferrers"));
 
-    expect(result.current.defs).toHaveLength(8);
+    expect(result.current.defs).toHaveLength(9);
     expect(result.current.defs[0]).toEqual({ key: "name", label: "Name", visible: true });
   });
 

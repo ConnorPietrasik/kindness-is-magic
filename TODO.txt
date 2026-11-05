@@ -1,4 +1,3 @@
-Move pickup window to per-referrer, not family
 Reorderable admin tiles
 Add a "gifts due" banner based on gift deadline to the public families page
 Add a "send reminder" button to email invited referrers

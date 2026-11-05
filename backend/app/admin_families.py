@@ -366,7 +366,6 @@ def create_family(
         bio=body.bio,
         address=body.address,
         phone_number=body.phone_number,
-        pickup_window=body.pickup_window,
         cash_only=body.cash_only,
         verification_status=FamilyVerificationStatus.verified,
     )

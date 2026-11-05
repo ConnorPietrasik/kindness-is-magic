@@ -159,6 +159,9 @@ class Referrer(Base):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    # When this referrer's referred families' gifts should be picked up — the
+    # referrer handles pickup and the last leg for all of their families.
+    pickup_window: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     family_invite_code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
     approval_status: Mapped[ReferrerApprovalStatus] = mapped_column(
         SAEnum(ReferrerApprovalStatus, name="referrer_approval_status", create_constraint=True),
@@ -233,7 +236,6 @@ class Family(Base):
         server_default="pending",
         nullable=False,
     )
-    pickup_window: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     # Cash-only lock (admin-set): shopping for this family has started, so new
     # gift claims are blocked while cash sponsorships stay open. Donors see an

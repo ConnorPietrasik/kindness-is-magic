@@ -20,6 +20,7 @@ function makeReferrer(overrides: Partial<ReferrerDetail>): ReferrerDetail {
     name: "Some Referrer",
     family_limit: 1,
     phone_number: "",
+    pickup_window: null,
     family_invite_code: "CODE1",
     family_count: 0,
     approval_status: "approved",
@@ -429,6 +430,7 @@ describe("AdminReferrers", () => {
           name: "New Hope",
           phone_number: "5559876543",
           family_limit: 1,
+          pickup_window: null,
         },
         expect.anything()
       );

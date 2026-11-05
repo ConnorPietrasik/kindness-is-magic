@@ -49,6 +49,7 @@ const mockReferrerDetail: ReferrerDetail = {
   name: "Referrer Ray",
   family_limit: 10,
   phone_number: "555-0100",
+  pickup_window: null,
   family_invite_code: "RAY-1234",
   family_count: 3,
   approval_status: "approved",
@@ -69,7 +70,6 @@ const mockPendingFamily: PendingFamilySummary = {
   verification_status: "pending",
   person_count: 3,
   created_at: "2025-11-01T00:00:00Z",
-  pickup_window: null,
 };
 
 const mockQueueItem: FamilyReviewQueueItem = {
@@ -158,6 +158,40 @@ describe("Dashboard", () => {
 
     expect(screen.queryByText(/awaiting your verification/)).not.toBeInTheDocument();
     expect(screen.queryByText(/awaiting your wish review/)).not.toBeInTheDocument();
+  });
+
+  it("shows the referrer's pickup window in the profile card", async () => {
+    vi.spyOn(api, "getReferrerMe").mockResolvedValue({ ...mockReferrerDetail, pickup_window: "2025-12-20T10:00:00Z" });
+    vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
+    vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
+
+    renderDashboard(referrerUser);
+
+    // Referrer profile card loads async
+    await waitFor(() => {
+      expect(screen.queryAllByText("Referrer Ray").length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText("Pickup Window")).toBeInTheDocument();
+  });
+
+  it("does not offer pickup window editing in the referrer self-form", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "getReferrerMe").mockResolvedValue({ ...mockReferrerDetail, pickup_window: "2025-12-20T10:00:00Z" });
+    vi.spyOn(api, "listPendingFamilies").mockResolvedValue([]);
+    vi.spyOn(api, "listReferrerReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
+
+    renderDashboard(referrerUser);
+
+    // Referrer profile card loads async
+    await waitFor(() => {
+      expect(screen.queryAllByText("Referrer Ray").length).toBeGreaterThan(0);
+    });
+
+    // The pickup window is admin-set — the self-form must not offer a picker for it
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
   });
 
   it("shows the wish approval alert for admins", async () => {

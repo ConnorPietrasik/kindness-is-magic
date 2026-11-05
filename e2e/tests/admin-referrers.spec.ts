@@ -12,13 +12,24 @@ import { findRowInTable } from "../helpers/assertions";
 const TEST_REFERRER = `Test E2E Org ${Math.random().toString(36).slice(2, 8)}`;
 let referrerId: number | undefined;
 
+const PICKUP_REFERRER = `Test E2E Pickup ${Math.random().toString(36).slice(2, 8)}`;
+let pickupReferrerId: number | undefined;
+
+// Local-time input value for the <input type="datetime-local"> picker
+const PICKUP_WINDOW_INPUT = "2026-12-20T10:00";
+
+// Same locale formatting as the UI's formatDateTime — computed here so the
+// assertion matches the rendered value regardless of the host locale.
+function formatPickupWindow(inputValue: string): string {
+  return new Date(inputValue).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 test.describe("Admin Referrers", () => {
   test.afterAll(async ({ request }) => {
-    if (referrerId) {
-      const authed = await loginViaApi(request);
-      await deleteReferrerViaApi(authed, referrerId);
-      await authed.dispose();
-    }
+    const authed = await loginViaApi(request);
+    if (referrerId) await deleteReferrerViaApi(authed, referrerId);
+    if (pickupReferrerId) await deleteReferrerViaApi(authed, pickupReferrerId);
+    await authed.dispose();
   });
 
   test("admin views referrers list with CSV-seeded data", async ({ browser }) => {
@@ -92,6 +103,41 @@ test.describe("Admin Referrers", () => {
     /* Should show Sarah's families */
     await expect(page.getByText("The Williams Family")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("The Rodriguez Family")).toBeVisible();
+
+    await context.close();
+  });
+
+  test("admin creates a referrer with a pickup window and sees it in the referrer view", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/referrers");
+    await expect(page.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
+
+    /* Fill the create form, including the pickup window (datetime-local) */
+    await page.getByRole("button", { name: "+ Add referrer" }).click();
+    await page.getByLabel("Name", { exact: true }).fill(PICKUP_REFERRER);
+    await page.getByLabel("Family Limit").fill("3");
+    await page.getByLabel("Phone Number").fill("5559990001");
+    await page.locator('input[type="datetime-local"]').fill(PICKUP_WINDOW_INPUT);
+
+    /* Submit — wait for the form to close so the table has refreshed */
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByLabel("Name", { exact: true })).not.toBeVisible({ timeout: 15_000 });
+
+    /* Narrow to the new row via search, then open its referrer view */
+    await page.getByLabel("Search by name").fill(PICKUP_REFERRER);
+    const row = await findRowInTable(page, PICKUP_REFERRER);
+    expect(row).not.toBeNull();
+
+    const idText = await (row as Locator).getByRole("cell").first().textContent();
+    if (idText) pickupReferrerId = parseInt(idText.trim(), 10);
+
+    await (row as Locator).getByRole("link", { name: "Manage" }).click();
+
+    /* The referrer card shows the window (InfoRow: label + value spans) */
+    const pickupRow = page.locator("div.flex.items-baseline").filter({ has: page.getByText("Pickup Window", { exact: true }) });
+    await expect(pickupRow).toContainText(formatPickupWindow(PICKUP_WINDOW_INPUT), { timeout: 10_000 });
 
     await context.close();
   });

@@ -188,6 +188,7 @@ def create_referrer(
         name=body.name,
         family_limit=body.family_limit,
         phone_number=body.phone_number,
+        pickup_window=body.pickup_window,
         family_invite_code=generate_unique_family_invite_code(db),
         approval_status=ReferrerApprovalStatus.approved,
         approved_by_admin_id=_admin.id,

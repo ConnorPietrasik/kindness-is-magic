@@ -9,6 +9,7 @@ const mockReferrerDetail: ReferrerDetail = {
   name: "Jane Smith",
   family_limit: 5,
   phone_number: "555-123-4567",
+  pickup_window: null,
   family_invite_code: "abc123",
   family_count: 2,
   approval_status: "approved",
@@ -156,6 +157,61 @@ describe("ReferrerForm", () => {
   it("shows loading state on submit button", () => {
     render(<ReferrerForm {...defaultProps} initial={mockReferrerDetail} loading={true} />);
     expect(screen.getByText("Saving\u2026")).toBeInTheDocument();
+  });
+
+  /* ── Pickup window ──────────────────────────────────────── */
+
+  it("sends pickup_window in submit payload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <ReferrerForm {...defaultProps} initial={{ name: "New Referrer", family_limit: 3, phone_number: "5559876543" }} onSubmit={onSubmit} />
+    );
+
+    // Set pickup window (find by type since OptionalLabel uses <span>, not <label>)
+    const pickupInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    expect(pickupInput).toBeTruthy();
+    await user.type(pickupInput!, "2025-03-20T10:00");
+
+    await user.click(screen.getByText("Create"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // datetime-local value is converted back to ISO UTC on submit (no milliseconds)
+        pickup_window: expect.stringMatching(/^2025-03-20T\d{2}:\d{2}:\d{2}Z$/),
+      })
+    );
+  });
+
+  it("pre-fills pickup window on edit and preserves value when unchanged", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    const detail = { ...mockReferrerDetail, pickup_window: "2025-02-15T14:30:00+00:00" };
+    render(<ReferrerForm {...defaultProps} title="Edit" isEdit={true} initial={detail} onSubmit={onSubmit} />);
+
+    // Verify the datetime-local input is pre-filled (local timezone format)
+    const pickupInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    expect(pickupInput).toBeTruthy();
+    expect(pickupInput!.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    // Change only the name, leave pickup window untouched
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    await user.clear(nameInput);
+    await user.type(nameInput, "The Updateds");
+
+    await user.click(screen.getByText("Update"));
+
+    // When the datetime-local input is not touched, the form preserves
+    // the original API value. normalizeUpdatePayload (tested in utils.test.ts)
+    // handles the same-instant comparison to omit unchanged datetime fields.
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "The Updateds",
+        pickup_window: detail.pickup_window,
+      })
+    );
   });
 
   /* ── Phone validation ───────────────────────────────────── */

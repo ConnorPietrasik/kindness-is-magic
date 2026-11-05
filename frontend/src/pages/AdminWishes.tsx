@@ -415,14 +415,14 @@ export default function AdminWishes() {
                   family_verification_status: (
                     <Td>{w.family_verification_status ? <ApprovalBadge status={w.family_verification_status} /> : "—"}</Td>
                   ),
-                  family_pickup_window: (
-                    <Td className="whitespace-nowrap text-xs">
-                      {w.family_pickup_window ? new Date(w.family_pickup_window).toLocaleDateString() : "—"}
-                    </Td>
-                  ),
                   family_bio: <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>,
                   referrer_name: <Td>{w.referrer_name ?? "—"}</Td>,
                   referrer_phone_number: <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>,
+                  referrer_pickup_window: (
+                    <Td className="whitespace-nowrap text-xs">
+                      {w.referrer_pickup_window ? new Date(w.referrer_pickup_window).toLocaleDateString() : "—"}
+                    </Td>
+                  ),
                   type: (
                     <Td>
                       <WishTypeBadge type={w.type} />
@@ -850,10 +850,10 @@ const WISH_COLUMN_SEARCH: Record<string, "text" | "date"> = {
   family_phone_number: "text",
   family_address: "text",
   family_verification_status: "text",
-  family_pickup_window: "date",
   family_bio: "text",
   referrer_name: "text",
   referrer_phone_number: "text",
+  referrer_pickup_window: "date",
   description: "text",
   size: "text",
   color: "text",
