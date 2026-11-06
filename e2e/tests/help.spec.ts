@@ -253,6 +253,25 @@ test.describe("help: discovery and layout", () => {
     await context.close();
   });
 
+  test("donor guide footer Sponsor Guide, clicked mid-page, scrolls back to the top", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/help/donor");
+    const footer = page.getByRole("contentinfo");
+    await expect(footer.getByRole("link", { name: "Sponsor Guide" })).toBeVisible({ timeout: 10_000 });
+
+    /* Same page, so the navigation changes nothing: the footer link must
+       scroll to the top itself. */
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
+    await footer.getByRole("link", { name: "Sponsor Guide" }).click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+    await context.close();
+  });
+
   test("authenticated guide does not render a duplicate footer", async ({ browser }) => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();

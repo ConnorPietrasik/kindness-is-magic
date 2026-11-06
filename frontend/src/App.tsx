@@ -4,6 +4,7 @@ import { HeaderBar } from "./components/HeaderBar";
 import { HelpRedirect } from "./components/HelpRedirect";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { PageSpinner, Spinner } from "./components/Spinner";
 import { useAuth } from "./context/AuthContext";
 import { ROLE_HOME, ROUTES } from "./lib/routes";
@@ -96,401 +97,406 @@ const AppLoadingFallback = () => (
 
 export default function App() {
   return (
-    <Suspense fallback={<AppLoadingFallback />}>
-      <Routes>
-        {/* ── Public routes (redirect if already logged in) ──────── */}
-        <Route
-          path={ROUTES.LOGIN}
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path={ROUTES.FORGOT_PASSWORD}
-          element={
-            <PublicRoute>
-              <ForgotPassword />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path={ROUTES.RESET_PASSWORD}
-          element={
-            <PublicRoute>
-              <ResetPassword />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path={ROUTES.REFERRER_SELF_REGISTER}
-          element={
-            <PublicRoute>
-              <ReferrerSelfRegister />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path={ROUTES.FAMILY_SELF_REGISTER}
-          element={
-            <PublicRoute>
-              <FamilySelfRegister />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path={ROUTES.DONOR_SELF_REGISTER}
-          element={
-            <PublicRoute>
-              <DonorSelfRegister />
-            </PublicRoute>
-          }
-        />
+    <>
+      {/* Outside <Suspense>: a lazy page load swaps the subtree for the
+          loading fallback, which would reset ScrollToTop's mount state. */}
+      <ScrollToTop />
+      <Suspense fallback={<AppLoadingFallback />}>
+        <Routes>
+          {/* ── Public routes (redirect if already logged in) ──────── */}
+          <Route
+            path={ROUTES.LOGIN}
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path={ROUTES.FORGOT_PASSWORD}
+            element={
+              <PublicRoute>
+                <ForgotPassword />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path={ROUTES.RESET_PASSWORD}
+            element={
+              <PublicRoute>
+                <ResetPassword />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path={ROUTES.REFERRER_SELF_REGISTER}
+            element={
+              <PublicRoute>
+                <ReferrerSelfRegister />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path={ROUTES.FAMILY_SELF_REGISTER}
+            element={
+              <PublicRoute>
+                <FamilySelfRegister />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path={ROUTES.DONOR_SELF_REGISTER}
+            element={
+              <PublicRoute>
+                <DonorSelfRegister />
+              </PublicRoute>
+            }
+          />
 
-        {/* ── Authenticated routes ───────────────────────────────── */}
-        <Route
-          path={ROUTES.DASHBOARD}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Authenticated routes ───────────────────────────────── */}
+          <Route
+            path={ROUTES.DASHBOARD}
+            element={
+              <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Admin-only ─────────────────────────────────────────── */}
-        <Route
-          path={ROUTES.ADMIN_USERS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminUsers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_WISH_REVIEW}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminWishReview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_DEADLINES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminDeadlines />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_PACKING_SLIPS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminPackingSlips />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_DELIVERY_SLIPS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminDeliverySlips />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_WISH_CARDS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminWishCards />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_WISHES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminWishes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_ASSIGNED_GIFTS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminAssignedGifts />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_EMAILS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminEmails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_EMAIL_UNSUBSCRIBES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminEmailUnsubscribes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_ZEFFY_PAYMENTS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminZeffyPayments />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_SPONSORSHIPS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminSponsorships />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_REFERRERS}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminReferrers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_REFERRER_FAMILIES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminReferrerFamilies />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_FAMILIES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminFamilies />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_FAMILY_PEOPLE}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminFamilyPeople />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_PEOPLE}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminPeople />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_CSV_UPLOAD}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <CsvUpload />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.ADMIN_INVITE_CODES}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <AdminInviteCodes />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Admin-only ─────────────────────────────────────────── */}
+          <Route
+            path={ROUTES.ADMIN_USERS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_WISH_REVIEW}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminWishReview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_DEADLINES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminDeadlines />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_PACKING_SLIPS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminPackingSlips />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_DELIVERY_SLIPS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminDeliverySlips />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_WISH_CARDS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminWishCards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_WISHES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminWishes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_ASSIGNED_GIFTS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminAssignedGifts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_EMAILS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminEmails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_EMAIL_UNSUBSCRIBES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminEmailUnsubscribes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_ZEFFY_PAYMENTS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminZeffyPayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_SPONSORSHIPS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminSponsorships />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_REFERRERS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminReferrers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_REFERRER_FAMILIES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminReferrerFamilies />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_FAMILIES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminFamilies />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_FAMILY_PEOPLE}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminFamilyPeople />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_PEOPLE}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminPeople />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_CSV_UPLOAD}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <CsvUpload />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.ADMIN_INVITE_CODES}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminInviteCodes />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Referrer self-service ────────────────────────────── */}
-        <Route
-          path={ROUTES.REFERRER_FAMILIES}
-          element={
-            <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerFamilies />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.REFERRER_FAMILY_DETAIL}
-          element={
-            <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerFamilyDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.REFERRER_FAMILY_INVITES}
-          element={
-            <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerFamilyInvites />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.REFERRER_WISH_REVIEW}
-          element={
-            <ProtectedRoute roles={["referrer"] as UserRole[]}>
-              <ReferrerReviewQueue />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Referrer self-service ────────────────────────────── */}
+          <Route
+            path={ROUTES.REFERRER_FAMILIES}
+            element={
+              <ProtectedRoute roles={["referrer"] as UserRole[]}>
+                <ReferrerFamilies />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.REFERRER_FAMILY_DETAIL}
+            element={
+              <ProtectedRoute roles={["referrer"] as UserRole[]}>
+                <ReferrerFamilyDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.REFERRER_FAMILY_INVITES}
+            element={
+              <ProtectedRoute roles={["referrer"] as UserRole[]}>
+                <ReferrerFamilyInvites />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.REFERRER_WISH_REVIEW}
+            element={
+              <ProtectedRoute roles={["referrer"] as UserRole[]}>
+                <ReferrerReviewQueue />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Family self-service ──────────────────────────────── */}
-        <Route
-          path={ROUTES.FAMILY_DASHBOARD}
-          element={
-            <ProtectedRoute roles={["family"] as UserRole[]}>
-              <FamilyDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.FAMILY_PEOPLE}
-          element={
-            <ProtectedRoute roles={["family"] as UserRole[]}>
-              <FamilyPeople />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Family self-service ──────────────────────────────── */}
+          <Route
+            path={ROUTES.FAMILY_DASHBOARD}
+            element={
+              <ProtectedRoute roles={["family"] as UserRole[]}>
+                <FamilyDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.FAMILY_PEOPLE}
+            element={
+              <ProtectedRoute roles={["family"] as UserRole[]}>
+                <FamilyPeople />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Purchaser self-service ───────────────────────────── */}
-        <Route
-          path={ROUTES.PURCHASER_ASSIGNED_GIFTS}
-          element={
-            <ProtectedRoute roles={["purchaser"] as UserRole[]}>
-              <PurchaserAssignedGifts />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Purchaser self-service ───────────────────────────── */}
+          <Route
+            path={ROUTES.PURCHASER_ASSIGNED_GIFTS}
+            element={
+              <ProtectedRoute roles={["purchaser"] as UserRole[]}>
+                <PurchaserAssignedGifts />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Delivery self-service ────────────────────────────── */}
-        <Route
-          path={ROUTES.DELIVERY_DASHBOARD}
-          element={
-            <ProtectedRoute roles={["delivery"] as UserRole[]}>
-              <DeliveryDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.DELIVERY_PACKING_SLIPS}
-          element={
-            <ProtectedRoute roles={["delivery"] as UserRole[]}>
-              <DeliveryPackingSlips />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.DELIVERY_SLIPS}
-          element={
-            <ProtectedRoute roles={["delivery"] as UserRole[]}>
-              <DeliverySlips />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Delivery self-service ────────────────────────────── */}
+          <Route
+            path={ROUTES.DELIVERY_DASHBOARD}
+            element={
+              <ProtectedRoute roles={["delivery"] as UserRole[]}>
+                <DeliveryDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.DELIVERY_PACKING_SLIPS}
+            element={
+              <ProtectedRoute roles={["delivery"] as UserRole[]}>
+                <DeliveryPackingSlips />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.DELIVERY_SLIPS}
+            element={
+              <ProtectedRoute roles={["delivery"] as UserRole[]}>
+                <DeliverySlips />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Donor self-service ───────────────────────────────── */}
-        <Route
-          path={ROUTES.DONOR_CLAIMS}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
-              <DonorClaims />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.DONOR_CLAIM_DETAIL}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
-              <DonorClaimDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.DONOR_CART}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
-              <DonorCart />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Donor self-service ───────────────────────────────── */}
+          <Route
+            path={ROUTES.DONOR_CLAIMS}
+            element={
+              <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+                <DonorClaims />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.DONOR_CLAIM_DETAIL}
+            element={
+              <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+                <DonorClaimDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.DONOR_CART}
+            element={
+              <ProtectedRoute roles={["admin", "referrer", "purchaser", "donor"] as UserRole[]}>
+                <DonorCart />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Help (per-role user guides) ───────────────────────── */}
-        <Route
-          path={ROUTES.HELP}
-          element={
-            <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
-              <HelpRedirect />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_ADMIN}
-          element={
-            <ProtectedRoute roles={["admin"] as UserRole[]}>
-              <HelpAdmin />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_REFERRER}
-          element={
-            <ProtectedRoute roles={["admin", "referrer"] as UserRole[]}>
-              <HelpReferrer />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_FAMILY}
-          element={
-            <ProtectedRoute roles={["admin", "family"] as UserRole[]}>
-              <HelpFamily />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_PURCHASER}
-          element={
-            <ProtectedRoute roles={["admin", "purchaser"] as UserRole[]}>
-              <HelpPurchaser />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path={ROUTES.HELP_DELIVERY}
-          element={
-            <ProtectedRoute roles={["admin", "delivery"] as UserRole[]}>
-              <HelpDelivery />
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Help (per-role user guides) ───────────────────────── */}
+          <Route
+            path={ROUTES.HELP}
+            element={
+              <ProtectedRoute roles={["admin", "referrer", "family", "purchaser", "delivery", "donor"] as UserRole[]}>
+                <HelpRedirect />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.HELP_ADMIN}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <HelpAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.HELP_REFERRER}
+            element={
+              <ProtectedRoute roles={["admin", "referrer"] as UserRole[]}>
+                <HelpReferrer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.HELP_FAMILY}
+            element={
+              <ProtectedRoute roles={["admin", "family"] as UserRole[]}>
+                <HelpFamily />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.HELP_PURCHASER}
+            element={
+              <ProtectedRoute roles={["admin", "purchaser"] as UserRole[]}>
+                <HelpPurchaser />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.HELP_DELIVERY}
+            element={
+              <ProtectedRoute roles={["admin", "delivery"] as UserRole[]}>
+                <HelpDelivery />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Public (no auth required) ─────────────────────────── */}
-        <Route path={ROUTES.HOME} element={<Home />} />
-        <Route path={ROUTES.PRIVACY} element={<PrivacyPolicy />} />
-        <Route path={ROUTES.FINANCIALS} element={<Financials />} />
-        <Route path={ROUTES.WISH_LIST_GUIDE} element={<WishListGuide />} />
-        {/* The donor guide is public so prospects can read it before registering */}
-        <Route path={ROUTES.HELP_DONOR} element={<HelpDonor />} />
-        <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
-        <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
-        <Route path={ROUTES.FAMILY_WISH_CARDS} element={<FamilyWishCards />} />
+          {/* ── Public (no auth required) ─────────────────────────── */}
+          <Route path={ROUTES.HOME} element={<Home />} />
+          <Route path={ROUTES.PRIVACY} element={<PrivacyPolicy />} />
+          <Route path={ROUTES.FINANCIALS} element={<Financials />} />
+          <Route path={ROUTES.WISH_LIST_GUIDE} element={<WishListGuide />} />
+          {/* The donor guide is public so prospects can read it before registering */}
+          <Route path={ROUTES.HELP_DONOR} element={<HelpDonor />} />
+          <Route path={ROUTES.PUBLIC_FAMILIES} element={<PublicFamilies />} />
+          <Route path={ROUTES.FAMILY_WISH_LIST} element={<FamilyWishList />} />
+          <Route path={ROUTES.FAMILY_WISH_CARDS} element={<FamilyWishCards />} />
 
-        {/* ── Root: role dashboards, or the brochure for guests ─── */}
-        <Route path={ROUTES.ROOT} element={<DashboardRedirect />} />
-        <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
-      </Routes>
-    </Suspense>
+          {/* ── Root: role dashboards, or the brochure for guests ─── */}
+          <Route path={ROUTES.ROOT} element={<DashboardRedirect />} />
+          <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
+        </Routes>
+      </Suspense>
+    </>
   );
 }

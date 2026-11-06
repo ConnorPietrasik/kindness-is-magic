@@ -105,6 +105,23 @@ test.describe("Home brochure (public)", () => {
     }
   });
 
+  test("footer Sponsor Guide, clicked from the bottom of the brochure, lands at the top of the guide", async ({
+    page,
+  }) => {
+    await page.goto("/home");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
+
+    /* SPA navigation keeps the scroll position, so the guide must be
+       explicitly reset to the top — verify from a deep spot in the brochure. */
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
+    await page.locator("footer").getByRole("link", { name: "Sponsor Guide" }).click();
+    await expect(page).toHaveURL(/\/help\/donor$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Sponsor Guide" })).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
   test("footer Donate and social links use the exact external URLs", async ({ page }) => {
     await page.goto("/home");
     const footer = page.locator("footer");
