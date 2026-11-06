@@ -59,9 +59,11 @@ export default function HelpAdmin() {
               </p>
               <h3>Dashboard tiles</h3>
               <p>
-                The tile grid is your personal workspace. Click the small gear button above the tiles to open the tile menu, check or
-                uncheck tiles to show or hide them, and use Reset to bring back the defaults. Your choices are saved on this device, so each
-                admin builds their own layout on their own computer.
+                The tile grid is your personal workspace. Drag a tile and the grid makes room as you go — the tile moves to its new spot
+                while you drag and the others slide out of the way, so you can see exactly where it will land. Release to drop it, or focus
+                a tile and use the left and right arrow keys to nudge it one step at a time. Click the small gear button above the tiles to
+                open the tile menu, check or uncheck tiles to show or hide them, and use Reset to bring back the default tiles and order.
+                Your choices are saved on this device, so each admin builds their own layout on their own computer.
               </p>
               <p>
                 On any page that loads data, a small refresh button sits in the top right. Click it to reload that page's data without

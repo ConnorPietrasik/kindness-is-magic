@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -347,6 +347,208 @@ describe("Dashboard — profile card", () => {
       // Second arg is React Query's mutation context (mutationFn is passed directly).
       expect(api.updateMyProfile).toHaveBeenCalledWith("New Admin Name", expect.anything());
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Admin tile drag & reorder
+/* ------------------------------------------------------------------ */
+
+describe("Dashboard — admin tile drag", () => {
+  // All admin tile keys in registry (default) order.
+  const allKeys = (DASHBOARD_TILES.admin ?? []).map((d) => d.key);
+
+  const rect = (left: number, width: number, height = 0) =>
+    ({ left, width, height, top: 0, bottom: height, right: left + width, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+  /** Visible tile labels in grid order (the tiles grid, not the role nav grid). */
+  const gridLabels = async (tileName: RegExp) => {
+    const tile = await screen.findByRole("link", { name: tileName });
+    const grid = tile.closest("div.grid");
+    expect(grid).not.toBeNull();
+    return Array.from(grid!.children).map((c) => c.textContent);
+  };
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("renders the admin tiles as draggable with a drag hint", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const tile = await screen.findByRole("link", { name: /Manage Referrers/ });
+    expect(tile).toHaveAttribute("draggable", "true");
+    expect(tile).toHaveAttribute("title", "Drag to reorder");
+  });
+
+  it("reflows the grid live while dragging (left half = before, right half = after) and commits on drop", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const wishes = await screen.findByRole("link", { name: /Manage Wishes/ });
+    const users = screen.getByRole("link", { name: /Manage Users/ });
+
+    fireEvent.dragStart(wishes, { dataTransfer: {} });
+
+    // Left half of "Manage Users" → the grid reflows immediately, before any
+    // drop: "Manage Wishes" now sits where the release will land.
+    users.getBoundingClientRect = () => rect(0, 200);
+    fireEvent.dragOver(users, { dataTransfer: {} });
+    let labels = (await gridLabels(/Manage Wishes/))!;
+    expect(labels[0]).toContain("Manage Wishes");
+    expect(labels[1]).toContain("Manage Users");
+
+    // jsdom events carry no clientX, so shifting the mocked rect left puts
+    // the (0,0) pointer in the right half → "after".
+    users.getBoundingClientRect = () => rect(-200, 200);
+    fireEvent.dragOver(users, { dataTransfer: {} });
+    labels = (await gridLabels(/Manage Wishes/))!;
+    expect(labels[1]).toContain("Manage Wishes");
+    expect(labels[2]).toContain("Manage Referrers");
+
+    // The preview is local state — nothing persists until the drop.
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(allKeys));
+    fireEvent.drop(users, { dataTransfer: {} });
+
+    const expected = [...allKeys];
+    expected.splice(expected.indexOf("wishes"), 1);
+    expected.splice(expected.indexOf("referrers"), 0, "wishes"); // "after" Manage Users
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(expected));
+  });
+
+  it("commits the preview when released over the dragged tile's new slot", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const wishes = await screen.findByRole("link", { name: /Manage Wishes/ });
+    const users = screen.getByRole("link", { name: /Manage Users/ });
+
+    fireEvent.dragStart(wishes, { dataTransfer: {} });
+    users.getBoundingClientRect = () => rect(0, 200);
+    fireEvent.dragOver(users, { dataTransfer: {} });
+
+    // After the reflow the cursor typically rests over the dimmed drag tile
+    // itself — releasing there must commit, not cancel.
+    fireEvent.drop(wishes, { dataTransfer: {} });
+
+    const expected = [...allKeys];
+    expected.splice(expected.indexOf("wishes"), 1);
+    expected.splice(0, 0, "wishes"); // "before" Manage Users
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(expected));
+  });
+
+  it("reverts the preview when the drag is cancelled (dragEnd without drop)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const wishes = await screen.findByRole("link", { name: /Manage Wishes/ });
+    const users = screen.getByRole("link", { name: /Manage Users/ });
+
+    fireEvent.dragStart(wishes, { dataTransfer: {} });
+    users.getBoundingClientRect = () => rect(0, 200);
+    fireEvent.dragOver(users, { dataTransfer: {} });
+    let labels = (await gridLabels(/Manage Wishes/))!;
+    expect(labels[0]).toContain("Manage Wishes");
+
+    fireEvent.dragEnd(wishes);
+    labels = (await gridLabels(/Manage Wishes/))!;
+    expect(labels[0]).toContain("Manage Users");
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(allKeys));
+  });
+
+  it("is a no-op when a tile is dropped without ever moving", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const wishes = await screen.findByRole("link", { name: /Manage Wishes/ });
+
+    fireEvent.dragStart(wishes, { dataTransfer: {} });
+    fireEvent.drop(wishes, { dataTransfer: {} });
+
+    // No dragover ever decided a new slot — storage still holds the default
+    // order (written on mount by the persistence effect).
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(allKeys));
+  });
+
+  it("sets the drag image to the grabbed tile only (never the whole grid)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const wishes = await screen.findByRole("link", { name: /Manage Wishes/ });
+    wishes.getBoundingClientRect = () => rect(100, 100, 100);
+
+    const setDragImage = vi.fn();
+    // jsdom drag events carry no pointer coordinates, so the handler's
+    // center-fallback grabs the tile at its middle (50, 50 for this rect).
+    fireEvent.dragStart(wishes, { dataTransfer: { setDragImage } });
+
+    expect(setDragImage).toHaveBeenCalledOnce();
+    expect(setDragImage).toHaveBeenCalledWith(wishes as HTMLAnchorElement, 50, 50);
+  });
+
+  it("cancels drags that start on the grid background (a guard against giant default drag images)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+    await screen.findByRole("link", { name: /Manage Wishes/ });
+
+    const grid = document.querySelector("[data-tile-grid]") as HTMLElement;
+    const ev = new Event("dragstart", { bubbles: true, cancelable: true });
+    grid.dispatchEvent(ev);
+
+    // The capture guard must have prevented the browser default (which builds
+    // the drag image), and no tile drag may have started.
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.querySelector(".opacity-50")).toBeNull();
+  });
+
+  it("moves a tile one visible step with arrow keys (and prevents page scroll)", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+
+    renderDashboard(adminUser);
+
+    const users = await screen.findByRole("link", { name: /Manage Users/ });
+
+    // fireEvent returns false when the event's default was prevented.
+    const notPrevented = fireEvent.keyDown(users, { key: "ArrowRight" });
+    expect(notPrevented).toBe(false);
+
+    const labels = (await gridLabels(/Manage Users/))!;
+    expect(labels[0]).toContain("Manage Referrers");
+    expect(labels[1]).toContain("Manage Users");
+
+    // Non-arrow keys keep their normal behavior (not prevented).
+    expect(fireEvent.keyDown(users, { key: "a" })).toBe(true);
+  });
+
+  it("restores the tile order AND default-visible set via Reset in the gear popover", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    const customOrder = ["wishes", ...allKeys.filter((k) => k !== "wishes")];
+    localStorage.setItem("kim:dashboardTileOrder:admin", JSON.stringify(customOrder));
+    // A customized visibility set too, so Reset has both dimensions to restore.
+    localStorage.setItem("kim:dashboardTiles:admin", JSON.stringify(allKeys.filter((k) => k !== "users")));
+
+    renderDashboard(adminUser);
+
+    await user.click(await screen.findByRole("button", { name: "Toggle dashboard tiles" }));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    const labels = (await gridLabels(/Manage Users/))!;
+    expect(labels[0]).toContain("Manage Users");
+    expect(localStorage.getItem("kim:dashboardTileOrder:admin")).toBe(JSON.stringify(allKeys));
+    expect(localStorage.getItem("kim:dashboardTiles:admin")).toBe(
+      JSON.stringify(allKeys.filter((k) => k !== "csv-upload" && k !== "sponsorships"))
+    );
   });
 });
 

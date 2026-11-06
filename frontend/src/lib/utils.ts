@@ -38,6 +38,32 @@ export function safeRemoveItem(key: string): void {
 }
 
 /**
+ * Normalize a stored user-defined key order against a registry.
+ *
+ * Keeps only keys present in the registry (in stored order), drops
+ * duplicates, and appends any missing keys at the end in registry order.
+ * Non-array input (malformed JSON, etc.) yields the default registry order.
+ * Shared by the column-order and dashboard-tile-order hooks.
+ */
+export function normalizeKeyOrder(stored: unknown, defs: Array<{ key: string }>): string[] {
+  const valid = new Set(defs.map((d) => d.key));
+  const result: string[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(stored)) {
+    for (const key of stored) {
+      if (typeof key === "string" && valid.has(key) && !seen.has(key)) {
+        result.push(key);
+        seen.add(key);
+      }
+    }
+  }
+  for (const def of defs) {
+    if (!seen.has(def.key)) result.push(def.key);
+  }
+  return result;
+}
+
+/**
  * NULLABLE_FIELDS — fields that the backend stores as `NULL` when empty.
  * Used by `normalizePayload` (create operations) to convert `""` → `null`.
  */

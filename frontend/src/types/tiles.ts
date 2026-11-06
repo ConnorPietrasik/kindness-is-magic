@@ -11,10 +11,13 @@ export interface DashboardTileDef {
 }
 
 /**
- * Dashboard tiles per role. Defs order is the display order; the stored
- * visibility list is a set, never an order. Only roles with an entry here
- * get the tile toggle (currently admins only). A tile's `visible` flag sets
- * its default — shown on first visit and restored by Reset.
+ * Dashboard tiles per role. Defs order is the DEFAULT display order; a
+ * user's custom order is a separate stored list of ALL tile keys (hidden
+ * tiles included — they hold their slot), managed by useDashboardTiles.
+ * The stored visibility list is a set, never an order. Only roles with an
+ * entry here get the tile toggle (currently admins only). A tile's
+ * `visible` flag sets its default — shown on first visit and restored by
+ * Reset.
  */
 export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
   admin: [

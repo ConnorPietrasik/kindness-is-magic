@@ -13,6 +13,7 @@ import {
   humanize,
   isExpiredInvite,
   isFamilyLocked,
+  normalizeKeyOrder,
   normalizePayload,
   normalizeUpdatePayload,
   nowIso,
@@ -102,6 +103,73 @@ describe("humanize", () => {
     expect(humanize("")).toBe("");
     expect(humanize(null)).toBe("");
     expect(humanize(undefined)).toBe("");
+  });
+});
+
+describe("normalizeKeyOrder", () => {
+  const defs = [
+    { key: "name" },
+    { key: "family_limit" },
+    { key: "phone_number" },
+    { key: "pickup_window" },
+    { key: "family_invite_code" },
+    { key: "approval_status" },
+    { key: "approved_by_admin_name" },
+    { key: "approved_at" },
+    { key: "created_at" },
+  ];
+
+  it("returns registry order for empty or non-array input", () => {
+    expect(normalizeKeyOrder([], defs)).toEqual(defs.map((d) => d.key));
+    expect(normalizeKeyOrder(undefined, defs)).toEqual(defs.map((d) => d.key));
+    expect(normalizeKeyOrder("garbage", defs)).toEqual(defs.map((d) => d.key));
+    expect(normalizeKeyOrder(42, defs)).toEqual(defs.map((d) => d.key));
+  });
+
+  it("keeps stored order for valid keys", () => {
+    expect(normalizeKeyOrder(["created_at", "name", "family_limit"], defs)).toEqual([
+      "created_at",
+      "name",
+      "family_limit",
+      "phone_number",
+      "pickup_window",
+      "family_invite_code",
+      "approval_status",
+      "approved_by_admin_name",
+      "approved_at",
+    ]);
+  });
+
+  it("drops unknown keys and duplicates", () => {
+    expect(normalizeKeyOrder(["name", "nonexistent_field", "name", 7, null, "family_limit"], defs)).toEqual([
+      "name",
+      "family_limit",
+      "phone_number",
+      "pickup_window",
+      "family_invite_code",
+      "approval_status",
+      "approved_by_admin_name",
+      "approved_at",
+      "created_at",
+    ]);
+  });
+
+  it("appends missing keys at the end in registry order", () => {
+    expect(normalizeKeyOrder(["family_limit"], defs)).toEqual([
+      "family_limit",
+      "name",
+      "phone_number",
+      "pickup_window",
+      "family_invite_code",
+      "approval_status",
+      "approved_by_admin_name",
+      "approved_at",
+      "created_at",
+    ]);
+  });
+
+  it("returns an empty order for an empty registry", () => {
+    expect(normalizeKeyOrder(["anything"], [])).toEqual([]);
   });
 });
 

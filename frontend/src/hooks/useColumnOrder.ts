@@ -1,8 +1,8 @@
 /** Hook for managing per-resource column order with localStorage persistence. */
 
 import { useEffect, useState } from "react";
-import { safeGetItem, safeSetItem } from "../lib/utils";
-import { COLUMNS, type ColumnDef, normalizeColumnOrder } from "../types/columns";
+import { normalizeKeyOrder, safeGetItem, safeSetItem } from "../lib/utils";
+import { COLUMNS, type ColumnDef } from "../types/columns";
 
 const STORAGE_PREFIX = "kim:columnOrder:";
 const EVENT_TYPE = "kim:column-order-change";
@@ -76,7 +76,7 @@ export function useColumnOrder(resourceKey: string, visibleKeys?: string[]): Use
     const stored = safeGetItem(storageKey);
     if (stored) {
       try {
-        return normalizeColumnOrder(JSON.parse(stored), defs);
+        return normalizeKeyOrder(JSON.parse(stored), defs);
       } catch {
         // ignore malformed data
       }

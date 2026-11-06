@@ -168,31 +168,6 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
   ],
 };
 
-/**
- * Normalize a stored column order against the column registry.
- *
- * Keeps only keys present in the registry (in stored order), drops
- * duplicates, and appends any missing keys at the end in registry order.
- * Non-array input (malformed JSON, etc.) yields the default registry order.
- */
-export function normalizeColumnOrder(stored: unknown, defs: ColumnDef[]): string[] {
-  const valid = new Set(defs.map((d) => d.key));
-  const result: string[] = [];
-  const seen = new Set<string>();
-  if (Array.isArray(stored)) {
-    for (const key of stored) {
-      if (typeof key === "string" && valid.has(key) && !seen.has(key)) {
-        result.push(key);
-        seen.add(key);
-      }
-    }
-  }
-  for (const def of defs) {
-    if (!seen.has(def.key)) result.push(def.key);
-  }
-  return result;
-}
-
 /** Column key → backend field names (for aliases that need multiple fields). */
 export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   linked_to: ["referrer_name", "family_name"],

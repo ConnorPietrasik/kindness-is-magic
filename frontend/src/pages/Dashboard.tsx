@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -467,19 +468,70 @@ function CopyableRow({ label, value }: CopyableRowProps) {
 
 /**
  * NavCard — clickable nav card with icon, label and description.
+ *
+ * Optionally a drag source/target for the admin tile reordering: pass
+ * `draggable` plus the handlers to get the grab cursor, dimmed drag state
+ * and focus ring. The non-admin role nav cards pass none of these and stay
+ * plain links.
  */
 interface NavCardProps {
   to: string;
   icon: string;
   label: string;
   desc: string;
+  /** Make this card draggable (admin tile reordering). */
+  draggable?: boolean;
+  /** Tooltip shown on drag-enabled cards. */
+  dragTitle?: string;
+  /** Stable key identifying the card (FLIP animation lookup). */
+  tileKey?: string;
+  /** Dimmed while this card is the one being dragged. */
+  dragging?: boolean;
+  onDragStart?: (e: DragEvent<HTMLAnchorElement>) => void;
+  onDragOver?: (e: DragEvent<HTMLAnchorElement>) => void;
+  onDrop?: (e: DragEvent<HTMLAnchorElement>) => void;
+  onDragEnd?: (e: DragEvent<HTMLAnchorElement>) => void;
+  onKeyDown?: (e: KeyboardEvent<HTMLAnchorElement>) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  /** Selection ring while this card is focused (click or Tab). */
+  focused?: boolean;
 }
 
-function NavCard({ to, icon, label, desc }: NavCardProps) {
+function NavCard({
+  to,
+  icon,
+  label,
+  desc,
+  draggable,
+  dragTitle,
+  tileKey,
+  dragging,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onKeyDown,
+  onFocus,
+  onBlur,
+  focused,
+}: NavCardProps) {
   return (
     <Link
       to={to}
-      className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md"
+      data-tile-key={tileKey}
+      {...(draggable && { draggable: true })}
+      {...(dragTitle && { title: dragTitle })}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      className={`group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-btn-start/40 hover:shadow-md ${
+        draggable ? "cursor-grab select-none active:cursor-grabbing" : ""
+      } ${dragging ? "opacity-50" : ""} ${focused ? "ring-2 ring-inset ring-btn-start/50" : ""}`}
     >
       <span className="text-2xl">{icon}</span>
       <span className="text-sm font-semibold text-gray-900 group-hover:text-btn-start">{label}</span>
@@ -490,22 +542,323 @@ function NavCard({ to, icon, label, desc }: NavCardProps) {
 
 /**
  * AdminTiles — admin nav tile grid driven by the DASHBOARD_TILES registry,
- * with a per-admin show/hide toggle (persisted to localStorage).
+ * with per-admin show/hide (gear popover) and drag-to-reorder, both
+ * persisted to localStorage.
+ *
+ * Dragging reflows the grid LIVE: the dragged tile (dimmed) moves to its
+ * would-be slot while the cursor is held and the other tiles slide out of
+ * the way (FLIP, below), so the drop point is always visible. Releasing on
+ * any tile commits the preview — Esc releases the drag the same way, so it
+ * drops on whatever tile is under the pointer. Releasing (or Esc) outside
+ * the grid reverts it. Hidden tiles hold their slot in the stored order
+ * (useDashboardTiles).
  */
 function AdminTiles() {
-  const { visibleTiles, defs } = useDashboardTiles("admin");
+  const { visibleTiles, orderedTiles, defs, reorder, moveBy } = useDashboardTiles("admin");
+  /** Key of the tile under an active drag (null when not dragging). */
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  /**
+   * Insertion index of the dragged tile within the visible tiles MINUS the
+   * dragged tile; null until the first hover decides it. The grid renders
+   * this preview — release commits it, cancel discards it.
+   */
+  const [dragInsert, setDragInsert] = useState<number | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const defByKey = new Map(defs.map((d) => [d.key, d]));
+  const baseTiles = orderedTiles.flatMap((key) => {
+    const def = defByKey.get(key);
+    return def && visibleTiles.includes(def.key) ? [def] : [];
+  });
+
+  // Live drag preview: base order with the dragged tile at `dragInsert`
+  // (its own slot until the first hover) — the grid the user sees is the
+  // grid they will get on release.
+  let tiles = baseTiles;
+  if (dragKey) {
+    const dragging = baseTiles.find((t) => t.key === dragKey);
+    if (dragging) {
+      const others = baseTiles.filter((t) => t.key !== dragKey);
+      const insert = dragInsert ?? baseTiles.indexOf(dragging);
+      tiles = [...others.slice(0, insert), dragging, ...others.slice(insert)];
+    }
+  }
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  /** Layout position + slot (index among grid children) at the last commit — the FLIP baseline. */
+  const lastRects = useRef(new Map<string, { x: number; y: number; slot: number }>());
+  const animations = useRef(new Map<string, Animation>());
+
+  // FLIP — slide tiles between layout positions, on every render.
+  //
+  // A tile animates only when its SLOT (index among the grid's children)
+  // changed: that is what a reorder is. Layout shifts that keep every tile
+  // in its slot (web-font swap, a banner appearing above the grid, window
+  // resize) snap silently — this is what stops tiles "flying in" from a
+  // stale baseline.
+  //
+  // The start point of each slide is the tile's VISUAL position before this
+  // render (previous layout + in-flight transform offset — see below), so a
+  // reorder landing mid-slide re-targets from where the tile visibly is:
+  // rapid reflows (live dragging, hammered arrow keys) re-target smoothly
+  // instead of restarting from a stale point and jittering.
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const els = Array.from(grid.querySelectorAll<HTMLElement>("[data-tile-key]"));
+    if (els.length === 0) return;
+
+    const measure = () => {
+      const m = new Map<string, { x: number; y: number; slot: number }>();
+      els.forEach((el, slot) => {
+        const key = el.dataset.tileKey;
+        if (!key) return;
+        // Document (not viewport) coordinates, so a scroll can't corrupt them.
+        const r = el.getBoundingClientRect();
+        m.set(key, { x: r.left - window.scrollX, y: r.top - window.scrollY, slot });
+      });
+      return m;
+    };
+
+    // "First" — current visual positions. The DOM is already at the NEW
+    // layout here, so these are (new layout + in-flight transform offset).
+    const firstNow = measure();
+    const prevRects = lastRects.current;
+
+    // Cancel the in-flight animations so "Last" is pure layout (and finished
+    // entries don't accumulate). In-flight keys are remembered: a tile whose
+    // slot didn't change but is mid-slide should finish its slide (e.g. the
+    // moment a drag releases), not snap to the layout.
+    const inFlight = new Set<string>();
+    for (const [key, anim] of animations.current) {
+      if (anim.playState === "finished") {
+        animations.current.delete(key);
+      } else {
+        inFlight.add(key);
+        anim.cancel();
+      }
+    }
+
+    // "Last" — pure layout positions. `slot` is the tile's index among the
+    // grid's children: it changes exactly when the tile's ORDER changes,
+    // and stays put for layout shifts that don't reorder (web-font swap,
+    // banner appearing above the grid, window resize) — those must snap,
+    // not slide.
+    const last = measure();
+    lastRects.current = last;
+
+    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+
+    // A genuine reorder moves a tile by at most the grid's own width or
+    // height. More than that means the stored baseline went stale without a
+    // render (e.g. a font swap) — snap instead of flying the tile in.
+    const gridRect = grid.getBoundingClientRect();
+    const maxDx = gridRect.width;
+    const maxDy = gridRect.height;
+
+    els.forEach((el, slot) => {
+      const key = el.dataset.tileKey;
+      if (!key) return;
+      const target = last.get(key);
+      const first = firstNow.get(key);
+      // Layout at the previous commit — where the tile sat before this render.
+      const prev = prevRects.get(key);
+      if (!target || !first || !prev) return;
+      // Same slot, no in-flight slide (font/resize/banner shift): no slide.
+      if (prev.slot === slot && !inFlight.has(key)) return;
+      // The tile's VISUAL position before this render: its previous layout
+      // plus the in-flight transform offset (zero when not animating). An
+      // in-flight animation's offset rides on the element, so a layout change
+      // moves the visual position with it — starting the new slide from this
+      // point is what makes rapid re-targets (live-drag reflows) jump-free.
+      const dx = prev.x + (first.x - target.x) - target.x;
+      const dy = prev.y + (first.y - target.y) - target.y;
+      if (dx === 0 && dy === 0) return;
+      if (Math.abs(dx) > maxDx || Math.abs(dy) > maxDy) return;
+      if (typeof el.animate !== "function") return; // jsdom (tests)
+      animations.current.set(
+        key,
+        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0px, 0px)" }], {
+          duration: 180,
+          easing: "cubic-bezier(0.2, 0, 0, 1)",
+        })
+      );
+    });
+  });
+
+  /**
+   * Set by an Esc keydown during the drag. Esc over a tile behaves like a
+   * normal release (the browser fires `drop` and commits), so this only
+   * matters for a dropless release that still lands inside the grid — over
+   * a gap between tiles — which then reverts instead of committing the
+   * last previewed slot.
+   */
+  const dragCancelled = useRef(false);
+
+  // While a drag is active, watch for Esc: it releases the drag like the
+  // mouse (drop → commit when over a tile), and this flag is what makes a
+  // dropless Esc release over a grid gap revert instead of committing.
+  useEffect(() => {
+    if (!dragKey) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") dragCancelled.current = true;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dragKey]);
+
+  /** True when a viewport point sits inside the tiles grid. */
+  function pointInGrid(point: { x: number; y: number }): boolean {
+    let el: Element | null;
+    try {
+      el = document.elementFromPoint(point.x, point.y);
+    } catch {
+      el = null;
+    }
+    return !!el?.closest?.("[data-tile-grid]");
+  }
+
+  // A drag that starts anywhere in the grid that is NOT a tile (the grid
+  // background, the gaps) would otherwise take a giant default drag image —
+  // or a text-selection drag — and bypass the tile handlers entirely.
+  // Cancel it before the browser builds any image.
+  useEffect(() => {
+    const guard = (e: globalThis.DragEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.("[data-tile-grid]") && !t.closest?.("[data-tile-key]")) e.preventDefault();
+    };
+    window.addEventListener("dragstart", guard, true);
+    return () => window.removeEventListener("dragstart", guard, true);
+  }, []);
+
+  function handleDragStart(e: DragEvent<HTMLAnchorElement>, key: string) {
+    // Don't hijack drags that start inside interactive controls.
+    const target = e.target as HTMLElement;
+    if (target.closest("input, textarea, select, button")) {
+      e.preventDefault();
+      return;
+    }
+    setDragKey(key);
+    setDragInsert(null);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      // The ghost must be exactly this tile, grabbed at the cursor. Relying
+      // on the browser's default image lets some browsers ghost a much
+      // larger region, which follows the cursor out of the window.
+      if (typeof e.dataTransfer.setDragImage === "function") {
+        const rect = e.currentTarget.getBoundingClientRect();
+        e.dataTransfer.setDragImage(
+          e.currentTarget,
+          Math.round((e.clientX ?? rect.left + rect.width / 2) - rect.left),
+          Math.round((e.clientY ?? rect.top + rect.height / 2) - rect.top)
+        );
+      }
+    }
+  }
+
+  function handleDragOver(e: DragEvent<HTMLAnchorElement>, key: string) {
+    if (!dragKey) return;
+    // A valid drop target on EVERY tile, including the dragged one itself:
+    // after the reflow the cursor usually rests over the dragged tile's new
+    // slot, and releasing there must commit, not cancel.
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    if (key === dragKey) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = (e.clientX ?? 0) < rect.left + rect.width / 2 ? "before" : "after";
+    // Insertion index of `key` in the base order minus the dragged tile.
+    const others = baseTiles.filter((t) => t.key !== dragKey);
+    const hIdx = others.findIndex((t) => t.key === key);
+    if (hIdx === -1) return;
+    const insert = pos === "before" ? hIdx : hIdx + 1;
+    // Render synchronously: while a native drag is in progress Chromium
+    // delivers no rAF ticks, and a plain state update from a dragover (a
+    // continuous event) would not paint until the next discrete event —
+    // the grid must visibly make room as the cursor moves.
+    flushSync(() => {
+      setDragInsert((cur) => (cur === insert ? cur : insert));
+    });
+  }
+
+  /** Commit the preview if the drag actually moved the tile. */
+  function commitDrag() {
+    if (!dragKey || dragInsert === null) return;
+    const baseIndex = baseTiles.findIndex((t) => t.key === dragKey);
+    if (baseIndex === -1 || dragInsert === baseIndex) return; // no move
+    const others = baseTiles.filter((t) => t.key !== dragKey);
+    // `dragInsert` is only set by a dragover over a real tile, so it indexes a
+    // neighbor in `others`; the check keeps that invariant explicit (and bails
+    // if state changed mid-drag) instead of relying on `!` assertions.
+    if (dragInsert < 0 || dragInsert > others.length) return;
+    const lastSlot = dragInsert === others.length;
+    const target = lastSlot ? others[others.length - 1] : others[dragInsert];
+    if (target) reorder(dragKey, target.key, lastSlot ? "after" : "before");
+  }
+
+  function handleDrop(e: DragEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    commitDrag();
+    setDragKey(null);
+    setDragInsert(null);
+  }
+
+  function handleDragEnd(e: DragEvent<HTMLAnchorElement>) {
+    // A successful `drop` already committed and cleared the state. Reaching
+    // here means the browser found no valid drop target — which happens even
+    // for a perfectly good release, because after the reflow the cursor
+    // usually rests over the moved drag tile and Chrome delivers no `drop`
+    // there. So: commit when the pointer ended inside the grid; revert only
+    // for an explicit Esc or a release outside it. The dragend event carries
+    // the true release position — correct even after a mid-drag auto-scroll.
+    if (dragKey && !dragCancelled.current && pointInGrid({ x: e.clientX, y: e.clientY })) {
+      commitDrag();
+    }
+    dragCancelled.current = false;
+    setDragKey(null);
+    setDragInsert(null);
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLAnchorElement>, key: string) {
+    // Arrow keys must keep their normal behavior inside inner controls —
+    // only react when the tile itself is focused.
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      moveBy(key, -1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      moveBy(key, 1);
+    }
+  }
 
   return (
     <div className="mb-6">
       <div className="mb-2 flex justify-end">
         <TileToggle roleKey="admin" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {defs
-          .filter((tile) => visibleTiles.includes(tile.key))
-          .map((tile) => (
-            <NavCard key={tile.key} to={tile.route} icon={tile.icon} label={tile.label} desc={tile.desc} />
-          ))}
+      <div ref={gridRef} data-tile-grid className="grid select-none gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {tiles.map((tile) => (
+          <NavCard
+            key={tile.key}
+            to={tile.route}
+            icon={tile.icon}
+            label={tile.label}
+            desc={tile.desc}
+            draggable
+            dragTitle="Drag to reorder"
+            tileKey={tile.key}
+            dragging={dragKey === tile.key}
+            onDragStart={(e) => handleDragStart(e, tile.key)}
+            onDragOver={(e) => handleDragOver(e, tile.key)}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            onKeyDown={(e) => handleKeyDown(e, tile.key)}
+            onFocus={() => setSelectedKey(tile.key)}
+            onBlur={() => setSelectedKey((k) => (k === tile.key ? null : k))}
+            focused={selectedKey === tile.key}
+          />
+        ))}
       </div>
     </div>
   );
@@ -516,6 +869,8 @@ function AdminTiles() {
  *
  * Uses useDashboardTiles internally. Unlike ColumnToggle, changes apply
  * immediately — tiles trigger no fetch, so there is no staged "Apply".
+ * "Reset" restores the default-visible set AND the default order (same
+ * full-reset semantics as ColumnToggle's Reset).
  */
 interface TileToggleProps {
   /** Role whose DASHBOARD_TILES entry drives the toggle (e.g. "admin"). */
