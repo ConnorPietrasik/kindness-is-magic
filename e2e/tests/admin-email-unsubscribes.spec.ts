@@ -46,7 +46,7 @@ test.describe.serial("Admin email unsubscribes", () => {
     // Verify the seed took effect (fail fast with the address if not)
     const api = await loginViaApi(request);
     const listResp = await api.get("/api/admin/emails/unsubscribes", { params: { search: EMAIL, page_size: 100 } });
-    const body = await listResp.json();
+    const body = (await listResp.json()) as { preferences?: Array<{ email: string }> };
     if (!listResp.ok() || body.preferences?.some((p) => p.email === EMAIL) !== true) {
       throw new Error(`seed verification failed: status=${listResp.status()} body=${JSON.stringify(body).slice(0, 300)}`);
     }

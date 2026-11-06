@@ -6,7 +6,10 @@
  *   npx playwright test --config=playwright.screenshots.config.ts
  *
  * Captures every screen the per-role help guides reference into
- * frontend/src/assets/help/ (committed; the Vite import hashes them). Re-runs
+ * frontend/src/assets/help/ (committed; the Vite import hashes them), plus
+ * the README's public-wish-list.png (the README's dashboard shot reuses
+ * admin-dashboard.png as-is). All at the standard 1440x1000 frame, so the
+ * two README shots render at identical sizes in its table. Re-runs
  * overwrite the same files, so the script is idempotent.
  *
  * Data: the demo-CSV seed (via the standard globalSetup) provides the rich
@@ -37,7 +40,8 @@
  * loudly (409) rather than silently duplicating: wipe and re-run.
  *
  * Determinism: fresh browser contexts (no localStorage, so default tiles and
- * column order), fixed 1440x1000 viewport, locale en-US, timezone
+ * column order), fixed 1440x1000 viewport, locale en-US,
+ * timezone
  * America/Los_Angeles, deadline banners hidden before every capture. A
  * preflight guarantees every character the UI renders has a glyph (Linux
  * auto-installs Noto Color Emoji + Noto Sans Symbols 2 user-locally if not —
@@ -401,6 +405,7 @@ test.describe.serial("help page screenshots", () => {
     for (const [slug, url, wait] of shots) {
       await capture(page, slug, url, wait);
     }
+
     await context.close();
   });
 
@@ -431,7 +436,7 @@ test.describe.serial("help page screenshots", () => {
     await context.close();
   });
 
-  test("donor: capture browse, claims, claim detail, cart, registration", async ({ browser }) => {
+  test("donor: capture browse, claims, claim detail, cart, public wish list, registration", async ({ browser }) => {
     /* No donor storageState file exists (the suite creates donors per-test) —
        log in as the seeded donor via the UI, then reuse the context. */
     const context = await browser.newContext();
@@ -459,6 +464,30 @@ test.describe.serial("help page screenshots", () => {
     const guest = await browser.newContext();
     const gpage = await guest.newPage();
     await capture(gpage, "donor-register", "/register-donor", { heading: "Donor Registration" });
+
+    /* README product shot: a fully-approved demo family's public wish list
+       in its unsponsored state (Garcia is never claimed by this script's
+       scenario), at the standard 1440x1000 help framing — the same
+       dimensions as admin-dashboard.png, which the README reuses, so the
+       two render at identical sizes in its table. The page's sticky footer
+       (mt-auto inside its min-h-screen flex column) ends a short page
+       exactly at the frame's bottom edge, so the image naturally ends on
+       the footer; the assert enforces that frame contract and fails
+       loudly if the page ever outgrows the frame */
+    const wlPage = await guest.newPage();
+    const garcia = await familyIdByName("The Garcia Family");
+    await capture(wlPage, "public-wish-list", `/families/${garcia}/wish-list`, {
+      heading: "Family Members",
+      assert: async (p) => {
+        const [footerTop, footerBottom] = await p.evaluate(() => {
+          const r = document.querySelector("footer")!.getBoundingClientRect();
+          return [Math.round(r.top), Math.round(r.bottom)];
+        });
+        expect(footerTop, "footer must be visible inside the 1440x1000 frame").toBeLessThan(995);
+        expect(footerBottom, "no page background may sit below the footer in the frame").toBeGreaterThanOrEqual(995);
+        expect(footerBottom, "no page background may sit below the footer in the frame").toBeLessThanOrEqual(1000);
+      },
+    });
     await guest.close();
 
     await context.close();
@@ -681,7 +710,13 @@ async function capture(
   page: Page,
   slug: string,
   url: string,
-  wait?: { heading?: string | RegExp; selector?: string; prep?: (page: Page) => Promise<void>; onSettled?: (page: Page) => Promise<void> },
+  wait?: {
+    heading?: string | RegExp;
+    selector?: string;
+    prep?: (page: Page) => Promise<void>;
+    onSettled?: (page: Page) => Promise<void>;
+    assert?: (page: Page) => Promise<void>;
+  },
 ): Promise<void> {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -692,6 +727,16 @@ async function capture(
   if (wait?.prep) {
     await wait.prep(page);
   }
+
+  /* Headless Chromium reserves a 15px classic-scrollbar gutter when the page
+     overflows, which leaves a flat background-colored strip right of the
+     full-bleed header/footer in the screenshot (real browsers use overlay
+     scrollbars and don't reserve it). Hide it so the layout — and the shot
+     — use the full frame width. Must come after prep: its reload() wipes
+     the document and any earlier style injection with it. */
+  await page.addStyleTag({
+    content: "html{scrollbar-width:none !important}::-webkit-scrollbar{display:none !important}",
+  });
 
   if (wait?.heading) {
     await page.getByRole("heading", { name: wait.heading }).first().waitFor({ state: "visible", timeout: 15_000 });
@@ -710,6 +755,12 @@ async function capture(
   if (wait?.onSettled) {
     await wait.onSettled(page);
     await page.waitForTimeout(150);
+  }
+
+  /* Frame contract (fail loudly if the page outgrew the standard frame
+     instead of shipping a mis-framed capture) */
+  if (wait?.assert) {
+    await wait.assert(page);
   }
 
   const out = path.join(OUTPUT_DIR, `${slug}.png`);

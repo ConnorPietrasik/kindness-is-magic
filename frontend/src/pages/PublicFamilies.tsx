@@ -135,7 +135,7 @@ export default function PublicFamilies() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="flex min-h-screen flex-col bg-slate-50">
         <HeaderBar />
         <PageError
           error={error}
@@ -144,6 +144,7 @@ export default function PublicFamilies() {
           to={ROUTES.ROOT}
           linkLabel="← Back to home"
         />
+
         <SiteFooter />
       </div>
     );
@@ -177,7 +178,7 @@ export default function PublicFamilies() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <HeaderBar />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

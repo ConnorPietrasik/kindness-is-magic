@@ -1,10 +1,10 @@
+Make the "Sponsor Guide" link at the bottom go to the top of the guide
 Reorderable admin tiles
 Add a "gifts due" banner based on gift deadline to the public families page
 Add a "send reminder" button to email invited referrers
 Gift-claims should have a "$100 Walmart gift card for Christmas dinner" optional
 Automated failure checks and admin emails
 Donor reminder emails before deadline
-Anonymous donors - accept payments for families without requiring a donor account
 EVENTUALLY - Email families a week before their pickup window
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak

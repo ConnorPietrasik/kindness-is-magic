@@ -68,7 +68,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |
 | `referrer_routes.py` | Referrer-managed families and people |
 | `family_routes.py` | Family self-service endpoints |
-| `families_routes.py` | Public family resource endpoints |
+| `families_routes.py` | Public family list/wish-list + authenticated `claim` endpoint |
 | `deadlines_routes.py` | Public read-only deadline endpoints (banner data, no auth) |
 | `zeffy.py` | Read-only Zeffy API client (payment reconciliation to donor carts) |
 | `zeffy_routes.py` | Public Zeffy payment webhook (primary automatic apply path) |

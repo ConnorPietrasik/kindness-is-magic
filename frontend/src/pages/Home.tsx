@@ -47,7 +47,7 @@ export default function Home() {
   }, [location]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-white">
       <HeaderBar />
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
@@ -205,8 +205,6 @@ export default function Home() {
         </Reveal>
       </section>
 
-      <SiteFooter />
-
       {showTopButton && (
         <button
           type="button"
@@ -217,6 +215,8 @@ export default function Home() {
           <span className="text-2xl">↑</span>
         </button>
       )}
+
+      <SiteFooter />
     </div>
   );
 }

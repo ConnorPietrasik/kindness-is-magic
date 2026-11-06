@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/public/logo.png" alt="Kindness Is Magic logo" width="200">
+</p>
+
 # Kindness Is Magic
 
 A web app that connects donors with families: families (referred by referrers) collect a wish list of gifts, donors sponsor the family's wishes, and volunteers purchase and deliver the gifts.
@@ -12,6 +16,12 @@ A web app that connects donors with families: families (referred by referrers) c
 - **Admins** oversee everything: referrers, invites, families, people, wishes, assignments, deadlines, the sent-email log, and CSV bulk import.
 
 There are six roles: `admin`, `referrer`, `family`, `purchaser`, `delivery`, `donor`. Auth is cookie-based (HttpOnly JWT access + refresh tokens); when an access token expires, the frontend silently refreshes it and retries the request.
+
+| | |
+|:---:|:---:|
+| ![A family's public wish list, as a donor sees it](frontend/src/assets/help/public-wish-list.png)<br>A family's wish list, as a visitor | ![The admin dashboard](frontend/src/assets/help/admin-dashboard.png)<br>The admin home (signed in) |
+
+User-facing documentation lives in the app itself: every authenticated role gets a help guide at `/help/<role>` (linked from the header), and the donor guide (`/help/donor`) is public so prospects can read it before registering.
 
 ## Tech stack
 

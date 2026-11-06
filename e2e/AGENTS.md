@@ -36,9 +36,11 @@ Unlike those five, there is no `donor.json` storageState. The CSV seeds a donor 
 ## Help screenshots (capture script, not part of the suite)
 
 `scripts/help-screenshots.spec.ts` + `playwright.screenshots.config.ts` capture
-the screens referenced by the per-role help guides into
-`frontend/src/assets/help/` (committed). It is deliberately **outside** the
-default config's `testDir`, so CI never runs it.
+the screens referenced by the per-role help guides (plus the README's
+`public-wish-list.png`; the README's dashboard shot reuses
+`admin-dashboard.png`; all at 1440x1000 with the scrollbar gutter hidden)
+into `frontend/src/assets/help/` (committed). It is
+deliberately **outside** the default config's `testDir`, so CI never runs it.
 
 Run from `e2e/` with the dev stack up (standard `.env` values; the zeffy-mock
 wiring is needed for the donor cart capture):

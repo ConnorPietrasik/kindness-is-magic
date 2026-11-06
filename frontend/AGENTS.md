@@ -52,7 +52,7 @@ All query keys are defined here as `as const` arrays (some as factory functions 
 - Pages are **lazy-loaded** via `React.lazy()` with a `<Suspense>` spinner fallback.
 - `ProtectedRoute` wraps routes with a `roles` array. Unauthenticated users → `/login`; wrong role → `/dashboard`.
 - `PublicRoute` wraps **auth-only** pages (login, registration, password reset). Authenticated users see "Already Logged In" instead of the form.
-- **Truly public pages** (Home, privacy, financials, family browse, wish list) have no wrapper — they render for everyone, authenticated or not.
+- **Truly public pages** (Home, privacy, financials, wish list guide, family browse, family wish list, family wish cards, public donor guide) have no wrapper — they render for everyone, authenticated or not.
 - Root `/` uses `DashboardRedirect` to send authenticated users to their role-specific dashboard.
 
 ## Styling
@@ -68,7 +68,7 @@ All query keys are defined here as `as const` arrays (some as factory functions 
 - Use **named exports** in `src/components/`.
 - Reuse existing components before creating new ones.
 - **`HeaderBar` is the app's single header.** Its content is a function of auth state, not of the page: guests get the brochure section nav + "Sign in"; signed-in users get "Sign out" (always, on every page) and the title/logo link to the role's home (`ROLE_HOME` in `src/lib/routes.ts` — keep it in sync with `DashboardRedirect`). Pages pass only `left` (back links), `right` (page actions like print), and `className` — never the title or the auth controls.
-- **`SiteFooter` is rendered exactly once per page, by the layout — never inside a page.** Public pages get it from their own wrapper (Home and PublicFamilies render it directly; Privacy, Financials and Wish List Guide via `StaticPage`; FamilyWishList itself). Every authenticated page gets it from `ProtectedRoute`, which is also the signed-in path back to the brochure (its Home link). Don't add footers inside pages.
+- **`SiteFooter` is rendered exactly once per page, by the layout — never inside a page.** Public pages get it from their own wrapper (Home and PublicFamilies render it directly; Privacy, Financials and Wish List Guide via `StaticPage`; FamilyWishList itself; the public donor guide via `HelpPage` with `renderFooter`). Every public wrapper is a `flex min-h-screen flex-col` column and the footer's `mt-auto` sticks it to the bottom of short pages (long pages just flow into it). Every authenticated page gets it from `ProtectedRoute`, which is also the signed-in path back to the brochure (its Home link). Don't add footers inside pages.
 
 ## Testing
 

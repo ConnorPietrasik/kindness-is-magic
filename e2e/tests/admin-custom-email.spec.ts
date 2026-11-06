@@ -163,7 +163,7 @@ test.describe.serial("Admin custom emails", () => {
     /* Drag the left edge past the 380px min, beyond the 16px park grace */
     const handle = page.getByRole("slider", { name: "Resize panel" });
     const box = await handle.boundingBox();
-    expect(box).not.toBeNull();
+    if (!box) throw new Error("Resize panel handle not visible");
     const viewport = page.viewportSize()!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();

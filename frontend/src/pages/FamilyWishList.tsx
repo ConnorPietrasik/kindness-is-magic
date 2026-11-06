@@ -67,7 +67,7 @@ export default function FamilyWishList() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="flex min-h-screen flex-col bg-slate-50">
         <HeaderBar className="no-print" left={<BackToFamilies />} />
         <PageError
           error={error}
@@ -76,13 +76,14 @@ export default function FamilyWishList() {
           to={ROUTES.ROOT}
           linkLabel="← Back to home"
         />
+
         <SiteFooter />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <HeaderBar className="no-print" left={<BackToFamilies />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">

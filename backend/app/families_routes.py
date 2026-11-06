@@ -1,7 +1,8 @@
-"""Public family endpoints (list + wish-list).
+"""Family resource endpoints (list, wish-list, claim).
 
-This router is resource-oriented (``/api/families``) and does **not**
-require authentication.  It sits alongside the self-service ``/api/family``
+This router is resource-oriented (``/api/families``).  The list and
+wish-list endpoints are public; ``claim`` requires an authenticated
+claim-capable user.  It sits alongside the self-service ``/api/family``
 router which is scoped to the authenticated family user.
 """
 

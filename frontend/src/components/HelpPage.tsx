@@ -43,7 +43,7 @@ interface HelpPageProps {
  */
 export function HelpPage({ title, intro, sections, backTo, backLabel = "Back", renderFooter = false }: HelpPageProps) {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <HeaderBar left={<BackLink to={backTo} label={backLabel} />} />
 
       <div className="mx-auto flex max-w-6xl gap-10 px-4 py-8 sm:px-6">
