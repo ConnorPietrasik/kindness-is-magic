@@ -95,6 +95,11 @@ def list_public_families(
     """
     # Extract current user id + role from access token (no DB lookup) —
     # scopes include_claimed to admin (all claimed) / owner (own claimed).
+    # Accepted staleness: the role comes from the JWT, not the DB, so a
+    # demoted admin keeps include_claimed visibility until their access
+    # token expires (ACCESS_TOKEN_EXPIRE_MINUTES). Deliberate — a DB lookup
+    # on this public brochure endpoint is not worth the benefit; the public
+    # summary carries no PII (no contact name/address/phone).
     current_user_id: int | None = None
     is_admin = False
     if access_token:
