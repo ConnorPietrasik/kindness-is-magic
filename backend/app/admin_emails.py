@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
-from app.mail import render_custom_message_html, send_email
+from app.mail import CUSTOM_EMAIL_DEFAULT_SUBJECT, render_custom_message_html, send_email
 from app.models import EmailKind, EmailPreference, EmailStatus, SentEmail, User
 from app.permissions import require_admin
 from app.rate_limit import limiter
@@ -88,10 +88,6 @@ def list_sent_emails(
     ]
 
     return column_filtered_page(items, columns, key="emails", total=total, page=page, page_size=page_size, always_include={"id"})
-
-
-# Default subject for admin custom emails when the admin leaves it blank.
-CUSTOM_EMAIL_DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨"
 
 
 @email_admin_router.post("/send")

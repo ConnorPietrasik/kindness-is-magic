@@ -44,6 +44,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   payment_confirmed: "Payment Confirmation",
   payment_expired: "Payment Expired",
   custom_message: "Custom Message",
+  campaign: "Email Campaign",
 };
 
 const STATUS_OPTIONS: EmailStatus[] = ["sent", "failed", "reset"];

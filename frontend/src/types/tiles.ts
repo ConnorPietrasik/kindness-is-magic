@@ -113,6 +113,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "email-campaigns",
+      route: ROUTES.ADMIN_EMAIL_CAMPAIGNS,
+      icon: "📨",
+      label: "Email Campaigns",
+      desc: "Send a batch email to selected roles or a list of addresses",
+      visible: true,
+    },
+    {
       key: "email-unsubscribes",
       route: ROUTES.ADMIN_EMAIL_UNSUBSCRIBES,
       icon: "🔕",

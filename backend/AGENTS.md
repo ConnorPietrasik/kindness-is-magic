@@ -58,11 +58,13 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_users.py` | Admin CRUD for users + CSV import |
 | `admin_wishes.py` | Admin CRUD for wishes (list/detail/update/mark-purchased/batch-assign) |
 | `admin_emails.py` | Admin sent-email log (list/filter) |
+| `admin_campaigns.py` | Admin email campaigns (batch email: create/preview/list/detail/cancel) |
 | `admin_deadlines.py` | Admin CRUD for event deadlines (no `columns`/pagination, hard delete) |
 | `admin_zeffy.py` | Admin Zeffy payment reconciliation (list payments, manual match/unmatch) |
 | `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
 | `deadlines.py` | Deadline enforcement (armed checks, batch actions, daily background task) |
 | `payments.py` | Cash-claim payment lifecycle (shared idempotent apply path, hourly expiry sweep) |
+| `email_campaigns.py` | Email campaign delivery (recipient snapshot, paced background worker) |
 | `delivery_routes.py` | Delivery person self-service (assigned families, packing slips) |
 | `donor_routes.py` | Donor / claim-capable self-service (family claims — available to admin, referrer, purchaser, donor) |
 | `purchaser_routes.py` | Purchaser self-service (assigned wishes, mark purchased) |

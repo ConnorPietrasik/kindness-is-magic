@@ -1,6 +1,7 @@
 /** Re-export all shared types. */
 
 export type {
+  AdminCampaignRecipientsListParams,
   AdminEmailsListParams,
   AdminFamiliesListParams,
   AdminListParams,
@@ -35,6 +36,7 @@ export type {
   CsvValidationStats,
 } from "./csv";
 export type {
+  AdminCampaignCreatePayload,
   AdminClaim,
   AdminClaimsListParams,
   AdminClaimsResponse,
@@ -43,6 +45,8 @@ export type {
   AdminUserCreate,
   AdminUserUpdate,
   AdminWishUpdate,
+  CampaignRecipientSource,
+  CampaignRecipientStatus,
   CartCheckoutItem,
   CartCheckoutResult,
   CartConfirmResult,
@@ -62,6 +66,12 @@ export type {
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
   DonorWishSummary,
+  EmailCampaignDetail,
+  EmailCampaignDetailResponse,
+  EmailCampaignPreview,
+  EmailCampaignRecipientSummary,
+  EmailCampaignStatus,
+  EmailCampaignSummary,
   EmailKind,
   EmailPreferenceListResponse,
   EmailPreferenceSummary,

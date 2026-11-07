@@ -535,10 +535,85 @@ export type EmailKind =
   | "payment_request"
   | "payment_confirmed"
   | "payment_expired"
-  | "custom_message";
+  | "custom_message"
+  | "campaign";
 
 /** Mirrors backend EmailStatus enum. */
 export type EmailStatus = "sent" | "failed" | "reset";
+
+// ---------------------------------------------------------------------------
+// Email Campaigns (admin batch email)
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend EmailCampaignStatus enum. */
+export type EmailCampaignStatus = "pending" | "sending" | "completed" | "canceled";
+
+/** Mirrors backend EmailCampaignRecipientSource enum. */
+export type CampaignRecipientSource = "role" | "manual";
+
+/** Mirrors backend EmailCampaignRecipientStatus enum. */
+export type CampaignRecipientStatus = "pending" | "sent" | "failed" | "canceled";
+
+/** One row of the admin campaign list. Mirrors EmailCampaignSummary. */
+export interface EmailCampaignSummary {
+  id: number;
+  subject: string;
+  roles: UserRole[];
+  status: EmailCampaignStatus;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  /** Derived from the recipient rows (total - sent - failed - canceled). */
+  pending_count: number;
+  canceled_count: number;
+  created_at: string;
+  completed_at: string | null;
+  sender_name: string | null;
+}
+
+/** Full campaign view (detail page) — the summary plus the stored message body. */
+export interface EmailCampaignDetail extends EmailCampaignSummary {
+  message: string;
+}
+
+/** One recipient row of a campaign (the delivery progress audit). Mirrors EmailCampaignRecipientSummary. */
+export interface EmailCampaignRecipientSummary {
+  id: number;
+  email: string;
+  source: CampaignRecipientSource;
+  status: CampaignRecipientStatus;
+  failure_reason: string | null;
+  sent_at: string | null;
+  /** Account display name when the address belongs to a user — null for manual-only addresses. */
+  user_display_name: string | null;
+}
+
+/** Campaign detail + its recipients as a paginated page. Mirrors EmailCampaignDetailResponse. */
+export interface EmailCampaignDetailResponse {
+  campaign: EmailCampaignDetail;
+  recipients: EmailCampaignRecipientSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Payload for creating an email campaign. Mirrors AdminCampaignCreateRequest. */
+export interface AdminCampaignCreatePayload {
+  roles: UserRole[];
+  extra_emails: string[];
+  /** Blank ("") subjects are sent as null — the server applies its default subject. */
+  subject: string | null;
+  /** Plain text, never HTML. */
+  message: string;
+}
+
+/** Resolved recipient counts for a campaign selection (no campaign created). Mirrors EmailCampaignPreviewResponse. */
+export interface EmailCampaignPreview {
+  total: number;
+  by_role: Partial<Record<UserRole, number>>;
+  manual: number;
+}
 
 /** One row of the referrer's family invite email history. Mirrors ReferrerInviteEmailItem. */
 export interface ReferrerInviteEmailItem {

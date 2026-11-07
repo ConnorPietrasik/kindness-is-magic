@@ -24,6 +24,7 @@ from app.auth import get_password_hash
 from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.deadlines import deadline_checks_loop
+from app.email_campaigns import campaign_worker_loop
 from app.payments import claim_expiry_loop
 from app.models import User, UserRole, default_display_name_from_email
 
@@ -208,6 +209,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     leader_fd = _try_acquire_leader_lock()
     deadline_task: asyncio.Task | None = None
     expiry_task: asyncio.Task | None = None
+    campaign_task: asyncio.Task | None = None
 
     if leader_fd is not None:
         db = None
@@ -264,13 +266,17 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
             # the deadline loop (tests exercise run_claim_expiry directly).
             expiry_task = asyncio.create_task(claim_expiry_loop())
             logger.info("Hourly claim-expiry task started.")
+            # Email campaign delivery — one campaign email per cycle, paced
+            # by EMAIL_CAMPAIGN_INTERVAL_SECONDS (see email_campaigns.py).
+            campaign_task = asyncio.create_task(campaign_worker_loop())
+            logger.info("Email campaign worker started.")
     else:
         logger.info("Not the leader worker — skipping startup seed and background tasks.")
 
     try:
         yield
     finally:
-        for task in (deadline_task, expiry_task):
+        for task in (deadline_task, expiry_task, campaign_task):
             if task is not None:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -376,6 +382,7 @@ from app.admin_users import csv_admin_router, user_admin_router  # noqa: E402
 from app.admin_invites import invite_admin_router  # noqa: E402
 from app.admin_wishes import admin_wishes_router  # noqa: E402
 from app.admin_emails import email_admin_router  # noqa: E402
+from app.admin_campaigns import campaign_admin_router  # noqa: E402
 from app.admin_deadlines import deadline_admin_router  # noqa: E402
 from app.admin_zeffy import zeffy_admin_router  # noqa: E402
 
@@ -387,6 +394,7 @@ app.include_router(user_admin_router)
 app.include_router(invite_admin_router)
 app.include_router(admin_wishes_router)
 app.include_router(email_admin_router)
+app.include_router(campaign_admin_router)
 app.include_router(deadline_admin_router)
 app.include_router(zeffy_admin_router)
 

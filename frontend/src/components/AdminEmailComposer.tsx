@@ -41,7 +41,7 @@ import { Button } from "./Button";
 import { EmailPreviewFrame } from "./EmailPreviewFrame";
 import { FormField } from "./FormField";
 
-// COUPLING: mirrors CUSTOM_EMAIL_DEFAULT_SUBJECT in backend/app/admin_emails.py —
+// COUPLING: mirrors CUSTOM_EMAIL_DEFAULT_SUBJECT in backend/app/mail.py —
 // shown as the Subject placeholder and in the preview whenever the subject is
 // blank (the server applies the same default).
 const DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨";

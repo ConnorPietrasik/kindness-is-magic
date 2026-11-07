@@ -77,6 +77,11 @@ mail_manager: FastMail = FastMail(conf)
 # be able to mute someone indefinitely.
 UNSUBSCRIBE_TOKEN_TTL_DAYS = 30
 
+# Default subject for admin-written emails (single custom send and email
+# campaigns) when the admin leaves the subject blank. Mirrored by the
+# frontend as a placeholder/preview — keep in sync.
+CUSTOM_EMAIL_DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨"
+
 
 def _unsubscribe_url(email: str) -> str:
     """Generate a signed, purpose-scoped JWT token embedding the email.

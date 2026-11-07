@@ -67,6 +67,7 @@ describe("KIND_LABELS", () => {
     "payment_confirmed",
     "payment_expired",
     "custom_message",
+    "campaign",
   ];
 
   it("has a display label for every email kind", () => {

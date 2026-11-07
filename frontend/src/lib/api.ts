@@ -11,6 +11,8 @@
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 import type {
+  AdminCampaignCreatePayload,
+  AdminCampaignRecipientsListParams,
   AdminClaimsListParams,
   AdminClaimsResponse,
   AdminEmailsListParams,
@@ -39,6 +41,9 @@ import type {
   DonorCartItem,
   DonorSelfRegisterPayload,
   DonorSelfRegisterResponse,
+  EmailCampaignDetailResponse,
+  EmailCampaignPreview,
+  EmailCampaignSummary,
   EmailListResponse,
   EmailPreferenceListResponse,
   EmailUnsubscribesListParams,
@@ -523,6 +528,49 @@ export function adminListEmailUnsubscribes(params?: EmailUnsubscribesListParams)
  */
 export function adminResubscribeEmail(email: string): Promise<void> {
   return apiPost("/api/admin/emails/unsubscribes/resubscribe", { email });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Email Campaigns (batch email)
+// ---------------------------------------------------------------------------
+
+/**
+ * List all email campaigns (newest first) with live progress counts.
+ *
+ * Small settings-style table — no pagination on the backend.
+ */
+export function adminListEmailCampaigns(): Promise<{ campaigns: EmailCampaignSummary[] }> {
+  return apiGet("/api/admin/email-campaigns");
+}
+
+/** Campaign detail (incl. message body) + its recipients as a paginated page. */
+export function adminGetEmailCampaign(id: number, params?: AdminCampaignRecipientsListParams): Promise<EmailCampaignDetailResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet(`/api/admin/email-campaigns/${id}`, p);
+}
+
+/**
+ * Resolve a campaign selection to recipient counts without creating — the
+ * blast size an admin sees before committing. No side effects.
+ */
+export function adminPreviewEmailCampaign(data: { roles: string[]; extra_emails: string[] }): Promise<EmailCampaignPreview> {
+  return apiPost("/api/admin/email-campaigns/preview", data);
+}
+
+/**
+ * Create an email campaign: freeze the recipient snapshot and queue delivery.
+ *
+ * A blank subject is sent as null (the server applies its default subject).
+ * Delivery is paced by the background worker — this returns as soon as the
+ * campaign is created (status "pending"), not when the emails finish.
+ */
+export function adminCreateEmailCampaign(data: AdminCampaignCreatePayload): Promise<EmailCampaignSummary> {
+  return apiPost("/api/admin/email-campaigns", data);
+}
+
+/** Cancel a campaign: its pending recipients will not be emailed. */
+export function adminCancelEmailCampaign(id: number): Promise<EmailCampaignSummary> {
+  return apiPost(`/api/admin/email-campaigns/${id}/cancel`);
 }
 
 // ---------------------------------------------------------------------------

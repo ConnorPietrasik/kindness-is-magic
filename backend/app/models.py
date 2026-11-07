@@ -2,6 +2,7 @@ import enum
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -432,6 +433,9 @@ class EmailKind(str, enum.Enum):
     payment_expired = "payment_expired"
     # Freeform email an admin hand-wrote and sent to any recipient.
     custom_message = "custom_message"
+    # Admin email campaign: one slow-drip batch send to selected roles /
+    # manual addresses (see EmailCampaign).
+    campaign = "campaign"
 
 
 class EmailStatus(str, enum.Enum):
@@ -486,6 +490,136 @@ class EmailPreference(Base):
 
     email: Mapped[str] = mapped_column(String(120), primary_key=True, index=True)
     unsubscribed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Email campaigns (admin batch email)
+# ---------------------------------------------------------------------------
+
+
+class EmailCampaignStatus(str, enum.Enum):
+    """Lifecycle of an admin email campaign.
+
+    * ``pending`` — created, not yet picked up by the delivery worker.
+    * ``sending`` — the worker has started delivering recipients.
+    * ``completed`` — every recipient row is processed (sent or failed).
+    * ``canceled`` — an admin canceled it; its pending recipients were
+      flipped to ``canceled``.
+    """
+
+    pending = "pending"
+    sending = "sending"
+    completed = "completed"
+    canceled = "canceled"
+
+
+class EmailCampaignRecipientSource(str, enum.Enum):
+    """How a recipient got onto a campaign: resolved from a selected role,
+    or typed in by the admin by hand."""
+
+    role = "role"
+    manual = "manual"
+
+
+class EmailCampaignRecipientStatus(str, enum.Enum):
+    """Outcome of one recipient in a campaign.
+
+    * ``pending`` — not yet attempted.
+    * ``sent`` — the SMTP send succeeded.
+    * ``failed`` — blocked or errored (``failure_reason`` mirrors the
+      ``send_email`` reason string, e.g. ``unsubscribed`` / ``smtp_error``).
+    * ``canceled`` — the campaign was canceled before this row was reached.
+    """
+
+    pending = "pending"
+    sent = "sent"
+    failed = "failed"
+    canceled = "canceled"
+
+
+class EmailCampaign(Base):
+    """An admin's batch email: one subject + plain-text message, delivered
+    slowly over time to a snapshot of recipients (see
+    ``EmailCampaignRecipient``).
+
+    The recipient set is frozen at creation — role selections resolve to the
+    users existing at that moment (soft-deleted users excluded), and the
+    delivery worker never re-queries roles. No ``deleted_at`` — a campaign is
+    an immutable audit record; the only post-creation mutation is cancel.
+    """
+
+    __tablename__ = "email_campaigns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # The acting admin. SET NULL like SentEmail.user_id: the campaign row
+    # survives even if the admin account is ever hard-deleted.
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Plain text only — rendered to escaped HTML at send time by the shared
+    # renderer (see mail.render_custom_message_html).
+    message: Mapped[str] = mapped_column(String(5000), nullable=False)
+    status: Mapped[EmailCampaignStatus] = mapped_column(
+        SAEnum(EmailCampaignStatus, name="email_campaign_status", create_constraint=True),
+        server_default="pending",
+        nullable=False,
+    )
+    # The selected roles, for audit display only — the recipient rows are the
+    # truth of who was (and was not) emailed.
+    roles: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Progress counters, maintained transactionally with the recipient rows by
+    # the delivery worker and the cancel path. pending/canceled are derived
+    # (total - sent - failed - <other>) by the response builders.
+    total_recipients: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sent_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
+    # Relationships
+    creator: Mapped["User | None"] = relationship("User", foreign_keys=[created_by])
+    recipients: Mapped[list["EmailCampaignRecipient"]] = relationship(
+        "EmailCampaignRecipient", back_populates="campaign", cascade="all, delete-orphan"
+    )
+
+
+class EmailCampaignRecipient(Base):
+    """One resolved recipient of a campaign (snapshot row, not a live user).
+
+    ``user_id`` is set whenever the address belongs to an account —
+    including a manual entry that happens to match one (the explicit entry
+    wins ``source = manual``; the account id is kept so the recipient row
+    can show the account name). It is NULL only for manual addresses no
+    account belongs to.
+    """
+
+    __tablename__ = "email_campaign_recipients"
+    __table_args__ = (
+        # The delivery worker claims the lowest-id pending row per campaign.
+        Index("ix_email_campaign_recipients_campaign_status", "campaign_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    campaign_id: Mapped[int] = mapped_column(Integer, ForeignKey("email_campaigns.id", ondelete="CASCADE"), nullable=False)
+    email: Mapped[str] = mapped_column(String(120), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    source: Mapped[EmailCampaignRecipientSource] = mapped_column(
+        SAEnum(EmailCampaignRecipientSource, name="email_campaign_recipient_source", create_constraint=True),
+        nullable=False,
+    )
+    status: Mapped[EmailCampaignRecipientStatus] = mapped_column(
+        SAEnum(EmailCampaignRecipientStatus, name="email_campaign_recipient_status", create_constraint=True),
+        server_default="pending",
+        nullable=False,
+    )
+    failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
+    @validates("email")
+    def _normalize_email(self, _key: str, value: str) -> str:
+        return value.strip().lower()
+
+    # Relationships
+    campaign: Mapped["EmailCampaign"] = relationship("EmailCampaign", back_populates="recipients")
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,9 @@ from app.models import (
     CommitmentType,
     DeadlineMode,
     DeadlineType,
+    EmailCampaignRecipientSource,
+    EmailCampaignRecipientStatus,
+    EmailCampaignStatus,
     EmailKind,
     EmailStatus,
     FamilyVerificationStatus,
@@ -630,6 +633,136 @@ class AdminResubscribeRequest(BaseModel):
     @classmethod
     def check_email(cls, v: str) -> str:
         return validate_email(v)
+
+
+# ---------------------------------------------------------------------------
+# Admin email campaign (batch email) schemas
+# ---------------------------------------------------------------------------
+
+
+class CampaignSelection(BaseModel):
+    """Recipient selection shared by the create and preview requests.
+
+    ``roles`` + ``extra_emails`` — at least one is required. Every
+    ``extra_emails`` entry is validated and normalized (strip + lower).
+    """
+
+    roles: list[UserRole] = Field(default_factory=list)
+    extra_emails: list[str] = Field(default_factory=list)
+
+    @field_validator("extra_emails")
+    @classmethod
+    def check_extra_emails(cls, v: list[str]) -> list[str]:
+        for email in v:
+            validate_email(email)
+        return v
+
+    @model_validator(mode="after")
+    def check_has_recipients(self) -> "CampaignSelection":
+        if not self.roles and not self.extra_emails:
+            raise ValueError("Select at least one role or add at least one email address")
+        return self
+
+
+class AdminCampaignCreateRequest(CampaignSelection):
+    """Admin creates an email campaign.
+
+    Inherits the recipient selection (see ``CampaignSelection``).
+    ``message`` is plain text, never HTML (same cap/renderer as the single
+    custom email); a blank subject falls back to the default subject
+    server-side.
+    """
+
+    subject: str | None = Field(None, max_length=200)
+    message: str = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("message")
+    @classmethod
+    def check_message_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("message must not be blank")
+        return v
+
+
+class AdminCampaignPreviewRequest(CampaignSelection):
+    """Recipient selection for a campaign preview.
+
+    Only the selection travels — subject/message are irrelevant to the
+    resolved blast size, so the admin can preview before writing the body.
+    """
+
+
+class EmailCampaignPreviewResponse(BaseModel):
+    """Resolved recipient counts for a campaign selection (no campaign created).
+
+    ``by_role`` counts recipients whose source is the role resolution, keyed
+    by role; ``manual`` counts explicit addresses. An address in both is
+    counted once, in ``manual`` (the explicit entry wins).
+    """
+
+    total: int
+    by_role: dict[str, int]
+    manual: int
+
+
+class EmailCampaignSummary(BaseModel):
+    """Campaign row for the admin list/detail views.
+
+    ``pending_count`` / ``canceled_count`` are derived from the recipient
+    rows (the stored counters track only sent/failed).
+    """
+
+    id: int
+    subject: str
+    roles: list[str]
+    status: EmailCampaignStatus
+    total_recipients: int
+    sent_count: int
+    failed_count: int
+    pending_count: int
+    canceled_count: int
+    created_at: datetime
+    completed_at: datetime | None
+    sender_name: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class EmailCampaignDetail(EmailCampaignSummary):
+    """Full campaign view — the summary plus the stored message body."""
+
+    message: str
+
+
+class EmailCampaignListResponse(BaseModel):
+    campaigns: list[EmailCampaignSummary]
+
+
+class EmailCampaignRecipientSummary(BaseModel):
+    """One recipient row of a campaign (the delivery progress audit)."""
+
+    id: int
+    email: str
+    source: EmailCampaignRecipientSource
+    status: EmailCampaignRecipientStatus
+    failure_reason: str | None = None
+    sent_at: datetime | None = None
+    # Account display name when the address belongs to a user — NULL for
+    # manual addresses with no account.
+    user_display_name: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class EmailCampaignDetailResponse(BaseModel):
+    """Campaign detail with its recipients as a paginated, column-filtered page."""
+
+    campaign: EmailCampaignDetail
+    recipients: list[EmailCampaignRecipientSummary]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
 
 
 # ---------------------------------------------------------------------------

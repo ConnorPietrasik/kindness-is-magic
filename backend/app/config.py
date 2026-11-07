@@ -85,3 +85,20 @@ ZEFFY_WEBHOOK_SECRET = os.environ.get("ZEFFY_WEBHOOK_SECRET", "")
 # ---------------------------------------------------------------------------
 DEADLINE_PACIFIC_UTC_OFFSET_HOURS = -8
 DEADLINE_ENFORCEMENT_HOUR_PACIFIC = 1
+
+# ---------------------------------------------------------------------------
+# Email campaigns (admin batch email)
+#
+# A campaign is delivered one recipient per worker cycle so a bulk send
+# trickles out over time instead of bursting the SMTP account into a
+# throttling block. The interval is deliberately env-overridable so local
+# dev/e2e can run a campaign to completion in seconds.
+# ---------------------------------------------------------------------------
+EMAIL_CAMPAIGN_INTERVAL_SECONDS = int(os.environ.get("EMAIL_CAMPAIGN_INTERVAL_SECONDS", "30"))
+# How often the worker checks for campaigns when nothing is due (vs. the
+# send interval above, which applies after a successful cycle).
+EMAIL_CAMPAIGN_IDLE_POLL_SECONDS = int(os.environ.get("EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", "10"))
+# Fat-finger guard: refuse to create a campaign whose resolved recipient set
+# exceeds this many addresses (the SMTP account's daily quota is the hard
+# ceiling the admin must still watch).
+EMAIL_CAMPAIGN_MAX_RECIPIENTS = int(os.environ.get("EMAIL_CAMPAIGN_MAX_RECIPIENTS", "1000"))

@@ -4,6 +4,7 @@ import adminCsvUpload from "../assets/help/admin-csv-upload.png";
 import adminDashboard from "../assets/help/admin-dashboard.png";
 import adminDeadlines from "../assets/help/admin-deadlines.png";
 import adminDeliverySlips from "../assets/help/admin-delivery-slips.png";
+import adminEmailCampaigns from "../assets/help/admin-email-campaigns.png";
 import adminEmailUnsubscribes from "../assets/help/admin-email-unsubscribes.png";
 import adminEmails from "../assets/help/admin-emails.png";
 import adminFamilies from "../assets/help/admin-families.png";
@@ -409,7 +410,7 @@ export default function HelpAdmin() {
         },
         {
           id: "emails",
-          title: "Email log and unsubscribes",
+          title: "Email log, campaigns, and unsubscribes",
           body: (
             <>
               <p>
@@ -424,6 +425,23 @@ export default function HelpAdmin() {
               <p>
                 Search by recipient email, filter by kind or status, and use <strong>+ Compose</strong> to send a one-off email from inside
                 the app. Rows marked Reset were cleared by an admin and no longer count toward invite limits.
+              </p>
+              <h3>Email campaigns</h3>
+              <HelpImage
+                src={adminEmailCampaigns}
+                alt="The email campaigns page with a table of subject, roles, progress, status, and created time"
+                caption="A campaign delivers one recipient at a time until it finishes or is canceled."
+              />
+              <p>
+                When one message should reach many people at once — every donor, every referrer, a list of addresses — use a campaign
+                instead of composing one email at a time. <strong>+ New campaign</strong> opens a dialog where you pick the roles to include
+                and add any extra addresses by hand; before you commit, it counts exactly who will be emailed. The emails then go out
+                slowly, one at a time over the following minutes, so a bulk send doesn't look like spam.
+              </p>
+              <p>
+                Open a campaign any time to see its message and a recipient-by-recipient record of who got it. Un-sent recipients can still
+                be skipped: <strong>Cancel campaign</strong> stops the delivery where it is, and everyone not yet emailed is marked
+                canceled. Unsubscribed addresses are never emailed — they show as Failed in the recipient list.
               </p>
               <h3>Unsubscribed emails</h3>
               <HelpImage

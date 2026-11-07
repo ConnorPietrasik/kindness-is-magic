@@ -132,6 +132,11 @@ export interface EmailUnsubscribesListParams extends AdminListParams {
   search?: string;
 }
 
+/** Query params for the recipient list inside an email-campaign detail. */
+export interface AdminCampaignRecipientsListParams extends AdminListParams {
+  search?: string;
+}
+
 /** Query params for the admin Zeffy payment list (cursor-based Zeffy pagination, not page-based). */
 export interface AdminZeffyPaymentsParams {
   /** Cursor from the previous page's next_cursor. */

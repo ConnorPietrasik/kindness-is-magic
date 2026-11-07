@@ -87,6 +87,16 @@ export const adminSentEmails = ["adminSentEmails"] as const;
 /** Admin unsubscribe blocklist */
 export const adminEmailUnsubscribes = ["adminEmailUnsubscribes"] as const;
 
+/** Admin email campaigns (batch email) list + detail share this root key. */
+export const adminEmailCampaigns = ["adminEmailCampaigns"] as const;
+
+/** One campaign's detail (recipients page) — nested under the list key. */
+export const adminEmailCampaign = (id: number) => ["adminEmailCampaigns", id] as const;
+
+/** The dialog's recipient preview for a candidate selection (read-only). */
+export const adminEmailCampaignPreview = (selection: { roles: string[]; extra_emails: string[] }) =>
+  ["adminEmailCampaigns", "preview", selection] as const;
+
 // ---------------------------------------------------------------------------
 // Admin — Dropdown lookups
 // ---------------------------------------------------------------------------

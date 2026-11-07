@@ -25,7 +25,12 @@
  *   - purchaser + delivery + admin assignments (wishes / families)
  *   - two display-mode deadlines for the admin deadlines page
  *   - a donor gift claim + a donor pending cash claim (cart)
- * Everything the script creates is cleaned up in afterAll (the golden rule).
+ *   - one demo email campaign (partially delivered, then canceled) for the
+ *     admin email-campaigns page
+ * Everything the script creates is cleaned up in afterAll (the golden rule)
+ * — except the demo campaign: campaigns are append-only (no delete
+ * endpoint), so it is left canceled and the capture filters to this run's
+ * row.
  * Two seeded rows are touched reversibly: the seeded purchaser/delivery/admin
  * assignments are reset to unassigned before the script's own assignments go
  * in (restoring "no assignment" afterwards), and the referrer review queue is
@@ -84,6 +89,9 @@ const PASSWORD = "Password123!";
 /** The demo-CSV donor account (seeded, no storageState file). */
 const DONOR_EMAIL = "olivia.reynolds@example.com";
 const REFERRER_EMAIL = "sarah.chen@example.com";
+/** Demo campaign for the admin email-campaigns capture (fixed subject so the
+ * shot is recognizable; manual-only so its recipient set is exact). */
+const DEMO_CAMPAIGN_SUBJECT = "Thank you for your support";
 
 /** Data created by the setup phase, used for cleanup in afterAll. */
 const d: {
@@ -108,6 +116,7 @@ const d: {
   inviteCodes: string[];
   inviteRedeemedTokenId?: number;
   inviteReferrerId?: number;
+  demoCampaignId?: number;
   zeffyGate: string | null;
 } = {
   adminApi: null,
@@ -299,6 +308,41 @@ test.describe.serial("help page screenshots", () => {
     d.inviteReferrerId = ((await grantReg.json()) as { referrer: { id: number } }).referrer.id;
     await grantCtx.dispose();
 
+    /* ── Email campaigns: one demo campaign, partially delivered then
+         canceled — the shot shows the progress bar and a Canceled row with
+         mixed recipient outcomes. Deterministic: the cancel flips every
+         still-pending recipient the instant the first delivery lands ── */
+    const campaignsResp = await api.get("/api/admin/email-campaigns");
+    const { campaigns } = (await campaignsResp.json()) as { campaigns: Array<{ id: number; subject: string; status: string }> };
+    for (const c of campaigns) {
+      if (c.subject === DEMO_CAMPAIGN_SUBJECT && (c.status === "pending" || c.status === "sending")) {
+        await api.post(`/api/admin/email-campaigns/${c.id}/cancel`);
+      }
+    }
+    const demoCampaign = await api.post("/api/admin/email-campaigns", {
+      data: {
+        subject: DEMO_CAMPAIGN_SUBJECT,
+        message: "A short note from the organizers, captured for the admin help guide.",
+        extra_emails: ["campaign.demo-1@example.com", "campaign.demo-2@example.com", "campaign.demo-3@example.com"],
+      },
+    });
+    expect(demoCampaign.status(), `demo campaign create failed (${demoCampaign.status()})`).toBe(201);
+    d.demoCampaignId = ((await demoCampaign.json()) as { id: number }).id;
+    /* Wait for the first paced delivery (the worker sends one recipient per
+       cycle; the first goes out within one idle poll), then cancel inside
+       the pacing gap so the remaining recipients are deterministically
+       skipped. */
+    let demoSent = 0;
+    for (let i = 0; i < 30; i++) {
+      const detail = await api.get(`/api/admin/email-campaigns/${d.demoCampaignId}`);
+      demoSent = ((await detail.json()) as { campaign: { sent_count: number } }).campaign.sent_count;
+      if (demoSent > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    expect(demoSent, "demo campaign's first delivery never landed (worker not running?)").toBeGreaterThan(0);
+    const demoCancel = await api.post(`/api/admin/email-campaigns/${d.demoCampaignId}/cancel`);
+    expect(demoCancel.ok(), `demo campaign cancel failed (${demoCancel.status()})`).toBeTruthy();
+
     console.log("[help-screenshots] Scenario data ready.");
   });
 
@@ -385,6 +429,19 @@ test.describe.serial("help page screenshots", () => {
       ["admin-delivery-slips", "/admin/delivery-slips", { selector: ".delivery-slip-card" }],
       ["admin-wish-cards", "/admin/wish-cards", { heading: "Blank Wish Cards" }],
       ["admin-emails", "/admin/emails", { heading: "Sent Emails" }],
+      ["admin-email-campaigns", "/admin/email-campaigns", { heading: "Email Campaigns", onSettled: async (p) => {
+        /* Keep only this run's demo campaign: campaigns are append-only
+           (no delete endpoint), so a crashed earlier run's canceled row
+           would otherwise share the frame */
+        await p.locator("table tbody tr").evaluateAll(
+          (rows, subject) => {
+            for (const row of rows) {
+              if (!(row.textContent ?? "").includes(subject)) row.style.display = "none";
+            }
+          },
+          DEMO_CAMPAIGN_SUBJECT,
+        );
+      } }],
       ["admin-email-unsubscribes", "/admin/email-unsubscribes", { heading: "Unsubscribed Emails" }],
       ["admin-zeffy-payments", "/admin/zeffy-payments", { heading: "Zeffy Payments" }],
       ["admin-sponsorships", "/admin/sponsorships", { heading: "Sponsorships", onSettled: async (p) => {
@@ -531,6 +588,12 @@ test.describe.serial("help page screenshots", () => {
       }
       /* Deadlines (hard delete) */
       for (const id of d.deadlineIds) await deleteDeadlineViaApi(api, id);
+      /* Demo campaign — append-only (no delete endpoint); cancel is
+         idempotent, a no-op once the setup already canceled it */
+      if (d.demoCampaignId != null) {
+        const cancel = await api.post(`/api/admin/email-campaigns/${d.demoCampaignId}/cancel`);
+        if (!cancel.ok()) console.warn(`[help-screenshots] demo campaign cancel returned ${cancel.status()}`);
+      }
       /* Seeded mock payment (tag-scoped reset) */
       if (d.zeffyGate === null) await mockReset("help-screenshots");
       console.log("[help-screenshots] Cleanup complete.");

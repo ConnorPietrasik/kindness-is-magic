@@ -24,6 +24,9 @@ from app.models import (
     ClaimPaymentStatus,
     CommitmentType,
     Deadline,
+    EmailCampaign,
+    EmailCampaignRecipient,
+    EmailCampaignRecipientStatus,
     Family,
     FamilyVerificationStatus,
     FamilyClaim,
@@ -39,6 +42,9 @@ from app.schemas import (
     DeadlineItem,
     DeadlineListResponse,
     DeliverySlipItem,
+    EmailCampaignDetail,
+    EmailCampaignRecipientSummary,
+    EmailCampaignSummary,
     FamilyClaimSummary,
     FamilyInfo,
     PackingSlipItem,
@@ -210,6 +216,90 @@ def build_deadline_list(db: Session) -> DeadlineListResponse:
     """
     rows = db.query(Deadline).order_by(Deadline.type, Deadline.due_date.asc().nulls_last(), Deadline.id).all()
     return DeadlineListResponse(deadlines=[build_deadline_item(d) for d in rows])
+
+
+# ---------------------------------------------------------------------------
+# Email campaign builders (admin batch email)
+# ---------------------------------------------------------------------------
+
+
+def campaign_status_counts(db: Session, campaign_ids: list[int]) -> dict[int, dict[EmailCampaignRecipientStatus, int]]:
+    """Recipient status counts per campaign, in one GROUP BY.
+
+    pending/canceled counts are derived (the campaign row stores only the
+    sent/failed counters). Campaigns with no rows in the result have no
+    pending/canceled recipients.
+    """
+    if not campaign_ids:
+        return {}
+    rows = (
+        db.query(EmailCampaignRecipient.campaign_id, EmailCampaignRecipient.status, func.count(EmailCampaignRecipient.id))
+        .filter(EmailCampaignRecipient.campaign_id.in_(campaign_ids))
+        .group_by(EmailCampaignRecipient.campaign_id, EmailCampaignRecipient.status)
+        .all()
+    )
+    counts: dict[int, dict[EmailCampaignRecipientStatus, int]] = {cid: {} for cid in campaign_ids}
+    for campaign_id, status_, count in rows:
+        counts[campaign_id][status_] = count
+    return counts
+
+
+def build_campaign_summary(
+    db: Session,
+    campaign: EmailCampaign,
+    *,
+    sender_name: str | None = None,
+    counts: dict[EmailCampaignRecipientStatus, int] | None = None,
+) -> EmailCampaignSummary:
+    """Campaign summary row (list + detail views).
+
+    ``counts`` lets a list endpoint pass its batched status counts instead
+    of running one GROUP BY per row; omit it for a single-campaign detail.
+    """
+    if counts is None:
+        counts = campaign_status_counts(db, [campaign.id]).get(campaign.id, {})
+    return EmailCampaignSummary(
+        id=campaign.id,
+        subject=campaign.subject,
+        roles=list(campaign.roles or []),
+        status=campaign.status,
+        total_recipients=campaign.total_recipients,
+        sent_count=campaign.sent_count,
+        failed_count=campaign.failed_count,
+        pending_count=counts.get(EmailCampaignRecipientStatus.pending, 0),
+        canceled_count=counts.get(EmailCampaignRecipientStatus.canceled, 0),
+        created_at=campaign.created_at,
+        completed_at=campaign.completed_at,
+        sender_name=sender_name,
+    )
+
+
+def build_campaign_detail(
+    db: Session,
+    campaign: EmailCampaign,
+    *,
+    sender_name: str | None = None,
+) -> EmailCampaignDetail:
+    """Full campaign view — the summary plus the stored message body."""
+    summary = build_campaign_summary(db, campaign, sender_name=sender_name)
+    return EmailCampaignDetail(**summary.model_dump(), message=campaign.message)
+
+
+def build_campaign_recipient_item(
+    recipient: EmailCampaignRecipient,
+    *,
+    user_display_name: str | None = None,
+) -> EmailCampaignRecipientSummary:
+    """One recipient row of a campaign (delivery progress audit)."""
+    return EmailCampaignRecipientSummary(
+        id=recipient.id,
+        email=recipient.email,
+        source=recipient.source,
+        status=recipient.status,
+        failure_reason=recipient.failure_reason,
+        sent_at=recipient.sent_at,
+        user_display_name=user_display_name,
+    )
 
 
 # ---------------------------------------------------------------------------
