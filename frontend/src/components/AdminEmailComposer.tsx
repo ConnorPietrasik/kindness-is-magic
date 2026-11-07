@@ -20,7 +20,7 @@
  * e.g. the family contact and the referrer), the recipient is a select over
  * them plus an "Other…" option that reveals a free-text field — the common
  * case is a click, not a typed email, which guards against typos to known
- * people. Entry points without options (e.g. the Sent Emails "+ Compose")
+ * people. Entry points without options (e.g. the Emails page's "+ Compose")
  * get the plain editable field: anyone, anywhere. Sends via
  * POST /api/admin/emails/send, which reuses the shared send path: the
  * unsubscribe gate applies (unsubscribed recipients are blocked and

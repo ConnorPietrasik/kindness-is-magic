@@ -1,7 +1,7 @@
 /**
  * Admin email campaigns (batch email) — an admin creates a campaign from a
  * role selection plus manual addresses, watches the paced delivery progress,
- * verifies the Sent Emails log, and cancels a campaign mid-flight.
+ * verifies the sent-email log, and cancels a campaign mid-flight.
  *
  * Self-contained: the campaigns it creates are append-only (no delete
  * endpoint), and their delivery by-products (recipient audit rows, SentEmail
@@ -85,7 +85,7 @@ test.describe.serial("Admin email campaigns", () => {
     const page = await context.newPage();
 
     /* Create a three-recipient, manual-only campaign (exact count) */
-    await page.goto("/admin/email-campaigns");
+    await page.goto("/admin/emails?tab=campaigns");
     await page.getByRole("button", { name: "+ New campaign" }).click();
     const dialog = page.getByRole("dialog", { name: "New email campaign" });
     await expect(dialog).toBeVisible();
@@ -127,8 +127,8 @@ test.describe.serial("Admin email campaigns", () => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
 
-    await page.goto("/admin/email-campaigns");
-    await expect(page.getByRole("heading", { name: "Email Campaigns" })).toBeVisible();
+    await page.goto("/admin/emails?tab=campaigns");
+    await expect(page.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     await page.getByRole("button", { name: "+ New campaign" }).click();
     const dialog = page.getByRole("dialog", { name: "New email campaign" });
@@ -170,7 +170,7 @@ test.describe.serial("Admin email campaigns", () => {
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
 
-    await page.goto("/admin/email-campaigns");
+    await page.goto("/admin/emails?tab=campaigns");
     const row = page.getByRole("row").filter({ hasText: CAMPAIGN_SUBJECT });
     await expect(row).toBeVisible();
     await row.click();
@@ -198,7 +198,7 @@ test.describe.serial("Admin email campaigns", () => {
     await context.close();
   });
 
-  test("the campaign email appears in the Sent Emails log as kind Email Campaign", async ({ browser }) => {
+  test("the campaign email appears in the sent log as kind Email Campaign", async ({ browser }) => {
     if (!firstRoleEmail) {
       test.skip(true, "setup incomplete");
       return;
@@ -208,7 +208,7 @@ test.describe.serial("Admin email campaigns", () => {
     const page = await context.newPage();
 
     await page.goto("/admin/emails");
-    await expect(page.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     /* Narrow to campaign emails so the row is unambiguous */
     await page.getByLabel("Kind filter").selectOption({ label: "Email Campaign" });

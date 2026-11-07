@@ -1,226 +1,100 @@
 /**
- * Admin — Sent Email Log
+ * Admin — Emails (sent log · campaigns · unsubscribes)
  *
- * Read-only paginated log of every email the app has sent (all kinds and
- * statuses). Filter by recipient search, kind, and status. No mutations —
- * a plain useQuery instead of useCrudManager.
+ * One page, three tabs: the read-only sent-email audit log, batch email
+ * campaigns, and the unsubscribe blocklist. The active tab is a URL query
+ * param (?tab=campaigns | ?tab=unsubscribes; the log is the default), so
+ * every tab deep-links.
+ *
+ * The page owns the shell (header, tablist, per-tab table width) and the
+ * generic compose dialog; each tab is a self-contained component under
+ * src/components/ that brings its own queries, filters, and mutations.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import type React from "react";
-import { Fragment, useMemo, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
-import { ColumnToggle } from "../components/ColumnToggle";
-import { DraggableTh } from "../components/DraggableTh";
+import { EmailCampaignsTab } from "../components/EmailCampaignsTab";
+import { EmailUnsubscribesTab } from "../components/EmailUnsubscribesTab";
 import { HeaderBar } from "../components/HeaderBar";
-import { Pagination } from "../components/Pagination";
-import { PageSpinner } from "../components/Spinner";
-import { Table, TableBody, TableHead, Td, Tr } from "../components/Table";
-import { useColumnOrder } from "../hooks/useColumnOrder";
-import { useColumnVisibility } from "../hooks/useColumnVisibility";
-import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { SentEmailsTab } from "../components/SentEmailsTab";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminListSentEmails } from "../lib/api";
-import { adminSentEmails } from "../lib/queryKeys";
-import { formatDateTime, formatEmailStatus } from "../lib/utils";
-import type { AdminEmailsListParams, EmailKind, EmailStatus } from "../types";
 
-/** kind → display label. Shared by the table cells and the filter dropdown. */
-export const KIND_LABELS: Record<EmailKind, string> = {
-  family_invite: "Family Invite",
-  referrer_invite: "Referrer Invite",
-  password_reset: "Password Reset",
-  family_pending: "Family Pending Verification",
-  family_verified: "Family Verified",
-  family_rejected: "Family Rejected",
-  referrer_approved: "Referrer Approved",
-  referrer_rejected: "Referrer Rejected",
-  claim_confirmation: "Sponsorship Confirmation",
-  admin_failure_notice: "Admin Failure Notice",
-  payment_request: "Payment Request",
-  payment_confirmed: "Payment Confirmation",
-  payment_expired: "Payment Expired",
-  custom_message: "Custom Message",
-  campaign: "Email Campaign",
-};
+type EmailTab = "sent" | "campaigns" | "unsubscribes";
 
-const STATUS_OPTIONS: EmailStatus[] = ["sent", "failed", "reset"];
+/** Tab order = display order. "sent" is the default (no query param). */
+const TABS: { key: EmailTab; label: string }[] = [
+  { key: "sent", label: "Sent" },
+  { key: "campaigns", label: "Campaigns" },
+  { key: "unsubscribes", label: "Unsubscribes" },
+];
 
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
+function parseTab(raw: string | null): EmailTab {
+  return raw === "campaigns" || raw === "unsubscribes" ? raw : "sent";
+}
+
 export default function AdminEmails() {
-  const pagination = usePagination({ defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [kindFilter, setKindFilter] = useState<EmailKind | "">("");
-  const [statusFilter, setStatusFilter] = useState<EmailStatus | "">("");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [composerOpen, setComposerOpen] = useState(false);
 
-  // Column visibility + user column order
-  const { visibleColumns, apiColumns } = useColumnVisibility("adminSentEmails");
-  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminSentEmails", visibleColumns);
-  const { widthClass } = useTableWidth("adminSentEmails");
+  const tab = parseTab(searchParams.get("tab"));
 
-  // Visible columns in the user's custom order (drives header + row render).
-  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
+  // Per-tab table width: the sent/unsubscribes tables honor the gear
+  // width preference (two resources, both hooked here so the page can size
+  // its wrapper); the campaigns tab (list and detail alike) is max-w-4xl.
+  const { widthClass: sentWidthClass } = useTableWidth("adminSentEmails");
+  const { widthClass: unsubWidthClass } = useTableWidth("adminEmailUnsubscribes");
+  const widthClass = tab === "campaigns" ? "max-w-4xl" : tab === "sent" ? sentWidthClass : unsubWidthClass;
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
-
-  const listParams = useMemo<AdminEmailsListParams>(
-    () => ({
-      ...pagination.params,
-      columns: apiColumns,
-      search: debouncedSearch || undefined,
-      kind: kindFilter || undefined,
-      status: statusFilter || undefined,
-    }),
-    [pagination.params, apiColumns, debouncedSearch, kindFilter, statusFilter]
-  );
-
-  const { data: listData, isLoading } = useQuery({
-    queryKey: [...adminSentEmails, listParams],
-    queryFn: () => adminListSentEmails(listParams),
-    staleTime: 0, // read-only audit log — always refetch when viewed (global default is 5min)
-  });
-
-  const pageInfo = useMemo(
-    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
-    [listData?.total, pagination.page, pagination.pageSize]
-  );
-
-  const emails = listData?.emails ?? [];
-
-  if (isLoading) return <PageSpinner />;
-
-  // Header cells per column key.
-  const emailHeaders: Record<string, React.ReactNode> = {
-    recipient_email: "Recipient",
-    kind: "Kind",
-    status: "Status",
-    sender_name: "Sender",
-    sent_at: "Sent",
+  const selectTab = (next: EmailTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "sent") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <HeaderBar />
 
-      <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-violet-950">Sent Emails</h2>
-          <div className="flex items-center gap-3">
-            {!isDefaultOrder && (
-              <Button variant="secondary" onClick={resetOrder}>
-                Reset order
-              </Button>
-            )}
-            <ColumnToggle resourceKey="adminSentEmails" />
+      <main className="mx-auto w-full px-4 py-8 sm:px-6">
+        <div className={`mx-auto ${widthClass}`}>
+          {/* Header */}
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-violet-950">Emails</h2>
             <Button onClick={() => setComposerOpen(true)}>+ Compose</Button>
           </div>
-        </div>
 
-        {/* Info note */}
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
-          Every email send attempt the app has made. “Reset” rows were cleared by an admin and no longer count toward invite limits.
-        </div>
-
-        {/* Filters */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            type="text"
-            placeholder="Search by recipient email…"
-            aria-label="Search by recipient email"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-            autoComplete="off"
-          />
-          <select
-            aria-label="Kind filter"
-            value={kindFilter}
-            onChange={(e) => {
-              setKindFilter(e.target.value as EmailKind | "");
-              pagination.goToPage(1);
-            }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          >
-            <option value="">All kinds</option>
-            {Object.entries(KIND_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
+          {/* Tabs (URL-backed — each tab deep-links via ?tab=) */}
+          <div role="tablist" className="mb-6 flex gap-4 border-b border-gray-200">
+            {TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                role="tab"
+                type="button"
+                id={`email-tab-${key}`}
+                aria-selected={tab === key}
+                aria-controls={`email-tabpanel-${key}`}
+                onClick={() => tab !== key && selectTab(key)}
+                className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
+                  tab === key ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
                 {label}
-              </option>
+              </button>
             ))}
-          </select>
-          <select
-            aria-label="Status filter"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as EmailStatus | "");
-              pagination.goToPage(1);
-            }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {formatEmailStatus(s, null)}
-              </option>
-            ))}
-          </select>
+          </div>
+
+          <div role="tabpanel" id={`email-tabpanel-${tab}`} aria-labelledby={`email-tab-${tab}`}>
+            {tab === "sent" && <SentEmailsTab />}
+            {tab === "campaigns" && <EmailCampaignsTab />}
+            {tab === "unsubscribes" && <EmailUnsubscribesTab />}
+          </div>
+
+          {/* Generic compose — no prefill (any recipient) */}
+          <AdminEmailComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
         </div>
-
-        {/* Table */}
-        {emails.length === 0 ? (
-          <Card>
-            <p className="py-8 text-center text-gray-400">No sent emails found.</p>
-          </Card>
-        ) : (
-          <Table>
-            <TableHead>
-              {displayColumns.map((key) => (
-                <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
-                  {emailHeaders[key]}
-                </DraggableTh>
-              ))}
-            </TableHead>
-            <TableBody>
-              {emails.map((email) => {
-                const emailCells: Record<string, React.ReactNode> = {
-                  recipient_email: <Td className="font-medium text-gray-900">{email.recipient_email}</Td>,
-                  kind: <Td>{KIND_LABELS[email.kind]}</Td>,
-                  status: <Td>{formatEmailStatus(email.status, email.failure_reason)}</Td>,
-                  sender_name: <Td>{email.sender_name ?? <span className="text-gray-400">—</span>}</Td>,
-                  sent_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(email.sent_at)}</Td>,
-                };
-                return (
-                  <Tr key={email.id}>
-                    {displayColumns.map((key) => (
-                      <Fragment key={key}>{emailCells[key]}</Fragment>
-                    ))}
-                  </Tr>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-
-        {/* Pagination */}
-        <Pagination
-          page={pagination.page}
-          totalPages={pageInfo.totalPages}
-          total={listData?.total ?? 0}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.goToPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
-
-        {/* Generic compose — no prefill (any recipient) */}
-        <AdminEmailComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
       </main>
     </div>
   );

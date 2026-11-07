@@ -345,7 +345,7 @@ test.describe.serial("Referrer family invites + sent email log", () => {
     });
     const adminPage = await adminContext.newPage();
     await adminPage.goto("/admin/emails");
-    await expect(adminPage.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+    await expect(adminPage.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     /* Search narrows the log down to this row (parallel tests add other rows) */
     await adminPage.getByLabel("Search by recipient email").fill(inviteeEmail);
@@ -416,7 +416,7 @@ test.describe.serial("Referrer family invites + sent email log", () => {
     });
     const adminPage2 = await adminCtx2.newPage();
     await adminPage2.goto("/admin/emails");
-    await expect(adminPage2.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+    await expect(adminPage2.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     await adminPage2.getByLabel("Search by recipient email").fill(inviteeEmail);
     const adminRow = adminPage2.getByRole("row").filter({ hasText: inviteeEmail });

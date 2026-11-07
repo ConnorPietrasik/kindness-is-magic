@@ -414,12 +414,14 @@ export default function HelpAdmin() {
           body: (
             <>
               <p>
-                The app sends its own emails: invite links, verification notices, payment requests, and confirmations. This log shows every
-                send attempt, so you can answer questions like did the invite actually go out.
+                The app sends its own emails: invite links, verification notices, payment requests, and confirmations. The Emails page has
+                three tabs: the log of every send attempt, batch <strong>campaigns</strong>, and the <strong>unsubscribes</strong>{" "}
+                blocklist.
               </p>
+              <h3>Sent emails</h3>
               <HelpImage
                 src={adminEmails}
-                alt="The sent emails page with a table of recipient, kind, status, sender, and sent time"
+                alt="The Emails page on its Sent tab, with a table of recipient, kind, status, sender, and sent time"
                 caption="Every email the app has sent, newest first."
               />
               <p>
@@ -429,7 +431,7 @@ export default function HelpAdmin() {
               <h3>Email campaigns</h3>
               <HelpImage
                 src={adminEmailCampaigns}
-                alt="The email campaigns page with a table of subject, roles, progress, status, and created time"
+                alt="The Emails page on its Campaigns tab, with a table of subject, roles, progress, status, and created time"
                 caption="A campaign delivers one recipient at a time until it finishes or is canceled."
               />
               <p>
@@ -446,7 +448,7 @@ export default function HelpAdmin() {
               <h3>Unsubscribed emails</h3>
               <HelpImage
                 src={adminEmailUnsubscribes}
-                alt="The unsubscribed emails page listing addresses that opted out"
+                alt="The Emails page on its Unsubscribes tab, listing addresses that opted out"
                 caption="These addresses are excluded from future app emails."
               />
               <p>When someone clicks unsubscribe in an app email, their address lands here and the app stops emailing them.</p>

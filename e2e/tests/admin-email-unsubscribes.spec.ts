@@ -1,6 +1,7 @@
 /**
  * Admin unsubscribe blocklist — an admin sees recipients who clicked an
- * unsubscribe link and re-subscribes them from the Unsubscribed Emails page.
+ * unsubscribe link and re-subscribes them from the Emails page's
+ * Unsubscribes tab.
  *
  * Self-contained: seeds the blocklist through the REAL public unsubscribe
  * path (a forged-but-validly-signed unsubscribe token POSTed to
@@ -63,12 +64,12 @@ test.describe.serial("Admin email unsubscribes", () => {
     await api.dispose();
   });
 
-  test("an unsubscribed recipient appears on the Unsubscribed Emails page", async ({ browser }) => {
+  test("an unsubscribed recipient appears on the Unsubscribes tab", async ({ browser }) => {
     const context = await browser.newContext({ storageState: STORAGE_ADMIN });
     const page = await context.newPage();
 
-    await page.goto("/admin/email-unsubscribes");
-    await expect(page.getByRole("heading", { name: "Unsubscribed Emails" })).toBeVisible();
+    await page.goto("/admin/emails?tab=unsubscribes");
+    await expect(page.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     const row = await findRowInTable(page, EMAIL);
     expect(row).not.toBeNull();
@@ -83,7 +84,7 @@ test.describe.serial("Admin email unsubscribes", () => {
     const context = await browser.newContext({ storageState: STORAGE_ADMIN });
     const page = await context.newPage();
 
-    await page.goto("/admin/email-unsubscribes");
+    await page.goto("/admin/emails?tab=unsubscribes");
     const row = await findRowInTable(page, EMAIL);
     expect(row).not.toBeNull();
 
@@ -112,7 +113,7 @@ test.describe.serial("Admin email unsubscribes", () => {
     const context = await browser.newContext({ storageState: STORAGE_ADMIN });
     const page = await context.newPage();
 
-    await page.goto("/admin/email-unsubscribes");
+    await page.goto("/admin/emails?tab=unsubscribes");
     const row = await findRowInTable(page, EMAIL);
     expect(row).not.toBeNull();
 

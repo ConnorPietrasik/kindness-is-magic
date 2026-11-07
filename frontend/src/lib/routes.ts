@@ -35,9 +35,9 @@ export const ROUTES = {
   ADMIN_WISH_CARDS: "/admin/wish-cards",
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
+  // One page, three tabs (sent log / campaigns / unsubscribes) selected
+  // by a ?tab= query param — see pages/AdminEmails.tsx.
   ADMIN_EMAILS: "/admin/emails",
-  ADMIN_EMAIL_CAMPAIGNS: "/admin/email-campaigns",
-  ADMIN_EMAIL_UNSUBSCRIBES: "/admin/email-unsubscribes",
   ADMIN_ZEFFY_PAYMENTS: "/admin/zeffy-payments",
   ADMIN_SPONSORSHIPS: "/admin/sponsorships",
 

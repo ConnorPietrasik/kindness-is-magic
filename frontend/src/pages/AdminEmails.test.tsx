@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { KIND_LABELS } from "../components/SentEmailsTab";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
@@ -10,19 +11,21 @@ import { auth } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
 import { headerUser } from "../test/fixtures";
 import type { EmailKind, SentEmailSummary } from "../types";
-import AdminEmails, { KIND_LABELS } from "./AdminEmails";
+import AdminEmails from "./AdminEmails";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
 const emptyListResponse = { emails: [], total: 0, page: 1, page_size: 50, total_pages: 0 };
+const emptyCampaignsResponse = { campaigns: [] };
+const emptyUnsubscribesResponse = { preferences: [], total: 0, page: 1, page_size: 50, total_pages: 0 };
 
-const wrap = () => {
+const wrap = (entry = "/admin/emails") => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(auth, headerUser);
   return render(
-    <MemoryRouter initialEntries={["/admin/emails"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={queryClient}>
         <ToastContainer>
           <AuthProvider>
@@ -190,5 +193,47 @@ describe("AdminEmails", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("shows the sent log by default and switches tabs via the ?tab= param", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListSentEmails").mockResolvedValue(emptyListResponse);
+    vi.spyOn(api, "adminListEmailCampaigns").mockResolvedValue(emptyCampaignsResponse);
+    vi.spyOn(api, "adminListEmailUnsubscribes").mockResolvedValue(emptyUnsubscribesResponse);
+
+    wrap();
+
+    // Default tab is the sent log
+    expect(await screen.findByText("No sent emails found.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sent" })).toHaveAttribute("aria-selected", "true");
+
+    // Tabs are exclusive: only the active tab's content is mounted
+    await user.click(screen.getByRole("tab", { name: "Campaigns" }));
+    expect(await screen.findByText(/No email campaigns yet/)).toBeInTheDocument();
+    expect(screen.queryByText("No sent emails found.")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Campaigns" })).toHaveAttribute("aria-selected", "true");
+
+    await user.click(screen.getByRole("tab", { name: "Unsubscribes" }));
+    expect(await screen.findByText("No unsubscribed emails.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Unsubscribes" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("deep-links straight to a tab from the ?tab= param", async () => {
+    vi.spyOn(api, "adminListSentEmails").mockResolvedValue(emptyListResponse);
+    vi.spyOn(api, "adminListEmailUnsubscribes").mockResolvedValue(emptyUnsubscribesResponse);
+
+    wrap("/admin/emails?tab=unsubscribes");
+
+    expect(await screen.findByText("No unsubscribed emails.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Unsubscribes" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("falls back to the sent log for an unknown ?tab= value", async () => {
+    vi.spyOn(api, "adminListSentEmails").mockResolvedValue(emptyListResponse);
+
+    wrap("/admin/emails?tab=bogus");
+
+    expect(await screen.findByText("No sent emails found.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sent" })).toHaveAttribute("aria-selected", "true");
   });
 });

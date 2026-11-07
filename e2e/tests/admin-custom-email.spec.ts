@@ -1,6 +1,6 @@
 /**
  * Admin custom emails — an admin sends a freeform ("custom") email from a
- * family's detail page and verifies the attempt in the Sent Emails log.
+ * family's detail page and verifies the attempt in the sent-email log.
  *
  * Self-contained: creates its own referrer, family, and family contact user
  * via API in setup (the contact user supplies the "Send email" recipient
@@ -183,14 +183,14 @@ test.describe.serial("Admin custom emails", () => {
     await context.close();
   });
 
-  test("the custom email is logged on the Sent Emails page", async ({ browser }) => {
+  test("the custom email is logged on the Emails page", async ({ browser }) => {
     test.skip(!familyId, "setup incomplete");
 
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
 
     await page.goto("/admin/emails");
-    await expect(page.getByRole("heading", { name: "Sent Emails" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Emails" })).toBeVisible();
 
     /* Narrow to custom messages so the row is unambiguous */
     await page.getByLabel("Kind filter").selectOption({ label: "Custom Message" });

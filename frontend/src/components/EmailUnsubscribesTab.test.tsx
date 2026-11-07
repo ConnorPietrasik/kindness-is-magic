@@ -1,16 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
-import { auth } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
-import { headerUser } from "../test/fixtures";
 import type { EmailPreferenceListResponse, EmailPreferenceSummary } from "../types";
-import AdminEmailUnsubscribes from "./AdminEmailUnsubscribes";
+import { EmailUnsubscribesTab } from "./EmailUnsubscribesTab";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -20,17 +16,12 @@ const emptyListResponse: EmailPreferenceListResponse = { preferences: [], total:
 
 const wrap = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(auth, headerUser);
   return render(
-    <MemoryRouter initialEntries={["/admin/email-unsubscribes"]}>
-      <QueryClientProvider client={queryClient}>
-        <ToastContainer>
-          <AuthProvider>
-            <AdminEmailUnsubscribes />
-          </AuthProvider>
-        </ToastContainer>
-      </QueryClientProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <ToastContainer>
+        <EmailUnsubscribesTab />
+      </ToastContainer>
+    </QueryClientProvider>
   );
 };
 
@@ -54,7 +45,7 @@ const listWith = (...prefs: EmailPreferenceSummary[]): EmailPreferenceListRespon
 /* Tests                                                               */
 /* ------------------------------------------------------------------ */
 
-describe("AdminEmailUnsubscribes", () => {
+describe("EmailUnsubscribesTab", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     cleanup();

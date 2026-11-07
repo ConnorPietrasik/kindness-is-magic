@@ -428,8 +428,8 @@ test.describe.serial("help page screenshots", () => {
       ["admin-packing-slips", "/admin/packing-slips", { selector: ".packing-slip-card" }],
       ["admin-delivery-slips", "/admin/delivery-slips", { selector: ".delivery-slip-card" }],
       ["admin-wish-cards", "/admin/wish-cards", { heading: "Blank Wish Cards" }],
-      ["admin-emails", "/admin/emails", { heading: "Sent Emails" }],
-      ["admin-email-campaigns", "/admin/email-campaigns", { heading: "Email Campaigns", onSettled: async (p) => {
+      ["admin-emails", "/admin/emails", { heading: "Emails" }],
+      ["admin-email-campaigns", "/admin/emails?tab=campaigns", { heading: "Emails", onSettled: async (p) => {
         /* Keep only this run's demo campaign: campaigns are append-only
            (no delete endpoint), so a crashed earlier run's canceled row
            would otherwise share the frame */
@@ -442,7 +442,7 @@ test.describe.serial("help page screenshots", () => {
           DEMO_CAMPAIGN_SUBJECT,
         );
       } }],
-      ["admin-email-unsubscribes", "/admin/email-unsubscribes", { heading: "Unsubscribed Emails" }],
+      ["admin-email-unsubscribes", "/admin/emails?tab=unsubscribes", { heading: "Emails" }],
       ["admin-zeffy-payments", "/admin/zeffy-payments", { heading: "Zeffy Payments" }],
       ["admin-sponsorships", "/admin/sponsorships", { heading: "Sponsorships", onSettled: async (p) => {
         /* Keep only this run's active sponsorships (the seeded donor's);

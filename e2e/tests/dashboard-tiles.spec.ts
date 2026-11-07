@@ -12,7 +12,7 @@ test.describe("Admin dashboard tiles", () => {
 
     await page.goto("/dashboard");
     const gear = page.getByRole("button", { name: "Toggle dashboard tiles" });
-    const emailsTile = page.getByRole("link", { name: /Sent Emails/ });
+    const emailsTile = page.getByRole("link", { name: /Emails/ });
     const csvTile = page.getByRole("link", { name: /CSV Import/ });
     await expect(emailsTile).toBeVisible({ timeout: 10_000 });
 
@@ -21,14 +21,14 @@ test.describe("Admin dashboard tiles", () => {
 
     // Hide a tile from the popover
     await gear.click();
-    await page.getByRole("checkbox", { name: "Sent Emails" }).uncheck();
+    await page.getByRole("checkbox", { name: "Emails" }).uncheck();
     await expect(emailsTile).toHaveCount(0);
 
     // Preference survives a reload
     await page.reload();
     await expect(emailsTile).toHaveCount(0);
 
-    // Reset restores the default set — Sent Emails back, CSV Import still hidden
+    // Reset restores the default set — Emails back, CSV Import still hidden
     await gear.click();
     await page.getByRole("button", { name: "Reset" }).click();
     await expect(emailsTile).toBeVisible();
@@ -55,8 +55,8 @@ test.describe("Admin dashboard tiles", () => {
  * Default visible tile order (CSV Import and Sponsorships hidden by
  * default): Manage Users, Manage Referrers, Manage Families, Manage
  * People, Invite Codes, Wish Approval, Deadlines, Manage Wishes, My
- * Assigned Gifts, Packing Slips, Delivery Slips, Blank Wish Cards, Sent
- * Emails, Unsubscribed Emails, Zeffy Payments, Browse Families.
+ * Assigned Gifts, Packing Slips, Delivery Slips, Blank Wish Cards, Emails,
+ * Zeffy Payments, Browse Families.
  */
 test.describe("Admin dashboard tile order", () => {
   const tileGrid = (page: Page) => page.locator("div.grid").first().locator("a");

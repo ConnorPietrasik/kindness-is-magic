@@ -127,3 +127,4 @@ Changes should:
 - pass tests (`npm run test`)
 - follow existing project patterns
 - avoid introducing duplicate abstractions
+- make sure help pages are still accurate

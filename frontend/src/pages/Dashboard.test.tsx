@@ -618,7 +618,7 @@ describe("Dashboard — admin tiles", () => {
     expect(screen.getByRole("link", { name: /Manage Users/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Manage Wishes/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Manage Referrers/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Sent Emails/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Emails/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /CSV Import/ })).not.toBeInTheDocument();
   });
 
