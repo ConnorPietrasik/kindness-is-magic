@@ -95,8 +95,12 @@ DEADLINE_ENFORCEMENT_HOUR_PACIFIC = 1
 # dev/e2e can run a campaign to completion in seconds.
 # ---------------------------------------------------------------------------
 EMAIL_CAMPAIGN_INTERVAL_SECONDS = int(os.environ.get("EMAIL_CAMPAIGN_INTERVAL_SECONDS", "30"))
-# How often the worker checks for campaigns when nothing is due (vs. the
-# send interval above, which applies after a successful cycle).
+# How often the worker checks for campaigns when nothing is due. Also the
+# chunk size of the send interval (the worker paces an ongoing campaign in
+# idle-poll chunks so a cancel ends the trickle early) and the minimum gap
+# between two campaigns' sends (a settled campaign hands the floor to the
+# next one after one poll, so a queue of campaigns can't burst the SMTP
+# account) — see email_campaigns.py.
 EMAIL_CAMPAIGN_IDLE_POLL_SECONDS = int(os.environ.get("EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", "10"))
 # Fat-finger guard: refuse to create a campaign whose resolved recipient set
 # exceeds this many addresses (the SMTP account's daily quota is the hard

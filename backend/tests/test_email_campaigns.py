@@ -1,19 +1,26 @@
-"""Tests for the email-campaign core: recipient resolution, creation, and the
-one-recipient delivery step (process_next_campaign_email).
+"""Tests for the email-campaign core: recipient resolution, creation, the
+one-recipient delivery step (process_next_campaign_email), and the worker
+loop's per-cycle decisions.
 
-The delivery worker loop itself is never run in tests (it's behind
-DISABLE_BACKGROUND_TASKS like the other background loops) — the pure step
-function is exercised directly, per the run_claim_expiry pattern. Tests run
-with SUPPRESS_SEND=1, so a "sent" outcome means the SMTP layer was skipped,
+The background worker is not run for real in tests (it's behind
+DISABLE_BACKGROUND_TASKS like the other background loops): the pure step
+function and the pacing helper are exercised directly, per the
+run_claim_expiry pattern, and the loop itself is driven as a canceled task
+with its cycle work faked (TestCampaignWorkerLoop). Tests run with
+SUPPRESS_SEND=1, so a "sent" outcome means the SMTP layer was skipped,
 not that a message went out. SMTP failures are monkeypatched per the
 test_admin_custom_email.py pattern.
 """
 
+import asyncio
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
 from sqlalchemy.orm import Session
 
+import app.email_campaigns as ec
 from app.email_campaigns import (
     CampaignResolutionError,
     cancel_campaign,
@@ -427,3 +434,147 @@ class TestProcessNextCampaignEmail:
         db.commit()
         db.refresh(campaign)
         assert campaign.status == EmailCampaignStatus.canceled
+
+
+class TestPaceOngoingCampaign:
+    """Post-send pacing (``_pace_ongoing_campaign``).
+
+    The loop's cycle work is faked in TestCampaignWorkerLoop; here the
+    pacing helper itself is the unit under test. ``asyncio.sleep`` is faked
+    (recorded, not awaited) and the interval constants shrunk, so no real
+    time passes.
+    """
+
+    @staticmethod
+    def _make_ongoing_campaign(db: Session, admin_user, subject: str) -> EmailCampaign:
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject=subject,
+            message="Body.",
+            roles=[],
+            extra_emails=["a@example.com", "b@example.com", "c@example.com"],
+        )
+        db.commit()
+        campaign.status = EmailCampaignStatus.sending  # as the worker sets it
+        db.commit()
+        return campaign
+
+    async def test_sleeps_full_interval_while_campaign_ongoing(self, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", 1)
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_INTERVAL_SECONDS", 3)
+        campaign = self._make_ongoing_campaign(db, admin_user, "Ongoing")
+
+        sleeps: list = []
+
+        async def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+
+        monkeypatch.setattr("asyncio.sleep", fake_sleep)
+        await ec._pace_ongoing_campaign(db, campaign.id)
+
+        # Pending rows never cleared → the whole interval, in idle-poll chunks.
+        assert sleeps == [1, 1, 1]
+
+    async def test_ends_early_when_campaign_canceled(self, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", 1)
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_INTERVAL_SECONDS", 3)
+        campaign = self._make_ongoing_campaign(db, admin_user, "Canceled mid-pace")
+
+        sleeps: list = []
+
+        async def cancel_after_first_chunk(seconds: float) -> None:
+            sleeps.append(seconds)
+            if len(sleeps) == 1:
+                # An admin cancel landing during the first chunk: all pending
+                # rows settle to canceled (the worker's own cancel endpoint).
+                campaign.status = EmailCampaignStatus.canceled
+                db.query(EmailCampaignRecipient).filter(
+                    EmailCampaignRecipient.campaign_id == campaign.id,
+                    EmailCampaignRecipient.status == EmailCampaignRecipientStatus.pending,
+                ).update(
+                    {EmailCampaignRecipient.status: EmailCampaignRecipientStatus.canceled},
+                    synchronize_session=False,
+                )
+                db.commit()
+
+        monkeypatch.setattr("asyncio.sleep", cancel_after_first_chunk)
+        await ec._pace_ongoing_campaign(db, campaign.id)
+
+        # Cleared after the first wake → back to the idle poll immediately.
+        assert sleeps == [1]
+
+    async def test_last_chunk_capped_at_interval(self, db: Session, admin_user, monkeypatch):
+        # Idle poll doesn't divide the interval → the last chunk is the
+        # remainder, so the total is exactly the interval.
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", 2)
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_INTERVAL_SECONDS", 5)
+        campaign = self._make_ongoing_campaign(db, admin_user, "Capped chunks")
+
+        sleeps: list = []
+
+        async def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+
+        monkeypatch.setattr("asyncio.sleep", fake_sleep)
+        await ec._pace_ongoing_campaign(db, campaign.id)
+
+        assert sleeps == [2, 2, 1]
+
+
+class TestCampaignWorkerLoop:
+    """The loop's per-cycle decisions: an ongoing campaign is paced and
+    continued without extra sleep; a settled one (completed, or canceled by
+    a terminal-state race) and a nothing-due cycle idle-poll — that poll is
+    the minimum gap between two campaigns' sends.
+
+    The loop runs forever, so it is driven as a task: the cycle work
+    (``process_next_campaign_email``) and the pacing are faked, and
+    ``asyncio.sleep`` is recorded while yielding to the real event loop, so
+    the task can be canceled once the scripted cycles are done. The ``db``
+    fixture is unused — with the fakes in place the loop's session never
+    issues a query.
+    """
+
+    async def test_ongoing_paced_settled_and_idle_polls(self, monkeypatch):
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_IDLE_POLL_SECONDS", 10)
+        monkeypatch.setattr(ec, "EMAIL_CAMPAIGN_INTERVAL_SECONDS", 30)
+
+        ongoing = SimpleNamespace(id=1, status=EmailCampaignStatus.sending)
+        settled = SimpleNamespace(id=2, status=EmailCampaignStatus.completed)
+        # Canceled = a cancel that won the terminal race inside the delivery
+        # step: the loop treats it like settled (no pacing, idle poll).
+        canceled = SimpleNamespace(id=3, status=EmailCampaignStatus.canceled)
+        scripted = [ongoing, settled, canceled, None]  # cycle 5 onward: nothing is due
+        sleeps: list = []
+        paced: list = []
+        real_sleep = asyncio.sleep
+
+        async def fake_process(db: Session):
+            return scripted.pop(0) if scripted else None
+
+        async def fake_pace(db: Session, campaign_id: int):
+            paced.append(campaign_id)
+
+        async def fake_sleep(seconds: float):
+            sleeps.append(seconds)
+            if len(sleeps) >= 4:  # the scripted cycles are done — stop the loop
+                task.cancel()
+            await real_sleep(0)
+
+        monkeypatch.setattr(ec, "process_next_campaign_email", fake_process)
+        monkeypatch.setattr(ec, "_pace_ongoing_campaign", fake_pace)
+        monkeypatch.setattr("asyncio.sleep", fake_sleep)
+
+        task = asyncio.create_task(ec.campaign_worker_loop())
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # Cycle 1: ongoing campaign — paced, then continued without extra
+        # sleep (the pacing is the same campaign's only wait).
+        # Cycles 2-3: settled / canceled — the next cycle may start a
+        # *different* campaign's first send, so the idle poll is the
+        # minimum gap between two campaigns' sends.
+        # Cycle 4: nothing due — the idle poll.
+        assert paced == [1]
+        assert sleeps == [0, 10, 10, 10]

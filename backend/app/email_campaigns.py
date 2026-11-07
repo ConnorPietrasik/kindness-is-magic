@@ -3,8 +3,14 @@
 A campaign freezes its recipient set at creation (role selections resolve to
 the non-deleted users existing at that moment; manual entries are normalized
 and deduped against them) and is then delivered one recipient per worker
-cycle, with a fixed interval between sends, so a bulk send trickles out
-instead of bursting the SMTP account into a throttling block.
+cycle, with a fixed interval between consecutive sends of the same campaign,
+so a bulk send trickles out instead of bursting the SMTP account into a
+throttling block. The interval never spans campaigns: when an ongoing
+campaign settles (completes) or is canceled, the worker moves on instead of
+waiting out an interval it didn't cause. But two campaign emails of
+different campaigns are never sent closer together than one idle poll, so a
+queue of campaigns still trickles out (the next campaign's first send goes
+out at most two idle polls after the cancel).
 
 Every send goes through the shared ``send_email`` path — the unsubscribe
 gate applies (unsubscribed recipients are recorded as failed, never
@@ -17,9 +23,10 @@ exception), so a step interrupted in the window after that commit but
 before its final commit re-sends the in-flight recipient on restart — a
 millisecond-wide window, and both attempts remain in the log.
 
-Only the leader worker runs the loop (see main.lifespan); tests exercise
-``process_next_campaign_email`` / ``create_campaign`` directly and never
-the loop itself.
+Only the leader worker runs the loop for real (see main.lifespan); tests
+exercise ``process_next_campaign_email`` / ``create_campaign`` directly
+and drive the loop as a canceled task with its cycle work faked (see
+``tests/test_email_campaigns.py``).
 """
 
 import asyncio
@@ -284,13 +291,57 @@ async def process_next_campaign_email(db: Session) -> EmailCampaign | None:
     return campaign
 
 
+def _campaign_has_pending_recipients(db: Session, campaign_id: int) -> bool:
+    return (
+        db.query(EmailCampaignRecipient.id)
+        .filter(
+            EmailCampaignRecipient.campaign_id == campaign_id,
+            EmailCampaignRecipient.status == EmailCampaignRecipientStatus.pending,
+        )
+        .first()
+        is not None
+    )
+
+
+async def _pace_ongoing_campaign(db: Session, campaign_id: int) -> None:
+    """Sleep out the post-send interval, in idle-poll chunks.
+
+    Wakes on every idle poll and returns early the moment the campaign has
+    no pending recipients left: while pacing the worker is asleep, so an
+    admin cancel (``cancel_campaign`` flips every pending row to canceled)
+    is the only thing that can clear them. It keeps the full
+    ``EMAIL_CAMPAIGN_INTERVAL_SECONDS`` between sends of an ongoing campaign,
+    while ending at most one idle poll after the cancel instead of waiting
+    out an interval the campaign didn't cause. An early exit goes straight
+    to the next cycle (see ``campaign_worker_loop``): a queued campaign's
+    first send is due immediately, and only an empty queue idles at the
+    normal poll.
+
+    The checks run on the worker's session, but a rollback before every
+    sleep chunk releases its pool connection (a check's autobegin
+    transaction is read-only, so nothing is lost), so the — much longer —
+    sleeps hold no connection and no open transaction.
+    """
+    elapsed = 0.0
+    while elapsed < EMAIL_CAMPAIGN_INTERVAL_SECONDS:
+        db.rollback()  # never sleep while holding the check's connection
+        chunk = min(EMAIL_CAMPAIGN_IDLE_POLL_SECONDS, EMAIL_CAMPAIGN_INTERVAL_SECONDS - elapsed)
+        await asyncio.sleep(chunk)
+        elapsed += chunk
+        if not _campaign_has_pending_recipients(db, campaign_id):
+            return
+
+
 async def campaign_worker_loop() -> None:
     """Deliver campaign emails one per cycle, paced to avoid SMTP throttling.
 
     Runs forever in the leader worker (started by the app lifespan,
     disabled in tests via DISABLE_BACKGROUND_TASKS). After a cycle that
-    delivered an email it sleeps ``EMAIL_CAMPAIGN_INTERVAL_SECONDS``; when
-    nothing is due it polls every ``EMAIL_CAMPAIGN_IDLE_POLL_SECONDS``.
+    delivered an email of a campaign that still has recipients queued it
+    paces the next send (see ``_pace_ongoing_campaign``) and continues
+    without extra sleep; after a cycle that settles a campaign — and when
+    nothing is due — it waits one idle poll, so two campaign emails are
+    never sent closer together than ``EMAIL_CAMPAIGN_IDLE_POLL_SECONDS``.
     DB errors are logged and swallowed (the next cycle retries) — mirroring
     ``deadline_checks_loop``. Cancelled on shutdown by the caller.
     """
@@ -300,10 +351,19 @@ async def campaign_worker_loop() -> None:
             db = next(get_db())
             try:
                 campaign = await process_next_campaign_email(db)
+                if campaign is not None and campaign.status == EmailCampaignStatus.sending:
+                    # Still has recipients queued: consume the post-send
+                    # interval in chunks (ends early if canceled), then go
+                    # straight to the next cycle — it continues the *same*
+                    # campaign and the interval above is the only wait.
+                    await _pace_ongoing_campaign(db, campaign.id)
+                    sleep_seconds = 0
+                # A settled campaign (or nothing due) keeps the default idle
+                # poll: the next cycle may start a *different* campaign's
+                # first send, and the poll is the minimum gap between two
+                # campaigns' sends (see the module docstring).
             finally:
                 db.close()
-            if campaign is not None:
-                sleep_seconds = EMAIL_CAMPAIGN_INTERVAL_SECONDS
         except Exception as exc:  # noqa: BLE001
             logger.error("Email campaign worker step failed (will retry): %s", exc, exc_info=True)
         await asyncio.sleep(sleep_seconds)
