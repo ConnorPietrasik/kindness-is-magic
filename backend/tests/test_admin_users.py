@@ -474,6 +474,27 @@ class TestAdminCreateUser:
         assert resp.status_code == 422
         assert db.query(User).filter(User.email == "a" * 109 + "@example.com").count() == 0
 
+    def test_201_create_without_display_name_long_local_part(self, test_client: TestClient, admin_user, db: Session):
+        """Omitted display_name + >40 char email local-part must 201, with the derived name clamped to 40."""
+        from app.models import User
+
+        email = "b" * 43 + "@example.com"
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/users",
+            json={
+                "email": email,
+                "password": "LongPass123!",
+                "role": "admin",
+            },
+        )
+        assert resp.status_code == 201
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == email).first()
+        assert user.display_name == "B" + "b" * 39
+        assert len(user.display_name) == 40
+
 
 # =========================================================================
 #  Admin — Update User

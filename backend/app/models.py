@@ -26,6 +26,11 @@ from app.database import Base
 # Auth models
 # ---------------------------------------------------------------------------
 
+# Width of User.display_name. Derived names (email local-part) and longer
+# source fields (e.g. the 60-char Referrer.name) are clamped to this in the
+# User.display_name validator so inserts never exceed the column.
+DISPLAY_NAME_MAX_LENGTH = 40
+
 
 class UserRole(str, enum.Enum):
     admin = "admin"
@@ -68,20 +73,23 @@ class User(Base):
         return value.strip().lower()
 
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    display_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(DISPLAY_NAME_MAX_LENGTH), nullable=False)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_constraint=True), nullable=False)
     referrer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("referrer.id", ondelete="SET NULL"), nullable=True)
 
     @validates("display_name")
     def _default_display_name(self, _key: str, value: str | None) -> str:
-        """Ensure display_name always has a value.
+        """Ensure display_name always has a value and fits the column.
 
         If not provided or empty, defaults to the email local-part with the
         first letter capitalized (e.g. ``sarah.chen@example.com`` → ``"Sarah.chen"``).
+        Longer values are clamped to ``DISPLAY_NAME_MAX_LENGTH`` — e.g. a
+        60-char referrer name or a name derived from a long email local-part —
+        so no insert path can exceed the column width.
         """
         if not value:
             value = default_display_name_from_email(self.email)
-        return value
+        return value[:DISPLAY_NAME_MAX_LENGTH]
 
     family_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)

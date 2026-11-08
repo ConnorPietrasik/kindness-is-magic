@@ -578,6 +578,31 @@ class TestReferrerSelfRegister:
         )
         assert resp.status_code == 422
 
+    def test_long_name_registers_with_clamped_display_name(self, test_client: TestClient, admin_user, db: Session):
+        """A 41-60 char name must register (201) — display_name clamps to the 40-char column."""
+        from app.models import Referrer, User
+
+        code = self._create_invite(test_client, admin_user)
+        name = "N" * 50
+        resp = test_client.post(
+            "/api/auth/register-referrer",
+            json={
+                "code": code,
+                "name": name,
+                "email": "longnameref@test.com",
+                "phone_number": "555-000-0000",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 201
+
+        db.expire_all()
+        referrer = db.query(Referrer).filter(Referrer.name == name).first()
+        assert referrer is not None  # Referrer keeps the full 60-char-column name
+        user = db.query(User).filter(User.email == "longnameref@test.com").first()
+        assert user.display_name == name[:40]
+        assert len(user.display_name) == 40
+
     def test_email_normalised(self, test_client: TestClient, admin_user, db: Session):
         """Email should be stored in lowercase."""
         code = self._create_invite(test_client, admin_user, family_limit=5)
@@ -810,6 +835,33 @@ class TestFamilySelfRegister:
         assert resp.status_code == 201
         body = resp.json()
         assert body["family"]["family_name"] == "The Joneses"
+
+    def test_long_local_part_email_registers(self, test_client: TestClient, admin_user, db: Session):
+        """An email with a >40 char local-part must register (201), not 500 on the derived display_name."""
+        from app.models import User
+
+        code = self._create_referrer_with_code(test_client, admin_user, db)
+        email = "a" * 43 + "@test.com"
+        resp = test_client.post(
+            "/api/auth/register-family",
+            json={
+                "code": code,
+                "family_name": "The Longs",
+                "family_wish": "Peace",
+                "contact_name": "Long",
+                "email": email,
+                "password": "GoodPass1234!",
+                "address": "none",
+                "phone_number": "555-000-0000",
+            },
+        )
+        assert resp.status_code == 201
+
+        db.expire_all()
+        user = db.query(User).filter(User.email == email).first()
+        assert user is not None
+        assert user.display_name == "A" + "a" * 39
+        assert len(user.display_name) == 40
 
     def test_invalid_code(self, test_client: TestClient):
         resp = test_client.post(

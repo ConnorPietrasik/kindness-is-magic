@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash, generate_unique_family_invite_code
 from app.models import (
+    DISPLAY_NAME_MAX_LENGTH,
     Family,
     FamilyVerificationStatus,
     Person,
@@ -816,6 +817,17 @@ def _process_users(
                 display_name = sanitize_plain_text(display_name_raw)
             except ValueError as exc:
                 summary.rows.append(RowResult(row_num, "user", "error", f"display_name: {exc}"))
+                summary.users_errors += 1
+                continue
+            if len(display_name) > DISPLAY_NAME_MAX_LENGTH:
+                summary.rows.append(
+                    RowResult(
+                        row_num,
+                        "user",
+                        "error",
+                        f"display_name too long (max {DISPLAY_NAME_MAX_LENGTH} characters)",
+                    )
+                )
                 summary.users_errors += 1
                 continue
         if display_name is None:

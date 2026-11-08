@@ -76,6 +76,34 @@ class TestUser:
         db.commit()
         assert db.query(User).count() == len(UserRole)
 
+    def test_display_name_clamped_to_column_width(self, db: Session):
+        """Over-long display names (derived or explicit) are clamped to 40 chars, not rejected at insert."""
+        from app.auth import get_password_hash
+
+        # Email-derived fallback for a 43-char local-part
+        long_local = "a" * 43
+        user = User(
+            email=f"{long_local}@test.com",
+            hashed_password=get_password_hash("Pass1234!"),
+            role=UserRole.admin,
+            display_name=None,
+        )
+        db.add(user)
+        db.commit()
+        assert user.display_name == "A" + "a" * 39
+        assert len(user.display_name) == 40
+
+        # Explicit over-long value (e.g. a 60-char referrer name)
+        user2 = User(
+            email="clamp@test.com",
+            hashed_password=get_password_hash("Pass1234!"),
+            role=UserRole.referrer,
+            display_name="N" * 60,
+        )
+        db.add(user2)
+        db.commit()
+        assert user2.display_name == "N" * 40
+
 
 class TestReferrer:
     def test_create_referrer(self, db: Session):

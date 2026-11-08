@@ -769,6 +769,23 @@ csv_html@test.com,Password123!,admin,,,<script>alert('xss')</script>
         assert len(error_rows) == 1
         assert "display_name" in error_rows[0]["message"]
 
+    def test_user_display_name_too_long_errors_row(self, test_client: TestClient, admin_user):
+        """A CSV display_name over 40 chars errors the row instead of 500ing the whole import."""
+        long_name = "D" + "n" * 40
+        csv_data = f"""# users
+email,password,role,referrer_name_or_id,family_name_or_id,display_name
+csv_toolong@test.com,Password123!,admin,,,{long_name}
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["users"]["created"] == 0
+        assert body["summary"]["users"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "user" and r["action"] == "error"]
+        assert len(error_rows) == 1
+        assert "display_name" in error_rows[0]["message"]
+
     def test_user_display_name_normalizes_whitespace(self, test_client: TestClient, admin_user, db: Session):
         """A CSV display_name has whitespace collapsed on import."""
         from app.models import User
