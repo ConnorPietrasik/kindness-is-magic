@@ -1778,6 +1778,23 @@ class TestBatchAssign:
         assert resp.status_code == 200
         assert resp.json()["assigned_count"] == 4
 
+    def test_batch_assign_duplicate_ids_counted_once(self, test_client, admin_user, wish_tree, db):
+        """Duplicate wish IDs are deduplicated — assigned_count counts unique wishes."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wishes = wish_tree["wishes"]
+        resp = test_client.post(
+            "/api/admin/wishes/batch-assign",
+            json={"wish_ids": [wishes[0].id, wishes[0].id, wishes[1].id], "assigned_to_id": admin_user.id},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"assigned_count": 2}
+
+        fresh = db.get(Wish, wishes[0].id)
+        assert fresh.assigned_to_id == admin_user.id
+
     def test_fail_fast_invalid_wish_id(self, test_client, admin_user, wish_tree):
         """Fail-fast when one wish ID doesn't exist."""
         test_client.post(

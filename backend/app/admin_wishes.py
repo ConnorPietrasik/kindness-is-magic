@@ -338,11 +338,15 @@ def batch_assign(
     if not is_unassign:
         _validate_assign_target(db, body.assigned_to_id)
 
+    # Deduplicate so repeated IDs don't inflate the count
+    seen: set[int] = set()
+    wish_ids = [wid for wid in body.wish_ids if not (wid in seen or seen.add(wid))]
+
     # Fail-fast: check all wish IDs exist and are not deleted
-    wishes = db.query(Wish).filter(Wish.id.in_(body.wish_ids)).all()
+    wishes = db.query(Wish).filter(Wish.id.in_(wish_ids)).all()
     wish_map = {w.id: w for w in wishes}
 
-    for wid in body.wish_ids:
+    for wid in wish_ids:
         if wid not in wish_map:
             raise HTTPException(status_code=400, detail=f"Wish {wid} not found")
         if wish_map[wid].deleted_at is not None:
@@ -350,7 +354,7 @@ def batch_assign(
 
     # All valid — perform the assignment
     count = 0
-    for wid in body.wish_ids:
+    for wid in wish_ids:
         wish_map[wid].assigned_to_id = None if is_unassign else body.assigned_to_id
         count += 1
 
