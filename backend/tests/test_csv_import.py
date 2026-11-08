@@ -989,3 +989,52 @@ csv_ws@test.com,Password123!,admin,,,  Ws\tName
         db.expire_all()
         user = db.query(User).filter(User.email == "csv_ws@test.com").first()
         assert user.display_name == "Ws Name"
+
+
+class TestCsvImportUnknownSections:
+    """Unknown section names (e.g. typos) are reported, not silently dropped."""
+
+    def test_clean_import_reports_no_unknown_sections(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        resp = _post_csv(test_client, CSV_MINIMAL)
+        assert resp.status_code == 200
+        assert resp.json()["unknown_sections"] == []
+
+    def test_typo_section_reported_and_known_sections_still_import(self, test_client: TestClient, admin_user, db: Session):
+        """A typo'd header (``# referrer``) is reported; the valid section still imports."""
+        from app.models import Referrer
+
+        csv_data = """# referrer
+name,family_limit,phone_number
+Typo Section Ref,5,555-000-0003
+
+# referrers
+name,family_limit,phone_number
+Good Ref,5,555-000-0004
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["unknown_sections"] == ["referrer"]
+        assert body["summary"]["referrers"]["created"] == 1
+
+        db.expire_all()
+        assert db.query(Referrer).filter(Referrer.name == "Good Ref").first() is not None
+        assert db.query(Referrer).filter(Referrer.name == "Typo Section Ref").first() is None
+
+    def test_unknown_sections_only_file_imports_nothing(self, test_client: TestClient, admin_user, db: Session):
+        """A file whose only section has a typo'd header: 200, all zeros, section named."""
+        from app.models import Referrer
+
+        csv_data = "# referrer\nname,family_limit,phone_number\nTypo Section Ref,5,555"
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["unknown_sections"] == ["referrer"]
+        assert all(all(v == 0 for v in section.values()) for section in body["summary"].values())
+        assert body["rows"] == []
+
+        db.expire_all()
+        assert db.query(Referrer).count() == 0

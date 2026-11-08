@@ -13,6 +13,10 @@ starting with ``#``.  Recognised section names (case-insensitive) are:
 Sections are processed in dependency order:
     referrers → families → people → users
 
+Unrecognised section names are not imported, but are reported in the
+import summary under ``unknown_sections`` so a typo'd header (e.g.
+``# referrer``) never silently drops an entire section.
+
 Within each section the first row is the *header* (column names).
 Subsequent rows are data.
 
@@ -127,6 +131,7 @@ class ImportSummary:
     users_skipped: int = 0
     users_errors: int = 0
     rows: list[RowResult] = field(default_factory=list)
+    unknown_sections: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -153,6 +158,7 @@ class ImportSummary:
                 },
             },
             "rows": [_row_result_to_dict(r) for r in self.rows],
+            "unknown_sections": list(self.unknown_sections),
         }
 
 
@@ -161,6 +167,10 @@ class ImportSummary:
 # ---------------------------------------------------------------------------
 
 _SECTION_RE = re.compile(r"^\s*#\s*(\w+)\s*$")
+
+# Section names the importer understands; everything else is reported in
+# ``ImportSummary.unknown_sections`` instead of being silently dropped.
+_KNOWN_SECTIONS = ("referrers", "families", "people", "users")
 
 
 def _parse_sections(csv_text: str) -> dict[str, list[list[str]]]:
@@ -986,12 +996,13 @@ def import_csv(
     """
     sections = _parse_sections(csv_text)
     summary = ImportSummary()
+    summary.unknown_sections = sorted(name for name in sections if name not in _KNOWN_SECTIONS)
 
     # Track row offsets for accurate row numbering
     row_offset = 0
 
     # Process in dependency order
-    for section_name in ("referrers", "families", "people", "users"):
+    for section_name in _KNOWN_SECTIONS:
         section_rows = sections.get(section_name)
         if not section_rows:
             continue

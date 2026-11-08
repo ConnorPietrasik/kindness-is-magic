@@ -116,6 +116,12 @@ async def import_csv_data(
         summary.people_errors,
         summary.users_errors,
     )
+    if summary.unknown_sections:
+        logger.warning(
+            "Admin %s CSV import skipped unrecognized section(s): %s",
+            _admin.id,
+            ", ".join(summary.unknown_sections),
+        )
     return summary.to_dict()
 
 

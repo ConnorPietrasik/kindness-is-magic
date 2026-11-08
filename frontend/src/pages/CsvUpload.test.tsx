@@ -123,6 +123,31 @@ describe("CsvUpload", () => {
     expect(await screen.findByText("CSV imported successfully")).toBeInTheDocument();
   });
 
+  it("warns instead of the green toast when the server reports unknown sections", async () => {
+    const user = userEvent.setup();
+    const sectionStat = { created: 1, skipped: 0, errors: 0 };
+    vi.spyOn(api, "adminImportCsv").mockResolvedValue({
+      summary: { referrers: sectionStat, families: sectionStat, people: sectionStat, users: sectionStat },
+      rows: [],
+      unknown_sections: ["referrer"],
+    });
+    const { container } = wrap(<CsvUpload />);
+
+    uploadFile(container, makeCsvFile(VALID_CSV));
+
+    await waitFor(() => {
+      expect(screen.getByText("2 rows")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Import CSV" }));
+
+    // Info toast naming the skipped section, not the green success toast
+    expect(await screen.findByText("Imported, but unrecognized section(s) were skipped: referrer")).toBeInTheDocument();
+    expect(screen.queryByText("CSV imported successfully")).not.toBeInTheDocument();
+    // Results banner also names the skipped section
+    expect(screen.getByText(/fix the header/)).toBeInTheDocument();
+  });
+
   it("loads the template from the API and shows it", async () => {
     const user = userEvent.setup();
     const sampleSpy = vi.spyOn(api, "adminGetCsvSample").mockResolvedValue({ csv_template: "# referrers\nname,family_limit,phone_number" });

@@ -34,7 +34,7 @@ export default function CsvUpload() {
 
   const importMut = useMutation({
     mutationFn: (text: string) => adminImportCsv(text),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setFile(null);
       // Refresh admin list pages so they show newly imported data
       queryClient.invalidateQueries({ queryKey: adminReferrers });
@@ -43,7 +43,12 @@ export default function CsvUpload() {
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       queryClient.invalidateQueries({ queryKey: adminUsers });
       queryClient.invalidateQueries({ queryKey: adminWishes });
-      toast.success("CSV imported successfully");
+      const unknown = (data as ImportData).unknown_sections ?? [];
+      if (unknown.length > 0) {
+        toast.info(`Imported, but unrecognized section(s) were skipped: ${unknown.join(", ")}`);
+      } else {
+        toast.success("CSV imported successfully");
+      }
     },
   });
 
@@ -273,11 +278,13 @@ interface ImportData {
     users: ImportSummarySection;
   };
   rows: ImportRow[];
+  unknown_sections?: string[];
 }
 
 function ImportResults({ data }: { data: unknown }) {
   const importData = data as ImportData;
   const { summary, rows } = importData;
+  const unknownSections = importData.unknown_sections ?? [];
 
   function sectionStat(label: string, s: ImportSummarySection) {
     return (
@@ -304,6 +311,13 @@ function ImportResults({ data }: { data: unknown }) {
   return (
     <Card className="mt-4">
       <h3 className="mb-4 text-lg font-semibold text-violet-950">Import Results</h3>
+
+      {unknownSections.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {"\u26A0"} Unrecognized section(s) skipped: {unknownSections.join(", ")} — fix the header (e.g. "# referrers") and re-import that
+          section.
+        </div>
+      )}
 
       {/* Summary grid */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
