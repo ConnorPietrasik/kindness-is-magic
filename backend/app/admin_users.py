@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_password_hash
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
-from app.models import Family, Referrer, User, UserRole, Wish
+from app.models import Family, RefreshToken, Referrer, User, UserRole, Wish
 from app.permissions import require_admin
 from app.response_builders import (
     _CLEAR,
@@ -386,6 +386,12 @@ def reset_user_password(
 ) -> UserDetail:
     user = get_or_404(db, User, user_id, "User not found")
     user.hashed_password = get_password_hash(body.password)
+
+    # Invalidate all refresh tokens (force re-login on all devices)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+    ).delete(synchronize_session="fetch")
+
     db.commit()
     db.refresh(user)
     logger.info("Admin reset password for user (id=%s)", user_id)

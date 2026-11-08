@@ -714,6 +714,43 @@ class TestAdminResetPassword:
         )
         assert resp.status_code == 200
 
+    def test_refresh_tokens_invalidated(self, test_client: TestClient, admin_user, db: Session):
+        """An admin reset revokes the target's existing sessions."""
+        from app.models import User, UserRole
+        from app.auth import get_password_hash
+
+        # Create a user with an active session
+        u = User(
+            email="resetme@test.com",
+            hashed_password=get_password_hash("OldPass1234!"),
+            role=UserRole.admin,
+            display_name=None,
+        )
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+
+        login_as(test_client, "resetme@test.com", "OldPass1234!")
+        refresh_before = test_client.cookies.get("refresh_token")
+        assert refresh_before is not None
+
+        # Admin resets the password
+        _admin_login(test_client)
+        resp = test_client.post(
+            f"/api/admin/users/{u.id}/reset-password",
+            json={"password": "NewPass1234!"},
+        )
+        assert resp.status_code == 200
+
+        # The pre-reset refresh token is revoked. Delete first: the jar also
+        # holds the admin's refresh cookie from _admin_login, and with both
+        # entries present the server would just validate the admin's token.
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["detail"].lower()
+
     def test_404_reset_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.post(
