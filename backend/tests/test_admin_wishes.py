@@ -1395,6 +1395,34 @@ class TestPatchWish:
         resp = test_client.patch(f"/api/admin/wishes/{wish_tree['wishes'][0].id}", json={"assigned_to_id": True})
         assert resp.status_code == 422
 
+    def test_set_assigned_to_id_wrong_role_400(self, test_client, admin_user, referrer_user, wish_tree):
+        """Assigning to a non-admin/non-purchaser role is rejected — the purchaser queue is the only view of assigned wishes."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"assigned_to_id": referrer_user.id},
+        )
+        assert resp.status_code == 400
+        assert "admin or purchaser" in resp.json()["detail"]
+
+    def test_set_assigned_to_id_soft_deleted_400(self, test_client, admin_user, referrer_user, wish_tree, db):
+        """Assigning to a soft-deleted user is rejected (would be invisible work until/unless restored)."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        referrer_user.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = test_client.patch(
+            f"/api/admin/wishes/{wish_tree['wishes'][0].id}",
+            json={"assigned_to_id": referrer_user.id},
+        )
+        assert resp.status_code == 400
+        assert "soft-deleted" in resp.json()["detail"]
+
     def test_set_purchased_at(self, test_client, admin_user, wish_tree):
         """Set purchased_at."""
         test_client.post(
@@ -1776,6 +1804,35 @@ class TestBatchAssign:
             json={"wish_ids": [wish_tree["wishes"][0].id], "assigned_to_id": 99999},
         )
         assert resp.status_code == 400
+
+    def test_fail_fast_wrong_role_user(self, test_client, admin_user, referrer_user, wish_tree, db):
+        """Fail-fast when assigned_to_id user is not admin/purchaser; nothing is assigned."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        resp = test_client.post(
+            "/api/admin/wishes/batch-assign",
+            json={"wish_ids": [wish_tree["wishes"][0].id], "assigned_to_id": referrer_user.id},
+        )
+        assert resp.status_code == 400
+        assert "admin or purchaser" in resp.json()["detail"]
+        assert db.get(Wish, wish_tree["wishes"][0].id).assigned_to_id is None
+
+    def test_fail_fast_soft_deleted_user(self, test_client, admin_user, referrer_user, wish_tree, db):
+        """Fail-fast when assigned_to_id user is soft-deleted."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        referrer_user.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        resp = test_client.post(
+            "/api/admin/wishes/batch-assign",
+            json={"wish_ids": [wish_tree["wishes"][0].id], "assigned_to_id": referrer_user.id},
+        )
+        assert resp.status_code == 400
+        assert "soft-deleted" in resp.json()["detail"]
 
     def test_single_wish(self, test_client, admin_user, wish_tree):
         """Batch assign with a single wish."""

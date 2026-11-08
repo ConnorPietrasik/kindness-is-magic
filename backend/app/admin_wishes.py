@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.display_ids import compute_display_ids, wish_display_id
-from app.models import Family, Person, Referrer, User, Wish, WishType
+from app.models import Family, Person, Referrer, User, UserRole, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
@@ -60,6 +60,24 @@ def _get_valid_wish_types_for_age(age: int) -> set[WishType]:
     if age >= 18:
         return {WishType.adult}
     return {WishType.practical, WishType.fun}
+
+
+def _validate_assign_target(db: Session, user_id: int) -> None:
+    """Validate a wish-assignment target: must exist, be active, and be admin/purchaser.
+
+    Only these two roles have a view of wishes assigned to them — the
+    purchaser queue (``require_purchaser`` routes, scoped to the purchaser's
+    own id) and the admin "My Assigned Gifts" page (admin wish list filtered
+    by ``assigned_to_id``). Assigning to any other role or a soft-deleted
+    user makes the wish invisible work.
+    """
+    target_user = db.get(User, user_id)
+    if target_user is None:
+        raise HTTPException(status_code=400, detail="Assigned user not found")
+    if target_user.deleted_at is not None:
+        raise HTTPException(status_code=400, detail="Assigned user is soft-deleted")
+    if target_user.role not in (UserRole.admin, UserRole.purchaser):
+        raise HTTPException(status_code=400, detail="User is not an admin or purchaser")
 
 
 @admin_wishes_router.get("", response_model_exclude_unset=True)
@@ -318,9 +336,7 @@ def batch_assign(
     is_unassign = body.assigned_to_id == 0
 
     if not is_unassign:
-        target_user = db.get(User, body.assigned_to_id)
-        if target_user is None:
-            raise HTTPException(status_code=400, detail="Assigned user not found")
+        _validate_assign_target(db, body.assigned_to_id)
 
     # Fail-fast: check all wish IDs exist and are not deleted
     wishes = db.query(Wish).filter(Wish.id.in_(body.wish_ids)).all()
@@ -437,10 +453,7 @@ def update_wish(
 
     # Validate assigned_to_id target if set
     if body.assigned_to_id is not None and body.assigned_to_id is not _CLEAR:
-        # It's an int — validate user exists
-        target_user = db.get(User, body.assigned_to_id)
-        if target_user is None:
-            raise HTTPException(status_code=400, detail="Assigned user not found")
+        _validate_assign_target(db, body.assigned_to_id)
 
     partial_update(wish, body)
     db.commit()
