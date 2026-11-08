@@ -127,6 +127,19 @@ describe("AdminEmailComposer", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("invalid_address result: error toast about the invalid address, and closes", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminSendCustomEmail").mockResolvedValue({ sent: false, reason: "invalid_address" });
+    const { onClose } = wrap();
+
+    await fillAndSend(user);
+
+    await waitFor(() => {
+      expect(screen.getByText(/The email could not be sent — the recipient address is invalid/)).toBeInTheDocument();
+    });
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("request failure: error toast from the API error, dialog stays open", async () => {
     const user = userEvent.setup();
     const apiError = Object.assign(new Error("Unprocessable Entity"), {

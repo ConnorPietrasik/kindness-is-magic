@@ -332,6 +332,36 @@ class TestProcessNextCampaignEmail:
         assert row.status == EmailCampaignRecipientStatus.failed
         assert row.failure_reason == "smtp_error"
 
+    async def test_special_use_domain_failed_and_campaign_continues(self, db: Session, admin_user):
+        # The mail layer's strict EmailStr rejects special-use domains that
+        # the app's own (looser) validation accepts (e.g. .test) — the send
+        # must be recorded as failed, not escape send_email (an escape wedges
+        # the worker on this recipient forever), and the campaign must
+        # continue with the next recipient.
+        create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.test", "b@example.com"]
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+
+        await process_next_campaign_email(db)
+
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.sending
+        assert campaign.failed_count == 1
+        assert campaign.sent_count == 0
+        rows = _recipients(db, campaign.id)
+        assert rows[0].status == EmailCampaignRecipientStatus.failed
+        assert rows[0].failure_reason == "invalid_address"
+        assert rows[0].sent_at is None
+
+        await process_next_campaign_email(db)
+
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.completed
+        assert campaign.sent_count == 1
+        assert _recipients(db, campaign.id)[1].status == EmailCampaignRecipientStatus.sent
+
     async def test_resume_after_restart(self, db: Session, admin_user):
         create_campaign(
             db,

@@ -138,6 +138,12 @@ jobs:
         # GitHub sets CI=true: the config already uses it for forbidOnly and
         # 2 retries.
         run: npx playwright test
+      # Backend/stack logs carry the server-side half of failures (worker
+      # loops, send results) that Playwright's artifacts can't show — they
+      # live only in the containers, which die with the runner.
+      - name: Capture stack logs
+        if: failure()
+        run: ./run-compose.sh logs --no-color > ci-stack-logs.txt 2>&1 || true
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -145,5 +151,6 @@ jobs:
           path: |
             e2e/test-results/
             e2e/playwright-report/
+            ci-stack-logs.txt
           if-no-files-found: ignore
       # No teardown: the runner VM is destroyed with its Docker state.

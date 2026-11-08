@@ -18,5 +18,8 @@ frontend/dist/
 # Database backups (written by ./run-compose.sh prod backup)
 backups/
 
+# CI artifact (stack logs captured by .github/workflows/ci.yml on e2e failure)
+ci-stack-logs.txt
+
 # Design sources (vector master for frontend/public/logo.png; not served, not versioned)
 logo.svg

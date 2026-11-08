@@ -49,6 +49,10 @@
  *   never turn "Sent", so the retry is doomed by construction. Fresh names
  *   give each attempt its own campaigns (created after the retry's
  *   cleanup), so a retry actually has a chance to pass.
+ * - The bootstrap admin's address (.env ADMIN_EMAIL) must be a domain the
+ *   mail layer's strict validation accepts: special-use TLDs like .test are
+ *   rejected at send time (the row records "Failed — invalid_address" and can
+ *   never turn "Sent"), which is why .env.example uses admin@example.com.
  */
 import { test, expect } from "@playwright/test";
 import type { Locator } from "@playwright/test";

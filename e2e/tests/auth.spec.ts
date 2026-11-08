@@ -76,7 +76,7 @@ test.describe("Authentication", () => {
     // the URL can still read /dashboard during boot before a redirect.
     await page.reload();
     /* The role badge, not the text "Admin": the committed test admin
-     * (admin@example.test) has the display name "Admin", so getByText("Admin")
+     * (admin@example.com) has the display name "Admin", so getByText("Admin")
      * would match both the profile name and the badge (strict-mode violation). */
     const roleBadge = page.getByTestId("role-badge");
     await expect(roleBadge).toBeVisible({ timeout: 15_000 });

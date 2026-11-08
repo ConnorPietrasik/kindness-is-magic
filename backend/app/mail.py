@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 
 import jwt
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
@@ -152,7 +153,12 @@ async def send_email(
     * Wraps body with a branded header and optional unsubscribe footer.
     * Records one ``SentEmail`` log row per attempt (``user_id`` is the actor
       whose action triggered the send, NULL when unauthenticated).
-    * SMTP failures are logged at ERROR level.
+    * Never raises: an address the mail layer's strict validation rejects
+      (e.g. special-use domains like ``.test``, which the app's own looser
+      validation accepts) is recorded as failed with reason
+      ``invalid_address``; SMTP failures are logged at ERROR level and
+      recorded with reason ``smtp_error``. Escaping an exception here would
+      wedge the campaign delivery worker on one recipient forever.
     * Returns ``{"sent": bool, "reason": str | None}``.
     """
     to_addr = to.lower()
@@ -167,18 +173,26 @@ async def send_email(
     unsubscribe_url = _unsubscribe_url(to_addr) if include_unsubscribe_link else None
     full_html = _wrap_email(html_body, unsubscribe_url)
 
-    message = MessageSchema(
-        subject=subject,
-        recipients=[to_addr],
-        body=full_html,
-        subtype="html",
-    )
-
     try:
+        # MessageSchema's strict EmailStr is validated as part of construction
+        # — it is inside the try on purpose: an escaping ValidationError would
+        # retry the same failing step forever (see the docstring above).
+        message = MessageSchema(
+            subject=subject,
+            recipients=[to_addr],
+            body=full_html,
+            subtype="html",
+        )
         await mail_manager.send_message(message)
         logger.info("Email sent: kind=%s", kind)
         _record_sent_email(db, to_addr, kind, user_id, EmailStatus.sent, None)
         return {"sent": True, "reason": None}
+    except ValidationError as exc:
+        first = exc.errors()[0] if exc.errors() else {}
+        # No address in the log — PII rule (the msg names the domain class).
+        logger.error("Recipient address failed mail validation (kind=%s): %s", kind, first.get("msg", "unknown"))
+        _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "invalid_address")
+        return {"sent": False, "reason": "invalid_address"}
     except Exception as exc:  # noqa: BLE001
         logger.error("SMTP error sending email (kind=%s): %s", kind, exc)
         _record_sent_email(db, to_addr, kind, user_id, EmailStatus.failed, "smtp_error")

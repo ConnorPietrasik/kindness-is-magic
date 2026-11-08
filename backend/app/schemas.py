@@ -603,8 +603,9 @@ class AdminSendEmailRequest(BaseModel):
 class AdminSendEmailResult(BaseModel):
     """Outcome of an admin custom-email send attempt.
 
-    ``reason`` is ``"unsubscribed"`` or ``"smtp_error"`` when ``sent`` is
-    False — mirrors ``send_email``'s return dict.
+    ``reason`` is ``"unsubscribed"``, ``"invalid_address"``, or
+    ``"smtp_error"`` when ``sent`` is False — mirrors ``send_email``'s
+    return dict.
     """
 
     sent: bool

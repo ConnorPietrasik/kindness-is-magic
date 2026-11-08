@@ -58,7 +58,7 @@ import { expect } from "@playwright/test";
 export async function loginAsAdmin(page: Page): Promise<void> {
   await loginAs(page, CREDENTIALS.admin);
   /* The role badge — not getByText("Admin"), which also matches an admin
-   * whose display name is "Admin" (admin@example.test derives exactly that). */
+   * whose display name is "Admin" (admin@example.com derives exactly that). */
   await expect(page.getByTestId("role-badge")).toHaveText("Admin");
 }
 

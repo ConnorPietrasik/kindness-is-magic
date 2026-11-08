@@ -178,13 +178,15 @@ export function AdminEmailComposer({
   const sendMut = useMutation({
     mutationFn: (data: AdminSendEmailPayload) => adminSendCustomEmail(data),
     onSuccess: (result) => {
-      // A SentEmail row is recorded for every attempt (sent, unsubscribed, or
-      // SMTP failure) — always refresh the log.
+      // A SentEmail row is recorded for every attempt (sent, unsubscribed,
+      // invalid address, or SMTP failure) — always refresh the log.
       queryClient.invalidateQueries({ queryKey: adminSentEmails });
       if (result.sent) {
         toast.success("Email sent");
       } else if (result.reason === "unsubscribed") {
         toast.info("Send skipped — the recipient has unsubscribed from our emails.");
+      } else if (result.reason === "invalid_address") {
+        toast.error("The email could not be sent — the recipient address is invalid.");
       } else {
         toast.error("The email could not be sent (SMTP error). Please try again.");
       }

@@ -647,8 +647,8 @@ export interface AdminSendEmailPayload {
 /** Outcome of an admin custom-email send attempt. Mirrors AdminSendEmailResult. */
 export interface AdminSendEmailResult {
   sent: boolean;
-  /** "unsubscribed" or "smtp_error" when `sent` is false. */
-  reason: "unsubscribed" | "smtp_error" | null;
+  /** "unsubscribed", "invalid_address", or "smtp_error" when `sent` is false. */
+  reason: "unsubscribed" | "invalid_address" | "smtp_error" | null;
 }
 
 /** One row of the unsubscribe blocklist. Mirrors EmailPreferenceSummary. */

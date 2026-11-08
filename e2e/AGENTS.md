@@ -63,7 +63,7 @@ npx playwright test --config=playwright.screenshots.config.ts
 ## Conventions
 
 - **`data-id` on table rows.** Family and people table rows carry `data-id={entity.id}` so tests can extract the raw DB ID for API calls. The visible ID column shows the presentational `display_id` (e.g. `3-2-1`), which must not be parsed as a DB key.
-- **`data-testid="role-badge"` on the dashboard role badge.** Assert the logged-in role through it (e.g. `getByTestId("role-badge").toHaveText("Admin")`), not a bare `getByText("Admin")` — display names default to the email local-part capitalized, so with the `.env.example` admin (`admin@example.test`) the profile name is also "Admin" and the bare text matches both (strict-mode violation).
+- **`data-testid="role-badge"` on the dashboard role badge.** Assert the logged-in role through it (e.g. `getByTestId("role-badge").toHaveText("Admin")`), not a bare `getByText("Admin")` — display names default to the email local-part capitalized, so with the `.env.example` admin (`admin@example.com`) the profile name is also "Admin" and the bare text matches both (strict-mode violation).
 - Use `{ exact: true }` when text could collide (e.g., "Family" matches "Family ID: N").
 - Reuse helpers from `helpers/auth.ts`, `helpers/assertions.ts`, and `helpers/api.ts`.
 - **Unique test data per run.** Use `Math.random().toString(36).slice(2, 8)` suffixes on names/emails so re-runs without a DB wipe don't collide with stale records from prior runs.
