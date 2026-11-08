@@ -103,7 +103,7 @@ _FULLY_APPROVED_FALSE = {"no", "false", "0"}
 class RowResult:
     """Per-row outcome."""
 
-    row_number: int  # 1-based line in the CSV file
+    row_number: int  # 1-based line in the CSV file (last line for multi-line quoted values)
     entity_type: str  # "referrer" | "family" | "person" | "user"
     action: str  # "created" | "skipped" | "error"
     message: str = ""  # human-readable detail
@@ -173,12 +173,14 @@ _SECTION_RE = re.compile(r"^\s*#\s*(\w+)\s*$")
 _KNOWN_SECTIONS = ("referrers", "families", "people", "users")
 
 
-def _parse_sections(csv_text: str) -> dict[str, list[list[str]]]:
+def _parse_sections(csv_text: str) -> dict[str, list[tuple[int, list[str]]]]:
     """Split raw CSV text into named sections.
 
-    Returns ``{section_name: [[header], [row1], [row2], ...]}``.
+    Returns ``{section_name: [(line_number, [header]), (line_number, [row1]), ...]}``
+    where ``line_number`` is the 1-based physical line of the row in the
+    original file (its last line when a quoted value spans multiple lines).
     """
-    sections: dict[str, list[list[str]]] = {}
+    sections: dict[str, list[tuple[int, list[str]]]] = {}
     current_section: str | None = None
 
     reader = csv.reader(io.StringIO(csv_text))
@@ -196,24 +198,29 @@ def _parse_sections(csv_text: str) -> dict[str, list[list[str]]]:
             continue
 
         if current_section is not None:
-            sections[current_section].append([c.strip() for c in row])
+            line_num = reader.line_num
+            sections[current_section].append((line_num, [c.strip() for c in row]))
 
     return sections
 
 
 def _rows_to_dicts(
-    section_rows: list[list[str]],
-) -> tuple[list[str], list[dict[str, str]]]:
-    """Convert raw row lists into dicts keyed by the header row."""
+    section_rows: list[tuple[int, list[str]]],
+) -> tuple[list[str], list[tuple[int, dict[str, str]]]]:
+    """Convert raw rows into dicts keyed by the header row.
+
+    Returns ``(headers, [(line_number, record), ...])`` preserving each
+    record's physical line number from the source file.
+    """
     if not section_rows:
         return [], []
-    headers = [h.lower().strip() for h in section_rows[0]]
+    headers = [h.lower().strip() for h in section_rows[0][1]]
     records = []
-    for row in section_rows[1:]:
+    for line_num, row in section_rows[1:]:
         d: dict[str, str] = {}
         for i, h in enumerate(headers):
             d[h] = row[i] if i < len(row) else ""
-        records.append(d)
+        records.append((line_num, d))
     return headers, records
 
 
@@ -302,16 +309,13 @@ def _resolve_family_id(name_or_id: str, db: Session) -> int | None:
 
 def _process_referrers(
     db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
+    records: list[tuple[int, dict[str, str]]],
     summary: ImportSummary,
     admin_id: int | None = None,
     dry_run: bool = False,
 ) -> None:
     """Create referrers from CSV records."""
-    for i, rec in enumerate(records):
-        row_num = base_row + i
-
+    for row_num, rec in records:
         name = rec.get("name", "").strip()
         if not name:
             summary.rows.append(RowResult(row_num, "referrer", "error", "Missing 'name'"))
@@ -392,15 +396,12 @@ def _process_referrers(
 
 def _process_families(
     db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
+    records: list[tuple[int, dict[str, str]]],
     summary: ImportSummary,
     dry_run: bool = False,
 ) -> None:
     """Create families from CSV records."""
-    for i, rec in enumerate(records):
-        row_num = base_row + i
-
+    for row_num, rec in records:
         # Resolve referrer (optional)
         referrer_ref = rec.get("referrer_name", "").strip()
         referrer_id = None
@@ -589,15 +590,12 @@ def _process_families(
 
 def _process_people(
     db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
+    records: list[tuple[int, dict[str, str]]],
     summary: ImportSummary,
     dry_run: bool = False,
 ) -> None:
     """Create people from CSV records."""
-    for i, rec in enumerate(records):
-        row_num = base_row + i
-
+    for row_num, rec in records:
         # Resolve family (required)
         family_ref = rec.get("family_name", "").strip()
         if not family_ref:
@@ -831,8 +829,7 @@ def _process_people(
 
 def _process_users(
     db: Session,
-    records: list[dict[str, str]],
-    base_row: int,
+    records: list[tuple[int, dict[str, str]]],
     summary: ImportSummary,
     dry_run: bool = False,
 ) -> None:
@@ -846,8 +843,7 @@ def _process_users(
         "donor": UserRole.donor,
     }
 
-    for i, rec in enumerate(records):
-        row_num = base_row + i
+    for row_num, rec in records:
         email = rec.get("email", "").strip().lower()
         password = rec.get("password", "").strip()
         role_str = rec.get("role", "").strip().lower()
@@ -998,10 +994,9 @@ def import_csv(
     summary = ImportSummary()
     summary.unknown_sections = sorted(name for name in sections if name not in _KNOWN_SECTIONS)
 
-    # Track row offsets for accurate row numbering
-    row_offset = 0
-
-    # Process in dependency order
+    # Process in dependency order. Row numbers are the physical line numbers
+    # captured during parsing, so section headers, blank lines, and unknown
+    # sections in the file are accounted for automatically.
     for section_name in _KNOWN_SECTIONS:
         section_rows = sections.get(section_name)
         if not section_rows:
@@ -1012,15 +1007,13 @@ def import_csv(
             continue
 
         if section_name == "referrers":
-            _process_referrers(db, records, row_offset + 1, summary, admin_id=admin_id, dry_run=dry_run)
+            _process_referrers(db, records, summary, admin_id=admin_id, dry_run=dry_run)
         elif section_name == "families":
-            _process_families(db, records, row_offset + 1, summary, dry_run=dry_run)
+            _process_families(db, records, summary, dry_run=dry_run)
         elif section_name == "people":
-            _process_people(db, records, row_offset + 1, summary, dry_run=dry_run)
+            _process_people(db, records, summary, dry_run=dry_run)
         elif section_name == "users":
-            _process_users(db, records, row_offset + 1, summary, dry_run=dry_run)
-
-        row_offset += len(section_rows)  # header + data rows
+            _process_users(db, records, summary, dry_run=dry_run)
 
     if dry_run:
         db.rollback()

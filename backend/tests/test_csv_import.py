@@ -627,6 +627,46 @@ class TestCsvImportRowDetail:
         assert rows[0]["action"] == "created"
         assert rows[0].get("db_id") is not None
 
+    def test_row_numbers_match_physical_file_lines(self, test_client: TestClient, admin_user):
+        """Reported row numbers must be actual 1-based line numbers in the uploaded file.
+
+        Section header lines, blank lines, and unknown sections all occupy
+        physical lines and must be counted, so an admin can jump to the
+        offending line in the file.
+        """
+        csv_data = (
+            "# referrers\n"  # line 1
+            "name,family_limit\n"  # line 2
+            "Good Ref,10\n"  # line 3
+            "\n"  # line 4
+            "# bogus\n"  # line 5
+            "whatever,stuff\n"  # line 6
+            "X,Y\n"  # line 7
+            "\n"  # line 8
+            "# families\n"  # line 9
+            "referrer_name,family_name,family_wish,contact_name,bio,address,phone_number\n"  # line 10
+            "Missing Ref,Fam,Wish,Contact,,501 St,555-000-0001\n"  # line 11
+        )
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+
+        assert body["summary"]["referrers"]["created"] == 1
+        assert body["summary"]["families"]["errors"] == 1
+        assert body["unknown_sections"] == ["bogus"]
+
+        rows = body["rows"]
+        assert len(rows) == 2
+
+        referrer_row = next(r for r in rows if r["entity_type"] == "referrer")
+        assert referrer_row["action"] == "created"
+        assert referrer_row["row_number"] == 3
+
+        family_row = next(r for r in rows if r["entity_type"] == "family")
+        assert family_row["action"] == "error"
+        assert family_row["row_number"] == 11
+
 
 class TestCsvImportPeopleDedup:
     def test_duplicate_person_same_family_name_age_skipped(self, test_client: TestClient, admin_user):
