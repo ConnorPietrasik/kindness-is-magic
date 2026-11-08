@@ -50,13 +50,20 @@ def validate_phone_number(value: str) -> str:
 
 _EMAIL_RE = re.compile(r"^[\w.+-]+@[\w-]+\.[\w.-]+$")
 
+# Must match the String(120) email columns in models.py (users, sent_emails,
+# email_campaign_recipients, referrer invite tokens, email_preferences).
+MAX_EMAIL_LENGTH = 120
+
 
 def validate_email(email: str) -> str:
     """Normalize an email address.
 
-    Raises ``ValueError`` if the address does not match the basic pattern.
+    Raises ``ValueError`` if the address does not match the basic pattern
+    or exceeds ``MAX_EMAIL_LENGTH`` characters.
     """
     normalized = email.strip().lower()
+    if len(normalized) > MAX_EMAIL_LENGTH:
+        raise ValueError(f"Email address too long (max {MAX_EMAIL_LENGTH} characters)")
     if not _EMAIL_RE.match(normalized):
         raise ValueError(f"Invalid email address: {email}")
     return normalized

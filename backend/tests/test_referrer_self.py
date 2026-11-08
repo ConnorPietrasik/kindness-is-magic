@@ -1123,6 +1123,15 @@ class TestSendFamilyInvite:
         )
         assert resp.status_code == 422
 
+    def test_over_long_email_rejected(self, test_client: TestClient, referrer_with_full_tree):
+        """Email longer than the 120-char SentEmail.recipient_email column must 422."""
+        _tree_referrer_login(test_client)
+        resp = test_client.post(
+            "/api/referrer/send-family-invite",
+            json={"email": "a" * 109 + "@example.com"},
+        )
+        assert resp.status_code == 422
+
     def test_unsubscribed_email_returns_403(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         from app.models import EmailPreference
         from datetime import datetime, timezone

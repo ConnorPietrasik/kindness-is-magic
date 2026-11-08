@@ -130,6 +130,8 @@ class TestCreateCampaign:
         assert test_client.post(BASE, json={"message": "x" * 5001, "extra_emails": ["a@example.com"]}).status_code == 422
         # Invalid manual email
         assert test_client.post(BASE, json={"message": "Hi", "extra_emails": ["not-an-email"]}).status_code == 422
+        # Over-long manual email (DB column is 120 — must 422, not a DB 500)
+        assert test_client.post(BASE, json={"message": "Hi", "extra_emails": ["a" * 109 + "@example.com"]}).status_code == 422
         # Oversized subject
         assert test_client.post(BASE, json={"message": "Hi", "extra_emails": ["a@example.com"], "subject": "x" * 201}).status_code == 422
         # No roles and no emails
@@ -177,6 +179,8 @@ class TestPreviewCampaign:
         assert test_client.post(BASE + "/preview", json={}).status_code == 422
         # Invalid manual email
         assert test_client.post(BASE + "/preview", json={"extra_emails": ["bad"]}).status_code == 422
+        # Over-long manual email (DB column is 120 — must 422, not a DB 500)
+        assert test_client.post(BASE + "/preview", json={"extra_emails": ["a" * 109 + "@example.com"]}).status_code == 422
 
 
 # ---------------------------------------------------------------------------

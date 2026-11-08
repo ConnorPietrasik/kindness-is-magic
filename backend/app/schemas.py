@@ -3,7 +3,16 @@
 from datetime import date, datetime
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, BeforeValidator, Field, ValidationInfo, field_validator, model_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from app.models import (
     ClaimPaymentStatus,
@@ -22,7 +31,7 @@ from app.models import (
     WishLockLevel,
     WishType,
 )
-from app.user_validation import sanitize_plain_text, validate_email, validate_phone_number
+from app.user_validation import MAX_EMAIL_LENGTH, sanitize_plain_text, validate_email, validate_phone_number
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +80,7 @@ class ReferrerInviteCreate(BaseModel):
     """Admin: create an invite token."""
 
     family_limit: int = Field(..., ge=1, le=999)
-    email: str | None = None
+    email: str | None = Field(None, max_length=MAX_EMAIL_LENGTH)
     email_message: str | None = Field(None, max_length=5000)
 
     @field_validator("email")
@@ -96,7 +105,7 @@ class ReferrerSelfRegister(BaseModel):
 
     code: str
     name: str = Field(..., min_length=1, max_length=60)
-    email: str = Field(..., min_length=1, max_length=40)
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     phone_number: str = Field(..., min_length=1, max_length=20)
     password: str = Field(..., min_length=8)
 
@@ -279,7 +288,7 @@ class FamilySelfRegister(BaseModel):
     family_name: str = Field(..., min_length=1, max_length=40)
     family_wish: str = Field(..., min_length=1, max_length=100)
     contact_name: str = Field(..., min_length=1, max_length=40)
-    email: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
     bio: Optional[str] = None
     address: str = Field(..., min_length=1, max_length=200)
@@ -472,7 +481,7 @@ class ReferrerDetail(BaseModel):
 class SendFamilyInviteRequest(BaseModel):
     """Referrer sends a family invite email to a given address."""
 
-    email: str
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
 
     @field_validator("email")
     @classmethod
@@ -574,7 +583,7 @@ class AdminSendEmailRequest(BaseModel):
     subject server-side.
     """
 
-    recipient_email: str = Field(..., min_length=1, max_length=120)
+    recipient_email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     subject: str | None = Field(None, max_length=200)
     message: str = Field(..., min_length=1, max_length=5000)
 
@@ -627,7 +636,7 @@ class AdminResubscribeRequest(BaseModel):
     addresses don't leak into request access logs.
     """
 
-    email: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
 
     @field_validator("email")
     @classmethod
@@ -648,7 +657,7 @@ class CampaignSelection(BaseModel):
     """
 
     roles: list[UserRole] = Field(default_factory=list)
-    extra_emails: list[str] = Field(default_factory=list)
+    extra_emails: list[Annotated[str, StringConstraints(max_length=MAX_EMAIL_LENGTH)]] = Field(default_factory=list)
 
     @field_validator("extra_emails")
     @classmethod
@@ -1386,7 +1395,7 @@ class PersonListResponse(BaseModel):
 class AdminUserCreate(BaseModel):
     """Admin-only: create a new user."""
 
-    email: str
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
     role: UserRole
     display_name: Optional[str] = Field(None, max_length=40)
@@ -1725,7 +1734,7 @@ class DonorSelfRegister(BaseModel):
     """Public: donor self-registration (open, no invite code required)."""
 
     display_name: str = Field(..., min_length=1, max_length=40)
-    email: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
 
     @field_validator("email")

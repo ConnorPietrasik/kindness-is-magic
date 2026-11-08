@@ -102,6 +102,18 @@ class TestInviteReferrerCreate:
         body = resp.json()
         assert body["code"].startswith("KRI-")
 
+    def test_invite_with_over_long_email_rejected(self, test_client: TestClient, admin_user, db: Session):
+        """Email longer than the 120-char column must 422, not crash at commit."""
+        from app.models import ReferrerInviteToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.post(
+            "/api/auth/invite-referrer",
+            json={"family_limit": 10, "email": "a" * 109 + "@example.com"},
+        )
+        assert resp.status_code == 422
+        assert db.query(ReferrerInviteToken).count() == 0
+
     def test_invite_with_email_sets_locked_email(self, test_client: TestClient, admin_user, db: Session):
         """When email is provided, locked_email is persisted on the invite token."""
         from app.models import ReferrerInviteToken
@@ -419,6 +431,23 @@ class TestReferrerSelfRegister:
         )
         assert resp.status_code == 400
         assert "invite code" in resp.json()["detail"].lower()
+
+    def test_over_long_email_rejected(self, test_client: TestClient, db: Session):
+        """Email longer than the 120-char User.email column must 422, not crash at commit."""
+        from app.models import User
+
+        resp = test_client.post(
+            "/api/auth/register-referrer",
+            json={
+                "code": "KRI-INVALID",
+                "name": "Long Email",
+                "email": "a" * 109 + "@example.com",
+                "phone_number": "555-000-0000",
+                "password": "GoodPass1234!",
+            },
+        )
+        assert resp.status_code == 422
+        assert db.query(User).filter(User.email == "a" * 109 + "@example.com").count() == 0
 
     def test_expired_code(self, test_client: TestClient, db: Session, admin_user):
         from app.models import ReferrerInviteToken

@@ -458,6 +458,22 @@ class TestAdminCreateUser:
         )
         assert resp.status_code == 422
 
+    def test_422_over_long_email(self, test_client: TestClient, admin_user, db: Session):
+        """Email longer than the 120-char User.email column must 422, not crash at commit."""
+        from app.models import User
+
+        _admin_login(test_client)
+        resp = test_client.post(
+            "/api/admin/users",
+            json={
+                "email": "a" * 109 + "@example.com",
+                "password": "LongPass123!",
+                "role": "admin",
+            },
+        )
+        assert resp.status_code == 422
+        assert db.query(User).filter(User.email == "a" * 109 + "@example.com").count() == 0
+
 
 # =========================================================================
 #  Admin — Update User

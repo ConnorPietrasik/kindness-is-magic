@@ -515,6 +515,19 @@ bad@test.com,Password123!,superadmin,,
         assert resp.status_code == 200
         assert resp.json()["summary"]["users"]["errors"] == 1
 
+    def test_over_long_email_rejected(self, test_client: TestClient, admin_user):
+        """Email longer than the 120-char User.email column errors on that row, not the whole import."""
+        csv_data = (
+            "# users\nemail,password,role,referrer_name_or_id,family_name_or_id\n" + "a" * 109 + "@example.com,Password123!,admin,,\n"
+        )
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["users"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "user" and r["action"] == "error"]
+        assert error_rows[0]["message"] == "Invalid email format"
+
     def test_referrer_user_missing_referrer_id(self, test_client: TestClient, admin_user):
         csv_data = """# users
 email,password,role,referrer_name_or_id,family_name_or_id
