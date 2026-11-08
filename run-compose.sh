@@ -107,7 +107,8 @@ prod_setup() {
   fi
 
   if [ "$(env_get DEBUG)" = "true" ]; then
-    echo "Warning: DEBUG=true in .env — production would run with insecure cookies and no rate limiting."
+    echo "Error: DEBUG=true in .env — production needs DEBUG=false (it disables rate limiting, the Secure cookie flag, and all outgoing email)."
+    exit 1
   fi
 
   # --- Let's Encrypt storage ---------------------------------------------------
