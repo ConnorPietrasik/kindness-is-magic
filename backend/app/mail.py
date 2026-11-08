@@ -500,9 +500,9 @@ def build_payment_email_failure_notice(donor_email: str, payment_kind: str, erro
     base = APP_BASE_URL
     return f"""<p>An error occurred while sending a sponsorship payment email to a donor.</p>
 <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{donor_email}</td></tr>
-<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Email type</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{payment_kind}</td></tr>
-<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{error_summary}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(donor_email)}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Email type</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(payment_kind)}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(error_summary)}</td></tr>
 </table>
 <p style="text-align:center;"><a href="{base}/admin" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Admin Dashboard</a></p>"""
 
@@ -517,10 +517,10 @@ def build_admin_email_failure_notice(
     base = APP_BASE_URL
     return f"""<p>An error occurred while sending the sponsorship confirmation email to a donor.</p>
 <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{donor_email}</td></tr>
-<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Family</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{family_display_id}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;width:140px;color:#4c1d95;">Donor email</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(donor_email)}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Family</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(family_display_id)}</td></tr>
 <tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Sponsorship ID</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{claim_id}</td></tr>
-<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{error_summary}</td></tr>
+<tr><td style="padding:6px 12px;font-weight:bold;color:#4c1d95;">Error</td><td style="padding:6px 12px;border-bottom:1px solid #eeeeee;">{escape(error_summary)}</td></tr>
 </table>
 <p style="text-align:center;"><a href="{base}/admin" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Go to Admin Dashboard</a></p>"""
 
