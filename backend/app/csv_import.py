@@ -29,6 +29,11 @@ families are skipped and never modified by the import.
 
 Blank lines and lines starting with ``#`` (outside of a section header) are
 skipped.
+
+Free-text values are length-checked against the database column widths
+(the same bounds the JSON API enforces via pydantic ``max_length``).
+An over-length cell errors that row instead of raising a varchar overflow
+that would 500 and roll back the entire import.
 """
 
 from __future__ import annotations
@@ -45,7 +50,18 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_password_hash, generate_unique_family_invite_code
 from app.models import (
+    ADDRESS_MAX_LENGTH,
+    CONTACT_NAME_MAX_LENGTH,
     DISPLAY_NAME_MAX_LENGTH,
+    FAMILY_BIO_MAX_LENGTH,
+    FAMILY_NAME_MAX_LENGTH,
+    GIVEN_NAME_MAX_LENGTH,
+    PERSON_NOTE_MAX_LENGTH,
+    PHONE_NUMBER_MAX_LENGTH,
+    REFERRER_NAME_MAX_LENGTH,
+    WISH_COLOR_MAX_LENGTH,
+    WISH_DESCRIPTION_MAX_LENGTH,
+    WISH_SIZE_MAX_LENGTH,
     Family,
     FamilyVerificationStatus,
     Person,
@@ -191,6 +207,18 @@ def _rows_to_dicts(
     return headers, records
 
 
+def _length_error(value: str, field_name: str, max_length: int) -> str | None:
+    """Row-error message if ``value`` exceeds the DB column width, else ``None``.
+
+    Mirrors the pydantic ``max_length`` bounds on the JSON API paths so an
+    over-length CSV cell becomes a per-row error instead of a varchar
+    overflow that 500s the whole import at flush.
+    """
+    if len(value) > max_length:
+        return f"{field_name} too long (max {max_length} characters)"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Lookup helpers — match by name within a session
 # ---------------------------------------------------------------------------
@@ -287,6 +315,12 @@ def _process_referrers(
             summary.referrers_errors += 1
             continue
 
+        err = _length_error(name, "name", REFERRER_NAME_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "referrer", "error", err))
+            summary.referrers_errors += 1
+            continue
+
         family_limit_raw = rec.get("family_limit", "").strip()
         if not family_limit_raw:
             summary.rows.append(RowResult(row_num, "referrer", "error", "Missing 'family_limit'"))
@@ -301,6 +335,11 @@ def _process_referrers(
             continue
 
         phone_number = rec.get("phone_number", "").strip() or ""
+        err = _length_error(phone_number, "phone_number", PHONE_NUMBER_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "referrer", "error", err))
+            summary.referrers_errors += 1
+            continue
 
         # Skip if already exists
         existing = _find_referrer(db, name)
@@ -383,6 +422,12 @@ def _process_families(
             summary.families_errors += 1
             continue
 
+        err = _length_error(family_name, "family_name", FAMILY_NAME_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "family", "error", err))
+            summary.families_errors += 1
+            continue
+
         # family_wish (required)
         family_wish = rec.get("family_wish", "").strip()
         if not family_wish:
@@ -394,6 +439,12 @@ def _process_families(
             family_wish = sanitize_plain_text(family_wish)
         except ValueError as exc:
             summary.rows.append(RowResult(row_num, "family", "error", f"family_wish: {exc}"))
+            summary.families_errors += 1
+            continue
+
+        err = _length_error(family_wish, "family_wish", WISH_DESCRIPTION_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "family", "error", err))
             summary.families_errors += 1
             continue
 
@@ -411,6 +462,12 @@ def _process_families(
             summary.families_errors += 1
             continue
 
+        err = _length_error(contact_name, "contact_name", CONTACT_NAME_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "family", "error", err))
+            summary.families_errors += 1
+            continue
+
         # Optional fields
         bio_raw = rec.get("bio", "").strip()
         bio: str | None = None
@@ -419,6 +476,12 @@ def _process_families(
                 bio = sanitize_plain_text(bio_raw)
             except ValueError:
                 pass  # silently drop invalid optional bio
+            else:
+                err = _length_error(bio, "bio", FAMILY_BIO_MAX_LENGTH)
+                if err:
+                    summary.rows.append(RowResult(row_num, "family", "error", err))
+                    summary.families_errors += 1
+                    continue
 
         # address (required)
         address = rec.get("address", "").strip()
@@ -434,10 +497,22 @@ def _process_families(
             summary.families_errors += 1
             continue
 
+        err = _length_error(address, "address", ADDRESS_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "family", "error", err))
+            summary.families_errors += 1
+            continue
+
         # phone_number (required)
         phone_number = rec.get("phone_number", "").strip()
         if not phone_number:
             summary.rows.append(RowResult(row_num, "family", "error", "Missing 'phone_number'"))
+            summary.families_errors += 1
+            continue
+
+        err = _length_error(phone_number, "phone_number", PHONE_NUMBER_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "family", "error", err))
             summary.families_errors += 1
             continue
 
@@ -547,6 +622,12 @@ def _process_people(
             summary.people_errors += 1
             continue
 
+        err = _length_error(given_name, "given_name", GIVEN_NAME_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "person", "error", err))
+            summary.people_errors += 1
+            continue
+
         # age (required, integer)
         age_raw = rec.get("age", "").strip()
         if not age_raw:
@@ -575,6 +656,12 @@ def _process_people(
             summary.people_errors += 1
             continue
 
+        err = _length_error(wish_desc, "wish", WISH_DESCRIPTION_MAX_LENGTH)
+        if err:
+            summary.rows.append(RowResult(row_num, "person", "error", err))
+            summary.people_errors += 1
+            continue
+
         # size (optional, empty/0 → NULL — "0" is the N/A marker)
         size_raw = rec.get("size", "").strip()
         size: str | None = None
@@ -583,6 +670,12 @@ def _process_people(
                 size = sanitize_plain_text(size_raw)
             except ValueError:
                 size = None
+            if size is not None:
+                err = _length_error(size, "size", WISH_SIZE_MAX_LENGTH)
+                if err:
+                    summary.rows.append(RowResult(row_num, "person", "error", err))
+                    summary.people_errors += 1
+                    continue
 
         # color (optional, empty/0 → NULL — "0" is the N/A marker)
         color_raw = rec.get("color", "").strip()
@@ -592,6 +685,12 @@ def _process_people(
                 color = sanitize_plain_text(color_raw)
             except ValueError:
                 color = None
+            if color is not None:
+                err = _length_error(color, "color", WISH_COLOR_MAX_LENGTH)
+                if err:
+                    summary.rows.append(RowResult(row_num, "person", "error", err))
+                    summary.people_errors += 1
+                    continue
 
         # fun_wish (required for children, error if present for adults)
         fun_wish_raw = rec.get("fun_wish", "").strip()
@@ -601,6 +700,11 @@ def _process_people(
                 fun_wish = sanitize_plain_text(fun_wish_raw)
             except ValueError as exc:
                 summary.rows.append(RowResult(row_num, "person", "error", f"fun_wish: {exc}"))
+                summary.people_errors += 1
+                continue
+            err = _length_error(fun_wish, "fun_wish", WISH_DESCRIPTION_MAX_LENGTH)
+            if err:
+                summary.rows.append(RowResult(row_num, "person", "error", err))
                 summary.people_errors += 1
                 continue
 
@@ -637,6 +741,12 @@ def _process_people(
                 note = sanitize_plain_text(note)
             except ValueError:
                 note = None
+            if note is not None:
+                err = _length_error(note, "note", PERSON_NOTE_MAX_LENGTH)
+                if err:
+                    summary.rows.append(RowResult(row_num, "person", "error", err))
+                    summary.people_errors += 1
+                    continue
 
         # Skip if already exists (same family + given_name + age)
         existing = _find_person(db, family_id, given_name, age)
@@ -819,15 +929,9 @@ def _process_users(
                 summary.rows.append(RowResult(row_num, "user", "error", f"display_name: {exc}"))
                 summary.users_errors += 1
                 continue
-            if len(display_name) > DISPLAY_NAME_MAX_LENGTH:
-                summary.rows.append(
-                    RowResult(
-                        row_num,
-                        "user",
-                        "error",
-                        f"display_name too long (max {DISPLAY_NAME_MAX_LENGTH} characters)",
-                    )
-                )
+            err = _length_error(display_name, "display_name", DISPLAY_NAME_MAX_LENGTH)
+            if err:
+                summary.rows.append(RowResult(row_num, "user", "error", err))
                 summary.users_errors += 1
                 continue
         if display_name is None:

@@ -6,3 +6,4 @@ Donor reminder emails before deadline
 EVENTUALLY - Email families a week before their pickup window
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak
+BEFORE NEXT SEASON - Update versions (containers, python, etc)

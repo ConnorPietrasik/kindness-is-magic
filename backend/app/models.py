@@ -31,6 +31,21 @@ from app.database import Base
 # User.display_name validator so inserts never exceed the column.
 DISPLAY_NAME_MAX_LENGTH = 40
 
+# Column-width limits for the free-text fields the CSV import validates.
+# The JSON API mirrors these as pydantic max_length; csv_import row-errors
+# values that would overflow the column instead of failing the whole import.
+PHONE_NUMBER_MAX_LENGTH = 20
+REFERRER_NAME_MAX_LENGTH = 60
+FAMILY_NAME_MAX_LENGTH = 40
+CONTACT_NAME_MAX_LENGTH = 40
+FAMILY_BIO_MAX_LENGTH = 400
+ADDRESS_MAX_LENGTH = 200
+GIVEN_NAME_MAX_LENGTH = 40
+PERSON_NOTE_MAX_LENGTH = 400
+WISH_DESCRIPTION_MAX_LENGTH = 100
+WISH_SIZE_MAX_LENGTH = 20
+WISH_COLOR_MAX_LENGTH = 20
+
 
 class UserRole(str, enum.Enum):
     admin = "admin"
@@ -165,9 +180,9 @@ class Referrer(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    name: Mapped[str] = mapped_column(String(REFERRER_NAME_MAX_LENGTH), nullable=False)
     family_limit: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(PHONE_NUMBER_MAX_LENGTH), nullable=False)
     # When this referrer's referred families' gifts should be picked up — the
     # referrer handles pickup and the last leg for all of their families.
     pickup_window: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
@@ -235,11 +250,11 @@ class Family(Base):
         ForeignKey("referrer.id", ondelete="SET NULL"),
         nullable=True,
     )
-    family_name: Mapped[str] = mapped_column(String(40), nullable=False)
-    bio: Mapped[str | None] = mapped_column(String(400), nullable=True)
-    address: Mapped[str] = mapped_column(String(200), nullable=False, server_default="none")
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
-    contact_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    family_name: Mapped[str] = mapped_column(String(FAMILY_NAME_MAX_LENGTH), nullable=False)
+    bio: Mapped[str | None] = mapped_column(String(FAMILY_BIO_MAX_LENGTH), nullable=True)
+    address: Mapped[str] = mapped_column(String(ADDRESS_MAX_LENGTH), nullable=False, server_default="none")
+    phone_number: Mapped[str] = mapped_column(String(PHONE_NUMBER_MAX_LENGTH), nullable=False, server_default="")
+    contact_name: Mapped[str] = mapped_column(String(CONTACT_NAME_MAX_LENGTH), nullable=False)
     verification_status: Mapped[FamilyVerificationStatus] = mapped_column(
         SAEnum(FamilyVerificationStatus, name="family_verification_status", create_constraint=True),
         server_default="pending",
@@ -313,10 +328,10 @@ class Person(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     family_id: Mapped[int] = mapped_column(Integer, ForeignKey("family.id"), nullable=False)
-    given_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    given_name: Mapped[str] = mapped_column(String(GIVEN_NAME_MAX_LENGTH), nullable=False)
     role: Mapped[PersonRole] = mapped_column(SAEnum(PersonRole, name="person_role", create_constraint=True), nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
-    note: Mapped[str] = mapped_column(String(400), nullable=True)
+    note: Mapped[str] = mapped_column(String(PERSON_NOTE_MAX_LENGTH), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -376,9 +391,9 @@ class Wish(Base):
     person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
     family_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("family.id"), nullable=True)
     type: Mapped[WishType] = mapped_column(SAEnum(WishType, name="wish_type", create_constraint=True), nullable=False)
-    description: Mapped[str] = mapped_column(String(100), nullable=False)
-    size: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    description: Mapped[str] = mapped_column(String(WISH_DESCRIPTION_MAX_LENGTH), nullable=False)
+    size: Mapped[str | None] = mapped_column(String(WISH_SIZE_MAX_LENGTH), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(WISH_COLOR_MAX_LENGTH), nullable=True)
     assigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     purchased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purchased_where: Mapped[str | None] = mapped_column(String(200), nullable=True)

@@ -15,19 +15,31 @@ from pydantic import (
 )
 
 from app.models import (
+    ADDRESS_MAX_LENGTH,
     ClaimPaymentStatus,
     CommitmentType,
+    CONTACT_NAME_MAX_LENGTH,
     DeadlineMode,
     DeadlineType,
+    DISPLAY_NAME_MAX_LENGTH,
     EmailCampaignRecipientSource,
     EmailCampaignRecipientStatus,
     EmailCampaignStatus,
     EmailKind,
     EmailStatus,
+    FAMILY_BIO_MAX_LENGTH,
+    FAMILY_NAME_MAX_LENGTH,
     FamilyVerificationStatus,
+    GIVEN_NAME_MAX_LENGTH,
+    PERSON_NOTE_MAX_LENGTH,
+    PHONE_NUMBER_MAX_LENGTH,
     PersonRole,
+    REFERRER_NAME_MAX_LENGTH,
     ReferrerApprovalStatus,
     UserRole,
+    WISH_COLOR_MAX_LENGTH,
+    WISH_DESCRIPTION_MAX_LENGTH,
+    WISH_SIZE_MAX_LENGTH,
     WishLockLevel,
     WishType,
 )
@@ -104,9 +116,9 @@ class ReferrerSelfRegister(BaseModel):
     """Public: redeem an invite code to register as a referrer."""
 
     code: str
-    name: str = Field(..., min_length=1, max_length=60)
+    name: str = Field(..., min_length=1, max_length=REFERRER_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
-    phone_number: str = Field(..., min_length=1, max_length=20)
+    phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
     password: str = Field(..., min_length=8)
 
     @field_validator("email")
@@ -285,14 +297,14 @@ class FamilySelfRegister(BaseModel):
     """Public: family self-registers via a referrer's family invite code."""
 
     code: str
-    family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=100)
-    contact_name: str = Field(..., min_length=1, max_length=40)
+    family_name: str = Field(..., min_length=1, max_length=FAMILY_NAME_MAX_LENGTH)
+    family_wish: str = Field(..., min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
+    contact_name: str = Field(..., min_length=1, max_length=CONTACT_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
-    bio: Optional[str] = None
-    address: str = Field(..., min_length=1, max_length=200)
-    phone_number: str = Field(..., min_length=1, max_length=20)
+    bio: Optional[str] = Field(None, max_length=FAMILY_BIO_MAX_LENGTH)
+    address: str = Field(..., min_length=1, max_length=ADDRESS_MAX_LENGTH)
+    phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
 
     @field_validator("email")
     @classmethod
@@ -411,9 +423,9 @@ class FamilyDropdownItem(BaseModel):
 
 
 class ReferrerCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=60)
+    name: str = Field(..., min_length=1, max_length=REFERRER_NAME_MAX_LENGTH)
     family_limit: int = Field(..., ge=1, le=999)
-    phone_number: str = Field(..., min_length=1, max_length=20)
+    phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
     pickup_window: Optional[datetime] = None
 
     @field_validator("name")
@@ -431,8 +443,8 @@ class ReferrerCreate(BaseModel):
 class ReferrerUpdate(BaseModel):
     """Referrer self-service update — family_limit and pickup_window are admin-only."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=60)
-    phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
+    name: Optional[str] = Field(None, min_length=1, max_length=REFERRER_NAME_MAX_LENGTH)
+    phone_number: Optional[str] = Field(None, min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
 
     @field_validator("name")
     @classmethod
@@ -782,12 +794,12 @@ class EmailCampaignDetailResponse(BaseModel):
 
 class FamilyCreate(BaseModel):
     referrer_id: int | None = None
-    family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=100)
-    contact_name: str = Field(..., min_length=1, max_length=40)
-    bio: Optional[str] = None
-    address: str = Field(..., min_length=1, max_length=200)
-    phone_number: str = Field(..., min_length=1, max_length=20)
+    family_name: str = Field(..., min_length=1, max_length=FAMILY_NAME_MAX_LENGTH)
+    family_wish: str = Field(..., min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
+    contact_name: str = Field(..., min_length=1, max_length=CONTACT_NAME_MAX_LENGTH)
+    bio: Optional[str] = Field(None, max_length=FAMILY_BIO_MAX_LENGTH)
+    address: str = Field(..., min_length=1, max_length=ADDRESS_MAX_LENGTH)
+    phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
     # Admin-write only cash-only lock ("already shopping") — this is the admin
     # create schema; the referrer create schema (FamilyCreateByReferrer) never
     # carries the field.
@@ -813,12 +825,12 @@ class FamilyCreate(BaseModel):
 
 
 class FamilyUpdate(BaseModel):
-    family_name: Optional[str] = Field(None, min_length=1, max_length=40)
-    family_wish: Optional[str] = Field(None, min_length=1, max_length=100)
-    contact_name: Optional[str] = Field(None, min_length=1, max_length=40)
-    bio: Optional[str] = None
-    address: Optional[str] = Field(None, min_length=1, max_length=200)
-    phone_number: Optional[str] = Field(None, max_length=20)
+    family_name: Optional[str] = Field(None, min_length=1, max_length=FAMILY_NAME_MAX_LENGTH)
+    family_wish: Optional[str] = Field(None, min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
+    contact_name: Optional[str] = Field(None, min_length=1, max_length=CONTACT_NAME_MAX_LENGTH)
+    bio: Optional[str] = Field(None, max_length=FAMILY_BIO_MAX_LENGTH)
+    address: Optional[str] = Field(None, min_length=1, max_length=ADDRESS_MAX_LENGTH)
+    phone_number: Optional[str] = Field(None, max_length=PHONE_NUMBER_MAX_LENGTH)
 
     @field_validator("family_name", "family_wish", "contact_name", "bio", "address")
     @classmethod
@@ -1020,9 +1032,9 @@ class WishCreate(BaseModel):
     """Create a single wish for a person (person_id inferred from route)."""
 
     type: WishType
-    description: str = Field(..., min_length=1, max_length=100)
-    size: str | None = Field(None, max_length=20)
-    color: str | None = Field(None, max_length=20)
+    description: str = Field(..., min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
+    size: str | None = Field(None, max_length=WISH_SIZE_MAX_LENGTH)
+    color: str | None = Field(None, max_length=WISH_COLOR_MAX_LENGTH)
 
     @field_validator("description")
     @classmethod
@@ -1051,10 +1063,10 @@ class WishUpdate(BaseModel):
     """
 
     type: WishType | None = None
-    description: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
     # "0" is the UI's N/A marker for size/color — it clears like "".
-    size: clearable_text(20, zero_as_clear=True)
-    color: clearable_text(20, zero_as_clear=True)
+    size: clearable_text(WISH_SIZE_MAX_LENGTH, zero_as_clear=True)
+    color: clearable_text(WISH_COLOR_MAX_LENGTH, zero_as_clear=True)
 
     @field_validator("description")
     @classmethod
@@ -1116,10 +1128,10 @@ class AdminWishUpdate(BaseModel):
     """
 
     type: WishType | None = None
-    description: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
     # "0" is the UI's N/A marker for size/color — it clears like "".
-    size: clearable_text(20, zero_as_clear=True)
-    color: clearable_text(20, zero_as_clear=True)
+    size: clearable_text(WISH_SIZE_MAX_LENGTH, zero_as_clear=True)
+    color: clearable_text(WISH_COLOR_MAX_LENGTH, zero_as_clear=True)
     assigned_to_id: clearable_fk()
     purchased_at: clearable_datetime()
     purchased_where: clearable_text(200)
@@ -1303,11 +1315,11 @@ def validate_wishes_for_age(wishes: list[WishCreate], age: int) -> None:
 
 class PersonCreate(BaseModel):
     family_id: int
-    given_name: str = Field(..., min_length=1, max_length=40)
+    given_name: str = Field(..., min_length=1, max_length=GIVEN_NAME_MAX_LENGTH)
     role: PersonRole
     age: int = Field(..., ge=0, le=200)
     wishes: list[WishCreate]
-    note: Optional[str] = Field(None, max_length=400)
+    note: Optional[str] = Field(None, max_length=PERSON_NOTE_MAX_LENGTH)
 
     @field_validator("given_name")
     @classmethod
@@ -1332,11 +1344,11 @@ class PersonCreate(BaseModel):
 
 
 class PersonUpdate(BaseModel):
-    given_name: Optional[str] = Field(None, min_length=1, max_length=40)
+    given_name: Optional[str] = Field(None, min_length=1, max_length=GIVEN_NAME_MAX_LENGTH)
     role: Optional[PersonRole] = None
     age: Optional[int] = Field(None, ge=0, le=200)
     wishes: list[WishCreate] | None = None
-    note: Optional[str] = Field(None, max_length=400)
+    note: Optional[str] = Field(None, max_length=PERSON_NOTE_MAX_LENGTH)
 
     @field_validator("given_name", "note")
     @classmethod
@@ -1399,7 +1411,7 @@ class AdminUserCreate(BaseModel):
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
     role: UserRole
-    display_name: Optional[str] = Field(None, max_length=40)
+    display_name: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX_LENGTH)
     referrer_id: Optional[int] = None
     family_id: Optional[int] = None
 
@@ -1423,7 +1435,7 @@ class AdminUserUpdate(BaseModel):
     ``display_name`` cannot be cleared (non-nullable column).
     """
 
-    display_name: Optional[str] = Field(None, max_length=40)
+    display_name: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX_LENGTH)
     role: Optional[UserRole] = None
     referrer_id: clearable_fk()
     family_id: clearable_fk()
@@ -1669,12 +1681,12 @@ class DeliverySlipItem(BaseModel):
 class FamilyCreateByReferrer(BaseModel):
     """Referrer creates a family — referrer_id is inferred from the session."""
 
-    family_name: str = Field(..., min_length=1, max_length=40)
-    family_wish: str = Field(..., min_length=1, max_length=100)
-    contact_name: str = Field(..., min_length=1, max_length=40)
-    bio: Optional[str] = None
-    address: str = Field(..., min_length=1, max_length=200)
-    phone_number: str = Field(..., min_length=1, max_length=20)
+    family_name: str = Field(..., min_length=1, max_length=FAMILY_NAME_MAX_LENGTH)
+    family_wish: str = Field(..., min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
+    contact_name: str = Field(..., min_length=1, max_length=CONTACT_NAME_MAX_LENGTH)
+    bio: Optional[str] = Field(None, max_length=FAMILY_BIO_MAX_LENGTH)
+    address: str = Field(..., min_length=1, max_length=ADDRESS_MAX_LENGTH)
+    phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
 
     @field_validator("family_name", "family_wish", "contact_name", "address", "phone_number")
     @classmethod
@@ -1698,11 +1710,11 @@ class FamilyCreateByReferrer(BaseModel):
 class PersonCreateInFamily(BaseModel):
     """Create a person inside a family — family_id is inferred from the URL or session."""
 
-    given_name: str = Field(..., min_length=1, max_length=40)
+    given_name: str = Field(..., min_length=1, max_length=GIVEN_NAME_MAX_LENGTH)
     role: PersonRole
     age: int = Field(..., ge=0, le=200)
     wishes: list[WishCreate]
-    note: Optional[str] = Field(None, max_length=400)
+    note: Optional[str] = Field(None, max_length=PERSON_NOTE_MAX_LENGTH)
 
     @field_validator("given_name")
     @classmethod
@@ -1734,7 +1746,7 @@ class PersonCreateInFamily(BaseModel):
 class DonorSelfRegister(BaseModel):
     """Public: donor self-registration (open, no invite code required)."""
 
-    display_name: str = Field(..., min_length=1, max_length=40)
+    display_name: str = Field(..., min_length=1, max_length=DISPLAY_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     password: str = Field(..., min_length=8)
 

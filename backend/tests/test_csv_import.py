@@ -3,6 +3,19 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models import (
+    ADDRESS_MAX_LENGTH,
+    CONTACT_NAME_MAX_LENGTH,
+    FAMILY_BIO_MAX_LENGTH,
+    FAMILY_NAME_MAX_LENGTH,
+    GIVEN_NAME_MAX_LENGTH,
+    PERSON_NOTE_MAX_LENGTH,
+    PHONE_NUMBER_MAX_LENGTH,
+    REFERRER_NAME_MAX_LENGTH,
+    WISH_COLOR_MAX_LENGTH,
+    WISH_DESCRIPTION_MAX_LENGTH,
+    WISH_SIZE_MAX_LENGTH,
+)
 from tests.conftest import login_as
 
 # ---------------------------------------------------------------------------
@@ -682,6 +695,180 @@ Dedup Fam3,Alice,12,Coat,,Game,son,
         body = resp.json()
         assert body["summary"]["people"]["created"] == 2
         assert body["summary"]["people"]["skipped"] == 0
+
+
+# =========================================================================
+#  CSV import - field length validation
+# =========================================================================
+
+
+class TestCsvImportFieldLengths:
+    """Over-length cells must error the row, not 500 the whole import.
+
+    Regression: an over-length value previously raised a varchar overflow
+    (SQLSTATE 22001) at flush, 500ing the endpoint and rolling back every
+    row of the import.
+    """
+
+    @staticmethod
+    def _error_row(body: dict, entity_type: str) -> dict:
+        error_rows = [r for r in body["rows"] if r["entity_type"] == entity_type and r["action"] == "error"]
+        assert len(error_rows) == 1
+        return error_rows[0]
+
+    def test_referrer_name_too_long_errors_row(self, test_client: TestClient, admin_user):
+        csv_data = f"""# referrers
+name,family_limit,phone_number
+{"R" * 61},5,555-000-0001
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["referrers"]["created"] == 0
+        assert body["summary"]["referrers"]["errors"] == 1
+        row = self._error_row(body, "referrer")
+        assert row["message"] == f"name too long (max {REFERRER_NAME_MAX_LENGTH} characters)"
+
+    def test_referrer_phone_too_long_errors_row(self, test_client: TestClient, admin_user):
+        """A 21+ char international phone number errors the row, not the import."""
+        csv_data = """# referrers
+name,family_limit,phone_number
+Phone Ref,5,+1 555 123 4567 ext. 1
+"""
+        assert len("+1 555 123 4567 ext. 1") == 22
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["referrers"]["created"] == 0
+        assert body["summary"]["referrers"]["errors"] == 1
+        row = self._error_row(body, "referrer")
+        assert row["message"] == f"phone_number too long (max {PHONE_NUMBER_MAX_LENGTH} characters)"
+
+    def _post_family_row(self, test_client: TestClient, cells: str) -> dict:
+        csv_data = f"""# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+{cells}
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["families"]["created"] == 0
+        assert body["summary"]["families"]["errors"] == 1
+        return self._error_row(body, "family")
+
+    def test_family_name_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",{'F' * 41},A wish,Contact,,1 Way,555-000-0001")
+        assert row["message"] == f"family_name too long (max {FAMILY_NAME_MAX_LENGTH} characters)"
+
+    def test_family_wish_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",Fam,{'W' * 101},Contact,,1 Way,555-000-0001")
+        assert row["message"] == f"family_wish too long (max {WISH_DESCRIPTION_MAX_LENGTH} characters)"
+
+    def test_contact_name_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",Fam,A wish,{'C' * 41},,1 Way,555-000-0001")
+        assert row["message"] == f"contact_name too long (max {CONTACT_NAME_MAX_LENGTH} characters)"
+
+    def test_bio_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",Fam,A wish,Contact,{'B' * 401},1 Way,555-000-0001")
+        assert row["message"] == f"bio too long (max {FAMILY_BIO_MAX_LENGTH} characters)"
+
+    def test_address_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",Fam,A wish,Contact,,{'A' * 201},555-000-0001")
+        assert row["message"] == f"address too long (max {ADDRESS_MAX_LENGTH} characters)"
+
+    def test_family_phone_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_family_row(test_client, f",Fam,A wish,Contact,,1 Way,{'1' * 21}")
+        assert row["message"] == f"phone_number too long (max {PHONE_NUMBER_MAX_LENGTH} characters)"
+
+    def _post_person_row(self, test_client: TestClient, cells: str) -> dict:
+        csv_data = f"""# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+,L Fam,A wish,Contact,,1 Way,555-000-0001
+
+# people
+family_name,given_name,age,wish,size,color,fun_wish,role,note
+L Fam,{cells}
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["people"]["created"] == 0
+        assert body["summary"]["people"]["errors"] == 1
+        return self._error_row(body, "person")
+
+    def test_given_name_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"{'G' * 41},8,Backpack,,,Doll,daughter,")
+        assert row["message"] == f"given_name too long (max {GIVEN_NAME_MAX_LENGTH} characters)"
+
+    def test_wish_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"Kid,8,{'W' * 101},,,Doll,daughter,")
+        assert row["message"] == f"wish too long (max {WISH_DESCRIPTION_MAX_LENGTH} characters)"
+
+    def test_size_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"Kid,8,Backpack,{'S' * 21},,Doll,daughter,")
+        assert row["message"] == f"size too long (max {WISH_SIZE_MAX_LENGTH} characters)"
+
+    def test_color_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"Kid,8,Backpack,,{'C' * 21},Doll,daughter,")
+        assert row["message"] == f"color too long (max {WISH_COLOR_MAX_LENGTH} characters)"
+
+    def test_fun_wish_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"Kid,8,Backpack,,,{'F' * 101},daughter,")
+        assert row["message"] == f"fun_wish too long (max {WISH_DESCRIPTION_MAX_LENGTH} characters)"
+
+    def test_note_too_long_errors_row(self, test_client: TestClient, admin_user):
+        row = self._post_person_row(test_client, f"Kid,8,Backpack,,,Doll,daughter,{'N' * 401}")
+        assert row["message"] == f"note too long (max {PERSON_NOTE_MAX_LENGTH} characters)"
+
+    def test_over_length_row_does_not_lose_other_rows(self, test_client: TestClient, admin_user, db: Session):
+        """The finding's repro: one over-length row errors; the rest still import."""
+        from app.models import Family
+
+        csv_data = f"""# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+,{"F" * 41},A wish,Contact,,1 Way,555-000-0001
+,Good Fam,A wish,Contact,,2 Way,555-000-0002
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["families"]["created"] == 1
+        assert body["summary"]["families"]["errors"] == 1
+
+        db.expire_all()
+        fam = db.query(Family).filter(Family.family_name == "Good Fam").first()
+        assert fam is not None
+
+    def test_values_at_limit_import_cleanly(self, test_client: TestClient, admin_user):
+        """Values exactly at each column width are accepted (off-by-one guard)."""
+        csv_data = f"""# referrers
+name,family_limit,phone_number
+{"R" * 60},5,{"1" * 20}
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+{"R" * 60},{"F" * 40},{"W" * 100},{"C" * 40},{"B" * 400},{"A" * 200},{"2" * 20}
+
+# people
+family_name,given_name,age,wish,size,color,fun_wish,role,note
+{"F" * 40},{"G" * 40},8,{"w" * 100},{"S" * 20},{"c" * 20},{"f" * 100},daughter,{"N" * 400}
+"""
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        s = body["summary"]
+        assert s["referrers"]["created"] == 1
+        assert s["families"]["created"] == 1
+        assert s["people"]["created"] == 1
+        assert s["referrers"]["errors"] == 0
+        assert s["families"]["errors"] == 0
+        assert s["people"]["errors"] == 0
 
 
 # =========================================================================
