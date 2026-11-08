@@ -113,11 +113,12 @@ async def _best_effort_payment_email(
     body_html: str,
     db: Session,
     kind: EmailKind,
-) -> None:
+) -> str | None:
     """Send a payment-flow email best-effort (SMTP failure never fails the action).
 
-    On failure (other than unsubscribe suppression) an admin failure notice
-    is attempted, following the gift-claim-confirmation pattern.
+    Returns an error string when the send failed (unsubscribe suppression
+    counts as success), None otherwise. On failure an admin failure notice is
+    attempted first, following the gift-claim-confirmation pattern.
     """
     try:
         result = await send_email(to=donor.email, subject=subject, html_body=body_html, db=db, kind=kind, user_id=donor.id)
@@ -139,6 +140,7 @@ async def _best_effort_payment_email(
         )
     except Exception:  # noqa: BLE001
         logger.error("Admin notification also failed for %s email (user_id=%s)", kind.value, donor.id, exc_info=True)
+    return "Payment email failed to send"
 
 
 # ---------------------------------------------------------------------------

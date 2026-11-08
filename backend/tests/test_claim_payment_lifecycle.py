@@ -6,6 +6,7 @@ loop is disabled in tests via DISABLE_BACKGROUND_TASKS).
 """
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -118,6 +119,36 @@ class TestCommitmentToggle:
         # The nudge went out (a one-item checkout)
         assert len(_sent_rows(db, EmailKind.payment_request)) == 1
         assert body.get("email_error") is None
+
+    def test_gifts_to_cash_smtp_failure_sets_email_error(self, test_client: TestClient, db: Session, admin_user):
+        """gifts→cash + nudge SMTP failure → toggle still succeeds, email_error set."""
+        _login_donor(test_client)
+        fam = _eligible_family(db, "Toggle Fail Family")
+        claim = _gift_claim(db, fam)
+
+        async def _fail_send(to, subject, html_body, db=None, **kwargs):
+            return {"sent": False, "reason": "smtp_error"}
+
+        admin_notifications = []
+
+        async def _capture_admin(subject, body_html, db=None, **kwargs):
+            admin_notifications.append({"subject": subject, "body": body_html})
+            return {"sent": True, "reason": None}
+
+        with patch("app.payments.send_email", new=_fail_send):
+            with patch("app.payments.send_admin_notification", new=_capture_admin):
+                resp = test_client.patch(f"/api/donor/claims/{claim.id}", json={"commitment_type": "cash"})
+
+        # Toggle still succeeds; the failure surfaces via email_error
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["commitment_type"] == "cash"
+        assert body["payment_status"] == "pending"
+        assert body["email_error"] is not None
+
+        # Admin failure notice was attempted
+        assert len(admin_notifications) == 1
+        assert "Failed" in admin_notifications[0]["subject"]
 
     def test_cash_to_gifts(self, test_client: TestClient, db: Session, admin_user):
         """cash→gifts (pending): released (paid) + gift confirmation email."""
