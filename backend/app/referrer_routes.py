@@ -489,7 +489,7 @@ async def _send_family_rejected_email(
     """Send a notification email to the family contact when rejected."""
     from app.mail import build_family_rejected_email, send_email
 
-    family_user = db.query(User).filter(User.family_id == fam.id).first()
+    family_user = db.query(User).filter(User.family_id == fam.id, User.deleted_at.is_(None)).first()
     if not family_user:
         return
 
@@ -513,7 +513,7 @@ async def _send_family_verified_email(
     """Send a notification email to the family contact when verified."""
     from app.mail import build_family_verified_email, send_email
 
-    family_user = db.query(User).filter(User.family_id == fam.id).first()
+    family_user = db.query(User).filter(User.family_id == fam.id, User.deleted_at.is_(None)).first()
     if not family_user:
         return
 

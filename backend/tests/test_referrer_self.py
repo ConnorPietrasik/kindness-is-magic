@@ -810,6 +810,95 @@ class TestReferrerVerifyFamily:
         resp = test_client.get("/api/referrer/me")
         assert resp.json()["family_count"] == 2
 
+    def test_verify_sends_email_to_family_contact(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Verifying a pending family notifies the family contact (mocked)."""
+        from unittest.mock import patch
+
+        from app.auth import get_password_hash
+        from app.models import EmailKind, FamilyVerificationStatus, User, UserRole
+
+        ref = referrer_with_full_tree["referrer"]
+        ref_user = referrer_with_full_tree["user"]
+        pending = make_family(
+            db,
+            referrer_id=ref.id,
+            family_name="Verify Email Family",
+            family_wish="A roof",
+            contact_name="Verify Email Contact",
+            phone_number="555-000-0000",
+            verification_status=FamilyVerificationStatus.pending,
+        )
+        db.add(pending)
+        db.commit()
+        db.refresh(pending)
+
+        fam_user = User(
+            email="fam_verify@test.com",
+            hashed_password=get_password_hash("FamPass1234!"),
+            role=UserRole.family,
+            family_id=pending.id,
+            display_name=None,
+        )
+        db.add(fam_user)
+        db.commit()
+
+        captured = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured.update(_kw)
+            return {"sent": True, "reason": None}
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email", side_effect=fake_send_email):
+            resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
+        assert resp.status_code == 200
+        assert captured["to"] == "fam_verify@test.com"
+        assert captured["kind"] == EmailKind.family_verified
+        assert captured["user_id"] == ref_user.id
+        body_html = captured["html_body"]
+        assert "Verify Email Family" in body_html
+        assert ref_user.display_name in body_html
+        assert "<strong>confirmed</strong>" in body_html
+
+    def test_verify_disabled_family_user_skips_email(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Soft-deleted family contact → no email, verify still succeeds."""
+        from unittest.mock import patch
+
+        from app.auth import get_password_hash
+        from app.models import FamilyVerificationStatus, User, UserRole
+
+        ref = referrer_with_full_tree["referrer"]
+        pending = make_family(
+            db,
+            referrer_id=ref.id,
+            family_name="Disabled Verify Contact",
+            family_wish="A roof",
+            contact_name="Disabled Verify Contact",
+            phone_number="555-000-0000",
+            verification_status=FamilyVerificationStatus.pending,
+        )
+        db.add(pending)
+        db.commit()
+        db.refresh(pending)
+
+        fam_user = User(
+            email="fam_disabled_verify@test.com",
+            hashed_password=get_password_hash("FamPass1234!"),
+            role=UserRole.family,
+            family_id=pending.id,
+            display_name=None,
+            deleted_at=datetime.now(timezone.utc),
+        )
+        db.add(fam_user)
+        db.commit()
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email") as mock_send:
+            resp = test_client.post(f"/api/referrer/families/{pending.id}/verify")
+        assert resp.status_code == 200
+        assert resp.json()["verification_status"] == "verified"
+        mock_send.assert_not_called()
+
     def test_400_cannot_verify_already_verified(self, test_client: TestClient, referrer_with_full_tree):
         _tree_referrer_login(test_client)
         fam = referrer_with_full_tree["family"]
@@ -1007,6 +1096,45 @@ class TestReferrerRejectFamily:
         db.add(pending)
         db.commit()
         db.refresh(pending)
+
+        _tree_referrer_login(test_client)
+        with patch("app.mail.send_email") as mock_send:
+            resp = test_client.post(f"/api/referrer/families/{pending.id}/reject")
+        assert resp.status_code == 200
+        assert resp.json()["verification_status"] == "rejected"
+        mock_send.assert_not_called()
+
+    def test_reject_disabled_family_user_skips_email(self, test_client: TestClient, referrer_with_full_tree, db: Session):
+        """Soft-deleted family contact → no email, reject still succeeds."""
+        from unittest.mock import patch
+
+        from app.auth import get_password_hash
+        from app.models import FamilyVerificationStatus, User, UserRole
+
+        ref = referrer_with_full_tree["referrer"]
+        pending = make_family(
+            db,
+            referrer_id=ref.id,
+            family_name="Disabled Reject Contact",
+            family_wish="A roof",
+            contact_name="Disabled Reject Contact",
+            phone_number="555-000-0000",
+            verification_status=FamilyVerificationStatus.pending,
+        )
+        db.add(pending)
+        db.commit()
+        db.refresh(pending)
+
+        fam_user = User(
+            email="fam_disabled_reject@test.com",
+            hashed_password=get_password_hash("FamPass1234!"),
+            role=UserRole.family,
+            family_id=pending.id,
+            display_name=None,
+            deleted_at=datetime.now(timezone.utc),
+        )
+        db.add(fam_user)
+        db.commit()
 
         _tree_referrer_login(test_client)
         with patch("app.mail.send_email") as mock_send:
