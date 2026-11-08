@@ -75,7 +75,7 @@ export default function AdminEmails() {
                 type="button"
                 id={`email-tab-${key}`}
                 aria-selected={tab === key}
-                aria-controls={`email-tabpanel-${key}`}
+                aria-controls={tab === key ? `email-tabpanel-${key}` : undefined}
                 onClick={() => tab !== key && selectTab(key)}
                 className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
                   tab === key ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"

@@ -207,6 +207,11 @@ describe("AdminEmails", () => {
     expect(await screen.findByText("No sent emails found.")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Sent" })).toHaveAttribute("aria-selected", "true");
 
+    // The active tab references the rendered tabpanel; inactive tabs carry no aria-controls
+    expect(screen.getByRole("tab", { name: "Sent" })).toHaveAttribute("aria-controls", "email-tabpanel-sent");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("id", "email-tabpanel-sent");
+    expect(screen.getByRole("tab", { name: "Campaigns" })).not.toHaveAttribute("aria-controls");
+
     // Tabs are exclusive: only the active tab's content is mounted
     await user.click(screen.getByRole("tab", { name: "Campaigns" }));
     expect(await screen.findByText(/No email campaigns yet/)).toBeInTheDocument();
