@@ -239,9 +239,10 @@ describe("Dashboard", () => {
     renderDashboard(referrerUser);
 
     // The banner text is split across spans (label, "due", date)
-    const label = await screen.findByText("Wish review by Dec 15");
+    await screen.findByText("Wish review by Dec 15");
     expect(screen.getByText("Dec 15, 2099")).toBeInTheDocument();
-    expect(label.closest("div")).toHaveClass("bg-blue-50");
+    // The row is in the future → upcoming wording ("due", not "deadline was")
+    expect(screen.getByText("due", { exact: true })).toBeInTheDocument();
 
     // Non-referrer roles never render the banner (even with a row configured)
     cleanup();

@@ -135,6 +135,12 @@ const wrap = (ui: React.ReactElement, path = "/families", user: User | null = nu
   if (user && user.role !== "family" && !vi.isMockFunction(api.donorListClaims)) {
     vi.spyOn(api, "donorListClaims").mockResolvedValue([]);
   }
+  // The gift drop-off deadline banner queries the public deadline rows — keep
+  // them empty by default so existing tests don't see a banner (unless a test
+  // spied on the API to supply its own rows).
+  if (!vi.isMockFunction(api.listDeadlines)) {
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
+  }
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
@@ -258,6 +264,8 @@ describe("PublicFamilies", () => {
 
   it("cards link to wish-list pages", async () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    // Renders without wrap() — keep the banner's public deadlines query hermetic
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
 
     const wishListPaths: string[] = [];
     const queryClient = createQueryClient();
@@ -419,6 +427,41 @@ describe("PublicFamilies", () => {
     expect(screen.queryByText("Sponsored")).not.toBeInTheDocument();
     expect(screen.queryByText("Awaiting payment")).not.toBeInTheDocument();
     expect(screen.queryByText("Fulfilled")).not.toBeInTheDocument();
+  });
+
+  /* Gift drop-off deadline banner */
+
+  it("shows the gift_dropoff deadline banner when a row is configured", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({
+      deadlines: [
+        {
+          id: 1,
+          type: "gift_dropoff",
+          label: "Gift drop-off",
+          due_date: "2099-12-15",
+          mode: "display",
+          created_at: "2025-01-01T00:00:00Z",
+        },
+      ],
+    });
+
+    wrap(<PublicFamilies />);
+
+    // The banner text is split across spans (label, "due", date)
+    await screen.findByText("Gift drop-off");
+    expect(screen.getByText("Dec 15, 2099")).toBeInTheDocument();
+    // The row is in the future → upcoming wording ("due", not "deadline was")
+    expect(screen.getByText("due", { exact: true })).toBeInTheDocument();
+  });
+
+  it("hides the deadline banner when no deadline row is configured", async () => {
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+    expect(screen.queryByTestId("deadline-banner")).not.toBeInTheDocument();
   });
 
   /* "Sponsored by me" section (claim-capable users) */
@@ -601,6 +644,10 @@ describe("PublicFamilies", () => {
   it("clicking sign out logs out and navigates to login", async () => {
     const event = userEvent.setup();
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    // Renders without wrap() — keep the banner's public deadlines query hermetic
+    vi.spyOn(api, "listDeadlines").mockResolvedValue({ deadlines: [] });
+    // The donor is claim-capable, so the page also queries their claims
+    vi.spyOn(api, "donorListClaims").mockResolvedValue([]);
     const logoutSpy = vi.spyOn(api, "logoutRequest").mockResolvedValue(undefined);
 
     const queryClient = createQueryClient();

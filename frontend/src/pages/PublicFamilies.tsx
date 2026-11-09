@@ -9,12 +9,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../components/Card";
+import { DeadlineBanner } from "../components/DeadlineBanner";
 import { HeaderBar } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import { SiteFooter } from "../components/SiteFooter";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
+import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { donorListClaims, listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
 import { CASH_CLAIM_AMOUNT_USD } from "../lib/constants";
@@ -131,6 +133,10 @@ export default function PublicFamilies() {
     queryFn: () => listPublicFamilies(apiParams),
   });
 
+  // Gift drop-off deadline banner (public — the rows feed every role, anonymous
+  // included); renders nothing when no dated row is configured.
+  const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
+
   if (isLoading) return <PageSpinner />;
 
   if (isError || !data) {
@@ -199,6 +205,9 @@ export default function PublicFamilies() {
             that goes 100% to gifts.
           </p>
         </section>
+
+        {/* Gift drop-off deadline (shared display banner; null renders nothing) */}
+        <DeadlineBanner result={giftDropoffDeadline} />
 
         {/* Sponsored by me — the claimant's own claims, above the grid */}
         {myClaims && myClaims.length > 0 && (

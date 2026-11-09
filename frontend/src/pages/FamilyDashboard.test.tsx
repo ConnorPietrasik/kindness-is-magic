@@ -120,8 +120,9 @@ describe("FamilyDashboard", () => {
     ]);
 
     // The banner text is split across spans (label, "due", date)
-    const label = await screen.findByText("Family information");
+    await screen.findByText("Family information");
     expect(screen.getByText("Dec 15, 2099")).toBeInTheDocument();
-    expect(label.closest("div")).toHaveClass("bg-blue-50");
+    // The row is in the future → upcoming wording ("due", not "deadline was")
+    expect(screen.getByText("due", { exact: true })).toBeInTheDocument();
   });
 });
