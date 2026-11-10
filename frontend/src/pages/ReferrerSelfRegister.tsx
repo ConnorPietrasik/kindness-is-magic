@@ -162,6 +162,7 @@ export default function ReferrerSelfRegister() {
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value),
                 required: true,
                 minLength: 8,
+                maxLength: 72,
                 placeholder: "Min 8 characters",
                 autoComplete: "new-password",
               }}
@@ -179,6 +180,7 @@ export default function ReferrerSelfRegister() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => update("confirmPassword", e.target.value),
               required: true,
               minLength: 8,
+              maxLength: 72,
               placeholder: "Re-enter password",
               autoComplete: "new-password",
             }}

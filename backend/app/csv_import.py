@@ -948,9 +948,16 @@ def _process_users(
         if display_name is None:
             display_name = default_display_name_from_email(email)  # e.g. "Mike.torres"
 
+        try:
+            hashed_password = get_password_hash(password)
+        except ValueError as exc:
+            summary.rows.append(RowResult(row_num, "user", "error", f"password: {exc}"))
+            summary.users_errors += 1
+            continue
+
         user = User(
             email=email,
-            hashed_password=get_password_hash(password),
+            hashed_password=hashed_password,
             role=role,
             display_name=display_name,
             referrer_id=referrer_id,

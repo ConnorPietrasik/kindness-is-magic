@@ -541,6 +541,24 @@ bad@test.com,Password123!,superadmin,,
         error_rows = [r for r in body["rows"] if r["entity_type"] == "user" and r["action"] == "error"]
         assert error_rows[0]["message"] == "Invalid email format"
 
+    def test_over_long_password_rejected(self, test_client: TestClient, admin_user):
+        """Password over 72 bytes errors on that row; the rest of the batch still imports."""
+        csv_data = (
+            "# users\nemail,password,role,referrer_name_or_id,family_name_or_id\n"
+            + "longpw@test.com,"
+            + "a" * 73
+            + ",admin,,\n"
+            + "okpw@test.com,Password123!,admin,,\n"
+        )
+        _admin_login(test_client)
+        resp = _post_csv(test_client, csv_data)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["summary"]["users"]["created"] == 1
+        assert body["summary"]["users"]["errors"] == 1
+        error_rows = [r for r in body["rows"] if r["entity_type"] == "user" and r["action"] == "error"]
+        assert "72 characters" in error_rows[0]["message"]
+
     def test_referrer_user_missing_referrer_id(self, test_client: TestClient, admin_user):
         csv_data = """# users
 email,password,role,referrer_name_or_id,family_name_or_id

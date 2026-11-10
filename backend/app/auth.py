@@ -55,15 +55,34 @@ def generate_unique_family_invite_code(db: "Session") -> str:
 # ---------------------------------------------------------------------------
 
 
+# bcrypt only accepts passwords of at most 72 bytes (UTF-8); longer input raises ValueError.
+PASSWORD_MAX_LENGTH = 72
+
+
 def get_password_hash(password: str) -> str:
-    """Hash a plain-text password with bcrypt (rounds=12)."""
+    """Hash a plain-text password with bcrypt (rounds=12).
+
+    Raises ValueError if the password exceeds 72 bytes in UTF-8.
+    """
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > PASSWORD_MAX_LENGTH:
+        raise ValueError(f"too long (max {PASSWORD_MAX_LENGTH} characters)")
     salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plain-text password against a bcrypt hash."""
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    """Verify a plain-text password against a bcrypt hash.
+
+    Returns False (rather than raising bcrypt's ValueError) when the candidate
+    exceeds 72 UTF-8 bytes: no stored password can ever be that long (every
+    write path enforces the limit), so over-long input can only be a wrong
+    password.
+    """
+    plain_bytes = plain.encode("utf-8")
+    if len(plain_bytes) > PASSWORD_MAX_LENGTH:
+        return False
+    return bcrypt.checkpw(plain_bytes, hashed.encode("utf-8"))
 
 
 # ---------------------------------------------------------------------------

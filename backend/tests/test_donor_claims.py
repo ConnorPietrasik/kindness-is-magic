@@ -142,6 +142,18 @@ class TestDonorSelfRegister:
         )
         assert resp.status_code == 422
 
+    def test_register_donor_long_password(self, test_client: TestClient):
+        """Register donor with a >72-byte password → 422, not an opaque 500 from bcrypt."""
+        resp = test_client.post(
+            "/api/auth/register-donor",
+            json={
+                "display_name": "Long Pass",
+                "email": "long@test.com",
+                "password": "L" * 73,
+            },
+        )
+        assert resp.status_code == 422
+
     def test_register_donor_auto_login(self, test_client: TestClient):
         """After registration, user can access /api/donor/me."""
         _create_donor(test_client)

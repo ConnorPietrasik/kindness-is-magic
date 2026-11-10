@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal, Optional
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     Field,
@@ -43,7 +44,23 @@ from app.models import (
     WishLockLevel,
     WishType,
 )
+from app.auth import PASSWORD_MAX_LENGTH
 from app.user_validation import MAX_EMAIL_LENGTH, sanitize_plain_text, validate_email, validate_phone_number
+
+
+def _validate_password_bytes(value: str) -> str:
+    """Reject passwords whose UTF-8 encoding exceeds bcrypt's 72-byte limit."""
+    if len(value.encode("utf-8")) > PASSWORD_MAX_LENGTH:
+        raise ValueError(f"Password must be 8-{PASSWORD_MAX_LENGTH} characters")
+    return value
+
+
+# Password for auth endpoints: 8-72 characters, and at most 72 UTF-8 bytes (bcrypt limit).
+PasswordField = Annotated[
+    str,
+    StringConstraints(min_length=8, max_length=PASSWORD_MAX_LENGTH),
+    AfterValidator(_validate_password_bytes),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +84,7 @@ class ChangePassword(BaseModel):
     """Change own password."""
 
     old_password: str
-    new_password: str = Field(..., min_length=8)
+    new_password: PasswordField
 
 
 class ForgotPassword(BaseModel):
@@ -85,7 +102,7 @@ class ResetPassword(BaseModel):
     """Consume a reset token and set a new password."""
 
     token: str
-    new_password: str = Field(..., min_length=8)
+    new_password: PasswordField
 
 
 class ReferrerInviteCreate(BaseModel):
@@ -119,7 +136,7 @@ class ReferrerSelfRegister(BaseModel):
     name: str = Field(..., min_length=1, max_length=REFERRER_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
     phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
-    password: str = Field(..., min_length=8)
+    password: PasswordField
 
     @field_validator("email")
     @classmethod
@@ -301,7 +318,7 @@ class FamilySelfRegister(BaseModel):
     family_wish: str = Field(..., min_length=1, max_length=WISH_DESCRIPTION_MAX_LENGTH)
     contact_name: str = Field(..., min_length=1, max_length=CONTACT_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
-    password: str = Field(..., min_length=8)
+    password: PasswordField
     bio: Optional[str] = Field(None, max_length=FAMILY_BIO_MAX_LENGTH)
     address: str = Field(..., min_length=1, max_length=ADDRESS_MAX_LENGTH)
     phone_number: str = Field(..., min_length=1, max_length=PHONE_NUMBER_MAX_LENGTH)
@@ -1409,7 +1426,7 @@ class AdminUserCreate(BaseModel):
     """Admin-only: create a new user."""
 
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
-    password: str = Field(..., min_length=8)
+    password: PasswordField
     role: UserRole
     display_name: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX_LENGTH)
     referrer_id: Optional[int] = None
@@ -1453,7 +1470,7 @@ class AdminUserUpdate(BaseModel):
 class UserPasswordReset(BaseModel):
     """Admin-only: reset a user's password via the dedicated endpoint."""
 
-    password: str = Field(..., min_length=8)
+    password: PasswordField
 
 
 class UserDetail(BaseModel):
@@ -1748,7 +1765,7 @@ class DonorSelfRegister(BaseModel):
 
     display_name: str = Field(..., min_length=1, max_length=DISPLAY_NAME_MAX_LENGTH)
     email: str = Field(..., min_length=1, max_length=MAX_EMAIL_LENGTH)
-    password: str = Field(..., min_length=8)
+    password: PasswordField
 
     @field_validator("email")
     @classmethod

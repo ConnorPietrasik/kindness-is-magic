@@ -56,6 +56,14 @@ class TestLogin:
         assert resp.status_code == 401
         assert "Incorrect email or password" in resp.json()["detail"]
 
+    def test_login_over_long_password_401(self, test_client: TestClient, admin_user):
+        """A >72-byte candidate must 401 like any wrong password, not 500 in bcrypt."""
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": "admin@test.com", "password": "L" * 73},
+        )
+        assert resp.status_code == 401
+
     def test_login_nonexistent_user(self, test_client: TestClient):
         resp = test_client.post(
             "/api/auth/login",
@@ -186,6 +194,37 @@ class TestChangePassword:
             },
         )
         assert resp.status_code == 422
+
+    def test_change_password_new_too_long(self, test_client: TestClient, admin_user):
+        """New password over 72 bytes → 422, not an opaque 500 from bcrypt."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.put(
+            "/api/auth/me/password",
+            json={
+                "old_password": "AdminPass123!",
+                "new_password": "L" * 73,
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_change_password_old_too_long(self, test_client: TestClient, admin_user):
+        """Over-long old_password must 400, not 500 in bcrypt, and change nothing."""
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        resp = test_client.put(
+            "/api/auth/me/password",
+            json={
+                "old_password": "L" * 73,
+                "new_password": "NewAdminPass1!",
+            },
+        )
+        assert resp.status_code == 400
+
+        # Password must be untouched: the original still works.
+        resp2 = test_client.post(
+            "/api/auth/login",
+            json={"email": "admin@test.com", "password": "AdminPass123!"},
+        )
+        assert resp2.status_code == 200
 
     def test_change_password_requires_auth(self, test_client: TestClient):
         resp = test_client.put(

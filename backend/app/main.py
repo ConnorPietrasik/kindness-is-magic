@@ -20,7 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth import get_password_hash
+from app.auth import PASSWORD_MAX_LENGTH, get_password_hash
 from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.deadlines import deadline_checks_loop
@@ -239,17 +239,27 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
             if admin_email and admin_password:
                 existing = db.query(User).filter(User.email == admin_email).first()
                 if not existing:
-                    admin = User(
-                        email=admin_email,
-                        hashed_password=get_password_hash(admin_password),
-                        role=UserRole.admin,
-                        display_name=default_display_name_from_email(admin_email),
-                        referrer_id=None,
-                        family_id=None,
-                    )
-                    db.add(admin)
-                    db.commit()
-                    logger.info("Bootstrap admin user created.")
+                    password_bytes = admin_password.encode("utf-8")
+                    if len(password_bytes) > PASSWORD_MAX_LENGTH:
+                        logger.error(
+                            "ADMIN_PASSWORD is %d bytes in UTF-8 but bcrypt only "
+                            "supports %d — bootstrap admin user was NOT created. "
+                            "Shorten the env var and restart.",
+                            len(password_bytes),
+                            PASSWORD_MAX_LENGTH,
+                        )
+                    else:
+                        admin = User(
+                            email=admin_email,
+                            hashed_password=get_password_hash(admin_password),
+                            role=UserRole.admin,
+                            display_name=default_display_name_from_email(admin_email),
+                            referrer_id=None,
+                            family_id=None,
+                        )
+                        db.add(admin)
+                        db.commit()
+                        logger.info("Bootstrap admin user created.")
 
         except (ProgrammingError, OperationalError) as exc:
             logger.warning(

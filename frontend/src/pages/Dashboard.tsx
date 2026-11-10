@@ -1006,6 +1006,7 @@ function PasswordRow() {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewPass(e.target.value),
               required: true,
               minLength: 8,
+              maxLength: 72,
               placeholder: "Min 8 characters",
               autoComplete: "new-password",
             }}
@@ -1019,6 +1020,7 @@ function PasswordRow() {
               required: true,
               autoComplete: "new-password",
               minLength: 8,
+              maxLength: 72,
             }}
           />
           <div className="flex gap-3">

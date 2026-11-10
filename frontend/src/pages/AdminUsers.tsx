@@ -682,6 +682,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
                 },
                 required: true,
                 minLength: 8,
+                maxLength: 72,
                 placeholder: "Min 8 characters",
                 autoComplete: "off",
               }}
@@ -697,6 +698,7 @@ function UserForm({ title, initial, isEdit, referrers, families, onCreate, onUpd
                 },
                 required: true,
                 minLength: 8,
+                maxLength: 72,
                 autoComplete: "off",
               }}
             />
@@ -751,6 +753,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, password: e.target.value }),
               required: true,
               minLength: 8,
+              maxLength: 72,
               placeholder: "Min 8 characters",
               autoComplete: "off",
             }}
@@ -763,6 +766,7 @@ function ResetPasswordDialog({ open, userId, form, setForm, onSubmit, onCancel, 
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, confirmPassword: e.target.value }),
               required: true,
               minLength: 8,
+              maxLength: 72,
               autoComplete: "off",
             }}
           />

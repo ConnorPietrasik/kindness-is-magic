@@ -51,6 +51,28 @@ class TestPasswordHashing:
         hashed = get_password_hash(password)
         assert verify_password(password, hashed) is True
 
+    def test_72_byte_boundary(self):
+        """72 bytes hashes fine; 73 bytes raises (bcrypt limit)."""
+        assert verify_password("a" * 72, get_password_hash("a" * 72)) is True
+        with pytest.raises(ValueError, match="72 characters"):
+            get_password_hash("a" * 73)
+
+    def test_multibyte_over_limit_rejected(self):
+        """24 CJK chars = 72 bytes (ok); 25 = 75 bytes (rejected)."""
+        assert verify_password("中" * 24, get_password_hash("中" * 24)) is True
+        with pytest.raises(ValueError, match="72 characters"):
+            get_password_hash("中" * 25)
+
+    def test_verify_over_long_candidate_returns_false(self):
+        """A >72-byte candidate must return False, not raise bcrypt's ValueError.
+
+        No stored password can exceed 72 bytes, so over-long input can only
+        be a wrong password — login and change-password rely on this.
+        """
+        hashed = get_password_hash("a" * 72)
+        assert verify_password("a" * 73, hashed) is False
+        assert verify_password("中" * 25, hashed) is False
+
 
 # ---------------------------------------------------------------------------
 # Access token

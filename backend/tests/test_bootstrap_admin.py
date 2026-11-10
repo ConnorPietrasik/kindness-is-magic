@@ -11,8 +11,11 @@ Covers:
 - idempotency: an existing user with the same email is left untouched
   (password and display name not clobbered, no duplicate row)
 - no env vars → no user created
+- over-long ADMIN_PASSWORD → seed skipped with a clear ERROR log, app starts
 - DB error during startup → seed skipped, app still starts
 """
+
+import logging
 
 import pytest
 import sqlalchemy.exc
@@ -30,6 +33,8 @@ BOOTSTRAP_EMAIL = "bootstrap@test.com"
 BOOTSTRAP_EMAIL_ENV = f" {BOOTSTRAP_EMAIL.upper()} "
 BOOTSTRAP_PASSWORD = "BootstrapPass123!"
 PREEXISTING_PASSWORD = "ExistingPass123!"
+# Over bcrypt's 72-byte limit — the seed must skip it with a clear error.
+LONG_PASSWORD = "L" * 73
 
 
 @pytest.fixture()
@@ -40,13 +45,17 @@ def bootstrap_client(db: Session, monkeypatch: pytest.MonkeyPatch, request: pyte
     - "seed":         ADMIN_EMAIL/ADMIN_PASSWORD set, empty DB
     - "no_env":       env vars unset (autouse _env_isolation strips them)
     - "preexisting":  env vars set, a user with the same email already exists
+    - "long_password": env vars set, password over bcrypt's 72-byte limit
     - "broken_db":    env vars set, get_db raises OperationalError
     """
     variant = request.param
 
     if variant != "no_env":
         monkeypatch.setenv("ADMIN_EMAIL", BOOTSTRAP_EMAIL_ENV)
-        monkeypatch.setenv("ADMIN_PASSWORD", BOOTSTRAP_PASSWORD)
+        monkeypatch.setenv(
+            "ADMIN_PASSWORD",
+            LONG_PASSWORD if variant == "long_password" else BOOTSTRAP_PASSWORD,
+        )
 
     if variant == "preexisting":
         existing = User(
@@ -130,3 +139,15 @@ class TestBootstrapSeeding:
         # Lifespan swallows the DB error (warning) and the app still serves.
         assert bootstrap_client.get("/api/health").status_code == 200
         assert _users_with_email(db) == []
+
+    @pytest.mark.parametrize("bootstrap_client", ["long_password"], indirect=True)
+    def test_over_long_env_password_skips_seed(self, caplog, bootstrap_client: TestClient, db: Session):
+        # A >72-byte password must be skipped with a clear operator-facing
+        # ERROR (not an opaque exception) and the app must still start.
+        assert bootstrap_client.get("/api/health").status_code == 200
+        assert _users_with_email(db) == []
+
+        # The seed runs in the TestClient lifespan, i.e. fixture setup — use
+        # get_records("setup"): caplog resets the handler at each phase.
+        messages = [record.getMessage() for record in caplog.get_records("setup") if record.levelno == logging.ERROR]
+        assert any("72" in message and "bootstrap admin user was NOT created" in message for message in messages)
