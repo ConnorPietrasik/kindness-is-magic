@@ -1,0 +1,24 @@
+# Keep the build context to runtime essentials (app/, alembic/, alembic.ini,
+# requirements.txt). The dev and test services mount ./backend:/app, so
+# nothing excluded here is lost — they read those files from the host mount;
+# the prod image (no mount) gets exactly what it serves.
+
+# Python / tool caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Test / lint tooling (pytest runs from the host mount, not the image)
+tests/
+pytest.ini
+requirements-test.txt
+run_tests.sh
+ruff.toml
+
+# Dev tooling, docs, and secrets
+email_examples/
+generate_email_examples.py
+AGENTS.md
+Dockerfile
+.env
