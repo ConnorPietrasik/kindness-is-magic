@@ -123,10 +123,19 @@ async def log_request_middleware(request: Request, call_next):
     Captures: request_id, user_id (from JWT cookie), method, path,
     status_code, and duration_ms. Adds X-Request-ID to every response.
 
+    Unhandled exceptions re-raise out of call_next before ServerErrorMiddleware
+    (above this middleware) sends the 500, so the audit line is emitted in the
+    except branch — a request is never left unlogged.
+
     No database writes — pure stdout, Docker handles rotation.
     """
     request_id = uuid.uuid4().hex[:16]
     token = _request_id_ctx.set(request_id)
+    # The scope dict also reaches the layers above this middleware — the
+    # catch-all handler runs there, outside these context vars. Stow the id
+    # there so its response and error line stay correlated (see
+    # generic_exception_handler).
+    request.scope["request_id"] = request_id
 
     # Extract user from JWT cookie (no DB hit). No email in logs — PII
     # minimization: the actor is the user_id; look the email up in the DB if
@@ -145,29 +154,35 @@ async def log_request_middleware(request: Request, call_next):
         except Exception:
             pass  # token invalid; log as anonymous
 
+    def _log_request(status_code: int, duration_ms: float) -> None:
+        logger.log(
+            logging.ERROR if status_code >= 500 else logging.WARNING if status_code >= 400 else logging.INFO,
+            "Request",
+            extra={
+                "request_id": request_id,
+                "user_id": user_id,
+                "user_role": user_role,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+
     start = datetime.now(timezone.utc)
     try:
         response = await call_next(request)
+    except Exception:
+        # Log the audit line (mirroring the 500 that ServerErrorMiddleware
+        # will send above us) and propagate.
+        _log_request(500, round((datetime.now(timezone.utc) - start).total_seconds() * 1000, 1))
+        raise
     finally:
         _request_id_ctx.reset(token)
 
-    duration_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    duration_ms = round((datetime.now(timezone.utc) - start).total_seconds() * 1000, 1)
     response.headers["X-Request-ID"] = request_id
-
-    log_level = logging.ERROR if response.status_code >= 500 else logging.WARNING if response.status_code >= 400 else logging.INFO
-    logger.log(
-        log_level,
-        "Request",
-        extra={
-            "request_id": request_id,
-            "user_id": user_id,
-            "user_role": user_role,
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": response.status_code,
-            "duration_ms": round(duration_ms, 1),
-        },
-    )
+    _log_request(response.status_code, duration_ms)
     return response
 
 
@@ -357,12 +372,27 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    """Catch-all for any unhandled exception — return 500 without stack traces."""
-    logger.error("Unexpected error: %s", exc, exc_info=True)
-    return JSONResponse(
+    """Catch-all for any unhandled exception — return 500 without stack traces.
+
+    Runs under ServerErrorMiddleware, above log_request_middleware, so the
+    request context vars aren't visible here. The middleware stows the
+    request_id in the shared scope dict so this response and error line stay
+    correlated with the audit log.
+    """
+    request_id = request.scope.get("request_id")
+    logger.error(
+        "Unexpected error: %s",
+        exc,
+        exc_info=True,
+        extra={"request_id": request_id} if request_id else None,
+    )
+    response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An unexpected error occurred"},
     )
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # ---------------------------------------------------------------------------

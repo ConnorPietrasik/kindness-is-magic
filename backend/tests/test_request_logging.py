@@ -8,6 +8,9 @@ Covers:
   the actor is the user_id, the email lives in the DB)
 - JWT-derived user fields in the access log for authenticated requests
 - log level by status class (INFO / WARNING / ERROR)
+- unhandled exceptions: audit line, X-Request-ID header, and correlated
+  error log line even though the 500 is sent by ServerErrorMiddleware
+  above the request middleware
 - _RequestContextFilter auto-injection of request_id/user_id into business
   log records made during request handling
 """
@@ -177,6 +180,66 @@ class TestAccessLogLine:
         record = _access_log_records(caplog)[0]
         assert record.levelno == logging.ERROR
         assert record.status_code == 500
+
+
+@pytest.fixture()
+def unhandled_error_client(db: Session, test_client: TestClient):
+    """The shared client with server-exception re-raising disabled.
+
+    TestClient re-raises unhandled exceptions after the response is sent,
+    which would swallow the 500 response we need to inspect. Flipping the
+    transport's flag avoids a second TestClient(app) context, which would
+    re-run the app lifespan (bootstrap seed, leader election) just for this
+    test.
+    """
+    transport = test_client._transport  # starlette's _TestClientTransport
+    transport.raise_server_exceptions = False
+    try:
+        yield test_client
+    finally:
+        transport.raise_server_exceptions = True
+
+
+def _trigger_unhandled_500(client: TestClient):
+    """Hit /api/families with a get_db override that raises a bare ValueError.
+
+    Unlike the SQLAlchemyError in test_level_error_on_500, no exception
+    handler matches — ServerErrorMiddleware sends the 500 above the request
+    middleware.
+    """
+
+    def _boom():
+        raise ValueError("kaboom")
+        yield  # pragma: no cover
+
+    saved = app.dependency_overrides[database.get_db]
+    app.dependency_overrides[database.get_db] = _boom
+    try:
+        return client.get("/api/families")
+    finally:
+        app.dependency_overrides[database.get_db] = saved
+
+
+class TestUnhandledException:
+    def test_500_response_carries_header_and_audit_line(self, unhandled_error_client: TestClient, caplog: pytest.LogCaptureFixture):
+        resp = _trigger_unhandled_500(unhandled_error_client)
+
+        assert resp.status_code == 500
+        assert re.fullmatch(r"[0-9a-f]{16}", resp.headers.get("X-Request-ID") or "")
+
+        record = _access_log_records(caplog)[0]
+        assert record.levelno == logging.ERROR
+        assert record.status_code == 500
+        assert record.path == "/api/families"
+        assert record.request_id == resp.headers["X-Request-ID"]
+        _assert_json_line(record)
+
+    def test_error_log_line_correlated_with_request_id(self, unhandled_error_client: TestClient, caplog: pytest.LogCaptureFixture):
+        resp = _trigger_unhandled_500(unhandled_error_client)
+
+        error_records = [r for r in caplog.records if r.name == "app.main" and r.getMessage().startswith("Unexpected error")]
+        assert len(error_records) == 1
+        assert error_records[0].request_id == resp.headers["X-Request-ID"]
 
 
 @pytest.fixture()
