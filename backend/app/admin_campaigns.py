@@ -42,6 +42,7 @@ from app.schemas import (
     EmailCampaignDetailResponse,
     EmailCampaignListResponse,
     EmailCampaignPreviewResponse,
+    EmailCampaignRecipientSummary,
 )
 from app.search_sort import CAMPAIGN_RECIPIENT_SORT_FIELDS, build_sort_clause, escape_like
 
@@ -179,6 +180,7 @@ def get_email_campaign(
     recipients_page = column_filtered_page(
         items,
         columns,
+        model=EmailCampaignRecipientSummary,
         key="recipients",
         total=total,
         page=page,

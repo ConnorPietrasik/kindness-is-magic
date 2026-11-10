@@ -87,7 +87,9 @@ def list_sent_emails(
         for e in emails
     ]
 
-    return column_filtered_page(items, columns, key="emails", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=SentEmailSummary, key="emails", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @email_admin_router.post("/send")
@@ -151,7 +153,16 @@ def list_unsubscribes(
 
     items = [EmailPreferenceSummary(email=p.email, unsubscribed_at=p.unsubscribed_at) for p in preferences]
 
-    return column_filtered_page(items, columns, key="preferences", total=total, page=page, page_size=page_size, always_include={"email"})
+    return column_filtered_page(
+        items,
+        columns,
+        model=EmailPreferenceSummary,
+        key="preferences",
+        total=total,
+        page=page,
+        page_size=page_size,
+        always_include={"email"},
+    )
 
 
 @email_admin_router.post("/unsubscribes/resubscribe", status_code=204)

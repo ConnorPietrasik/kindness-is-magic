@@ -35,16 +35,22 @@ class ColumnRequest:
         return any(name in self._requested for name in field_names)
 
 
-def _get_required_fields(item) -> set[str]:
-    """Extract required field names from a Pydantic model instance."""
+def _get_required_fields(model_cls) -> set[str]:
+    """Extract required field names from a Pydantic model class."""
     required: set[str] = set()
-    for name, field_info in type(item).model_fields.items():
+    for name, field_info in model_cls.model_fields.items():
         if field_info.is_required():
             required.add(name)
     return required
 
 
-def apply_column_filter(items: list, columns: str | None, *, always_include: set[str] | None = None) -> list[dict]:
+def apply_column_filter(
+    items: list,
+    columns: str | None,
+    *,
+    model: type | None = None,
+    always_include: set[str] | None = None,
+) -> list[dict]:
     """Filter model instances (or dicts) to only include requested columns.
 
     When *columns* is None, return full model_dump for each item (or the dicts
@@ -56,6 +62,12 @@ def apply_column_filter(items: list, columns: str | None, *, always_include: set
     Required fields from the Pydantic model are always included regardless of
     the column filter, so the partial dicts remain valid against the response
     schema.
+
+    When *model* is given, the required-field merge and whitelist check run
+    against that class regardless of page contents, so an invalid column name
+    is rejected even when the page is empty. When *model* is omitted, the
+    class is inferred from the first item (validation is skipped for empty
+    pages and dict items).
 
     Raises 400 if any requested column name is not a valid field on the
     response model (whitelist enforcement).
@@ -69,13 +81,15 @@ def apply_column_filter(items: list, columns: str | None, *, always_include: set
     if always_include:
         requested.update(always_include)
 
-    # Always include required fields so partial dicts satisfy the response schema
-    if items and hasattr(type(items[0]), "model_fields"):
-        requested.update(_get_required_fields(items[0]))
+    model_cls: type | None = model
+    if model_cls is None and items and hasattr(type(items[0]), "model_fields"):
+        model_cls = type(items[0])
 
-    # Validate against whitelist — reject unknown column names
-    if items and hasattr(type(items[0]), "model_fields"):
-        allowed = set(type(items[0]).model_fields.keys())
+    if model_cls is not None:
+        # Always include required fields so partial dicts satisfy the response schema
+        requested.update(_get_required_fields(model_cls))
+        # Validate against whitelist — reject unknown column names
+        allowed = set(model_cls.model_fields.keys())
         unknown = requested - allowed
         if unknown:
             raise HTTPException(
@@ -92,6 +106,7 @@ def column_filtered_page(
     items: list,
     columns: str | None,
     *,
+    model: type | None = None,
     key: str,
     total: int,
     page: int,
@@ -103,13 +118,16 @@ def column_filtered_page(
     Returns ``{"<key>": items, "total", "page", "page_size", "total_pages"}`` where the
     items are filtered through :func:`apply_column_filter`.
 
+    Pass *model* (the item response model class) so column-name validation
+    runs even when the page is empty.
+
     NOTE: Returns a plain dict (not the ``*ListResponse`` model) because
     apply_column_filter produces partial dicts with only requested columns.
     FastAPI validates this dict against the annotated response model —
     required fields are always included so validation passes.
     """
     return {
-        key: apply_column_filter(items, columns, always_include=always_include),
+        key: apply_column_filter(items, columns, model=model, always_include=always_include),
         "total": total,
         "page": page,
         "page_size": page_size,

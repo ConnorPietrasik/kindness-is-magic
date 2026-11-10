@@ -322,7 +322,9 @@ def list_wishes(
 
     logger.info("Admin listed wishes (page=%d, total=%d)", page, total)
 
-    return column_filtered_page(items, columns, key="wishes", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=WishListSummary, key="wishes", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @admin_wishes_router.post("/batch-assign")

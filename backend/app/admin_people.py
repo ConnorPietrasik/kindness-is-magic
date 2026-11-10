@@ -140,7 +140,9 @@ def list_people(
 
     items = [PersonDetail(**build_person_list_item(p, display_id=pos_map.get(p.id), wishes=wish_map.get(p.id, []))) for p in people]
 
-    return column_filtered_page(items, columns, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"})
+    return column_filtered_page(
+        items, columns, model=PersonDetail, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"}
+    )
 
 
 @people_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -163,7 +165,9 @@ def list_deleted_people(
 
     items = [PersonDetail(**build_person_list_item(p, display_id="DELETED", wishes=[])) for p in people]
 
-    return column_filtered_page(items, columns, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"})
+    return column_filtered_page(
+        items, columns, model=PersonDetail, key="people", total=total, page=page, page_size=page_size, always_include={"id", "wishes"}
+    )
 
 
 @people_admin_router.get("/{per_id}")

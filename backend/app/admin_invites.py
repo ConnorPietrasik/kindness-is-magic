@@ -148,7 +148,9 @@ def list_invites(
 
     items = [_build_invite_summary(inv, admin_map, referrer_map) for inv in invites]
 
-    return column_filtered_page(items, columns, key="invites", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=ReferrerInviteSummary, key="invites", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @invite_admin_router.get("/{invite_id}")

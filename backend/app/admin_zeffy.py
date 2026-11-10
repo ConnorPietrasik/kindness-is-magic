@@ -141,7 +141,7 @@ def list_zeffy_payments(
     ]
 
     return {
-        "payments": apply_column_filter(items, columns, always_include={"id", "matched"}),
+        "payments": apply_column_filter(items, columns, model=AdminZeffyPayment, always_include={"id", "matched"}),
         "has_more": page.has_more,
         "next_cursor": page.next_cursor,
     }

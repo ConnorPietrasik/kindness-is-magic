@@ -158,7 +158,14 @@ def list_families(
     items = [FamilyDetail(**build_family_list_item(f, ctx)) for f in families]
 
     return column_filtered_page(
-        items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id", "contact_email"}
+        items,
+        columns,
+        model=FamilyDetail,
+        key="families",
+        total=total,
+        page=page,
+        page_size=page_size,
+        always_include={"id", "contact_email"},
     )
 
 
@@ -186,7 +193,9 @@ def list_deleted_families(
 
     items = [FamilyDetail(**build_family_list_item(f, ctx, display_id="DELETED")) for f in families]
 
-    return column_filtered_page(items, columns, key="families", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=FamilyDetail, key="families", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @family_admin_router.get("/review-queue")

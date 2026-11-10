@@ -595,7 +595,9 @@ def list_admin_claims(
         for c in claims
     ]
 
-    return column_filtered_page(items, columns, key="claims", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=AdminClaim, key="claims", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 # ---------------------------------------------------------------------------

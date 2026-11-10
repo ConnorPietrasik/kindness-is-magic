@@ -117,7 +117,7 @@ def list_referrers(
     ]
 
     return column_filtered_page(
-        items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id", "email"}
+        items, columns, model=ReferrerDetail, key="referrers", total=total, page=page, page_size=page_size, always_include={"id", "email"}
     )
 
 
@@ -163,7 +163,9 @@ def list_deleted_referrers(
         ReferrerDetail(**build_referrer_detail(r, db, family_count=family_count_map.get(r.id, 0), admin_map=admin_map)) for r in referrers
     ]
 
-    return column_filtered_page(items, columns, key="referrers", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=ReferrerDetail, key="referrers", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @referrer_admin_router.get("/{ref_id}")

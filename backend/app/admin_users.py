@@ -215,7 +215,9 @@ def list_users(
 
     items = [UserDetail(**build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map)) for u in users]
 
-    return column_filtered_page(items, columns, key="users", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=UserDetail, key="users", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @user_admin_router.get("/deleted", response_model_exclude_unset=True)
@@ -261,7 +263,9 @@ def list_deleted_users(
 
     items = [UserDetail(**build_user_detail(u, db, referrer_map=referrer_map, family_map=family_map)) for u in users]
 
-    return column_filtered_page(items, columns, key="users", total=total, page=page, page_size=page_size, always_include={"id"})
+    return column_filtered_page(
+        items, columns, model=UserDetail, key="users", total=total, page=page, page_size=page_size, always_include={"id"}
+    )
 
 
 @user_admin_router.get("/{user_id}")
