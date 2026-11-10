@@ -117,7 +117,7 @@ cd /dockerx/backend && ./run_tests.sh > /tmp/test-output.txt 2>&1
 ## Validation Workflow
 
 After making code changes:
-1. Run `ruff check .` and `ruff format --check .` first (instant).
+1. Run `../.venv/bin/ruff check .` and `../.venv/bin/ruff format --check .` first (instant).
 2. If the change could affect behaviour, run the test suite (see "Running Tests").
 3. For trivial changes (typos, formatting, renames), skip tests unless asked.
 
@@ -125,11 +125,11 @@ After making code changes:
 
 - Tests in `tests/` use **pytest** + **httpx** + **pytest-xdist**. See "Running Tests" above.
 
-- Use `ruff check .` and `ruff format --check .` to validate code quality. You can also use `python3 -c "import ..."` to verify imports and basic logic.
+- Validate code quality with `../.venv/bin/ruff check .` and `../.venv/bin/ruff format --check .` — ruff is pinned in `requirements-test.txt`; a newer ruff from PATH has different default rules and reports phantom errors. You can also use `../.venv/bin/python -c "import ..."` to verify imports and basic logic (system Python lacks the project deps).
 
 ## Definition of Done
 
-- `ruff check .` and `ruff format --check .` clean
+- `../.venv/bin/ruff check .` and `../.venv/bin/ruff format --check .` clean
 - `./run_tests.sh` green
 
 
