@@ -49,7 +49,7 @@ import {
   donorToggleCartGroceries,
   getFamilyWishList,
 } from "../lib/api";
-import { CASH_CLAIM_AMOUNT_USD, CASH_CLAIM_GROCERIES_AMOUNT_USD, PAYMENT_REASSURANCE_COPY } from "../lib/constants";
+import { PAYMENT_REASSURANCE_COPY } from "../lib/constants";
 import { donorCart, donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
 import { formatApiError, formatDateTime, parseCheckoutConflictFamilyId } from "../lib/utils";
@@ -60,9 +60,9 @@ const CART_POLL_INTERVAL_MS = 15_000;
 
 type Phase = "cart" | "waiting" | "success";
 
-/** Local (uncommitted) cart line price — mirrors the backend constants. */
-function localLineTotal(includesGroceries: boolean): number {
-  return CASH_CLAIM_AMOUNT_USD + (includesGroceries ? CASH_CLAIM_GROCERIES_AMOUNT_USD : 0);
+/** Local (uncommitted) cart line price — the server-provided prices from GET /api/donor/cart, so env-overridden config prices show up. */
+function localLineTotal(claimAmountUsd: number, groceriesAmountUsd: number, includesGroceries: boolean): number {
+  return claimAmountUsd + (includesGroceries ? groceriesAmountUsd : 0);
 }
 
 /** A derived expiry is "expired" once it's in the past (hourly-sweep lag). */
@@ -140,12 +140,16 @@ export default function DonorCart() {
     }
   }, [phase, cart]);
 
-  const totalUsd = useMemo(
-    () =>
+  const totalUsd = useMemo(() => {
+    if (!cart) return 0;
+    return (
       committedItems.reduce((sum, item) => sum + item.line_total_usd, 0) +
-      localItems.reduce((sum, item) => sum + localLineTotal(item.includes_groceries), 0),
-    [committedItems, localItems]
-  );
+      localItems.reduce(
+        (sum, item) => sum + localLineTotal(cart.cash_claim_amount_usd, cart.cash_claim_groceries_amount_usd, item.includes_groceries),
+        0
+      )
+    );
+  }, [cart, committedItems, localItems]);
 
   /* ── Mutations ─────────────────────────────────────────────── */
 
@@ -240,6 +244,10 @@ export default function DonorCart() {
   }
 
   const hasItems = committedItems.length > 0 || localItems.length > 0;
+  // Server-provided live prices for the local (uncommitted) lines and the
+  // groceries labels — the cart renders nothing before `cart` has loaded.
+  const claimAmountUsd = cart.cash_claim_amount_usd;
+  const groceriesAmountUsd = cart.cash_claim_groceries_amount_usd;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -270,6 +278,8 @@ export default function DonorCart() {
                 <LocalItemRow
                   key={item.family_id}
                   item={item}
+                  claimAmountUsd={claimAmountUsd}
+                  groceriesAmountUsd={groceriesAmountUsd}
                   onRemove={() => removeFromCart(item.family_id)}
                   onToggleGroceries={setGroceries}
                 />
@@ -278,6 +288,7 @@ export default function DonorCart() {
                 <CommittedItemRow
                   key={item.claim_id}
                   item={item}
+                  groceriesAmountUsd={groceriesAmountUsd}
                   onToggleGroceries={(value) => groceriesMut.mutate({ claimId: item.claim_id, value })}
                   onRemove={() => setCancelTarget(item)}
                 />
@@ -379,10 +390,14 @@ export default function DonorCart() {
 
 function LocalItemRow({
   item,
+  claimAmountUsd,
+  groceriesAmountUsd,
   onRemove,
   onToggleGroceries,
 }: {
   item: { family_id: number; includes_groceries: boolean };
+  claimAmountUsd: number;
+  groceriesAmountUsd: number;
   onRemove: () => void;
   onToggleGroceries: (familyId: number, value: boolean) => void;
 }) {
@@ -397,7 +412,7 @@ function LocalItemRow({
   // A failed lookup (deleted / not fully approved) or a non-null claim_status
   // (claimed in the meantime) → unavailable.
   const unavailable = isError || wishList?.claim_status != null;
-  const lineTotal = localLineTotal(item.includes_groceries);
+  const lineTotal = localLineTotal(claimAmountUsd, groceriesAmountUsd, item.includes_groceries);
 
   return (
     <li className={`flex items-center gap-3 py-3 ${unavailable ? "opacity-60" : ""}`}>
@@ -424,7 +439,7 @@ function LocalItemRow({
             onChange={(e) => onToggleGroceries(item.family_id, e.target.checked)}
             className="h-4 w-4 rounded border-gray-300"
           />
-          Groceries (+${CASH_CLAIM_GROCERIES_AMOUNT_USD})
+          Groceries (+${groceriesAmountUsd})
         </label>
         <span className="w-16 text-right text-sm font-semibold text-gray-900">${lineTotal}</span>
         <button
@@ -446,10 +461,12 @@ function LocalItemRow({
 
 function CommittedItemRow({
   item,
+  groceriesAmountUsd,
   onToggleGroceries,
   onRemove,
 }: {
   item: DonorCartItem;
+  groceriesAmountUsd: number;
   onToggleGroceries: (value: boolean) => void;
   onRemove: () => void;
 }) {
@@ -486,7 +503,7 @@ function CommittedItemRow({
             onChange={(e) => onToggleGroceries(e.target.checked)}
             className="h-4 w-4 rounded border-gray-300"
           />
-          Groceries (+${CASH_CLAIM_GROCERIES_AMOUNT_USD})
+          Groceries (+${groceriesAmountUsd})
         </label>
         <span className="w-16 text-right text-sm font-semibold text-gray-900">${item.line_total_usd}</span>
         <button

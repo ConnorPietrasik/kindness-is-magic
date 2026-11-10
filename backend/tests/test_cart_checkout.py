@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.zeffy as zeffy
-from app.config import CASH_CLAIM_PAYMENT_HOURS
+from app.config import CASH_CLAIM_AMOUNT_USD, CASH_CLAIM_GROCERIES_AMOUNT_USD, CASH_CLAIM_PAYMENT_HOURS
 from app.models import (
     ClaimPaymentStatus,
     CommitmentType,
@@ -222,8 +222,19 @@ class TestGetCart:
         assert body["items"] == []
         assert body["item_count"] == 0
         assert body["total_usd"] == 0
+        assert body["cash_claim_amount_usd"] == CASH_CLAIM_AMOUNT_USD
+        assert body["cash_claim_groceries_amount_usd"] == CASH_CLAIM_GROCERIES_AMOUNT_USD
         assert body["payment_expires_at"] is None
         assert body["email_error"] is None
+
+    def test_price_fields_track_env_overrides(self, test_client: TestClient, monkeypatch):
+        """The exposed prices are read at request time from the config values the route module holds, so an env override (e.g. a live $1 test donation) re-prices the cart UI."""
+        _create_donor(test_client)
+        monkeypatch.setattr("app.donor_routes.CASH_CLAIM_AMOUNT_USD", 1)
+        monkeypatch.setattr("app.donor_routes.CASH_CLAIM_GROCERIES_AMOUNT_USD", 2)
+        body = test_client.get("/api/donor/cart").json()
+        assert body["cash_claim_amount_usd"] == 1
+        assert body["cash_claim_groceries_amount_usd"] == 2
 
     def test_committed_pending_claims_listed_with_prices_and_expiry(self, test_client: TestClient, db: Session, admin_user):
         _create_donor(test_client)

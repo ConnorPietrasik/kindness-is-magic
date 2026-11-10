@@ -1910,12 +1910,20 @@ class CartResponse(BaseModel):
     The frontend merges these committed items with the local uncommitted
     ones. ``payment_expires_at`` is the earliest expiry across items; the
     line/total prices here are the source of truth the server recompute at
-    checkout relies on.
+    checkout relies on. ``cash_claim_amount_usd`` /
+    ``cash_claim_groceries_amount_usd`` are the live per-claim prices served
+    so the frontend prices the uncommitted (local) lines from the server
+    instead of mirroring the config in build-time constants — env-overridden
+    prices (e.g. a live $1 test donation) then show up in the cart.
     """
 
     items: list[CartItem]
     item_count: int
     total_usd: int
+    # Live per-claim prices from config (env-overridable) — price of a base
+    # cash claim and of the optional groceries add-on.
+    cash_claim_amount_usd: int
+    cash_claim_groceries_amount_usd: int
     payment_expires_at: datetime | None = None
     # Set when the window's "please pay" nudge has a failed send and no
     # successful one (derived from the email log — the nudge went out on a

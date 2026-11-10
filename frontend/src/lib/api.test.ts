@@ -1,5 +1,6 @@
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DonorCart } from "../types";
 
 // We need to mock axios before importing the api module.
 // The module registers an interceptor at import time, so we capture it.
@@ -1179,7 +1180,15 @@ describe("donor cart API functions", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("donorGetCart — GET /api/donor/cart", async () => {
-    const cart = { items: [], item_count: 0, total_usd: 0, payment_expires_at: null, email_error: null };
+    const cart: DonorCart = {
+      items: [],
+      item_count: 0,
+      total_usd: 0,
+      cash_claim_amount_usd: 500,
+      cash_claim_groceries_amount_usd: 100,
+      payment_expires_at: null,
+      email_error: null,
+    };
     mockAxiosInstance.get.mockResolvedValueOnce({ data: cart });
     const result = await apiModule.donorGetCart();
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/donor/cart");

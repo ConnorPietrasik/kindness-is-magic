@@ -33,11 +33,17 @@ const committedItem: DonorCartItem = {
   payment_expires_at: "2099-12-04T00:00:00Z",
 };
 
-function cartResponse(items: DonorCartItem[], emailError: string | null = null): DonorCart {
+function cartResponse(
+  items: DonorCartItem[],
+  emailError: string | null = null,
+  prices: { amountUsd?: number; groceriesUsd?: number } = {}
+): DonorCart {
   return {
     items,
     item_count: items.length,
     total_usd: items.reduce((sum, item) => sum + item.line_total_usd, 0),
+    cash_claim_amount_usd: prices.amountUsd ?? 500,
+    cash_claim_groceries_amount_usd: prices.groceriesUsd ?? 100,
     payment_expires_at: items[0]?.payment_expires_at ?? null,
     email_error: emailError,
   };
@@ -147,6 +153,23 @@ describe("DonorCart", () => {
     expect(screen.getByText(/If your payment isn't auto-matched, no worries — an admin will match it manually/)).toBeInTheDocument();
     // No waiting-state controls yet
     expect(screen.queryByRole("button", { name: "I completed my payment" })).not.toBeInTheDocument();
+  });
+
+  it("prices local (uncommitted) items from the server, not build-time constants", async () => {
+    // Env-overridden config prices (e.g. a live $1 test donation) must flow
+    // through to the local line, the groceries label, the total, and the
+    // amount the donor is told to enter on Zeffy.
+    seedLocalCart([{ family_id: 10, includes_groceries: true }]);
+    vi.spyOn(api, "donorGetCart").mockResolvedValue(cartResponse([], null, { amountUsd: 1, groceriesUsd: 2 }));
+    vi.spyOn(api, "getFamilyWishList").mockImplementation((familyId: number) => Promise.resolve(wishList(familyId === 10 ? "3-2" : "??")));
+
+    wrap();
+
+    expect(await screen.findByText("3-2")).toBeInTheDocument();
+    // Local line ($1 + $2) and the total both render the server-priced $3
+    expect(screen.getAllByText("$3").length).toBe(2);
+    expect(screen.getByText("Groceries (+$2)")).toBeInTheDocument();
+    expect(screen.getByText(/Enter \$3 exactly/)).toBeInTheDocument();
   });
 
   it("checkout opens the Zeffy URL, clears the committed local items, and enters the waiting state", async () => {

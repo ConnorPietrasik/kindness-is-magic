@@ -46,8 +46,10 @@ from app.zeffy import ZeffyPayment
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Pricing (mirrored by the frontend constants — the server recompute at
-# checkout is the source of truth)
+# Pricing — the server recompute at checkout is the source of truth. The
+# donor cart prices lines from these values as served by GET /api/donor/cart
+# (no mirroring); the only frontend constant mirror is display-only copy on
+# the public families page (frontend/src/lib/constants.ts).
 # ---------------------------------------------------------------------------
 
 

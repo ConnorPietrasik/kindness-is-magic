@@ -15,7 +15,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import CASH_CLAIM_PAYMENT_HOURS, GIFT_CLAIM_CAP, ZEFFY_FORM_URL
+from app.config import CASH_CLAIM_AMOUNT_USD, CASH_CLAIM_GROCERIES_AMOUNT_USD, CASH_CLAIM_PAYMENT_HOURS, GIFT_CLAIM_CAP, ZEFFY_FORM_URL
 from app.column_filter import column_filtered_page
 from app.search_sort import CLAIM_SORT_FIELDS, build_sort_clause, escape_like
 from app.database import get_db, is_active_claim_race
@@ -161,9 +161,12 @@ def get_cart(
     The server half of the cart page — the frontend merges this with the
     local (uncommitted) items. Line prices use the same constants as the
     checkout recompute (the server total at checkout is the source of
-    truth). ``email_error`` is set when the window's "please pay" nudge has
-    a failed send and no successful one, so a donor who missed the email
-    isn't left guessing.
+    truth), and ``cash_claim_amount_usd`` /
+    ``cash_claim_groceries_amount_usd`` expose the live config prices so
+    the frontend prices the uncommitted lines from the server rather than
+    from mirrored build-time constants. ``email_error`` is set when the
+    window's "please pay" nudge has a failed send and no successful one,
+    so a donor who missed the email isn't left guessing.
     """
     claims = pending_cash_claims_for(db, user.id)
 
@@ -191,6 +194,8 @@ def get_cart(
         items=items,
         item_count=len(items),
         total_usd=claims_total_usd(claims),
+        cash_claim_amount_usd=CASH_CLAIM_AMOUNT_USD,
+        cash_claim_groceries_amount_usd=CASH_CLAIM_GROCERIES_AMOUNT_USD,
         payment_expires_at=cart_payment_expires_at(claims),
         email_error=email_error,
     )

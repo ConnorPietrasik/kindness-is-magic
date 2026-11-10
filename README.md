@@ -154,8 +154,12 @@ A payment can be applied by three paths, all idempotent:
 | `ZEFFY_API_BASE` | Local `zeffy-mock` only — remove for real deployments (defaults to `https://api.zeffy.com`) |
 | `ZEFFY_MIN_INTERVAL_SECONDS` | Min spacing between outbound Zeffy calls (default 3; 0 disables — mock only) |
 | `SEND_PAYMENT_CONFIRMED_EMAIL` | `false` (default) — Zeffy already emails the donor a receipt; `true` sends the app's own "payment confirmed" email on top |
+| `CASH_CLAIM_AMOUNT_USD` | Base cash-sponsorship price per family, `500` (default) |
+| `CASH_CLAIM_GROCERIES_AMOUNT_USD` | Groceries add-on price per family, `100` (default) |
 
 `.env.example` ships with the bundled **zeffy-mock** values (a mock API + donation-form page served by the dev stack at `http://localhost:8931/form` — if the dev stack runs on another machine, point `ZEFFY_FORM_URL` at that machine's host instead), so the full cash-sponsorship flow works out of the box for local dev and CI without touching the real API. For live use, replace the keys above with the real ones and remove `ZEFFY_API_BASE` / `ZEFFY_MIN_INTERVAL_SECONDS`. The backend reads these at container start — after editing, (re)start the stack (`./run-compose.sh up -d`, or `prod up -d --build` on the server).
+
+**Live $1 test donation.** To test the real payment path with the real Zeffy account before going live, set `CASH_CLAIM_AMOUNT_USD=1` (and `CASH_CLAIM_GROCERIES_AMOUNT_USD=1` if testing the groceries add-on) in `.env` and restart the stack. The donor cart reads the prices from the backend at page load, so the cart lines, the total, and the amount donors are told to enter on the Zeffy form all reflect the $1 price — remove the overrides and restart to go back to $500/$100.
 
 ## Production deployment
 

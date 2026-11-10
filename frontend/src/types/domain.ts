@@ -965,6 +965,14 @@ export interface DonorCart {
   items: DonorCartItem[];
   item_count: number;
   total_usd: number;
+  /**
+   * Live per-claim prices from the server (config, env-overridable). The cart
+   * prices its local (uncommitted) lines from these — not from build-time
+   * constants — so an overridden price (e.g. a live $1 test donation) shows
+   * in the UI instead of the stale default.
+   */
+  cash_claim_amount_usd: number;
+  cash_claim_groceries_amount_usd: number;
   /** Earliest expiry across committed items; null when there are none. */
   payment_expires_at: string | null;
   /** Set when the window's "please pay" nudge has a failed send and no successful one. */
