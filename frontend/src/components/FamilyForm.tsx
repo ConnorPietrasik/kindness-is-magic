@@ -103,7 +103,7 @@ export function FamilyForm({
           )}
           {hasReferrerMap && !referrerOptionsLoading && referrerOptions.length > 0 && (
             <FormField
-              label={isEdit ? "Referrer" : "Referrer"}
+              label="Referrer"
               as="select"
               fieldProps={{
                 value: isEdit ? String(form.referrer_id ?? 0) : String(form.referrer_id) || "",
