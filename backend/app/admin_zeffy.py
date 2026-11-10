@@ -16,6 +16,7 @@ The payment id in the path is a Zeffy UUID string, not our DB int — route
 typing differs from the sibling admin modules on purpose.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -223,7 +224,7 @@ async def match_payment(
     if not data.claim_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="claim_ids must not be empty")
 
-    payment = _fetch_zeffy_payment(payment_id)
+    payment = await asyncio.to_thread(_fetch_zeffy_payment, payment_id)
     if payment.status != "succeeded":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Payment is not succeeded (status: {payment.status})")
     if payment.campaign_id != zeffy.ZEFFY_CAMPAIGN_ID:

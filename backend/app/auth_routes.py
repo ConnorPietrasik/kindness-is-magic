@@ -1,5 +1,6 @@
 """Authentication routes: /api/auth/*"""
 
+import asyncio
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -760,7 +761,7 @@ async def register_family(
 
     user = User(
         email=data.email,
-        hashed_password=get_password_hash(data.password),
+        hashed_password=await asyncio.to_thread(get_password_hash, data.password),
         role=UserRole.family,
         display_name=default_display_name_from_email(data.email),
         family_id=family.id,
