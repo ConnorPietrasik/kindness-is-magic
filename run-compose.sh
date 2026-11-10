@@ -325,11 +325,20 @@ if [ "$1" = "clear" ]; then
 fi
 
 # Convenience: `./run-compose.sh test` runs tests and cleans up after.
+# Scoped to the test-profile services: `down` would also stop the unprofiled
+# dev stack, and `-v` would delete the shared DB volume.
 if [ "$1" = "test" ]; then
   shift
-  sudo docker compose --profile test down -v --remove-orphans 2>/dev/null
+  # Removes stale test-profile containers (e.g. from an interrupted run).
+  # Runs pre-test and on every exit path: a failed test aborts via set -e
+  # before a plain trailing cleanup would run, so the trap makes cleanup
+  # reliable.
+  cleanup() {
+    sudo docker compose --profile test rm -sf test test_db 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM
+  cleanup
   sudo docker compose --profile test run --rm test "$@"
-  sudo docker compose --profile test down -v --remove-orphans
   exit $?
 fi
 
