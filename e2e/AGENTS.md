@@ -15,7 +15,7 @@ If the stack is up, it always contains the current code. Do not waste time probi
 Run and capture output:
 
 ```bash
-cd /dockerx/kindness-is-magic/e2e && npx playwright test > /tmp/e2e-test-output.txt 2>&1
+cd /dockerx/e2e && npx playwright test > /tmp/e2e-test-output.txt 2>&1
 ```
 
 Check the exit code. `tail -1` the file for the summary; on failure, read it for tracebacks.

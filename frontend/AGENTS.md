@@ -77,7 +77,7 @@ All query keys are defined here as `as const` arrays (some as factory functions 
 Run and capture output:
 
 ```bash
-cd /dockerx/kindness-is-magic/frontend && npm run test > /tmp/frontend-test-output.txt 2>&1
+cd /dockerx/frontend && npm run test > /tmp/frontend-test-output.txt 2>&1
 ```
 
 Check the exit code. `tail -1` the file for the summary; on failure, read it for tracebacks.

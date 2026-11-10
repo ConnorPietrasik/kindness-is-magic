@@ -109,7 +109,7 @@ Run tests only via `backend/run_tests.sh` (parallel, checks the test DB is up). 
 
 Save output to a temp file, then inspect with `tail -5` (more for tracebacks):
 ```bash
-cd /dockerx/kindness-is-magic/backend && ./run_tests.sh > /tmp/test-output.txt 2>&1
+cd /dockerx/backend && ./run_tests.sh > /tmp/test-output.txt 2>&1
 ```
 
 **When running tests after changes:** iterate until tests pass. Avoid pasting full test output unless a failure needs user input. Report: final test status, pass/fail count, and a brief summary of any fixes made. If a failure requires a design decision, ask the user.
