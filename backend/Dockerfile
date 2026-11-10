@@ -22,7 +22,10 @@ CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --
 # instead of freezing the whole site; one-shot lifespan side effects are
 # guarded by a leader lock (main._try_acquire_leader_lock). Note: slowapi's
 # in-memory limits are per-process, so configured limits are effectively 2x
-# looser — acceptable at this scale. ---
+# looser — acceptable at this scale. APP_WORKERS is the single source of
+# truth for the worker count: it also sizes the per-process DB pool budget
+# in app/database.py. ---
 FROM base AS prod
+ENV APP_WORKERS=2
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${APP_WORKERS}"]

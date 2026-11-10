@@ -16,18 +16,47 @@ DATABASE_URL = os.environ.get(
 POSTGRES_DEFAULT_MAX_CONNECTIONS = 100
 
 
+def _app_worker_count() -> int:
+    """Worker count of the process group sharing the database (APP_WORKERS).
+
+    It must match the number of uvicorn workers actually running — the prod
+    image sets one value and passes it to both — so a bad value is a config
+    error to fail on at startup, not a number to guess at.
+    """
+    raw = os.environ.get("APP_WORKERS", "1")
+    try:
+        workers = int(raw)
+        if workers < 1:
+            raise ValueError
+    except ValueError:
+        raise ValueError(
+            f"APP_WORKERS must be a positive integer (got {raw!r}) — it drives both the uvicorn "
+            "worker count and the per-worker DB pool budget"
+        ) from None
+    return workers
+
+
 def _detect_pool_settings(url: str) -> tuple[int, int]:
     """Pick (pool_size, max_overflow) for this machine.
 
     The warm pool is 2 connections per CPU core (floor of 5 — Pi-friendly),
-    with burst headroom (max_overflow) equal to the pool size, clamped to the
-    server's actual max_connections (queried live) minus one connection kept
-    free for out-of-band access (psql, migrations, ...). A single uvicorn
-    process owns this pool; if you ever run N workers, budget for
-    N * (size + overflow) against max_connections.
+    with burst headroom (max_overflow) equal to the pool size, clamped to a
+    per-process budget of (max_connections - 1) // APP_WORKERS: one
+    connection kept free for out-of-band access (psql, migrations, ...), and
+    the rest divided equally across all worker processes so the whole box
+    never wants more connections than Postgres can hand out. max_connections
+    is queried live from the server.
+
+    APP_WORKERS is the worker count of the process group sharing this
+    database — set by the image (prod runs 2 workers and passes the same
+    value to uvicorn), defaulting to 1 for dev and anything run directly.
+    A bad value fails at startup (see _app_worker_count) rather than
+    silently mis-sizing the pool.
 
     Override either value with the DB_POOL_SIZE / DB_MAX_OVERFLOW env vars.
     """
+    workers = _app_worker_count()
+
     cores = os.cpu_count() or 1
     pool_size = max(5, 2 * cores)
     max_overflow = pool_size
@@ -46,7 +75,7 @@ def _detect_pool_settings(url: str) -> tuple[int, int]:
     finally:
         probe.dispose()
 
-    budget = max(1, max_connections - 1)
+    budget = max(1, (max_connections - 1) // workers)
     pool_size = min(pool_size, budget)
     max_overflow = min(max_overflow, budget - pool_size)
 
