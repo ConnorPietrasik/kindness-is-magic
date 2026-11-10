@@ -318,7 +318,7 @@ describe("validateCsvForImport", () => {
     expect(result.valid).toBe(true);
   });
 
-  it("errors when users section is missing display_name", () => {
+  it("accepts users section without the optional display_name column (backend defaults it)", () => {
     const sections = {
       users: {
         headers: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id"],
@@ -326,8 +326,43 @@ describe("validateCsvForImport", () => {
       },
     };
     const result = validateCsvForImport(sections);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("accepts the backend's minimal fixture headers (people without color, users without display_name)", () => {
+    // Mirrors backend/tests/test_csv_import.py CSV_MINIMAL — the same header
+    // sets the importer accepts must pass client-side validation too.
+    const text = `# referrers
+name,family_limit,phone_number
+Test Ref,5,555-000-0001
+
+# families
+referrer_name,family_name,family_wish,contact_name,bio,address,phone_number
+Test Ref,Test Fam,A wish,Contact,,789 Test Way,555-000-0002
+
+# people
+family_name,given_name,age,wish,size,fun_wish,role,note
+Test Fam,Alice,8,Backpack,,Doll,daughter,
+
+# users
+email,password,role,referrer_name_or_id,family_name_or_id
+user@example.com,Password123!,referrer,Test Ref,`;
+    const result = validateCsvForImport(parseCsvSections(text));
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it("still errors when a truly required column is missing (people role)", () => {
+    const sections = {
+      people: {
+        headers: ["family_name", "given_name", "age", "wish", "fun_wish", "note"],
+        rows: [["Smiths", "Alice", "8", "Bike", "Lego", ""]],
+      },
+    };
+    const result = validateCsvForImport(sections);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("display_name"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("missing columns") && e.includes('"role"'))).toBe(true);
   });
 
   it("aggregates errors across multiple sections", () => {
@@ -419,10 +454,18 @@ describe("OPTIONAL_HEADERS", () => {
     expect(Object.keys(OPTIONAL_HEADERS)).toEqual(["referrers", "families", "people", "users"]);
   });
 
-  it("marks fully_approved as the only optional column (in families)", () => {
-    expect(OPTIONAL_HEADERS.families).toEqual(["fully_approved"]);
-    expect(OPTIONAL_HEADERS.referrers).toEqual([]);
-    expect(OPTIONAL_HEADERS.people).toEqual([]);
-    expect(OPTIONAL_HEADERS.users).toEqual([]);
+  it("matches the columns the backend reads via rec.get with an empty-string default", () => {
+    expect(OPTIONAL_HEADERS.referrers).toEqual(["phone_number"]);
+    expect(OPTIONAL_HEADERS.families).toEqual(["referrer_name", "bio", "fully_approved"]);
+    expect(OPTIONAL_HEADERS.people).toEqual(["size", "color", "fun_wish", "note"]);
+    expect(OPTIONAL_HEADERS.users).toEqual(["referrer_name_or_id", "family_name_or_id", "display_name"]);
+  });
+
+  it("keeps every optional column present in the expected headers of its section", () => {
+    for (const section of KNOWN_SECTIONS) {
+      for (const optional of OPTIONAL_HEADERS[section]) {
+        expect(EXPECTED_HEADERS[section]).toContain(optional);
+      }
+    }
   });
 });

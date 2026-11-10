@@ -95,7 +95,7 @@ describe("CsvUpload", () => {
     uploadFile(container, makeCsvFile(INVALID_CSV));
 
     // The validation error is shown and the import button is disabled
-    expect(await screen.findByText('Section "referrers" is missing columns: "family_limit", "phone_number".')).toBeInTheDocument();
+    expect(await screen.findByText('Section "referrers" is missing columns: "family_limit".')).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import CSV" })).toBeDisabled();
     expect(importSpy).not.toHaveBeenCalled();
   });

@@ -23,12 +23,21 @@ export const EXPECTED_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly 
   users: ["email", "password", "role", "referrer_name_or_id", "family_name_or_id", "display_name"],
 };
 
-/** Columns the backend treats as optional — their absence is not an error. */
+/**
+ * Columns the backend treats as optional — a missing column is not an error
+ * (the backend reads every cell via `rec.get(field, "")`).
+ *
+ * A few of these are conditionally required *per row* — people's `fun_wish`
+ * for under-18s, and users' `referrer_name_or_id` / `family_name_or_id` for
+ * referrer / family users. The backend reports those as per-row errors
+ * rather than rejecting the file, so a missing column must still not block
+ * the upload.
+ */
 export const OPTIONAL_HEADERS: Record<(typeof KNOWN_SECTIONS)[number], readonly string[]> = {
-  referrers: [],
-  families: ["fully_approved"],
-  people: [],
-  users: [],
+  referrers: ["phone_number"],
+  families: ["referrer_name", "bio", "fully_approved"],
+  people: ["size", "color", "fun_wish", "note"],
+  users: ["referrer_name_or_id", "family_name_or_id", "display_name"],
 };
 
 /** Regex that matches a section header line (e.g. `# referrers`). */
