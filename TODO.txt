@@ -1,3 +1,4 @@
+Change logo colors for wish cards
 Add a "send reminder" button to email invited referrers
 Gift-claims should have a "$100 Walmart gift card for Christmas dinner" optional
 Automated failure checks and admin emails

@@ -337,7 +337,7 @@ def reset_sent_emails(
     they simply no longer count toward the limits.
     """
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
-    referrer_user = db.query(User).filter(User.referrer_id == ref.id).first()
+    referrer_user = db.query(User).filter(User.referrer_id == ref.id, User.deleted_at.is_(None)).first()
     reset_count = 0
     if referrer_user:
         reset_count = (
