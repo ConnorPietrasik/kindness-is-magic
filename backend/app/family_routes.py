@@ -89,7 +89,7 @@ def request_review(
     if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot request review at current lock level.",
+            detail="Your wish list has been reviewed and is now locked. Contact your referrer if you need changes.",
         )
     if fam.wish_review_requested_at is not None:
         raise HTTPException(
@@ -117,7 +117,7 @@ def cancel_review(
     if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot cancel review at current lock level.",
+            detail="Your wish list is now locked. Contact your referrer if you need changes.",
         )
     if fam.wish_review_requested_at is None:
         raise HTTPException(

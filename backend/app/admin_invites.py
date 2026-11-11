@@ -175,7 +175,7 @@ def revoke_invite(
     invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
 
     if invite.redeemed_by_user_id is not None:
-        raise HTTPException(status_code=400, detail="Cannot revoke an already-redeemed invite")
+        raise HTTPException(status_code=400, detail="This invite has already been used and can't be revoked")
 
     invite.expires_at = datetime.now(timezone.utc)
     db.commit()
@@ -205,7 +205,7 @@ def extend_invite(
     invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
 
     if invite.redeemed_by_user_id is not None:
-        raise HTTPException(status_code=400, detail="Cannot extend an already-redeemed invite")
+        raise HTTPException(status_code=400, detail="This invite has already been used and can't be extended")
 
     invite.expires_at = datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)
     db.commit()

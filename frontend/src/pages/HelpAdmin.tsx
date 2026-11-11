@@ -355,7 +355,7 @@ export default function HelpAdmin() {
                 </li>
                 <li>
                   <strong>Gift drop-off</strong>: the date donors stop being able to start gift sponsorships. Enforced mode blocks new gift
-                  claims.
+                  sponsorships.
                 </li>
               </ul>
               <h3>Display, reminders, enforced</h3>

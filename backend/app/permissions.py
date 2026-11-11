@@ -165,7 +165,7 @@ def require_family_owner(
     if fam_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing family id path parameter",
+            detail="Missing family id",
         )
 
     fam = db.get(Family, int(fam_id))
@@ -220,7 +220,7 @@ def require_person_owner(
     if per_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing per_id path parameter",
+            detail="Missing person id",
         )
 
     # Use joinedload to get Family in the same query — avoids the separate Family lookup

@@ -140,13 +140,13 @@ def decode_access_token(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
+            detail="Your session has expired. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
+            detail="Your session is no longer valid. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -161,13 +161,13 @@ def decode_refresh_token(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token expired",
+            detail="Your session has expired. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail="Your session is no longer valid. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -226,7 +226,7 @@ async def get_current_user(
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Please log in again.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 

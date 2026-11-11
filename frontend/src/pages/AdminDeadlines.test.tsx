@@ -99,7 +99,7 @@ describe("AdminDeadlines", () => {
     await user.selectOptions(screen.getByLabelText("Type"), "gift_dropoff");
     expect(labelInput).toHaveValue("Gift drop-off");
     // The enforced hint follows the selected type
-    expect(screen.getByText(/Enforced blocks new gift claims/)).toBeInTheDocument();
+    expect(screen.getByText(/Enforced blocks new gift sponsorships/)).toBeInTheDocument();
   });
 
   it("create sends the right POST (type, label, date-only due date, mode)", async () => {

@@ -414,7 +414,7 @@ function ClaimActionsMenu({ claim, isOwner, isAdmin }: { claim: FamilyClaimDetai
             ) : (
               <div className="mb-3">
                 <span className="mb-1 block text-sm font-medium text-gray-700">Commitment Type</span>
-                <p className="text-sm text-gray-500">{commitmentValue} — locked once the claim is paid.</p>
+                <p className="text-sm text-gray-500">{commitmentValue} — locked once the sponsorship is paid.</p>
               </div>
             )}
 

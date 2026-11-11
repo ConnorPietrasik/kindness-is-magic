@@ -146,13 +146,13 @@ describe("AdminDeliverySlips", () => {
 
   it("shows error state with API detail on failure", async () => {
     const error = new Error("Request failed with status code 400") as Error & { response?: { data?: { detail?: string } } };
-    error.response = { data: { detail: "Invalid scope parameter" } };
+    error.response = { data: { detail: "scope must be one of: all, assigned, unassigned" } };
     vi.spyOn(api, "adminGetDeliverySlips").mockRejectedValue(error);
 
     wrap(<AdminDeliverySlips />);
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid scope parameter")).toBeInTheDocument();
+      expect(screen.getByText("scope must be one of: all, assigned, unassigned")).toBeInTheDocument();
     });
   });
 

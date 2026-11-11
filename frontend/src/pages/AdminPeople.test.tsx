@@ -132,7 +132,7 @@ function mockListApis() {
 /** Builds the error shape the restore-person endpoint returns when the family is deleted. */
 function makeFamilyDeletedError() {
   const error = new Error("400 Bad Request") as Error & { response?: { data?: { detail?: string } } };
-  error.response = { data: { detail: "family_deleted" } };
+  error.response = { data: { detail: "The person's family has already been deleted — restore the family first." } };
   return error;
 }
 
@@ -377,7 +377,7 @@ describe("AdminPeople", () => {
 
     await user.click(screen.getByRole("button", { name: "Yes, restore" }));
 
-    // The person restore fails with family_deleted → family restore dialog appears
+    // The person restore fails because the family is deleted → family restore dialog appears
     await waitFor(() => {
       expect(screen.getByText(/Family is deleted/)).toBeInTheDocument();
     });

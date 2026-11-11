@@ -1342,7 +1342,7 @@ class TestPatchWish:
         w = family_wish(db, wish_tree)
         resp = test_client.patch(f"/api/admin/wishes/{w.id}", json={"type": "fun"})
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "Family wish type cannot be changed"
+        assert resp.json()["detail"] == "The type of a family wish can't be changed."
         assert w.type == WishType.family
 
     def test_set_assigned_to_id(self, test_client, admin_user, wish_tree):
@@ -1421,7 +1421,7 @@ class TestPatchWish:
             json={"assigned_to_id": referrer_user.id},
         )
         assert resp.status_code == 400
-        assert "soft-deleted" in resp.json()["detail"]
+        assert "already been deleted" in resp.json()["detail"]
 
     def test_set_purchased_at(self, test_client, admin_user, wish_tree):
         """Set purchased_at."""
@@ -1849,7 +1849,7 @@ class TestBatchAssign:
             json={"wish_ids": [wish_tree["wishes"][0].id], "assigned_to_id": referrer_user.id},
         )
         assert resp.status_code == 400
-        assert "soft-deleted" in resp.json()["detail"]
+        assert "already been deleted" in resp.json()["detail"]
 
     def test_single_wish(self, test_client, admin_user, wish_tree):
         """Batch assign with a single wish."""

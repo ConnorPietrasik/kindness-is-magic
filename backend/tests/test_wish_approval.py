@@ -223,6 +223,15 @@ class TestFamilyRequestCancelReview:
         resp = test_client.post("/api/family/me/cancel-review")
         assert resp.status_code == 400
 
+    def test_cannot_cancel_review_when_locked(self, test_client, family_user, family, db):
+        family.wish_lock_level = "referrer"
+        db.commit()
+        _login(test_client, family_user.email, "FamPass1234!")
+        resp = test_client.post("/api/family/me/cancel-review")
+        assert resp.status_code == 400
+        assert "now locked" in resp.json()["detail"]
+        assert "Contact your referrer" in resp.json()["detail"]
+
     def test_request_review_clears_stale_rejection(self, test_client, family_user, family, db):
         family.wish_rejection_reason = "Old reason"
         db.commit()
@@ -334,6 +343,28 @@ class TestReferrerApproveReject:
         assert data["wish_lock_level"] == "referrer"
         assert data["wish_review_requested_at"] is not None
 
+    def test_referrer_cannot_approve_when_fully_approved(self, test_client, referrer_user, family, db):
+        family.wish_lock_level = "admin"
+        db.commit()
+        _login(test_client, referrer_user.email, "RefPass1234!")
+        resp = test_client.post(f"/api/referrer/families/{family.id}/approve-wishes")
+        assert resp.status_code == 400
+        assert "already been approved" in resp.json()["detail"]
+        assert "Contact an admin" in resp.json()["detail"]
+
+    def test_referrer_cannot_reject_when_submitted(self, test_client, referrer_user, family, db):
+        family.wish_lock_level = "referrer"
+        family.wish_review_requested_at = datetime.now(timezone.utc)
+        db.commit()
+        _login(test_client, referrer_user.email, "RefPass1234!")
+        resp = test_client.post(
+            f"/api/referrer/families/{family.id}/reject-wishes",
+            json={"reason": "Wishes need more detail"},
+        )
+        assert resp.status_code == 400
+        assert "can no longer be rejected" in resp.json()["detail"]
+        assert "Contact an admin" in resp.json()["detail"]
+
 
 # ---------------------------------------------------------------------------
 # 4. Admin approve/reject
@@ -387,6 +418,30 @@ class TestAdminApproveReject:
         _login(test_client, admin.email, "AdminPass123!")
         resp = test_client.post(f"/api/admin/families/{family.id}/approve-wishes")
         assert resp.status_code == 400
+
+    def test_admin_cannot_reject_unsubmitted_wishes(self, test_client, admin, family, db):
+        """Rejecting at lock=family: the referrer hasn't approved yet (admins may
+        still fully approve directly, so no referrer-first guidance)."""
+        family.wish_lock_level = "family"
+        db.commit()
+        _login(test_client, admin.email, "AdminPass123!")
+        resp = test_client.post(
+            f"/api/admin/families/{family.id}/reject-wishes",
+            json={"reason": "Please add more details"},
+        )
+        assert resp.status_code == 400
+        assert "haven't been approved by a referrer yet" in resp.json()["detail"]
+
+    def test_admin_cannot_reject_fully_approved_wishes(self, test_client, admin, family, db):
+        family.wish_lock_level = "admin"
+        db.commit()
+        _login(test_client, admin.email, "AdminPass123!")
+        resp = test_client.post(
+            f"/api/admin/families/{family.id}/reject-wishes",
+            json={"reason": "Please add more details"},
+        )
+        assert resp.status_code == 400
+        assert "already fully approved" in resp.json()["detail"]
 
     def test_fully_approved_family_appears_in_packing_slips(self, test_client, admin, family, person_in_family, db):
         """A fully-approved family shows up in packing slips."""

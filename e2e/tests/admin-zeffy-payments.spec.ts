@@ -228,18 +228,18 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       await expect(group).toContainText("$500");
 
       // Select the exact claim → the amount hint turns green
-      await page.getByLabel(new RegExp(`Match claim ${data.claim1Id} \\(family`)).check();
+      await page.getByLabel(new RegExp(`Match sponsorship ${data.claim1Id} \\(family`)).check();
       await expect(page.getByText("Selected total matches the payment amount.")).toBeVisible();
 
       await page.getByRole("button", { name: "Confirm match" }).click();
-      await expect(page.getByRole("alert").filter({ hasText: "Payment matched to 1 claim" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("alert").filter({ hasText: "Payment matched to 1 sponsorship" })).toBeVisible({ timeout: 10_000 });
 
       // Matched rows are hidden by the unmatched-only default filter…
       await expect(row1).toHaveCount(0);
       // …and revealed by the toggle, with the claim link and no match button
       await page.getByLabel("Show matched").check();
       await expect(row1).toContainText("Matched", { timeout: 10_000 });
-      await expect(row1.getByRole("link", { name: `claim ${data.claim1Id}` })).toBeVisible();
+      await expect(row1.getByRole("link", { name: `Sponsorship ${data.claim1Id}` })).toBeVisible();
       await expect(row1.getByRole("button", { name: "Match manually" })).toHaveCount(0);
       // …and stay hidden after a reload with the toggle off
       await page.reload();
@@ -287,10 +287,10 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
         const row = page.locator("tr").filter({ hasText: data.d2!.email }).filter({ hasText: "$500.00" });
         await expect(row.getByRole("button", { name: "Match manually" })).toBeVisible({ timeout: 10_000 });
         await row.getByRole("button", { name: "Match manually" }).click();
-        await page.getByLabel(new RegExp(`Match claim ${data.claim2Id} \\(family`)).check({ timeout: 10_000 });
+        await page.getByLabel(new RegExp(`Match sponsorship ${data.claim2Id} \\(family`)).check({ timeout: 10_000 });
         await expect(page.getByText("Selected total matches the payment amount.")).toBeVisible();
         await page.getByRole("button", { name: "Confirm match" }).click();
-        await expect(page.getByRole("alert").filter({ hasText: "Payment matched to 1 claim" })).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByRole("alert").filter({ hasText: "Payment matched to 1 sponsorship" })).toBeVisible({ timeout: 10_000 });
       } finally {
         await context.close();
       }
@@ -331,7 +331,7 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       // back to unmatched (visible again without the toggle).
       await row1.getByRole("button", { name: "Unmatch" }).click();
       await page.getByRole("button", { name: "Yes, unmatch" }).click();
-      await expect(page.getByRole("alert").filter({ hasText: "Payment unmatched — 1 claim back to pending" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("alert").filter({ hasText: "Payment unmatched — 1 sponsorship back to pending" })).toBeVisible({ timeout: 10_000 });
 
       await page.getByLabel("Show matched").uncheck();
       await expect(page.locator("tr").filter({ hasText: data.d1!.email }).filter({ hasText: "$500.00" })).toContainText("Unmatched", {

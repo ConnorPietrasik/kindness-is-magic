@@ -143,7 +143,7 @@ test.describe("Authentication", () => {
     /* Browser cookie jars are shared across tabs: two tabs whose access
      * tokens just expired both fire /refresh with the same pre-rotation
      * refresh token. Without the grace window, the loser of the race gets
-     * 401 "revoked" and is logged out. Both must succeed. */
+     * 401 (session ended) and is logged out. Both must succeed. */
     const loginCtx = await playwrightRequest.newContext({ baseURL: getBaseUrl() });
     const login = await loginCtx.post("/api/auth/login", {
       data: { email: getAdminEmail(), password: getAdminPassword() },

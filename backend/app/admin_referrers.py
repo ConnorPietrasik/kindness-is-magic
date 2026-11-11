@@ -234,7 +234,7 @@ def restore_referrer(
     """
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
     if ref.deleted_at is None:
-        raise HTTPException(status_code=400, detail="Referrer is not deleted")
+        raise HTTPException(status_code=400, detail="Referrer hasn't been deleted")
     ref.deleted_at = None
     db.query(User).filter(User.referrer_id == ref_id, User.deleted_at.isnot(None)).update(
         {User.deleted_at: None}, synchronize_session=False

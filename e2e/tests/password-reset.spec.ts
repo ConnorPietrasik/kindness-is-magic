@@ -35,7 +35,7 @@ test.describe("Password reset", () => {
     await page.getByRole("button", { name: "Set password" }).click();
 
     /* Should show error */
-    await expect(page.getByText("Invalid or expired reset token")).toBeVisible({
+    await expect(page.getByText("That reset link is invalid or has expired")).toBeVisible({
       timeout: 10_000,
     });
   });

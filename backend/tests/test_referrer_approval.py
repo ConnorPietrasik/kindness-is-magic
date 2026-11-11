@@ -745,7 +745,7 @@ class TestAdminInviteCRUD:
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/invites/{token.id}/revoke")
         assert resp.status_code == 400
-        assert "redeemed" in resp.json()["detail"].lower()
+        assert "already been used" in resp.json()["detail"].lower()
 
     def test_revoke_nonexistent_invite(self, test_client: TestClient, admin_user):
         """Revoke non-existent invite returns 404."""
@@ -1004,7 +1004,7 @@ class TestAdminInviteCRUD:
         _admin_login(test_client)
         resp = test_client.post(f"/api/admin/invites/{token.id}/extend")
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "Cannot extend an already-redeemed invite"
+        assert resp.json()["detail"] == "This invite has already been used and can't be extended"
 
         db.refresh(token)
         assert token.expires_at == original_expiry
@@ -1070,4 +1070,4 @@ class TestAdminInviteCRUD:
         _admin_login(test_client)  # self-register auto-logs-in as the new referrer
         resp = test_client.post(f"/api/admin/invites/{live_token.id}/revoke")
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "Cannot revoke an already-redeemed invite"
+        assert resp.json()["detail"] == "This invite has already been used and can't be revoked"

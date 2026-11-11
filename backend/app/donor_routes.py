@@ -931,7 +931,8 @@ def restore_claim(
     taken = db.query(FamilyClaim.id).filter(FamilyClaim.family_id == claim.family_id, FamilyClaim.deleted_at.is_(None)).first()
     if taken is not None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="This family has been sponsored again — the cancelled claim cannot be restored"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This family has been sponsored again — the cancelled sponsorship cannot be restored",
         )
 
     claim.deleted_at = None

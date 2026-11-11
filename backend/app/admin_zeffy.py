@@ -222,17 +222,19 @@ async def match_payment(
     exactly the matched claims (a re-match after unmatch re-emails).
     """
     if not data.claim_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="claim_ids must not be empty")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Select at least one sponsorship")
 
     payment = await asyncio.to_thread(_fetch_zeffy_payment, payment_id)
     if payment.status != "succeeded":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Payment is not succeeded (status: {payment.status})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"This payment hasn't completed yet (status: {payment.status})")
     if payment.campaign_id != zeffy.ZEFFY_CAMPAIGN_ID:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is not on the dedicated sponsorship campaign")
 
     already = db.query(FamilyClaim.id).filter(FamilyClaim.zeffy_payment_id == payment_id, FamilyClaim.deleted_at.is_(None)).first()
     if already is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is already matched to claims — unmatch first")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="This payment is already matched to sponsorships — unmatch it first"
+        )
 
     requested = set(data.claim_ids)
     claims = (
@@ -248,14 +250,16 @@ async def match_payment(
     if len(claims) != len(requested):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="All claim_ids must be active, unpaid cash claims",
+            detail="All selected sponsorships must be active, unpaid cash sponsorships",
         )
 
     applied = await apply_payment_to_claims(db, claims, payment)
     if not applied:
         # A concurrent apply stored the same payment id between the check
         # and the write — identical state, report it as already matched.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is already matched to claims — unmatch first")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="This payment is already matched to sponsorships — unmatch it first"
+        )
 
     families = [c.family for c in claims]
     family_info_map = batch_build_family_info(db, families)
@@ -288,13 +292,13 @@ def unmatch_payment(
         .all()
     )
     if not claims:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No claims store this payment id")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No sponsorship is linked to this payment")
 
     for claim in claims:
         if claim.fulfilled_at is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Claim {claim.id} is fulfilled — unmatch cannot undo fulfillment",
+                detail=f"Sponsorship {claim.id} is already fulfilled — unmatching the payment won't undo that",
             )
 
     now = datetime.now(timezone.utc)

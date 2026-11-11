@@ -293,11 +293,11 @@ def create_user(
     if body.referrer_id is not None:
         ref = get_or_404(db, Referrer, body.referrer_id, "Referrer not found")
         if ref.deleted_at is not None:
-            raise HTTPException(status_code=422, detail="Referrer is soft-deleted")
+            raise HTTPException(status_code=422, detail="Referrer has already been deleted")
     if body.family_id is not None:
         fam = get_or_404(db, Family, body.family_id, "Family not found")
         if fam.deleted_at is not None:
-            raise HTTPException(status_code=422, detail="Family is soft-deleted")
+            raise HTTPException(status_code=422, detail="Family has already been deleted")
 
     # Check for duplicate email
     existing = db.query(User).filter(User.email == body.email).first()
@@ -358,11 +358,11 @@ def update_user(
     if new_referrer_id is not None:
         ref = get_or_404(db, Referrer, new_referrer_id, "Referrer not found")
         if ref.deleted_at is not None:
-            raise HTTPException(status_code=422, detail="Referrer is soft-deleted")
+            raise HTTPException(status_code=422, detail="Referrer has already been deleted")
     if new_family_id is not None:
         fam = get_or_404(db, Family, new_family_id, "Family not found")
         if fam.deleted_at is not None:
-            raise HTTPException(status_code=422, detail="Family is soft-deleted")
+            raise HTTPException(status_code=422, detail="Family has already been deleted")
 
     partial_update(user, body)
     db.commit()
@@ -379,7 +379,7 @@ def restore_user(
 ) -> UserDetail:
     user = get_or_404(db, User, user_id, "User not found")
     if user.deleted_at is None:
-        raise HTTPException(status_code=400, detail="User is not deleted")
+        raise HTTPException(status_code=400, detail="User hasn't been deleted")
     user.deleted_at = None
     db.commit()
     db.refresh(user)

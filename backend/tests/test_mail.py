@@ -600,7 +600,7 @@ class TestUnsubscribeEndpoint:
     def test_get_invalid_token(self, test_client: TestClient):
         resp = test_client.get("/api/auth/unsubscribe?token=invalid-token-value")
         assert resp.status_code == 400
-        assert "invalid" in resp.json()["detail"].lower() or "malformed" in resp.json()["detail"].lower()
+        assert "no longer valid" in resp.json()["detail"]
 
     def test_get_missing_token(self, test_client: TestClient):
         resp = test_client.get("/api/auth/unsubscribe")

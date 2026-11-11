@@ -904,6 +904,7 @@ class TestReferrerVerifyFamily:
         fam = referrer_with_full_tree["family"]
         resp = test_client.post(f"/api/referrer/families/{fam.id}/verify")
         assert resp.status_code == 400
+        assert "already been reviewed" in resp.json()["detail"]
 
     def test_400_cannot_verify_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         from app.models import FamilyVerificationStatus
@@ -1148,6 +1149,7 @@ class TestReferrerRejectFamily:
         fam = referrer_with_full_tree["family"]
         resp = test_client.post(f"/api/referrer/families/{fam.id}/reject")
         assert resp.status_code == 400
+        assert "already been reviewed" in resp.json()["detail"]
 
     def test_400_cannot_reject_already_rejected(self, test_client: TestClient, referrer_with_full_tree, db: Session):
         from app.models import FamilyVerificationStatus

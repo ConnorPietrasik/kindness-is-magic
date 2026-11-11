@@ -770,7 +770,7 @@ class TestAdminResetPassword:
         test_client.cookies.set("refresh_token", refresh_before)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
-        assert "revoked" in resp.json()["detail"].lower()
+        assert "session has ended" in resp.json()["detail"].lower()
 
     def test_404_reset_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)

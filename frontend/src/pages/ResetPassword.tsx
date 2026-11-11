@@ -33,7 +33,7 @@ export default function ResetPassword() {
     } catch (err: unknown) {
       toast.error(
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          "Reset failed. The token may be invalid or expired."
+          "Reset failed. The link may be invalid or expired."
       );
     } finally {
       setLoading(false);

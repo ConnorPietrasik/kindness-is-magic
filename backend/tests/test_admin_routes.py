@@ -1050,7 +1050,7 @@ class TestAdminUpdatePerson:
         db.commit()
         resp = test_client.post(f"/api/admin/people/{person.id}/restore")
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "family_deleted"
+        assert resp.json()["detail"] == "The person's family has already been deleted — restore the family first."
 
     def test_200_null_unchanges_nullable_field(self, test_client: TestClient, admin_user, family_with_people):
         """Sending null for a nullable field should leave it unchanged."""

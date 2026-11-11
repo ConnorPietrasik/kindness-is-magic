@@ -137,7 +137,7 @@ class TestRefreshToken:
         with pytest.raises(HTTPException) as exc_info:
             decode_refresh_token(access)
         assert exc_info.value.status_code == 401
-        assert "refresh" in exc_info.value.detail.lower()
+        assert "session" in exc_info.value.detail.lower()
 
     def test_expired_refresh_token_raises_401(self):
         from fastapi import HTTPException

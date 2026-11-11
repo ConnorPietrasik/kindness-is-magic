@@ -293,7 +293,7 @@ describe("DonorClaimDetail", () => {
 
     await screen.findByText("Edit Sponsorship Details");
     expect(screen.queryByLabelText("Commitment Type")).not.toBeInTheDocument();
-    expect(screen.getByText(/locked once the claim is paid/)).toBeInTheDocument();
+    expect(screen.getByText(/locked once the sponsorship is paid/)).toBeInTheDocument();
   });
 
   it("renders the claim details for the owner", async () => {

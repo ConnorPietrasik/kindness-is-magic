@@ -62,7 +62,9 @@ export default function AdminZeffyPayments() {
   const unmatchMut = useMutation({
     mutationFn: (paymentId: string) => adminUnmatchZeffyPayment(paymentId),
     onSuccess: (result) => {
-      toast.success(`Payment unmatched — ${result.claim_ids.length} ${result.claim_ids.length === 1 ? "claim" : "claims"} back to pending`);
+      toast.success(
+        `Payment unmatched — ${result.claim_ids.length} ${result.claim_ids.length === 1 ? "sponsorship" : "sponsorships"} back to pending`
+      );
       setUnmatchTarget(null);
       // The payment flips to unmatched (list) and the claims re-enter the
       // pending pool (match-modal data) — invalidate both.
@@ -217,7 +219,7 @@ export default function AdminZeffyPayments() {
                                   to={route.donorClaimDetail(claimId)}
                                   className="text-xs font-medium text-btn-start hover:underline"
                                 >
-                                  claim {claimId}
+                                  Sponsorship {claimId}
                                 </Link>
                               ))}
                             </div>
@@ -278,8 +280,8 @@ export default function AdminZeffyPayments() {
         description={
           unmatchTarget
             ? `The ${unmatchTarget.claim_ids.length} matched ${
-                unmatchTarget.claim_ids.length === 1 ? "claim" : "claims"
-              } go back to pending with a fresh ${CASH_CLAIM_PAYMENT_HOURS}-hour payment window. Use this to correct a wrong match, then re-match the payment to the right claims.`
+                unmatchTarget.claim_ids.length === 1 ? "sponsorship" : "sponsorships"
+              } go back to pending with a fresh ${CASH_CLAIM_PAYMENT_HOURS}-hour payment window. Use this to correct a wrong match, then re-match the payment to the right sponsorships.`
             : undefined
         }
         onConfirm={() => {
@@ -314,7 +316,7 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
   const matchMut = useMutation({
     mutationFn: (claimIds: number[]) => adminMatchZeffyPayment(payment.id, claimIds),
     onSuccess: (_result, claimIds) => {
-      toast.success(`Payment matched to ${claimIds.length} ${claimIds.length === 1 ? "claim" : "claims"}`);
+      toast.success(`Payment matched to ${claimIds.length} ${claimIds.length === 1 ? "sponsorship" : "sponsorships"}`);
       onMatched();
       void queryClient.invalidateQueries({ queryKey: adminZeffyPendingClaims });
       onClose();
@@ -358,9 +360,9 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
           {isLoading && <PageSpinner />}
-          {isError && <p className="text-sm text-red-600">{formatApiError(error, "Could not load pending claims.")}</p>}
+          {isError && <p className="text-sm text-red-600">{formatApiError(error, "Could not load pending sponsorships.")}</p>}
           {!isLoading && !isError && (data?.donors.length ?? 0) === 0 && (
-            <p className="text-sm text-gray-500">No pending cash claims to match.</p>
+            <p className="text-sm text-gray-500">No pending cash sponsorships to match.</p>
           )}
 
           {(data?.donors ?? []).map((donor) => {
@@ -381,7 +383,7 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
                     <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700">
                       <input
                         type="checkbox"
-                        aria-label={`Select all claims for ${donor.donor_email}`}
+                        aria-label={`Select all sponsorships for ${donor.donor_email}`}
                         checked={allSelected}
                         onChange={(e) => selectDonorClaims(donorClaimIds, e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300"
@@ -397,7 +399,7 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
                       <label className="flex min-w-0 items-center gap-2">
                         <input
                           type="checkbox"
-                          aria-label={`Match claim ${claim.claim_id} (family ${claim.family.display_id})`}
+                          aria-label={`Match sponsorship ${claim.claim_id} (family ${claim.family.display_id})`}
                           checked={selected.has(claim.claim_id)}
                           onChange={() => toggleClaim(claim.claim_id)}
                           className="h-4 w-4 shrink-0 rounded border-gray-300"

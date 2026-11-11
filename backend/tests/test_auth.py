@@ -266,7 +266,7 @@ class TestChangePassword:
             },
         )
         assert resp.status_code == 400
-        assert "Invalid or expired" in resp.json()["detail"]
+        assert "reset link is invalid or has expired" in resp.json()["detail"]
 
     def test_change_password_invalidates_refresh_tokens(self, test_client: TestClient, admin_user):
         """A password change should invalidate all active refresh tokens,
@@ -288,7 +288,7 @@ class TestChangePassword:
         test_client.cookies.set("refresh_token", refresh_before)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
-        assert "revoked" in resp.json()["detail"].lower()
+        assert "session has ended" in resp.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -506,7 +506,7 @@ class TestResetPassword:
             },
         )
         assert resp.status_code == 400
-        assert "Invalid or expired" in resp.json()["detail"]
+        assert "reset link is invalid or has expired" in resp.json()["detail"]
 
     def test_reset_password_expired_token(self, test_client: TestClient, admin_user, db: Session):
         from app.models import PasswordResetToken
@@ -708,7 +708,7 @@ class TestRefresh:
         test_client.cookies.set("refresh_token", old_refresh)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
-        assert "revoked" in resp.json()["detail"].lower()
+        assert "session has ended" in resp.json()["detail"].lower()
 
     def test_refresh_after_logout_fails(self, test_client: TestClient, admin_user):
         """A refresh token extracted before logout cannot be used after logout."""
@@ -721,7 +721,7 @@ class TestRefresh:
         test_client.cookies.set("refresh_token", refresh_before_logout)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
-        assert "revoked" in resp.json()["detail"].lower()
+        assert "session has ended" in resp.json()["detail"].lower()
 
     def test_logout_invalidates_pre_rotation_token(self, test_client: TestClient, admin_user):
         """Logout must also kill the grace window: after rotating and then
@@ -743,7 +743,7 @@ class TestRefresh:
         test_client.cookies.set("refresh_token", old_refresh)
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
-        assert "revoked" in resp.json()["detail"].lower()
+        assert "session has ended" in resp.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------

@@ -75,7 +75,7 @@ def _validate_assign_target(db: Session, user_id: int) -> None:
     if target_user is None:
         raise HTTPException(status_code=400, detail="Assigned user not found")
     if target_user.deleted_at is not None:
-        raise HTTPException(status_code=400, detail="Assigned user is soft-deleted")
+        raise HTTPException(status_code=400, detail="The assigned user has already been deleted")
     if target_user.role not in (UserRole.admin, UserRole.purchaser):
         raise HTTPException(status_code=400, detail="User is not an admin or purchaser")
 
@@ -449,7 +449,7 @@ def update_wish(
     if body.type is not None and body.type != wish.type:
         if person is None:
             # Type is fixed per owner — family wishes can't change type
-            raise HTTPException(status_code=400, detail="Family wish type cannot be changed")
+            raise HTTPException(status_code=400, detail="The type of a family wish can't be changed.")
         valid_types = _get_valid_wish_types_for_age(person.age)
         if body.type not in valid_types:
             raise HTTPException(

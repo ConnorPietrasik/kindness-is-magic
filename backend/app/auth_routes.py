@@ -80,8 +80,8 @@ def _issue_session(response: Response, user: User, db: Session) -> None:
 
     The refresh-token row is only flushed — the caller MUST ``db.commit()``
     afterwards, or the row is rolled back at the end of the request and
-    /refresh answers 401 "revoked" (the cookie exists but the server has
-    no record of the token).
+    /refresh answers 401 "Your session has ended. Please log in again."
+    (the cookie exists but the server has no record of the token).
     """
     # The access log middleware correlates log lines with the acting user via
     # ``sub`` (see log_request_middleware in main.py). No email in the token
@@ -142,14 +142,14 @@ def _decode_unsubscribe_token(token: str) -> str:
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=400, detail="This unsubscribe link has expired")
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+        raise HTTPException(status_code=400, detail="This unsubscribe link is no longer valid")
 
     if payload.get("type") != "unsubscribe":
-        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+        raise HTTPException(status_code=400, detail="This unsubscribe link is no longer valid")
 
     email: str | None = payload.get("email")
     if not email or not isinstance(email, str):
-        raise HTTPException(status_code=400, detail="Invalid or malformed unsubscribe token")
+        raise HTTPException(status_code=400, detail="This unsubscribe link is no longer valid")
     return email.strip().lower()
 
 
@@ -328,12 +328,12 @@ def refresh(
     within REFRESH_ROTATION_GRACE_SECONDS of the rotation.
     """
     if not refresh_token_cookie:
-        raise HTTPException(status_code=401, detail="No refresh token")
+        raise HTTPException(status_code=401, detail="Your session has expired. Please log in again.")
 
     payload = decode_refresh_token(refresh_token_cookie)
     user_id = payload.get("sub")
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise HTTPException(status_code=401, detail="Your session is no longer valid. Please log in again.")
 
     user = db.get(User, int(user_id))
     if user is None or user.deleted_at is not None:
@@ -354,14 +354,14 @@ def refresh(
         .first()
     )
     if not stored:
-        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+        raise HTTPException(status_code=401, detail="Your session has ended. Please log in again.")
 
     now = datetime.now(timezone.utc)
     if stored.rotated_at is None:
         stored.rotated_at = now
     elif now - stored.rotated_at > timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS):
         # A replay well after rotation — treat as a stolen token.
-        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+        raise HTTPException(status_code=401, detail="Your session has ended. Please log in again.")
     # Within the grace window: a concurrent client replaying the token.
     # Tolerate it, but do NOT slide rotated_at — otherwise a captured token
     # could be replayed forever, minting new tokens indefinitely.
@@ -517,10 +517,10 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
     )
 
     if not reset:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        raise HTTPException(status_code=400, detail="That reset link is invalid or has expired. Please request a new one.")
 
     if reset.expires_at and reset.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Reset token has expired")
+        raise HTTPException(status_code=400, detail="That reset link has expired. Please request a new one.")
 
     user = db.get(User, reset.user_id)
     if not user:

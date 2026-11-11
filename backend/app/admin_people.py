@@ -241,10 +241,10 @@ def restore_person(
 ) -> PersonDetail:
     per = get_or_404(db, Person, per_id, "Person not found")
     if per.deleted_at is None:
-        raise HTTPException(status_code=400, detail="Person is not deleted")
+        raise HTTPException(status_code=400, detail="Person hasn't been deleted")
     family = db.get(Family, per.family_id)
     if family and family.deleted_at is not None:
-        raise HTTPException(status_code=400, detail="family_deleted")
+        raise HTTPException(status_code=400, detail="The person's family has already been deleted — restore the family first.")
     per.deleted_at = None
     # Restore associated wishes too
     restore_person_wishes(db, per_id)
@@ -446,7 +446,7 @@ def restore_person_wish(
     if wish.person_id != per_id:
         raise HTTPException(status_code=404, detail="Wish not found")
     if wish.deleted_at is None:
-        raise HTTPException(status_code=400, detail="Wish is not deleted")
+        raise HTTPException(status_code=400, detail="Wish hasn't been deleted")
 
     # Check for active wish of the same type that would conflict
     conflicting = (
@@ -462,7 +462,7 @@ def restore_person_wish(
     if conflicting:
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot restore: active wish of type '{wish.type.value}' already exists (id={conflicting.id})",
+            detail=f"Cannot restore: this person already has an active {wish.type.value} wish.",
         )
 
     wish.deleted_at = None

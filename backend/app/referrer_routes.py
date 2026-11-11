@@ -173,7 +173,7 @@ def create_family(
     if current_count >= ref.family_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Family limit of {ref.family_limit} reached",
+            detail=f"You've reached your family limit of {ref.family_limit}.",
         )
 
     fam = Family(
@@ -297,7 +297,7 @@ async def verify_family(
     if fam.verification_status != FamilyVerificationStatus.pending:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Family is not in pending status",
+            detail="This family has already been reviewed.",
         )
 
     # Check family_limit before verifying
@@ -315,7 +315,7 @@ async def verify_family(
     if current_count >= ref.family_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Family limit of {ref.family_limit} reached. Cannot verify without freeing a slot.",
+            detail=f"You've reached your family limit of {ref.family_limit}.",
         )
 
     fam.verification_status = FamilyVerificationStatus.verified
@@ -346,7 +346,7 @@ async def reject_family(
     if fam.verification_status != FamilyVerificationStatus.pending:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Family is not in pending status",
+            detail="This family has already been reviewed.",
         )
 
     fam.verification_status = FamilyVerificationStatus.rejected
@@ -441,7 +441,7 @@ def referrer_approve_wishes(
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot approve wishes at current lock level.",
+            detail="This wish list has already been approved and is now locked. Contact an admin if you need changes.",
         )
 
     db.commit()
@@ -463,7 +463,7 @@ def referrer_reject_wishes(
     if fam.wish_lock_level != WishLockLevel.family:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only reject wishes at family lock level.",
+            detail="This wish list has already been submitted and can no longer be rejected. Contact an admin if you need changes.",
         )
     if fam.wish_review_requested_at is None:
         raise HTTPException(

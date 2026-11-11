@@ -505,7 +505,7 @@ class TestMatch:
         _login_admin(test_client)
         resp = test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/match", json={"claim_ids": [c1.id]})
         assert resp.status_code == 400
-        assert "succeeded" in resp.json()["detail"]
+        assert "hasn't completed" in resp.json()["detail"]
 
     def test_wrong_campaign_400(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         d1 = _donor_row(db, DONOR1_EMAIL)

@@ -49,6 +49,17 @@ import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminPeopleListParams, PersonPayload } from "../types";
 import { personRoleLabel } from "../types";
 
+/**
+ * True when restore-person failed because the person's family is soft-deleted.
+ * The backend returns a user-facing message (restore_person in
+ * admin_people.py), so this substring must stay in sync with that detail —
+ * this page converts that specific failure into the family-restore dialog.
+ */
+function isFamilyDeletedError(error: unknown): boolean {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  return typeof detail === "string" && detail.includes("family has already been deleted");
+}
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -175,8 +186,7 @@ export default function AdminPeople() {
       toast.success("Person restored");
     },
     onError: (error) => {
-      const data = (error as { response?: { data?: Record<string, unknown> } })?.response?.data;
-      if (data?.detail === "family_deleted" && restoreConfirm != null) {
+      if (isFamilyDeletedError(error) && restoreConfirm != null) {
         const person = listData?.people?.find((p) => p.id === restoreConfirm);
         if (person?.family_id != null) {
           setRestoreConfirm(null);
@@ -586,7 +596,7 @@ export default function AdminPeople() {
           />
         </div>
 
-        {/* Errors (suppress family_deleted — handled by the family-restore dialog) */}
+        {/* Errors (suppress the family-deleted message — handled by the family-restore dialog) */}
         <MutationErrors
           mutations={[
             createMut,
@@ -594,11 +604,7 @@ export default function AdminPeople() {
             deleteMut,
             {
               ...personRestoreMut,
-              error:
-                personRestoreMut.error &&
-                (personRestoreMut.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail === "family_deleted"
-                  ? null
-                  : personRestoreMut.error,
+              error: personRestoreMut.error && isFamilyDeletedError(personRestoreMut.error) ? null : personRestoreMut.error,
             },
             familyRestoreMut,
           ].filter((m): m is NonNullable<typeof m> => m != null)}

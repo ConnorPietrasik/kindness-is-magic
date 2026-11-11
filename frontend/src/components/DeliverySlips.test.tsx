@@ -110,10 +110,10 @@ describe("DeliverySlipsView", () => {
 
   it("shows the error state with API detail on failure", () => {
     const error = new Error("Request failed with status code 400") as Error & { response?: { data?: { detail?: string } } };
-    error.response = { data: { detail: "Invalid scope parameter" } };
+    error.response = { data: { detail: "scope must be one of: all, assigned, unassigned" } };
     renderView({ isError: true, error });
 
-    expect(screen.getByText("Invalid scope parameter")).toBeInTheDocument();
+    expect(screen.getByText("scope must be one of: all, assigned, unassigned")).toBeInTheDocument();
   });
 
   it("shows the fallback message when the error has no detail", () => {

@@ -150,8 +150,8 @@ describe("AdminZeffyPayments", () => {
     expect(screen.getByText("Bob Buyer")).toBeInTheDocument();
     // The "Matched" badge (the column header also says "Matched")
     expect(screen.getByText("Matched", { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "claim 12" })).toHaveAttribute("href", "/donor/claims/12");
-    expect(screen.getByRole("link", { name: "claim 13" })).toHaveAttribute("href", "/donor/claims/13");
+    expect(screen.getByRole("link", { name: "Sponsorship 12" })).toHaveAttribute("href", "/donor/claims/12");
+    expect(screen.getByRole("link", { name: "Sponsorship 13" })).toHaveAttribute("href", "/donor/claims/13");
   });
 
   it("passes the visible columns (comma-joined by the api layer) to the API", async () => {
@@ -262,12 +262,12 @@ describe("AdminZeffyPayments", () => {
     expect(confirm).toBeDisabled();
 
     // Select the $600 claim — exact match with the $600 payment
-    await user.click(screen.getByRole("checkbox", { name: "Match claim 31 (family 3-1)" }));
+    await user.click(screen.getByRole("checkbox", { name: "Match sponsorship 31 (family 3-1)" }));
     await waitFor(() => expect(confirm).not.toBeDisabled());
     expect(screen.getByText("Selected total matches the payment amount.")).toBeInTheDocument();
 
     // Add the $500 claim — total now differs from the payment amount
-    await user.click(screen.getByRole("checkbox", { name: "Match claim 32 (family 3-2)" }));
+    await user.click(screen.getByRole("checkbox", { name: "Match sponsorship 32 (family 3-2)" }));
     expect(screen.getByText("Selected total ($1100.00) differs from the payment amount — use your judgment.")).toBeInTheDocument();
   });
 
@@ -281,11 +281,11 @@ describe("AdminZeffyPayments", () => {
     await screen.findByText("Alice Donor");
     await user.click(screen.getByRole("button", { name: "Match manually" }));
 
-    await user.click(await screen.findByRole("checkbox", { name: "Select all claims for donor@example.com" }));
-    expect(screen.getByRole("checkbox", { name: "Match claim 31 (family 3-1)" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Match claim 32 (family 3-2)" })).toBeChecked();
+    await user.click(await screen.findByRole("checkbox", { name: "Select all sponsorships for donor@example.com" }));
+    expect(screen.getByRole("checkbox", { name: "Match sponsorship 31 (family 3-1)" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Match sponsorship 32 (family 3-2)" })).toBeChecked();
     // The other donor is untouched
-    expect(screen.getByRole("checkbox", { name: "Match claim 40 (family 3-3)" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Match sponsorship 40 (family 3-3)" })).not.toBeChecked();
   });
 
   it("confirms the match against the API, toasts, and refetches the payment list", async () => {
@@ -300,13 +300,13 @@ describe("AdminZeffyPayments", () => {
 
     await screen.findByText("Alice Donor");
     await user.click(screen.getByRole("button", { name: "Match manually" }));
-    await user.click(await screen.findByRole("checkbox", { name: "Match claim 31 (family 3-1)" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Match sponsorship 31 (family 3-1)" }));
     await user.click(screen.getByRole("button", { name: "Confirm match" }));
 
     await waitFor(() => {
       expect(matchSpy).toHaveBeenCalledWith(unmatchedPayment.id, [31]);
     });
-    expect(await screen.findByText("Payment matched to 1 claim")).toBeInTheDocument();
+    expect(await screen.findByText("Payment matched to 1 sponsorship")).toBeInTheDocument();
     // The list was refetched after the match
     await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
@@ -354,7 +354,7 @@ describe("AdminZeffyPayments", () => {
 
     // Confirm dialog names the affected claims and requires confirmation
     expect(await screen.findByText("Unmatch this payment?")).toBeInTheDocument();
-    expect(screen.getByText(/The 2 matched claims go back to pending with a fresh 48-hour payment window/)).toBeInTheDocument();
+    expect(screen.getByText(/The 2 matched sponsorships go back to pending with a fresh 48-hour payment window/)).toBeInTheDocument();
 
     // Cancel: no API call
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -366,7 +366,7 @@ describe("AdminZeffyPayments", () => {
     await user.click(await screen.findByRole("button", { name: "Yes, unmatch" }));
 
     await waitFor(() => expect(unmatchSpy).toHaveBeenCalledWith(matchedPayment.id));
-    expect(await screen.findByText("Payment unmatched — 2 claims back to pending")).toBeInTheDocument();
+    expect(await screen.findByText("Payment unmatched — 2 sponsorships back to pending")).toBeInTheDocument();
     // The payment list was refetched (the payment is unmatched again now)
     await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
@@ -381,7 +381,7 @@ describe("AdminZeffyPayments", () => {
     const error = new Error("Request failed");
     (error as unknown as { response: { status: number; data: { detail: string } } }).response = {
       status: 400,
-      data: { detail: "Claim 12 is fulfilled — unmatch cannot undo fulfillment" },
+      data: { detail: "Sponsorship 12 is already fulfilled — unmatching the payment won't undo that" },
     };
     vi.spyOn(api, "adminUnmatchZeffyPayment").mockRejectedValue(error);
 
@@ -392,6 +392,6 @@ describe("AdminZeffyPayments", () => {
     await user.click(await screen.findByRole("button", { name: "Unmatch" }));
     await user.click(await screen.findByRole("button", { name: "Yes, unmatch" }));
 
-    expect(await screen.findByText("Claim 12 is fulfilled — unmatch cannot undo fulfillment")).toBeInTheDocument();
+    expect(await screen.findByText("Sponsorship 12 is already fulfilled — unmatching the payment won't undo that")).toBeInTheDocument();
   });
 });

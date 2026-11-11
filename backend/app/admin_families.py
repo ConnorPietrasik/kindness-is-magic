@@ -255,7 +255,7 @@ def resolve_slip_families_by_ids(db: Session, family_ids: str) -> list[Family]:
     try:
         requested_ids = [int(x.strip()) for x in family_ids.split(",") if x.strip()]
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid family_ids parameter")
+        raise HTTPException(status_code=400, detail="family_ids must be a comma-separated list of numbers")
 
     if not requested_ids:
         return []
@@ -324,7 +324,7 @@ def get_delivery_slips(
         families = resolve_slip_families_by_ids(db, family_ids)
     else:
         if scope not in ("all", "assigned", "unassigned"):
-            raise HTTPException(status_code=400, detail="Invalid scope parameter")
+            raise HTTPException(status_code=400, detail="scope must be one of: all, assigned, unassigned")
 
         filters = [
             Family.deleted_at.is_(None),
@@ -339,7 +339,7 @@ def get_delivery_slips(
             try:
                 user_id = int(delivery_user_id.strip())
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid delivery_user_id parameter")
+                raise HTTPException(status_code=400, detail="delivery_user_id must be a number")
             get_active_or_404(db, User, user_id, "Delivery user not found")
             filters.append(Family.delivery_user_id == user_id)
 
@@ -404,7 +404,7 @@ def update_family(
     if body.delivery_user_id is not None and body.delivery_user_id is not _CLEAR:
         delivery_user = get_or_404(db, User, body.delivery_user_id, "Delivery user not found")
         if delivery_user.deleted_at is not None:
-            raise HTTPException(status_code=422, detail="Delivery user is soft-deleted")
+            raise HTTPException(status_code=422, detail="The assigned delivery person has already been deleted")
         if delivery_user.role != UserRole.delivery:
             raise HTTPException(status_code=422, detail="User is not a delivery person")
     partial_update(fam, body, exclude={"family_wish"})
@@ -424,7 +424,7 @@ def restore_family(
 ) -> FamilyDetail:
     fam = get_or_404(db, Family, fam_id, "Family not found")
     if fam.deleted_at is None:
-        raise HTTPException(status_code=400, detail="Family is not deleted")
+        raise HTTPException(status_code=400, detail="Family hasn't been deleted")
     # Restore the family, all its soft-deleted people, and all its wishes
     fam.deleted_at = None
     restore_family_cascade(db, fam_id)
@@ -495,10 +495,15 @@ def admin_reject_wishes(
     """Admin rejects wishes — family moves back to referrer lock."""
     fam = get_active_or_404(db, Family, fam_id, "Family not found")
 
+    if fam.wish_lock_level == WishLockLevel.admin:
+        raise HTTPException(
+            status_code=400,
+            detail="These wishes are already fully approved.",
+        )
     if fam.wish_lock_level != WishLockLevel.referrer:
         raise HTTPException(
             status_code=400,
-            detail="Cannot reject wishes at current lock level.",
+            detail="These wishes haven't been approved by a referrer yet.",
         )
     if fam.wish_review_requested_at is None:
         raise HTTPException(

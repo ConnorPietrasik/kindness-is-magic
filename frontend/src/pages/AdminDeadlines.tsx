@@ -44,7 +44,7 @@ const DEADLINE_TYPE_META: Record<DeadlineType, { label: string; enforcedHint: st
   },
   gift_dropoff: {
     label: "Gift drop-off",
-    enforcedHint: "Enforced blocks new gift claims",
+    enforcedHint: "Enforced blocks new gift sponsorships",
   },
 };
 

@@ -646,7 +646,7 @@ class TestRestorePersonWish:
             f"/api/admin/people/{person_with_wishes['person'].id}/wishes/{wish.id}/restore",
         )
         assert resp.status_code == 400
-        assert "not deleted" in resp.json()["detail"]
+        assert "hasn't been deleted" in resp.json()["detail"]
 
     def test_404_wish_not_found(self, test_client: TestClient, admin_user, person_with_wishes):
         _admin_login(test_client)
