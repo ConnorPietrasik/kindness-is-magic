@@ -3,6 +3,7 @@
 All endpoints are guarded with ``require_admin``.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -103,7 +104,7 @@ async def import_csv_data(
 
     from app.csv_import import import_csv as do_import
 
-    summary = do_import(db, content, admin_id=_admin.id)
+    summary = await asyncio.to_thread(do_import, db, content, admin_id=_admin.id)
     logger.info(
         "Admin %s imported CSV — R:%d F:%d P:%d U:%d (errors: R:%d F:%d P:%d U:%d)",
         _admin.id,
