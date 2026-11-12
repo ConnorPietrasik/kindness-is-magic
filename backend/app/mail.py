@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth import SECRET_KEY, ALGORITHM
-from app.config import APP_BASE_URL
+from app.config import APP_BASE_URL, CASH_CLAIM_GROCERIES_AMOUNT_USD
 from app.display_ids import compute_display_ids
 from app.models import (
     EmailKind,
@@ -455,6 +455,7 @@ def build_claim_confirmation_email(
     people: list[dict],
     claim_detail_url: str,
     wish_cards_url: str,
+    gift_card_amount_usd: int,
 ) -> str:
     """Build the HTML body for a donor claim confirmation email.
 
@@ -467,6 +468,8 @@ def build_claim_confirmation_email(
             Each wish has type, description, and optional size.
         claim_detail_url: Full URL to the claim detail page.
         wish_cards_url: Full URL to the printable wish-card sheet.
+        gift_card_amount_usd: Suggested amount (USD) of the optional Walmart
+            gift card for the family's Christmas dinner.
     """
     has_children = any(p["age"] < 18 for p in people)
 
@@ -492,6 +495,7 @@ def build_claim_confirmation_email(
 <a href="{claim_detail_url}" style="display:inline-block;padding:12px 24px;background-color:{_BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;margin:0 4px 8px;">View Your Sponsorship</a>
 <a href="{wish_cards_url}" style="display:inline-block;padding:12px 24px;border:2px solid {_BRAND_COLOR};color:{_BRAND_COLOR};text-decoration:none;border-radius:4px;font-weight:bold;margin:0 4px;">Print Wish Cards</a>
 </p>
+<p style="margin-top:16px;color:#666666;">If you'd like, you're also welcome to include an optional {_format_usd(gift_card_amount_usd)} Walmart gift card to provide a nice Christmas dinner.</p>
 <p style="margin-top:16px;color:#666666;">This email is your record of the commitment you made. You can use it as a reference while shopping for gifts. Print the wish cards and attach them to the gifts you buy.</p>"""
 
 
@@ -599,6 +603,7 @@ async def send_claim_confirmation(claim: FamilyClaim, fam: Family, user: User, d
             people=people_data,
             claim_detail_url=claim_detail_url,
             wish_cards_url=wish_cards_url,
+            gift_card_amount_usd=CASH_CLAIM_GROCERIES_AMOUNT_USD,
         )
 
         result = await send_email(

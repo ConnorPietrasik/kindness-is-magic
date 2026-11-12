@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { claimFamily } from "../lib/api";
+import { CASH_CLAIM_GROCERIES_AMOUNT_USD } from "../lib/constants";
 import { donorClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDay, setPendingClaimFamilyId } from "../lib/utils";
@@ -260,6 +261,10 @@ function ClaimSuccess({ claim, onClose }: { claim: FamilyClaimSummary; onClose: 
               : "We've emailed you the family's full wish list."}
           </li>
           {dropoff && <li>Drop your wrapped gifts off by {formatDay(dropoff.dueDate)}.</li>}
+          <li>
+            If you'd like, you're also welcome to include an optional ${CASH_CLAIM_GROCERIES_AMOUNT_USD} Walmart gift card to provide a nice
+            Christmas dinner.
+          </li>
         </ul>
       </div>
 

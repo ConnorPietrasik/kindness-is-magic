@@ -193,7 +193,7 @@ describe("ClaimModal success view", () => {
     cleanup();
   });
 
-  it("gifts success celebrates, shows email + deadline lines, and navigates to the claim detail", async () => {
+  it("gifts success celebrates, shows email, deadline, and gift card lines, and navigates to the claim detail", async () => {
     const user = userEvent.setup();
     renderAuthedClaim(giftsClaim, [giftDeadline]);
 
@@ -202,6 +202,11 @@ describe("ClaimModal success view", () => {
     expect(screen.getByRole("heading", { name: /You made Family 12-3's Christmas magical/ })).toBeInTheDocument();
     expect(screen.getByText("We've emailed you the family's full wish list.")).toBeInTheDocument();
     expect(screen.getByText(/Drop your wrapped gifts off by/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "If you'd like, you're also welcome to include an optional $100 Walmart gift card to provide a nice Christmas dinner."
+      )
+    ).toBeInTheDocument();
     // The form is replaced by the success view
     expect(screen.queryByRole("heading", { name: "Sponsor This Family" })).not.toBeInTheDocument();
 

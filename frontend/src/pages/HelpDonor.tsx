@@ -211,8 +211,9 @@ export default function HelpDonor() {
                 <li>
                   <strong>Gift sponsorship.</strong> Your confirmation email has the full wish list, and the family's page has wish cards
                   you can print for your shopping trip. Buy the gifts, attach the wish cards to them, and drop them off by the gift drop-off
-                  deadline, wrapped or unwrapped. We check that every wish is covered, wrap what's still unwrapped, and get them to the
-                  family in time for a magical Christmas.
+                  deadline, wrapped or unwrapped. If you'd like, you're also welcome to include an optional $
+                  {CASH_CLAIM_GROCERIES_AMOUNT_USD} Walmart gift card to provide a nice Christmas dinner. We check that every wish is
+                  covered, wrap what's still unwrapped, and get them to the family in time for a magical Christmas.
                 </li>
                 <li>
                   <strong>Cash sponsorship.</strong> Our volunteers use your ${CASH_CLAIM_AMOUNT_USD} to buy the family's wishes and the

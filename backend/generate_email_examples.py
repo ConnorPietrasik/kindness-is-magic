@@ -33,6 +33,7 @@ from app.mail import (
     build_referrer_approved_email,
     build_referrer_rejected_email,
 )
+from app.config import CASH_CLAIM_GROCERIES_AMOUNT_USD
 
 # ---------------------------------------------------------------------------
 # Example data
@@ -157,6 +158,7 @@ EXAMPLES = [
             ],
             claim_detail_url="https://kindnessismagic.love/donor/claims/42",
             wish_cards_url="https://kindnessismagic.love/families/17/wish-cards",
+            gift_card_amount_usd=CASH_CLAIM_GROCERIES_AMOUNT_USD,
         ),
         "unsubscribe": True,
     },
