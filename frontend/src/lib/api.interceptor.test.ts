@@ -100,6 +100,16 @@ describe("response interceptor — 401 token refresh", () => {
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
+  it("skips refresh when the original request is the login endpoint (bad credentials)", async () => {
+    const error = {
+      response: { status: 401, data: {} },
+      config: { url: "/api/auth/login", method: "post", _retry: false },
+    };
+    await expect(rejectedHandler!(error)).rejects.toBe(error);
+    expect(mockApi.post).not.toHaveBeenCalled();
+    expect(dispatchedEvents.length).toBe(0);
+  });
+
   it("rejects with original error when refresh fails, dispatching onFailedRefresh", async () => {
     mockApi.post.mockRejectedValueOnce(new Error("refresh failed"));
 

@@ -162,17 +162,22 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as ExtendedRequestConfig | undefined;
 
-    // Only attempt refresh on 401, skip the refresh endpoint and the auth check.
-    // /api/auth/me is excluded here (not in fetchCurrentUser) because a refresh
-    // failure on it would dispatch onFailedRefresh, redirecting anonymous
-    // visitors on public pages to /login. fetchCurrentUser handles its own
-    // refresh-and-retry and reports "logged out" (null) instead.
+    // Only attempt refresh on 401, skip the refresh endpoint, the auth check,
+    // and login. /api/auth/me is excluded here (not in fetchCurrentUser)
+    // because a refresh failure on it would dispatch onFailedRefresh,
+    // redirecting anonymous visitors on public pages to /login. fetchCurrentUser
+    // handles its own refresh-and-retry and reports "logged out" (null) instead.
+    // A 401 from /api/auth/login means bad credentials, not an expired session —
+    // attempting a refresh would waste a rate-limited round trip and, on refresh
+    // failure, dispatch onFailedRefresh (a spurious "session ended" on the
+    // login screen).
     if (
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       originalRequest.url !== "/api/auth/refresh" &&
-      originalRequest.url !== "/api/auth/me"
+      originalRequest.url !== "/api/auth/me" &&
+      originalRequest.url !== "/api/auth/login"
     ) {
       originalRequest._retry = true;
 
