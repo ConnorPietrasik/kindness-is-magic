@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WishTipsPanel } from "./WishTipsPanel";
 
 const WISH_TIPS_CLOSED_KEY = "wish-tips-closed";
@@ -62,5 +62,28 @@ describe("WishTipsPanel", () => {
 
     expect(screen.getByText(TIP_TEXT)).toBeInTheDocument();
     expect(localStorage.getItem(WISH_TIPS_CLOSED_KEY)).toBeNull();
+  });
+
+  it("survives when storage access is blocked (renders, toggles, no crash)", async () => {
+    const user = userEvent.setup();
+    const deny = () => {
+      throw new Error("SecurityError: storage access denied");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(deny);
+    const setItemSpy = vi.spyOn(window.localStorage, "setItem").mockImplementation(deny);
+    vi.spyOn(window.localStorage, "removeItem").mockImplementation(deny);
+
+    // A read failure during mount used to throw and unmount the whole page
+    renderPanel();
+    expect(screen.getByText(TIP_TEXT)).toBeInTheDocument();
+
+    // Toggle works; the write failure is swallowed with a warning
+    await user.click(screen.getByRole("button", { name: TOGGLE_NAME }));
+    expect(screen.queryByText(TIP_TEXT)).not.toBeInTheDocument();
+    expect(setItemSpy).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+
+    vi.restoreAllMocks();
   });
 });

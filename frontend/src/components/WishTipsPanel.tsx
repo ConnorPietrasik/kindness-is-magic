@@ -8,11 +8,15 @@
  * This is a plain local UI preference (same category as the CartContext
  * localStorage draft), not server state: no API or React Query involved.
  * The collapse interaction follows the InternalNotesSection pattern.
+ * Storage goes through the safe* wrappers — if access is blocked (site data
+ * denied) or the quota is exceeded, the panel simply won't remember its state
+ * instead of throwing during render and unmounting the whole page.
  */
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../lib/routes";
+import { safeGetItem, safeRemoveItem, safeSetItem } from "../lib/utils";
 
 const WISH_TIPS_CLOSED_KEY = "wish-tips-closed";
 
@@ -26,15 +30,15 @@ const TIPS = [
 ] as const;
 
 export function WishTipsPanel() {
-  const [expanded, setExpanded] = useState<boolean>(() => localStorage.getItem(WISH_TIPS_CLOSED_KEY) === null);
+  const [expanded, setExpanded] = useState<boolean>(() => safeGetItem(WISH_TIPS_CLOSED_KEY) === null);
 
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
     if (next) {
-      localStorage.removeItem(WISH_TIPS_CLOSED_KEY);
+      safeRemoveItem(WISH_TIPS_CLOSED_KEY);
     } else {
-      localStorage.setItem(WISH_TIPS_CLOSED_KEY, "1");
+      safeSetItem(WISH_TIPS_CLOSED_KEY, "1");
     }
   };
 
