@@ -125,6 +125,22 @@ def check_wish_edit_lock(user: User, family: Family) -> None:
             )
 
 
+def _parse_path_id(raw: str, label: str) -> int:
+    """Parse a raw path parameter as an id, raising 422 (not 500) when it isn't an integer.
+
+    FastAPI validates the endpoint's own path params only *after* sub-dependencies
+    run, so a guard that reads ``request.path_params`` must parse defensively —
+    an unhandled ``ValueError`` here would surface as a 500.
+    """
+    try:
+        return int(raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{label} must be an integer",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Family ownership guard
 # ---------------------------------------------------------------------------
@@ -161,14 +177,14 @@ def require_family_owner(
 
     from app.models import Family
 
-    fam_id = request.path_params.get("fam_id") or request.path_params.get("fid")
-    if fam_id is None:
+    raw_id = request.path_params.get("fam_id") or request.path_params.get("fid")
+    if raw_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing family id",
         )
 
-    fam = db.get(Family, int(fam_id))
+    fam = db.get(Family, _parse_path_id(raw_id, "Family id"))
     if fam is None or fam.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -216,15 +232,15 @@ def require_person_owner(
     if current_user.role == UserRole.admin:
         return PersonOwner(user=current_user, person=None)
 
-    per_id = request.path_params.get("per_id")
-    if per_id is None:
+    raw_id = request.path_params.get("per_id")
+    if raw_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing person id",
         )
 
     # Use joinedload to get Family in the same query — avoids the separate Family lookup
-    per = db.get(Person, int(per_id), options=[joinedload(Person.family)])
+    per = db.get(Person, _parse_path_id(raw_id, "Person id"), options=[joinedload(Person.family)])
     if per is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

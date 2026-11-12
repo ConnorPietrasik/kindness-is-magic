@@ -220,3 +220,36 @@ class TestReferrerFamilyOwnership:
         body = resp.json()
         families = body if isinstance(body, list) else body.get("families", [])
         assert families == [], f"{path} leaked unassigned families: {families}"
+
+
+# ---------------------------------------------------------------------------
+# require_family_owner / require_person_owner — non-numeric path ids (F2)
+# ---------------------------------------------------------------------------
+
+
+class TestNonNumericPathId:
+    """Non-numeric ids in guarded routes must yield 422, not 500.
+
+    Regression for F2: the guards read the raw path param and called ``int()``
+    inside the dependency, which FastAPI resolves *before* validating the
+    endpoint's own path params — so an authenticated referrer hitting
+    ``/api/referrer/families/abc/people`` raised ValueError and the catch-all
+    handler turned it into a 500.
+    """
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/referrer/families/abc",  # fam_id variant (require_family_owner)
+            "/api/referrer/families/abc/people",  # fid variant (require_family_owner)
+            "/api/people/abc",  # per_id (require_person_owner, family branch)
+        ],
+    )
+    def test_non_numeric_id_returns_422_not_500(self, test_client: TestClient, referrer_user, family_user, path):
+        """A typo'd id is a client error — users get 422 instead of a server error."""
+        if path.startswith("/api/referrer/"):
+            login_as(test_client, "referrer@test.com", "RefPass1234!")
+        else:
+            login_as(test_client, "family@test.com", "FamPass1234!")
+        resp = test_client.get(path)
+        assert resp.status_code == 422
