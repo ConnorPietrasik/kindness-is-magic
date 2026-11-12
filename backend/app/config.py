@@ -6,8 +6,11 @@ imported wherever needed.
 
 import os
 
-# Base URL for the application (used in emails, CORS, redirect links)
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost")
+# Base URL for the application (used in emails, CORS, redirect links).
+# Trailing slash is stripped: CORSMiddleware compares origins by exact string
+# match and browsers send Origin without a slash, and all usages append
+# "/path" directly, so a leftover slash would break CORS and yield "//" links.
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost").rstrip("/")
 
 # Maximum number of active persons a family can have (non-admin creation)
 MAX_FAMILY_PERSONS = 10
