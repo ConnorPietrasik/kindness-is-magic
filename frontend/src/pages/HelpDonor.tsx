@@ -6,6 +6,7 @@ import donorClaims from "../assets/help/donor-claims.png";
 import donorRegister from "../assets/help/donor-register.png";
 import { HelpImage } from "../components/HelpImage";
 import { HelpPage } from "../components/HelpPage";
+import { CASH_CLAIM_AMOUNT_USD, CASH_CLAIM_GROCERIES_AMOUNT_USD } from "../lib/constants";
 import { DONATE_URL } from "../lib/links";
 import { ROUTES } from "../lib/routes";
 
@@ -23,9 +24,9 @@ export default function HelpDonor() {
       title="Sponsor Guide"
       intro={
         <p>
-          Sponsoring a family means covering one family's holiday wish list, either with gifts you buy yourself or with $500 that our
-          volunteers use to buy the family's gifts. This guide walks through the whole journey, from finding a family to watching the wishes
-          get fulfilled.
+          Sponsoring a family means covering one family's holiday wish list, either with gifts you buy yourself or with $
+          {CASH_CLAIM_AMOUNT_USD} that our volunteers use to buy the family's gifts. This guide walks through the whole journey, from
+          finding a family to watching the wishes get fulfilled.
         </p>
       }
       sections={[
@@ -45,8 +46,8 @@ export default function HelpDonor() {
                   magical Christmas.
                 </li>
                 <li>
-                  <strong>Cash sponsorship, $500.</strong> Your $500 covers the family's wish list, and our volunteers take care of the
-                  rest.
+                  <strong>Cash sponsorship, ${CASH_CLAIM_AMOUNT_USD}.</strong> Your ${CASH_CLAIM_AMOUNT_USD} covers the family's wish list,
+                  and our volunteers take care of the rest.
                 </li>
                 <li>
                   <strong>General donation.</strong> A direct gift to the program, and 100% of it goes to gifts.
@@ -99,8 +100,8 @@ export default function HelpDonor() {
                   confirmation email carrying the family's full wish list.
                 </li>
                 <li>
-                  <strong>Cash.</strong> Click <strong>Add to cart</strong> and the family joins your cart, where the $500 sponsorship is
-                  created at checkout.
+                  <strong>Cash.</strong> Click <strong>Add to cart</strong> and the family joins your cart, where the $
+                  {CASH_CLAIM_AMOUNT_USD} sponsorship is created at checkout.
                 </li>
               </ul>
               <p>If a family is marked (already shopping), shopping for that family has started, and it accepts cash sponsorships only.</p>
@@ -120,12 +121,13 @@ export default function HelpDonor() {
               <HelpImage
                 src={donorCart}
                 alt="The sponsorship cart with family line items, a total, and the Pay with Zeffy button"
-                caption="Each line is one family at $500, with an optional $100 groceries add on."
+                caption={`Each line is one family at $${CASH_CLAIM_AMOUNT_USD}, with an optional $${CASH_CLAIM_GROCERIES_AMOUNT_USD} groceries add on.`}
               />
               <h3>What the cart shows</h3>
               <ul>
                 <li>
-                  One line per family at $500, with an optional <strong>groceries</strong> add on for $100 more per family.
+                  One line per family at ${CASH_CLAIM_AMOUNT_USD}, with an optional <strong>groceries</strong> add on for $
+                  {CASH_CLAIM_GROCERIES_AMOUNT_USD} more per family.
                 </li>
                 <li>A total for everything in the cart.</li>
                 <li>A payment window with a deadline. Complete the payment by that time to keep the sponsorship.</li>
@@ -213,8 +215,8 @@ export default function HelpDonor() {
                   family in time for a magical Christmas.
                 </li>
                 <li>
-                  <strong>Cash sponsorship.</strong> Our volunteers use your $500 to buy the family's wishes and the family receives
-                  everything in time for a magical Christmas. Zeffy emails your receipt separately.
+                  <strong>Cash sponsorship.</strong> Our volunteers use your ${CASH_CLAIM_AMOUNT_USD} to buy the family's wishes and the
+                  family receives everything in time for a magical Christmas. Zeffy emails your receipt separately.
                 </li>
               </ul>
               <p>
