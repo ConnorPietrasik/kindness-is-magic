@@ -20,7 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth import PASSWORD_MAX_LENGTH, get_password_hash
+from app.auth import PASSWORD_MAX_LENGTH, get_password_hash, validate_production_secrets
 from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.deadlines import deadline_checks_loop
@@ -220,6 +220,12 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     _try_acquire_leader_lock); the other workers skip them.
     """
     from sqlalchemy.exc import ProgrammingError, OperationalError
+
+    # Fail closed before serving a single request: the built-in dev JWT keys
+    # are public in the repository, so a non-DEBUG process running with them
+    # would let anyone forge admin sessions. Runs in every worker (before
+    # leader election) so no worker can serve while a sibling refuses to start.
+    validate_production_secrets()
 
     leader_fd = _try_acquire_leader_lock()
     deadline_task: asyncio.Task | None = None

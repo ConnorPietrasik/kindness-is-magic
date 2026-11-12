@@ -6,6 +6,8 @@ import jwt
 import pytest
 
 from app.auth import (
+    _DEFAULT_REFRESH_SECRET_KEY,
+    _DEFAULT_SECRET_KEY,
     ALGORITHM,
     REFRESH_SECRET_KEY,
     clear_auth_cookies,
@@ -175,3 +177,91 @@ class TestCookieHelpers:
         clear_auth_cookies(response)
         headers = response.headers
         assert "set-cookie" in headers
+
+
+# ---------------------------------------------------------------------------
+# Production secret validation (startup fail-closed guard)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateProductionSecrets:
+    """A non-DEBUG process must not sign with the repo-published dev keys or empty ones."""
+
+    def test_raises_when_debug_false_and_default_secret_key(self, monkeypatch):
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setattr(auth, "SECRET_KEY", _DEFAULT_SECRET_KEY)
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", "real-refresh-key-0123456789abcdef")
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            auth.validate_production_secrets()
+
+    def test_raises_when_debug_false_and_default_refresh_key(self, monkeypatch):
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setattr(auth, "SECRET_KEY", "real-access-key-0123456789abcdef")
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", _DEFAULT_REFRESH_SECRET_KEY)
+        with pytest.raises(RuntimeError, match="REFRESH_SECRET_KEY"):
+            auth.validate_production_secrets()
+
+    def test_raises_when_debug_false_and_empty_secret_key(self, monkeypatch):
+        """An explicitly empty SECRET_KEY (e.g. `SECRET_KEY=` in .env) is as forgeable as the default."""
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setattr(auth, "SECRET_KEY", "")
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", "real-refresh-key-0123456789abcdef")
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            auth.validate_production_secrets()
+
+    def test_raises_when_debug_false_and_empty_refresh_key(self, monkeypatch):
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setattr(auth, "SECRET_KEY", "real-access-key-0123456789abcdef")
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", "")
+        with pytest.raises(RuntimeError, match="REFRESH_SECRET_KEY"):
+            auth.validate_production_secrets()
+
+    def test_raises_when_debug_unset_and_default_keys(self, monkeypatch):
+        """Unset DEBUG is treated as production (same convention as the Secure cookie flag)."""
+        import app.auth as auth
+
+        monkeypatch.delenv("DEBUG", raising=False)
+        monkeypatch.setattr(auth, "SECRET_KEY", _DEFAULT_SECRET_KEY)
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", _DEFAULT_REFRESH_SECRET_KEY)
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            auth.validate_production_secrets()
+
+    def test_passes_when_debug_true(self, monkeypatch):
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "true")
+        monkeypatch.setattr(auth, "SECRET_KEY", _DEFAULT_SECRET_KEY)
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", _DEFAULT_REFRESH_SECRET_KEY)
+        auth.validate_production_secrets()  # must not raise
+
+    def test_passes_when_debug_false_and_real_keys(self, monkeypatch):
+        import app.auth as auth
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setattr(auth, "SECRET_KEY", "real-access-key-0123456789abcdef")
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", "real-refresh-key-0123456789abcdef")
+        auth.validate_production_secrets()  # must not raise
+
+    def test_lifespan_refuses_production_defaults(self, monkeypatch, tmp_path):
+        """Wiring check: the app lifespan actually calls the guard and fails to start."""
+        import app.auth as auth
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
+        monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setenv("LIFESPAN_LOCK_PATH", str(tmp_path / "leader.lock"))
+        monkeypatch.setenv("DISABLE_BACKGROUND_TASKS", "1")
+        monkeypatch.setattr(auth, "SECRET_KEY", _DEFAULT_SECRET_KEY)
+        monkeypatch.setattr(auth, "REFRESH_SECRET_KEY", _DEFAULT_REFRESH_SECRET_KEY)
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            with TestClient(app):
+                pass

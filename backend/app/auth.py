@@ -14,13 +14,45 @@ from app.database import get_db
 # ---------------------------------------------------------------------------
 # Configuration (from environment)
 # ---------------------------------------------------------------------------
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me-in-production-aaaabbbbccccdddd")
-REFRESH_SECRET_KEY = os.environ.get("REFRESH_SECRET_KEY", "dev-refresh-secret-key-change-me-in-production-aaaabbbbccccdddd")
+# Built-in fallback keys, committed to the repository — fine for DEBUG/dev,
+# but anyone who can read the repo can forge tokens with them.
+# validate_production_secrets() refuses to boot outside DEBUG with either.
+_DEFAULT_SECRET_KEY = "dev-secret-key-change-me-in-production-aaaabbbbccccdddd"
+_DEFAULT_REFRESH_SECRET_KEY = "dev-refresh-secret-key-change-me-in-production-aaaabbbbccccdddd"
+
+SECRET_KEY = os.environ.get("SECRET_KEY", _DEFAULT_SECRET_KEY)
+REFRESH_SECRET_KEY = os.environ.get("REFRESH_SECRET_KEY", _DEFAULT_REFRESH_SECRET_KEY)
 ALGORITHM = "HS256"
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 INVITE_EXPIRY_HOURS = int(os.environ.get("INVITE_EXPIRY_HOURS", "168"))
+
+
+def validate_production_secrets() -> None:
+    """Fail closed if a non-DEBUG process would sign with the built-in dev keys.
+
+    The fallback keys are public in the repository, so signing with them in
+    production lets anyone mint access-token cookies (including admin ids) and
+    unsubscribe tokens. Empty keys are rejected for the same reason. Called
+    from the app lifespan in every worker before any request is served; a
+    no-op when DEBUG=true.
+    """
+    if os.environ.get("DEBUG", "false").lower() == "true":
+        return
+    if not SECRET_KEY or SECRET_KEY == _DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "Refusing to start: SECRET_KEY is unset, empty, or still the built-in dev default, "
+            "which is public in the repository and would allow forged admin sessions. "
+            'Generate a unique one: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+        )
+    if not REFRESH_SECRET_KEY or REFRESH_SECRET_KEY == _DEFAULT_REFRESH_SECRET_KEY:
+        raise RuntimeError(
+            "Refusing to start: REFRESH_SECRET_KEY is unset, empty, or still the built-in dev default, "
+            "which is public in the repository. "
+            'Generate a unique one: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+        )
+
 
 # ---------------------------------------------------------------------------
 # Invite code generation
