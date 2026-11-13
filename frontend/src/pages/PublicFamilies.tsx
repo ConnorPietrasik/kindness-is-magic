@@ -195,15 +195,30 @@ export default function PublicFamilies() {
         </div>
 
         {/* How to help — three paths: gift sponsorship, cash sponsorship, or a general donation */}
-        <section aria-label="Three ways to help" className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-sm leading-relaxed text-gray-700">
-            <strong className="font-semibold text-gray-900">Three ways to help:</strong> sponsor a family with gifts you buy yourself,
-            sponsor with ${CASH_CLAIM_AMOUNT_USD} that our volunteers use to buy the family's gifts, or make a{" "}
-            <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-btn-start hover:underline">
-              general donation
-            </a>{" "}
-            that goes 100% to gifts.
-          </p>
+        <section aria-label="Three ways to help" className="mb-6 rounded-lg bg-slate-100 px-4 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Three ways to help</p>
+          <ul className="mt-1.5 space-y-1 text-sm leading-snug text-gray-600">
+            <li>
+              <strong className="font-semibold text-gray-900">Gifts you buy yourself:</strong> browse below and sponsor a family with the
+              gifts from their wish list.
+            </li>
+            <li>
+              <strong className="font-semibold text-gray-900">Cash sponsorship:</strong> give ${CASH_CLAIM_AMOUNT_USD} that our volunteers
+              use to buy the family's gifts.
+            </li>
+            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <strong className="font-semibold text-gray-900">General donation:</strong>
+              <a
+                href={DONATE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-btn-start/40 bg-btn-start/5 px-3 py-1.5 text-sm font-medium text-btn-start hover:bg-btn-start/10"
+              >
+                Make a general donation
+              </a>
+              that goes 100% to gifts.
+            </li>
+          </ul>
         </section>
 
         {/* Gift drop-off deadline (shared display banner; null renders nothing) */}
