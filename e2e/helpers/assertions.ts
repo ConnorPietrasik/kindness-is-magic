@@ -19,7 +19,7 @@ export async function findRowInTable(
 
 /** 1-based offset of the first item on the current page ("Showing X–Y of Z"). */
 async function listPageStart(page: Page): Promise<number | null> {
-  // Absent on single-page lists (pagination isn't rendered) — keep it bounded.
+  // The text is absent on single-page lists (they show "N total" instead of a range) — keep it bounded.
   const text = await page
     .getByText(/Showing \d+\D+\d+ of \d+/)
     .first()
@@ -47,8 +47,9 @@ async function waitPageRendered(page: Page, beforeStart: number | null): Promise
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const now = await listPageStart(page);
-    // Offset moved (new page rendered) or pagination vanished (list shrank
-    // to a single page) — either way the current page is settled.
+    // Offset moved (new page rendered) or the range text vanished (list
+    // shrank to a single page, which shows "N total" instead) — either way
+    // the current page is settled.
     if (now == null || (beforeStart != null && now !== beforeStart)) return;
     await page.waitForTimeout(100);
   }

@@ -70,7 +70,7 @@ async function waitHeading(page: Page): Promise<void> {
 
 /** 1-based offset of the first card on the current page ("Showing X–Y of Z"). */
 async function pageStart(page: Page): Promise<number> {
-  // The text is absent on single-page lists (pagination isn't rendered) — keep it bounded.
+  // The text is absent on single-page lists (they show "N total" instead of a range) — keep it bounded.
   const text = await page
     .getByText(/Showing \d+\D+\d+ of \d+/)
     .first()
@@ -108,7 +108,7 @@ async function gotoFirstPage(page: Page): Promise<void> {
   await waitHeading(page);
   const firstBtn = page.getByRole("button", { name: "First page" });
   // Only readable after settling: a missing button means a single-page list
-  // (the pagination component isn't rendered), not a spinner.
+  // (no page buttons on a single page), not a spinner.
   if ((await firstBtn.count()) === 0) return;
   for (let attempt = 0; attempt < 3; attempt++) {
     if (await firstBtn.isDisabled()) return; // already on page 1

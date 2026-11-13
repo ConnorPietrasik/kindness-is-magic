@@ -16,7 +16,7 @@ import { Pagination } from "./Pagination";
  * These encode the ellipsis algorithm that Pagination relies on.
  */
 const rangeCases: Array<{ page: number; totalPages: number; expected: (number | "…")[] }> = [
-  // Edge: 0 or 1 pages → empty (component returns null)
+  // Edge: 0 or 1 pages → no page buttons
   { page: 1, totalPages: 0, expected: [] },
   { page: 1, totalPages: 1, expected: [] },
 
@@ -54,8 +54,8 @@ describe("Pagination — page range generation", () => {
       render(<Pagination page={page} totalPages={totalPages} total={totalPages * 10} pageSize={10} onPageChange={onPageChange} />);
 
       if (expected.length === 0) {
-        // Component returns null for totalPages <= 1
-        expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
+        // No page buttons for a single (or empty) list
+        expect(screen.queryByLabelText("Page 1")).not.toBeInTheDocument();
         return;
       }
 
@@ -173,6 +173,37 @@ describe("Pagination — item count", () => {
 
     // Page 10, pageSize 10 → items 91–95 of 95
     expect(screen.getByText("Showing 91–95 of 95")).toBeInTheDocument();
+  });
+
+  it("shows a simple total for a single-page list", () => {
+    render(<Pagination page={1} totalPages={1} total={18} pageSize={20} onPageChange={vi.fn()} />);
+
+    expect(screen.getByText("18 total")).toBeInTheDocument();
+    expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Page 1")).not.toBeInTheDocument();
+  });
+
+  it("does not render for an empty list", () => {
+    render(<Pagination page={1} totalPages={0} total={0} pageSize={20} onPageChange={vi.fn()} />);
+
+    expect(screen.queryByText("0 total")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
+  });
+
+  it("still renders the page size selector on a single-page list", () => {
+    render(
+      <Pagination
+        page={1}
+        totalPages={1}
+        total={18}
+        pageSize={20}
+        pageSizeOptions={[10, 20]}
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText("Items per page")).toBeInTheDocument();
   });
 });
 

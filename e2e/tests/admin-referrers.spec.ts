@@ -73,7 +73,7 @@ test.describe("Admin Referrers", () => {
        IDs, so the row's page can shift while we look — and the shared
        pagination walk is one-directional (a slow refetch past the first
        10s wait leaves page 1 and never returns). A search hit is a single
-       row on page 1 with no pagination. */
+       row on page 1 with no page buttons. */
     await page.getByLabel("Search by name").fill(TEST_REFERRER);
 
     const referrerRow = await findRowInTable(page, TEST_REFERRER);

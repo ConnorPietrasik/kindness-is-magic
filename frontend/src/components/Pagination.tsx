@@ -31,7 +31,7 @@ interface PaginationProps {
  * Shows: first page, last page, current page ± 1, with ellipsis gaps.
  *
  * Examples:
- *   totalPages=1  → [1]
+ *   totalPages=1  → [] (single-page lists show no page buttons)
  *   totalPages=5, page=3 → [1, 2, 3, 4, 5]
  *   totalPages=10, page=3 → [1, 2, 3, 4, "…", 10]
  *   totalPages=20, page=10 → [1, "…", 9, 10, 11, "…", 20]
@@ -74,84 +74,86 @@ export const Pagination = memo(function Pagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  // No data yet (loading) or empty list → nothing to render
+  if (total <= 0) return null;
 
-  const pages = generatePageRange(page, totalPages);
+  const paginated = totalPages > 1;
+  const pages = paginated ? generatePageRange(page, totalPages) : [];
   const startItem = (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, total);
 
   return (
     <div className="mt-4 flex flex-col items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:px-6">
-      {/* Item count */}
-      <span className="text-sm text-gray-500">
-        Showing {startItem}–{endItem} of {total}
-      </span>
+      {/* Item count — always shown; simplified when there's a single page */}
+      <span className="text-sm text-gray-500">{paginated ? `Showing ${startItem}–${endItem} of ${total}` : `${total} total`}</span>
 
       {/* Page buttons */}
-      <div className="flex items-center gap-1">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-8 px-2 text-xs"
-          onClick={() => onPageChange(1)}
-          disabled={page === 1}
-          aria-label="First page"
-        >
-          «
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-8 px-2 text-xs"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page === 1}
-          aria-label="Previous page"
-        >
-          ‹
-        </Button>
+      {paginated && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={() => onPageChange(1)}
+            disabled={page === 1}
+            aria-label="First page"
+          >
+            «
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+            aria-label="Previous page"
+          >
+            ‹
+          </Button>
 
-        {pages.map((p, idx) =>
-          p === "…" ? (
-            <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">
-              …
-            </span>
-          ) : (
-            <button
-              type="button"
-              key={p}
-              onClick={() => onPageChange(p as number)}
-              className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition-colors ${
-                page === p ? "bg-btn-start text-white" : "text-gray-700 hover:bg-gray-100"
-              }`}
-              aria-label={`Page ${p}`}
-              aria-current={page === p ? "page" : undefined}
-            >
-              {p}
-            </button>
-          )
-        )}
+          {pages.map((p, idx) =>
+            p === "…" ? (
+              <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">
+                …
+              </span>
+            ) : (
+              <button
+                type="button"
+                key={p}
+                onClick={() => onPageChange(p as number)}
+                className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition-colors ${
+                  page === p ? "bg-btn-start text-white" : "text-gray-700 hover:bg-gray-100"
+                }`}
+                aria-label={`Page ${p}`}
+                aria-current={page === p ? "page" : undefined}
+              >
+                {p}
+              </button>
+            )
+          )}
 
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-8 px-2 text-xs"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page === totalPages}
-          aria-label="Next page"
-        >
-          ›
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-8 px-2 text-xs"
-          onClick={() => onPageChange(totalPages)}
-          disabled={page === totalPages}
-          aria-label="Last page"
-        >
-          »
-        </Button>
-      </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page === totalPages}
+            aria-label="Next page"
+          >
+            ›
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={() => onPageChange(totalPages)}
+            disabled={page === totalPages}
+            aria-label="Last page"
+          >
+            »
+          </Button>
+        </div>
+      )}
 
       {/* Page size selector */}
       {onPageSizeChange && (
