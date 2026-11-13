@@ -116,7 +116,7 @@ see **Releases (CD)** below.
 
 ## Configuration
 
-Runtime config lives in `.env` (see `.env.example` for documented defaults): JWT secrets and token lifetimes, bootstrap admin, `DEBUG` (insecure cookies + no rate limiting in dev), invite expiry, SMTP mail settings, `APP_BASE_URL` (links in emails), and production-only `PUBLIC_HOSTNAME` / `LETSENCRYPT_EMAIL` for the Traefik/Let's Encrypt setup.
+Runtime config lives in `.env` (see `.env.example` for documented defaults): JWT secrets and token lifetimes, bootstrap admin, `DEBUG` (insecure cookies + no rate limiting in dev), invite expiry, SMTP mail settings, and production-only `PUBLIC_HOSTNAME` / `LETSENCRYPT_EMAIL` for the Traefik/Let's Encrypt setup. `APP_BASE_URL` (links in emails) needs no production value — it's derived from `PUBLIC_HOSTNAME`; in dev it defaults to `http://localhost` (override in `.env` only when the stack runs elsewhere).
 
 Business-logic constants — per-family person limit, gift claim cap, refresh-token rotation grace window, and event-deadline enforcement timing — live in `backend/app/config.py` and are changed there in code, not via `.env`.
 
@@ -213,7 +213,7 @@ to continue until they're replaced.
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | bootstrap admin, created on first backend start — the only way to get the *first* admin; further admins can be created from the admin users page or CSV import |
 | `PUBLIC_HOSTNAME` | bare domain, e.g. `yourdomain.com` (no scheme) |
 | `LETSENCRYPT_EMAIL` | Let's Encrypt expiry notices (safety net) |
-| `APP_BASE_URL` | `https://yourdomain.com` (links in emails) |
+| `APP_BASE_URL` | don't set in production — derived from `PUBLIC_HOSTNAME` (links in emails); the `.env` value is a dev/e2e override only, see `.env.example` |
 | `DEBUG` | `false` |
 | `POSTGRES_*`, `MAIL_*` | real values |
 

@@ -64,7 +64,6 @@ prod_setup() {
   for var in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB \
              SECRET_KEY REFRESH_SECRET_KEY \
              ADMIN_EMAIL ADMIN_PASSWORD \
-             APP_BASE_URL \
              MAIL_USERNAME MAIL_PASSWORD MAIL_FROM \
              PUBLIC_HOSTNAME LETSENCRYPT_EMAIL; do
     value="$(env_get "$var")"
@@ -89,10 +88,13 @@ prod_setup() {
   fi
 
   # Dev/e2e-only Zeffy values: a production backend pointed at the mock would
-  # 502 every checkout, and ZEFFY_MIN_INTERVAL_SECONDS=0 disables the throttle
-  # protecting the rate-limited real API — refuse the committed dev values.
+  # 502 every checkout, ZEFFY_MIN_INTERVAL_SECONDS=0 disables the throttle
+  # protecting the rate-limited real API, a stale ZEFFY_FORM_URL passes checkout
+  # silently and ships donors to the mock's dead localhost page, and a stale
+  # campaign ID 503s the first checkout (plus breaks admin reconciliation) —
+  # refuse the committed dev values.
   local zeffy_dev_vars=()
-  for var in ZEFFY_API_KEY ZEFFY_API_BASE ZEFFY_MIN_INTERVAL_SECONDS; do
+  for var in ZEFFY_API_KEY ZEFFY_API_BASE ZEFFY_MIN_INTERVAL_SECONDS ZEFFY_FORM_URL ZEFFY_CAMPAIGN_ID; do
     value="$(env_get "$var")"
     example_value="$(example_get "$var")"
     if [ -n "$value" ] && [ "$value" = "$example_value" ]; then
@@ -102,13 +104,17 @@ prod_setup() {
   if [ "${#zeffy_dev_vars[@]}" -gt 0 ]; then
     echo "Error: .env still has dev/e2e Zeffy values from .env.example:"
     printf '  - %s\n' "${zeffy_dev_vars[@]}"
-    echo "Set real Zeffy credentials for production (or leave ZEFFY_API_BASE / ZEFFY_MIN_INTERVAL_SECONDS unset)."
+    echo "Set the real Zeffy values for production (form URL + campaign ID from the Zeffy dashboard; leave ZEFFY_API_BASE / ZEFFY_MIN_INTERVAL_SECONDS unset)."
     exit 1
   fi
 
   if [ "$(env_get DEBUG)" = "true" ]; then
     echo "Error: DEBUG=true in .env — production needs DEBUG=false (it disables rate limiting, the Secure cookie flag, and all outgoing email)."
     exit 1
+  fi
+
+  if [ -n "$(env_get APP_BASE_URL)" ]; then
+    echo "Warning: APP_BASE_URL is set in .env — production ignores it (derived from PUBLIC_HOSTNAME as https://<PUBLIC_HOSTNAME>)."
   fi
 
   # --- Let's Encrypt storage ---------------------------------------------------
