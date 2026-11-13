@@ -316,8 +316,10 @@ if [ "$1" = "clear" ]; then
   fi
   sudo docker compose down -v --remove-orphans
   sudo docker compose --profile test down -v --remove-orphans 2>/dev/null || true
-  # Remove the project network if it still exists
-  sudo docker network rm kindness-is-magic_kindnet 2>/dev/null || true
+  # Remove the dev project network if it still exists (dev project name
+  # comes from `name:` in docker-compose.yml; prod's network keeps the
+  # kindness-is-magic_ prefix and must never be touched here)
+  sudo docker network rm kindness-is-magic-dev_kindnet 2>/dev/null || true
   # Prune any leftover anonymous/orphan volumes (e.g. from interrupted builds)
   sudo docker volume prune -f
   echo "Cleared all containers, volumes, and networks."
@@ -347,8 +349,8 @@ fi
 if [ "$1" = "testdb" ]; then
   shift
   cleanup() {
-    sudo docker rm -f kindness-is-magic-test_db-1 2>/dev/null || true
-    sudo docker network rm kindness-is-magic_kindnet 2>/dev/null || true
+    sudo docker rm -f kindness-is-magic-dev-test_db-1 2>/dev/null || true
+    sudo docker network rm kindness-is-magic-dev_kindnet 2>/dev/null || true
   }
   trap cleanup EXIT INT TERM
   sudo docker compose --profile test up test_db "$@"

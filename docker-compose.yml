@@ -1,3 +1,8 @@
+# Pinned distinct from prod's project name (docker-compose.prod.yml pins
+# `kindness-is-magic`): without this, on the server the dev file falls back
+# to the directory basename and collides with prod's containers/volume.
+name: kindness-is-magic-dev
+
 services:
   traefik:
     image: traefik:v3.7
