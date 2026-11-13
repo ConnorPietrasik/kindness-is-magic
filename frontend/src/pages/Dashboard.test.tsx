@@ -104,6 +104,11 @@ const mockActiveGiftClaim: FamilyClaimSummary = {
 
 function renderDashboard(user: User) {
   vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(user);
+  // Admin-only query default — per-test spies set up before renderDashboard
+  // take precedence (only stub it when the test hasn't already).
+  if (!vi.isMockFunction(api.adminListZeffyUnmatchedSummary)) {
+    vi.spyOn(api, "adminListZeffyUnmatchedSummary").mockResolvedValue({ count: 0, oldest_created_at: null });
+  }
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={["/dashboard"]}>
@@ -200,6 +205,41 @@ describe("Dashboard", () => {
     renderDashboard(adminUser);
 
     expect(await screen.findByText(/2 families awaiting your wish approval/)).toBeInTheDocument();
+  });
+
+  it("shows the unmatched-payments alert for admins, stacked above the wish approval alert", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([mockQueueItem]);
+    vi.spyOn(api, "adminListZeffyUnmatchedSummary").mockResolvedValue({
+      count: 2,
+      oldest_created_at: "2025-12-01T00:00:00Z",
+    });
+
+    renderDashboard(adminUser);
+
+    const paymentsAlert = await screen.findByText("2 unmatched Zeffy payments waiting for a match →");
+    expect(paymentsAlert.closest("a")).toHaveAttribute("href", "/admin/zeffy-payments");
+    const wishAlert = screen.getByText(/1 family awaiting your wish approval/);
+    // Money first: the payments alert stacks above (earlier in document order than) the review alert
+    expect(wishAlert.compareDocumentPosition(paymentsAlert) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it("hides the unmatched-payments alert when nothing is waiting", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "adminListZeffyUnmatchedSummary").mockResolvedValue({ count: 0, oldest_created_at: null });
+
+    renderDashboard(adminUser);
+
+    await waitFor(() => expect(screen.getByText("Welcome back!")).toBeInTheDocument());
+    expect(screen.queryByText(/unmatched Zeffy payment/)).not.toBeInTheDocument();
+  });
+
+  it("shows a singular unmatched-payments alert for one payment", async () => {
+    vi.spyOn(api, "listAdminReviewQueue").mockResolvedValue([]);
+    vi.spyOn(api, "adminListZeffyUnmatchedSummary").mockResolvedValue({ count: 1, oldest_created_at: null });
+
+    renderDashboard(adminUser);
+
+    expect(await screen.findByText("1 unmatched Zeffy payment waiting for a match →")).toBeInTheDocument();
   });
 
   it("shows the assigned gifts tile for admins", async () => {

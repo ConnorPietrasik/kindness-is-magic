@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import FamilyClaim, User
-from app.payments import apply_payment_to_claims, cart_window_anchor, claims_total_usd, pending_cash_claims_for
+from app.payments import (
+    apply_payment_to_claims,
+    cart_window_anchor,
+    claims_total_usd,
+    pending_cash_claims_for,
+    upsert_zeffy_payment,
+)
 import app.zeffy as zeffy
 
 logger = logging.getLogger(__name__)
@@ -35,6 +41,12 @@ async def zeffy_webhook(
     replay window). 2xx acks every processed delivery — Zeffy retries
     non-2xx up to 5 times, and a duplicate delivery is handled by the apply
     path's idempotency (already-applied payment → no-op, no re-email).
+
+    Every verified payment on the dedicated campaign is mirrored to the
+    local ``zeffy_payments`` table *before* the business checks (committed
+    here, so the "ignored" returns below persist the row): the payments
+    that fail those checks are exactly what the admin unmatched-payments
+    banner is for.
 
     Business-level ignores (other event type, other campaign/status, unknown
     donor, empty cart, non-exact amount) log + 200: the donor-initiated
@@ -82,6 +94,12 @@ async def zeffy_webhook(
         return {"status": "ignored"}
 
     payment = zeffy.parse_payment(data)
+
+    # Mirror before any business check (idempotent upsert); committed now so
+    # every "ignored" return path below leaves the row behind for the admin
+    # banner. The shared apply path re-upserts on a successful apply.
+    upsert_zeffy_payment(db, payment)
+    db.commit()
 
     # Duplicate delivery (Zeffy retries non-2xx up to 5 times; our acks are
     # 2xx, but a retry can still race an apply): the payment id is already

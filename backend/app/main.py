@@ -25,7 +25,7 @@ from app.config import APP_BASE_URL
 from app.database import MAX_OVERFLOW, POOL_SIZE, get_db
 from app.deadlines import deadline_checks_loop
 from app.email_campaigns import campaign_worker_loop
-from app.payments import claim_expiry_loop
+from app.payments import claim_expiry_loop, zeffy_payment_sync_loop
 from app.models import User, UserRole, default_display_name_from_email
 
 
@@ -231,6 +231,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     deadline_task: asyncio.Task | None = None
     expiry_task: asyncio.Task | None = None
     campaign_task: asyncio.Task | None = None
+    sync_task: asyncio.Task | None = None
 
     if leader_fd is not None:
         db = None
@@ -297,6 +298,11 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
             # the deadline loop (tests exercise run_claim_expiry directly).
             expiry_task = asyncio.create_task(claim_expiry_loop())
             logger.info("Hourly claim-expiry task started.")
+            # Hourly Zeffy payment mirror sync — the webhook upsert is the
+            # instant path; this catches missed deliveries and backfills
+            # history on first run (see zeffy_payment_sync_loop).
+            sync_task = asyncio.create_task(zeffy_payment_sync_loop())
+            logger.info("Hourly Zeffy-payment sync task started.")
             # Email campaign delivery — one campaign email per cycle, paced
             # by EMAIL_CAMPAIGN_INTERVAL_SECONDS (see email_campaigns.py).
             campaign_task = asyncio.create_task(campaign_worker_loop())
@@ -307,7 +313,7 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     try:
         yield
     finally:
-        for task in (deadline_task, expiry_task, campaign_task):
+        for task in (deadline_task, expiry_task, campaign_task, sync_task):
             if task is not None:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

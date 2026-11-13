@@ -263,10 +263,12 @@ export const donorClaim = (id: number) => ["donorClaim", id] as const;
 // Admin — Zeffy Payments (unmatched-payment reconciliation)
 // ---------------------------------------------------------------------------
 
-/** Admin Zeffy payment list (cursor-based; cursor passed at call site) */
+/** Admin Zeffy payment list (the local mirror table; page/filter at call site) */
 export const adminZeffyPayments = ["adminZeffyPayments"] as const;
 /** Admin Zeffy pending claims (match-modal grouped data) */
 export const adminZeffyPendingClaims = ["adminZeffyPendingClaims"] as const;
+/** Admin dashboard banner — unmatched Zeffy payments waiting for action */
+export const adminZeffyUnmatchedSummary = ["adminZeffyUnmatchedSummary"] as const;
 
 // ---------------------------------------------------------------------------
 // Admin — Sponsorships (claims: active + cancelled)

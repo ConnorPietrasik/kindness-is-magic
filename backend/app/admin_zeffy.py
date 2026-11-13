@@ -2,11 +2,19 @@
 
 All endpoints are guarded with ``require_admin``.
 
-* ``GET /payments`` — pass-through of the Zeffy read API (503 when Zeffy is
-  unconfigured), enriched with local match state; cursor-based envelope
-  (Zeffy's pagination), ``columns`` supported.
+* ``GET /payments`` — the local mirror table (refreshed by the webhook,
+  the hourly sync, and ``POST /sync``), enriched with local match state;
+  unmatched-only by default (the admin banner's population),
+  ``show_matched`` includes the rest; standard page envelope, ``columns``
+  supported. Local read — works unconfigured.
 * ``GET /pending-claims`` — local read only (works unconfigured): every
   active unpaid cash claim grouped by donor; feeds the match modal.
+* ``POST /sync`` — pull the campaign's succeeded payments into the mirror
+  now (the hourly background loop does the same in the background).
+* ``GET /unmatched-summary`` — count + oldest of the payments waiting for
+  action; feeds the admin dashboard banner.
+* ``POST /payments/{id}/seen`` / ``DELETE /payments/{id}/seen`` — the
+  admin's "no action needed" acknowledgment (suppresses the banner).
 * ``POST /payments/{id}/match`` — manual match: mark the chosen unpaid cash
   claims paid with the payment (shared apply path → confirmation emails).
 * ``POST /payments/{id}/unmatch`` — correction: clear the payment id +
@@ -21,16 +29,24 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import zeffy
-from app.column_filter import apply_column_filter
+from app.column_filter import column_filtered_page
 from app.config import CASH_CLAIM_PAYMENT_HOURS
 from app.database import get_db
-from app.models import ClaimPaymentStatus, CommitmentType, Family, FamilyClaim, User
-from app.payments import apply_payment_to_claims, claim_line_total, claims_total_usd
+from app.models import ClaimPaymentStatus, CommitmentType, Family, FamilyClaim, User, ZeffyPaymentRecord
+from app.payments import (
+    apply_payment_to_claims,
+    claim_line_total,
+    claims_total_usd,
+    sync_zeffy_payments,
+    upsert_zeffy_payment,
+)
 from app.permissions import require_admin
-from app.response_builders import batch_build_family_info, build_claim_summary
+from app.response_builders import batch_build_family_info, build_claim_summary, build_zeffy_payment_item
 from app.schemas import (
     AdminZeffyMatchRequest,
     AdminZeffyMatchResponse,
@@ -39,6 +55,9 @@ from app.schemas import (
     AdminZeffyPendingClaimItem,
     AdminZeffyPendingClaimsResponse,
     AdminZeffyPendingDonorGroup,
+    AdminZeffySeenResponse,
+    AdminZeffySyncResponse,
+    AdminZeffyUnmatchedSummary,
     AdminZeffyUnmatchResponse,
     FamilyInfo,
 )
@@ -86,65 +105,95 @@ def _fetch_zeffy_payment(payment_id: str) -> zeffy.ZeffyPayment:
     return payment
 
 
-def _payment_buyer_name(payment: zeffy.ZeffyPayment) -> str | None:
-    buyer = payment.buyer
-    if buyer is None:
-        return None
-    name = " ".join(n for n in (buyer.first_name, buyer.last_name) if n).strip()
-    return name or buyer.company_name
+def _get_zeffy_payment_record(db: Session, payment_id: str) -> ZeffyPaymentRecord:
+    """The mirror row for a Zeffy payment id — 404 when never mirrored."""
+    record = db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment_id).first()
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found in the local mirror — sync first")
+    return record
+
+
+def _is_mirror_payment_race(exc: IntegrityError) -> bool:
+    """Whether a failed commit lost a first-insert race on the mirror's
+    one-row-per-payment index (uq_zeffy_payments_payment_id).
+
+    Same duck-typed driver detection as ``is_active_claim_race``: only a
+    violation of exactly this constraint is a lost race; any other
+    IntegrityError is a genuine surprise for the 500 handler.
+    """
+    orig = exc.orig
+    diag = getattr(orig, "diag", None)
+    return getattr(orig, "pgcode", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_zeffy_payments_payment_id"
+
+
+def _unmatched_conditions(db: Session) -> list:
+    """The banner's filter conditions: no "seen" acknowledgment and no live
+    claim storing the payment id (a soft-deleted claim does not count as a
+    match). One filter in the list endpoint, unpacked into the summary
+    aggregate."""
+    matched_ids = db.query(FamilyClaim.zeffy_payment_id).filter(
+        FamilyClaim.deleted_at.is_(None),
+        FamilyClaim.zeffy_payment_id.isnot(None),
+    )
+    return [ZeffyPaymentRecord.seen_at.is_(None), ZeffyPaymentRecord.payment_id.notin_(matched_ids)]
 
 
 @zeffy_admin_router.get("/payments", response_model=AdminZeffyPaymentsResponse, response_model_exclude_unset=True)
 def list_zeffy_payments(
-    starting_after: str | None = Query(None, description="Cursor from the previous page's next_cursor"),
-    limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    show_matched: bool = Query(False, description="Include matched and seen payments (default: unmatched only)"),
     columns: str | None = Query(None),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> dict:
-    """The dedicated campaign's succeeded payments (newest first), enriched
-    with local match state. Supports the ``columns`` param; the envelope
-    stays cursor-based (Zeffy pagination)."""
-    _require_zeffy_configured()
+    """The dedicated campaign's mirrored payments (newest first), enriched
+    with local match state. Unmatched-only by default — the admin banner's
+    population; ``show_matched`` includes matched and seen rows. Standard
+    page envelope; ``columns`` supported. Local read: works unconfigured."""
+    query = db.query(ZeffyPaymentRecord)
+    if not show_matched:
+        query = query.filter(*_unmatched_conditions(db))
 
-    try:
-        page = zeffy.list_payments(campaign_id=zeffy.ZEFFY_CAMPAIGN_ID, status="succeeded", starting_after=starting_after, limit=limit)
-    except zeffy.ZeffyAuthError:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Zeffy is misconfigured — please try again later.")
-    except zeffy.ZeffyError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not fetch payments: {exc}")
+    total = query.count()
+    records = (
+        query.order_by(ZeffyPaymentRecord.created_at.desc(), ZeffyPaymentRecord.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
     # Local match state: which (non-deleted) claims store each payment id
     claims_by_payment: dict[str, list[int]] = {}
-    if page.data:
+    if records:
         rows = (
             db.query(FamilyClaim.zeffy_payment_id, FamilyClaim.id)
-            .filter(FamilyClaim.zeffy_payment_id.in_([p.id for p in page.data]), FamilyClaim.deleted_at.is_(None))
+            .filter(
+                FamilyClaim.zeffy_payment_id.in_([r.payment_id for r in records]),
+                FamilyClaim.deleted_at.is_(None),
+            )
             .all()
         )
         for payment_id, claim_id in rows:
             claims_by_payment.setdefault(payment_id, []).append(claim_id)
 
-    items = [
-        AdminZeffyPayment(
-            id=p.id,
-            created_at=datetime.fromtimestamp(p.created, tz=timezone.utc),
-            amount_cents=p.amount,
-            currency=p.currency,
-            buyer_name=_payment_buyer_name(p),
-            buyer_email=p.buyer.email if p.buyer is not None else None,
-            receipt_url=p.receipt_url,
-            claim_ids=sorted(claims_by_payment.get(p.id, [])),
-            matched=bool(claims_by_payment.get(p.id)),
-        )
-        for p in page.data
-    ]
+    items = [build_zeffy_payment_item(r, claims_by_payment.get(r.payment_id, [])) for r in records]
 
-    return {
-        "payments": apply_column_filter(items, columns, model=AdminZeffyPayment, always_include={"id", "matched"}),
-        "has_more": page.has_more,
-        "next_cursor": page.next_cursor,
-    }
+    # claim_ids / seen_at / refund_status are selectable columns, but they
+    # drive the row's chips and actions — always_include guarantees them in
+    # the output regardless of the user's column selection (a missing
+    # seen_at or refund_status reads as "fresh, non-refunded" client-side
+    # and breaks the Seen/Refunded UI).
+    return column_filtered_page(
+        items,
+        columns,
+        model=AdminZeffyPayment,
+        key="payments",
+        total=total,
+        page=page,
+        page_size=page_size,
+        always_include={"id", "matched", "claim_ids", "seen_at", "refund_status"},
+    )
 
 
 @zeffy_admin_router.get("/pending-claims", response_model=AdminZeffyPendingClaimsResponse)
@@ -205,6 +254,86 @@ def list_pending_cash_claims(
     return AdminZeffyPendingClaimsResponse(donors=groups)
 
 
+@zeffy_admin_router.post("/sync", response_model=AdminZeffySyncResponse)
+def sync_payments(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> AdminZeffySyncResponse:
+    """Pull the dedicated campaign's succeeded payments into the local
+    mirror now (the page's "Sync with Zeffy" button; the hourly background
+    loop does the same in the background). Returns the number of rows
+    inserted / refreshed. Steady state is one Zeffy call (the walk stops
+    at the first known row)."""
+    _require_zeffy_configured()
+
+    try:
+        new_count, updated_count = sync_zeffy_payments(db)
+    except IntegrityError as exc:
+        # Roll back first — the session is broken after a DBAPI error either
+        # way. A unique violation on the mirror's payment_id index is a lost
+        # first-insert race (the webhook or a sibling sync committed the same
+        # payment first) — the row is already mirrored and the next sync
+        # converges. Anything else re-raises into the 500 handler.
+        db.rollback()
+        if not _is_mirror_payment_race(exc):
+            raise
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another sync is in progress — please try again")
+    except zeffy.ZeffyAuthError:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Zeffy is misconfigured — please try again later.")
+    except zeffy.ZeffyError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not sync payments: {exc}")
+
+    logger.info("Admin Zeffy sync: %d new, %d refreshed", new_count, updated_count)
+    return AdminZeffySyncResponse(new_count=new_count, updated_count=updated_count)
+
+
+@zeffy_admin_router.get("/unmatched-summary", response_model=AdminZeffyUnmatchedSummary)
+def unmatched_summary(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> AdminZeffyUnmatchedSummary:
+    """How many mirrored payments are waiting for admin action (no live
+    match, no "seen" acknowledgment) plus the oldest — the admin dashboard
+    banner. Local read; works unconfigured."""
+    row = db.query(func.count(ZeffyPaymentRecord.id), func.min(ZeffyPaymentRecord.created_at)).filter(*_unmatched_conditions(db)).first()
+    count, oldest = row if row is not None else (0, None)
+    return AdminZeffyUnmatchedSummary(count=count, oldest_created_at=oldest)
+
+
+@zeffy_admin_router.post("/payments/{payment_id}/seen", response_model=AdminZeffySeenResponse)
+def mark_payment_seen(
+    payment_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> AdminZeffySeenResponse:
+    """Mark a payment "seen": the admin's "no action needed" acknowledgment
+    (suppresses the dashboard banner). Idempotent — re-marking refreshes
+    the timestamp and the actor. Local write; no Zeffy call."""
+    record = _get_zeffy_payment_record(db, payment_id)
+    record.seen_at = datetime.now(timezone.utc)
+    record.seen_by = _admin.id
+    db.commit()
+    logger.info("Payment %s marked seen by admin %s", payment_id, _admin.id)
+    return AdminZeffySeenResponse(payment_id=payment_id, seen_at=record.seen_at)
+
+
+@zeffy_admin_router.delete("/payments/{payment_id}/seen", response_model=AdminZeffySeenResponse)
+def clear_payment_seen(
+    payment_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> AdminZeffySeenResponse:
+    """Clear the "seen" acknowledgment — the payment re-enters the banner
+    while still unmatched. Idempotent — clearing a fresh payment is a
+    no-op. Local write; no Zeffy call."""
+    record = _get_zeffy_payment_record(db, payment_id)
+    if record.seen_at is not None:
+        record.seen_at = None
+        record.seen_by = None
+        db.commit()
+    return AdminZeffySeenResponse(payment_id=payment_id, seen_at=record.seen_at)
+
+
 @zeffy_admin_router.post("/payments/{payment_id}/match", response_model=AdminZeffyMatchResponse)
 async def match_payment(
     payment_id: str,
@@ -214,12 +343,16 @@ async def match_payment(
 ) -> AdminZeffyMatchResponse:
     """Manual match: mark the chosen unpaid cash claims paid with the payment.
 
-    The payment is verified via the read API (exists, succeeded, on the
-    dedicated campaign, not already matched — no currency block on manual
-    match; the list shows the currency, admin judgment). A partial match
-    (a $600 payment covering one $500 claim) is allowed. The shared apply
-    path does the single commit + per-donor confirmation email covering
-    exactly the matched claims (a re-match after unmatch re-emails).
+    The payment is fetched fresh from the read API and checked first —
+    exists, succeeded, on the dedicated campaign: the mirror's population
+    (a payment outside it is never mirrored). Its mirror row is then
+    refreshed + committed *before* the remaining business checks — a
+    rejected match still leaves the page with the fresh state (e.g. a
+    refund that landed after the webhook). Not-yet-matched and active-claim
+    checks are local. A partial match (a $600 payment covering one $500
+    claim) is allowed. The shared apply path does the single commit +
+    per-donor confirmation email covering exactly the matched claims (a
+    re-match after unmatch re-emails).
     """
     if not data.claim_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Select at least one sponsorship")
@@ -229,6 +362,10 @@ async def match_payment(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"This payment hasn't completed yet (status: {payment.status})")
     if payment.campaign_id != zeffy.ZEFFY_CAMPAIGN_ID:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is not on the dedicated sponsorship campaign")
+    # Refresh the mirror row with the fresh payment, persisted before the
+    # business checks below (see the docstring).
+    upsert_zeffy_payment(db, payment)
+    db.commit()
 
     already = db.query(FamilyClaim.id).filter(FamilyClaim.zeffy_payment_id == payment_id, FamilyClaim.deleted_at.is_(None)).first()
     if already is not None:
@@ -283,8 +420,7 @@ def unmatch_payment(
     payment window (created_at = now — without it the next sweep would
     delete a claim whose window already lapsed). 400 if any target is
     fulfilled (fulfillment is not undone here); 404 if no claim stores the
-    id. No email — a re-match (the typical next step) re-emails.
-    """
+    id. No email — a re-match (the typical next step) re-emails."""
     claims = (
         db.query(FamilyClaim)
         .filter(FamilyClaim.zeffy_payment_id == payment_id, FamilyClaim.deleted_at.is_(None))

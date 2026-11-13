@@ -16,6 +16,7 @@ import { useToast } from "../context/ToastContext";
 import { useDashboardTiles } from "../hooks/useDashboardTiles";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import {
+  adminListZeffyUnmatchedSummary,
   changePasswordRequest,
   donorListClaims,
   getReferrerMe,
@@ -27,6 +28,7 @@ import {
 } from "../lib/api";
 import {
   adminReviewQueue,
+  adminZeffyUnmatchedSummary,
   auth,
   donorClaims,
   pendingFamilies as PENDING_FAMILIES_KEY,
@@ -66,6 +68,14 @@ export default function Dashboard() {
     queryKey: adminReviewQueue,
     queryFn: listAdminReviewQueue,
     enabled: user?.role === "admin",
+  });
+
+  // Unmatched Zeffy payments waiting for a match (the admin banner)
+  const { data: zeffyUnmatchedSummary } = useQuery({
+    queryKey: adminZeffyUnmatchedSummary,
+    queryFn: adminListZeffyUnmatchedSummary,
+    enabled: user?.role === "admin",
+    refetchInterval: 60_000, // webhook/sync land new rows without a reload
   });
 
   const { data: donorClaimsData, isLoading: donorClaimsLoading } = useQuery({
@@ -126,6 +136,11 @@ export default function Dashboard() {
         {/* Referrer wish review queue alert */}
         {user?.role === "referrer" && referrerReviewQueueData && referrerReviewQueueData.length > 0 && (
           <QueueAlert count={referrerReviewQueueData.length} label="awaiting your wish review" to={ROUTES.REFERRER_WISH_REVIEW} />
+        )}
+
+        {/* Admin unmatched-payments alert (money first, above the review queue) */}
+        {user?.role === "admin" && zeffyUnmatchedSummary && zeffyUnmatchedSummary.count > 0 && (
+          <UnmatchedPaymentsAlert count={zeffyUnmatchedSummary.count} />
         )}
 
         {/* Admin wish review queue alert */}
@@ -1066,6 +1081,23 @@ function QueueAlert({ count, label, to, tone = "blue" }: QueueAlertProps) {
       className={`mb-6 block rounded-xl border px-6 py-4 text-sm font-semibold shadow-sm transition-colors ${queueAlertTones[tone]}`}
     >
       {count} famil{count > 1 ? "ies" : "y"} {label} →
+    </Link>
+  );
+}
+
+/**
+ * UnmatchedPaymentsAlert — Zeffy payments waiting for a manual match or a
+ * "seen" acknowledgment (the local mirror's unmatched population). Amber
+ * like the other money-adjacent queue alert; stacks with the wish-review
+ * alert when both are non-empty.
+ */
+function UnmatchedPaymentsAlert({ count }: { count: number }) {
+  return (
+    <Link
+      to={ROUTES.ADMIN_ZEFFY_PAYMENTS}
+      className={`mb-6 block rounded-xl border px-6 py-4 text-sm font-semibold shadow-sm transition-colors ${queueAlertTones.amber}`}
+    >
+      {count} unmatched Zeffy payment{count === 1 ? "" : "s"} waiting for a match →
     </Link>
   );
 }

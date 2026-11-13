@@ -779,3 +779,49 @@ class FamilyClaim(Base):
     # Relationships
     donor_user: Mapped["User"] = relationship("User")
     family: Mapped["Family"] = relationship("Family")
+
+
+# ---------------------------------------------------------------------------
+# Zeffy payment mirror (admin unmatched-payments banner + local reconciliation)
+# ---------------------------------------------------------------------------
+
+
+class ZeffyPaymentRecord(Base):
+    """Local mirror of a Zeffy payment observed on the dedicated campaign.
+
+    One row per Zeffy payment id, upserted by every path that fetches a
+    payment (webhook, hourly sync walk, admin "sync now", shared apply
+    path). Snapshot fields carry display data. **Match state is not stored
+    here** — a payment is matched when a live (non-deleted) claim stores
+    its ``payment_id`` on ``FamilyClaim.zeffy_payment_id`` — so match and
+    unmatch via the existing endpoints keep the banner and the local list
+    in sync for free.
+
+    ``seen_at``/``seen_by`` are the admin's explicit "no action needed"
+    acknowledgment; the banner shows payments with no live match and no
+    ``seen_at``. The apply path clears them on match, so a later unmatch
+    re-surfaces the payment. Rows are never deleted (mirror history).
+    """
+
+    __tablename__ = "zeffy_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # Zeffy payment id (UUID string) — unique: one mirror row per payment.
+    payment_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    # When Zeffy recorded the payment (its ``created`` unix timestamp).
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    buyer_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    buyer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    campaign_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    receipt_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Succeeded on ingest; the match endpoint and the sync walk's newest
+    # known row refresh these (e.g. a refund), so the page shows a fresh
+    # state.
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    refund_status: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
+    # Admin "seen" acknowledgment (banner suppression), set/cleared by the
+    # seen endpoints; cleared again by the apply path on match.
+    seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    seen_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, default=None)

@@ -31,6 +31,7 @@ from app.models import (
     FamilyVerificationStatus,
     SentEmail,
     WishLockLevel,
+    ZeffyPaymentRecord,
 )
 from app.payments import apply_payment_to_claims
 from tests.conftest import login_as, make_family
@@ -889,6 +890,10 @@ class TestConfirm:
         # The cart is now empty
         assert test_client.get("/api/donor/cart").json()["item_count"] == 0
 
+        # The applied payment is mirrored (the apply path upserts it, so
+        # confirm-matched payments appear in the admin reconciliation list)
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-77").first() is not None
+
         # Exactly one confirmation email
         assert len(_sent_rows(db, EmailKind.payment_confirmed, DONOR_EMAIL)) == 1
 
@@ -1087,6 +1092,8 @@ class TestWebhook:
 
         claim = db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).first()
         assert claim.payment_status == ClaimPaymentStatus.pending
+        # Other campaigns are filtered BEFORE the mirror — no row
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment["id"]).first() is None
 
     def test_known_donor_with_matching_payment_applies(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         _create_donor(test_client)
@@ -1108,6 +1115,8 @@ class TestWebhook:
         assert claim.payment_status == ClaimPaymentStatus.paid
         assert claim.zeffy_payment_id == "pay-wh"
         assert len(_sent_rows(db, EmailKind.payment_confirmed, DONOR_EMAIL)) == 1
+        # The applied payment is mirrored (matched via the claim)
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-wh").first() is not None
 
     def test_duplicate_delivery_is_noop(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         """Zeffy retries non-2xx up to 5 times — a duplicate delivery of the
@@ -1140,6 +1149,11 @@ class TestWebhook:
         resp = test_client.post("/api/zeffy/webhook", content=body, headers=_webhook_headers(body))
         assert resp.status_code == 200
         assert resp.json()["status"] == "ignored"
+        # …but the payment is mirrored: this is exactly what the admin
+        # unmatched-payments banner is for (no donor account to auto-match).
+        record = db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment["id"]).first()
+        assert record is not None
+        assert record.buyer_email == "ghost@test.com"
 
     def test_no_pending_cart_ignored(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         _create_donor(test_client)
@@ -1150,6 +1164,8 @@ class TestWebhook:
         resp = test_client.post("/api/zeffy/webhook", content=body, headers=_webhook_headers(body))
         assert resp.status_code == 200
         assert resp.json()["status"] == "ignored"
+        # Mirrored despite the ignore (the donor exists but has no cart)
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment["id"]).first() is not None
 
     def test_amount_mismatch_ignored(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         _create_donor(test_client)
@@ -1168,3 +1184,5 @@ class TestWebhook:
 
         claim = db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).first()
         assert claim.payment_status == ClaimPaymentStatus.pending
+        # Mirrored despite the ignore (wrong amount for the cart)
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment["id"]).first() is not None

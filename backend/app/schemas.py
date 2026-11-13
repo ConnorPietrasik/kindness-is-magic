@@ -2016,10 +2016,14 @@ class AdminClaimMarkPaid(BaseModel):
 
 
 class AdminZeffyPayment(BaseModel):
-    """One Zeffy payment enriched with local match state.
+    """One mirrored Zeffy payment enriched with local match state.
 
-    ``matched`` / ``claim_ids`` are local: the claims storing this payment
-    id (a matched payment lists them; an unmatched one has none).
+    ``matched`` / ``claim_ids`` are local: the live claims storing this
+    payment id (a matched payment lists them; an unmatched one has none).
+    ``seen_at`` is the admin's "no action needed" acknowledgment; the
+    snapshot fields (incl. ``refund_status``) are refreshed by the match
+    endpoint and the sync walk's newest known row, so a recent refund shows
+    up.
     """
 
     id: str
@@ -2031,15 +2035,43 @@ class AdminZeffyPayment(BaseModel):
     receipt_url: str | None = None
     claim_ids: list[int]
     matched: bool
+    seen_at: datetime | None = None
+    refund_status: str = "none"
 
 
 class AdminZeffyPaymentsResponse(BaseModel):
-    """Zeffy payment list — cursor-based (Zeffy's pagination), not the page
-    envelope the other admin lists use."""
+    """Mirrored payment list — the standard admin page envelope (the local
+    table is the source; the webhook, the hourly sync, and Sync now keep
+    it fresh)."""
 
     payments: list[AdminZeffyPayment]
-    has_more: bool
-    next_cursor: str | None = None
+    total: int = 0
+    page: int = 1
+    page_size: int = 25
+    total_pages: int = 0
+
+
+class AdminZeffyUnmatchedSummary(BaseModel):
+    """The admin dashboard banner: how many mirrored payments are waiting
+    for action (no live match, no "seen" acknowledgment) and the oldest."""
+
+    count: int = 0
+    oldest_created_at: datetime | None = None
+
+
+class AdminZeffySyncResponse(BaseModel):
+    """Result of an admin-triggered "sync now" pull of the campaign's
+    payments into the local mirror."""
+
+    new_count: int = 0
+    updated_count: int = 0
+
+
+class AdminZeffySeenResponse(BaseModel):
+    """Result of marking a payment seen / clearing the acknowledgment."""
+
+    payment_id: str
+    seen_at: datetime | None = None
 
 
 class AdminZeffyPendingClaimItem(BaseModel):

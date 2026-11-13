@@ -1,5 +1,6 @@
-"""Admin Zeffy reconciliation tests: payment list (pass-through + enrichment),
-pending-claims grouping, manual match, unmatch.
+"""Admin Zeffy reconciliation tests: the local mirror list (unmatched-first +
+sync), pending-claims grouping, the unmatched summary, seen, manual match,
+unmatch.
 
 The Zeffy client is mocked via ``_transport_override`` (the same pattern as
 ``test_cart_checkout.py``); throttle is disabled via ZEFFY_MIN_INTERVAL_SECONDS.
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.zeffy as zeffy
@@ -26,9 +28,10 @@ from app.models import (
     User,
     UserRole,
     WishLockLevel,
+    ZeffyPaymentRecord,
 )
 from app.auth import get_password_hash
-from app.payments import apply_payment_to_claims
+from app.payments import apply_payment_to_claims, upsert_zeffy_payment
 from app.response_builders import batch_build_family_info
 from tests.conftest import login_as, make_family
 
@@ -188,13 +191,24 @@ def _sent_rows(db: Session, kind: EmailKind, recipient: str) -> list[SentEmail]:
     return db.query(SentEmail).filter(SentEmail.kind == kind, SentEmail.recipient_email == recipient).order_by(SentEmail.sent_at).all()
 
 
+def _seed_mirror(db: Session, raw: dict, **overrides) -> ZeffyPaymentRecord:
+    """A mirror row straight from a raw Zeffy payment (the webhook's job in
+    production), with optional post-insert field tweaks."""
+    record = upsert_zeffy_payment(db, zeffy.parse_payment(raw))
+    for field, value in overrides.items():
+        setattr(record, field, value)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
 # ---------------------------------------------------------------------------
-# GET /api/admin/zeffy/payments — pass-through + enrichment
+# GET /api/admin/zeffy/payments — the local mirror, unmatched-first
 # ---------------------------------------------------------------------------
 
 
 class TestPaymentsList:
-    async def test_enriches_matched_and_unmatched_rows(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+    async def test_default_unmatched_only_and_show_matched(self, test_client: TestClient, db: Session, admin_user):
         d1 = _donor_row(db, DONOR1_EMAIL)
         _donor_row(db, DONOR2_EMAIL)
         fam1 = _eligible_family(db, "Matched Family 1")
@@ -202,37 +216,49 @@ class TestPaymentsList:
         c1 = _pending_cash_claim(db, d1, fam1)
         c2 = _pending_cash_claim(db, d1, fam2)
 
-        raw_matched = _payment_raw(id="pay-matched", amount=110_000, email=DONOR1_EMAIL)
-        raw_unmatched = _payment_raw(id="pay-unmatched", amount=50_000, email=DONOR2_EMAIL)
+        raw_matched = _payment_raw(id="pay-matched", created=int(time.time()) - 60, amount=110_000, email=DONOR1_EMAIL)
+        raw_unmatched = _payment_raw(id="pay-unmatched", created=int(time.time()), amount=50_000, email=DONOR2_EMAIL)
+        _seed_mirror(db, raw_matched)
+        _seed_mirror(db, raw_unmatched)
         # Match the first payment to both claims via the shared apply path
+        # (email off in this fixture — Zeffy sends its own receipt)
         applied = await apply_payment_to_claims(db, [c1, c2], zeffy.parse_payment(raw_matched))
         assert applied is True
 
-        _configure_zeffy(monkeypatch, payments=[raw_matched, raw_unmatched])
         _login_admin(test_client)
+        # Default view: the banner's population — unmatched only
         resp = test_client.get("/api/admin/zeffy/payments")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["has_more"] is False
-        assert body["next_cursor"] is None
+        assert body["total"] == 1
+        assert body["total_pages"] == 1
+        unmatched = body["payments"][0]
+        assert unmatched["id"] == "pay-unmatched"
+        assert unmatched["matched"] is False
+        assert unmatched["claim_ids"] == []
+        assert unmatched["buyer_email"] == DONOR2_EMAIL
+        assert unmatched["buyer_name"] == "Ada Lovelace"
+        assert unmatched["amount_cents"] == 50_000
+        assert unmatched["currency"] == "usd"
+        assert unmatched["receipt_url"] == "https://zeffy.com/receipt/pay-unmatched"
+        assert unmatched["created_at"] is not None
+        assert unmatched["seen_at"] is None
+        assert unmatched["refund_status"] == "none"
 
+        # show_matched: the full history, matched rows enriched with claims
+        resp = test_client.get("/api/admin/zeffy/payments", params={"show_matched": "true"})
+        body = resp.json()
+        assert body["total"] == 2
         by_id = {p["id"]: p for p in body["payments"]}
+        # Newest first (the unmatched row was created later)
+        assert [p["id"] for p in body["payments"]] == ["pay-unmatched", "pay-matched"]
         matched = by_id["pay-matched"]
         assert matched["matched"] is True
         assert matched["claim_ids"] == sorted([c1.id, c2.id])
         assert matched["buyer_email"] == DONOR1_EMAIL
-        assert matched["buyer_name"] == "Ada Lovelace"
-        assert matched["amount_cents"] == 110_000
-        assert matched["currency"] == "usd"
-        assert matched["receipt_url"] == "https://zeffy.com/receipt/pay-matched"
-        assert matched["created_at"] is not None
 
-        unmatched = by_id["pay-unmatched"]
-        assert unmatched["matched"] is False
-        assert unmatched["claim_ids"] == []
-
-    def test_columns_trimming(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
-        _configure_zeffy(monkeypatch, payments=[_payment_raw(id="pay-c", email=DONOR1_EMAIL)])
+    def test_columns_trimming(self, test_client: TestClient, db: Session, admin_user):
+        _seed_mirror(db, _payment_raw(id="pay-c", email=DONOR1_EMAIL))
         _login_admin(test_client)
 
         resp = test_client.get("/api/admin/zeffy/payments", params={"columns": "id,matched,buyer_email"})
@@ -242,24 +268,106 @@ class TestPaymentsList:
         assert "buyer_email" in item
         assert "buyer_name" not in item
         assert "receipt_url" not in item
+        # The row's chips/actions aren't selectable columns — always present
+        # (a missing seen_at/refund_status reads as a fresh, non-refunded row
+        # client-side and breaks the Seen/Refunded UI)
+        assert "seen_at" in item
+        assert "refund_status" in item
+        assert "claim_ids" in item
 
         # Unknown column → 400
         resp = test_client.get("/api/admin/zeffy/payments", params={"columns": "id,bogus"})
         assert resp.status_code == 400
         assert "bogus" in resp.json()["detail"]
 
-    def test_cursor_passthrough(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
-        seen: dict[str, str | None] = {}
+    def test_pagination(self, test_client: TestClient, db: Session, admin_user):
+        now = int(time.time())
+        for i in range(3):
+            _seed_mirror(db, _payment_raw(id=f"pay-page-{i}", created=now - i * 100, email=DONOR1_EMAIL))
+
+        _login_admin(test_client)
+        resp = test_client.get("/api/admin/zeffy/payments", params={"page": 1, "page_size": 2})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 3
+        assert body["total_pages"] == 2
+        assert [p["id"] for p in body["payments"]] == ["pay-page-0", "pay-page-1"]  # newest first
+
+        resp = test_client.get("/api/admin/zeffy/payments", params={"page": 2, "page_size": 2})
+        assert [p["id"] for p in resp.json()["payments"]] == ["pay-page-2"]
+
+    def test_works_unconfigured(self, test_client: TestClient, db: Session, admin_user):
+        """The list and summary are local reads — no 503 in the default
+        unconfigured state (empty table)."""
+        _login_admin(test_client)
+        resp = test_client.get("/api/admin/zeffy/payments")
+        assert resp.status_code == 200
+        assert resp.json() == {"payments": [], "total": 0, "page": 1, "page_size": 25, "total_pages": 0}
+
+        resp = test_client.get("/api/admin/zeffy/unmatched-summary")
+        assert resp.status_code == 200
+        assert resp.json() == {"count": 0, "oldest_created_at": None}
+
+    def test_forbidden_for_donor(self, test_client: TestClient, db: Session, admin_user):
+        """require_admin rejects before any Zeffy call (works unconfigured)."""
+        _register_donor(test_client, DONOR1_EMAIL, DONOR1_PASSWORD, "Z Donor 1")
+        resp = test_client.get("/api/admin/zeffy/payments")
+        assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/zeffy/sync — pull the campaign into the local mirror
+# ---------------------------------------------------------------------------
+
+
+class TestSync:
+    def test_inserts_new_and_stops_at_first_known(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """Steady-state sync: one API call (the walk stops at the first
+        known row, even when the mock claims there is a next page)."""
+        list_calls: list[int] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
                 return httpx.Response(
                     200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
                 )
-            seen["starting_after"] = request.url.params.get("starting_after")
-            seen["limit"] = request.url.params.get("limit")
-            seen["status"] = request.url.params.get("status")
-            return httpx.Response(200, json=_envelope([_payment_raw(id="pay-page2")], has_more=True, next_cursor="cursor-2"))
+            list_calls.append(1)
+            return httpx.Response(
+                200,
+                json=_envelope(
+                    [_payment_raw(id="pay-new-1"), _payment_raw(id="pay-new-2"), _payment_raw(id="pay-known")],
+                    has_more=True,
+                    next_cursor="should-not-be-used",
+                ),
+            )
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+        _seed_mirror(db, _payment_raw(id="pay-known"))
+
+        _login_admin(test_client)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 200
+        assert resp.json() == {"new_count": 2, "updated_count": 1}
+        assert len(list_calls) == 1  # stopped at pay-known; no second page
+        ids = {r.payment_id for r in db.query(ZeffyPaymentRecord).all()}
+        assert ids == {"pay-known", "pay-new-1", "pay-new-2"}
+
+    def test_backfill_walks_all_pages(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """First run on an empty mirror: every page until exhausted."""
+        pages = {
+            None: _envelope([_payment_raw(id="pay-b1"), _payment_raw(id="pay-b2")], has_more=True, next_cursor="c2"),
+            "c2": _envelope([_payment_raw(id="pay-b3")], has_more=False),
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
+                return httpx.Response(
+                    200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+                )
+            return httpx.Response(200, json=pages[request.url.params.get("starting_after")])
 
         monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
         monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
@@ -267,38 +375,234 @@ class TestPaymentsList:
         zeffy.clear_campaign_cache()
 
         _login_admin(test_client)
-        resp = test_client.get("/api/admin/zeffy/payments", params={"starting_after": "cursor-1", "limit": 7})
+        resp = test_client.post("/api/admin/zeffy/sync")
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["has_more"] is True
-        assert body["next_cursor"] == "cursor-2"
-        assert seen["starting_after"] == "cursor-1"
-        assert seen["limit"] == "7"
-        assert seen["status"] == "succeeded"
+        assert resp.json() == {"new_count": 3, "updated_count": 0}
+        assert db.query(ZeffyPaymentRecord).count() == 3
+
+    def test_refreshes_known_fields_and_preserves_seen(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A known row's snapshot is refreshed (e.g. a refund that landed
+        after the webhook); the admin's seen acknowledgment survives."""
+        raw = _payment_raw(id="pay-ref")
+        record = _seed_mirror(db, raw, seen_at=datetime.now(timezone.utc))
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
+                return httpx.Response(
+                    200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+                )
+            raw_refunded = dict(raw)
+            raw_refunded["refund_status"] = "refunded"
+            raw_refunded["amount"] = 99_000
+            return httpx.Response(200, json=_envelope([raw_refunded]))
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+
+        _login_admin(test_client)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 200
+        assert resp.json() == {"new_count": 0, "updated_count": 1}
+
+        db.refresh(record)
+        assert record.refund_status == "refunded"
+        assert record.amount_cents == 99_000
+        assert record.seen_at is not None  # attention state untouched
 
     def test_unconfigured_503(self, test_client: TestClient, db: Session, admin_user):
         _login_admin(test_client)
-        resp = test_client.get("/api/admin/zeffy/payments")
+        resp = test_client.post("/api/admin/zeffy/sync")
         assert resp.status_code == 503
 
     def test_bad_campaign_503(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         _configure_zeffy(monkeypatch, payments=[], campaign_found=False)
         _login_admin(test_client)
-        resp = test_client.get("/api/admin/zeffy/payments")
+        resp = test_client.post("/api/admin/zeffy/sync")
         assert resp.status_code == 503
 
     def test_bad_key_502(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         """A rejected API key (401) is a 502, not a 500 — same mapping as the donor confirm endpoint."""
         _configure_zeffy(monkeypatch, payments=[], auth_ok=False)
         _login_admin(test_client)
-        resp = test_client.get("/api/admin/zeffy/payments")
+        resp = test_client.post("/api/admin/zeffy/sync")
         assert resp.status_code == 502
 
-    def test_forbidden_for_donor(self, test_client: TestClient, db: Session, admin_user):
-        """require_admin rejects before any Zeffy call (works unconfigured)."""
-        _register_donor(test_client, DONOR1_EMAIL, DONOR1_PASSWORD, "Z Donor 1")
-        resp = test_client.get("/api/admin/zeffy/payments")
-        assert resp.status_code == 403
+    def test_sync_lost_insert_race_409s(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A concurrent first insert (the webhook or a sibling sync committing
+        the same payment first) loses to the mirror's unique index — the
+        endpoint rolls the session back and reports the conflict instead of a
+        500; the row already exists (the winner's) and the next sync
+        converges."""
+        from types import SimpleNamespace
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
+                return httpx.Response(
+                    200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+                )
+            return httpx.Response(200, json=_envelope([_payment_raw(id="pay-race")]))
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+        _login_admin(test_client)
+
+        class _UniqueViolation(Exception):
+            pgcode = "23505"  # SQLSTATE unique_violation
+
+            def __init__(self):
+                super().__init__('duplicate key value violates unique constraint "uq_zeffy_payments_payment_id"')
+                self.diag = SimpleNamespace(constraint_name="uq_zeffy_payments_payment_id")
+
+        def _commit_losing_race():
+            # Flush like a real commit so the INSERT lands in the savepoint,
+            # then fail the way Postgres would once the rival row commits.
+            db.flush()
+            raise IntegrityError(
+                "INSERT INTO zeffy_payments (payment_id) VALUES (%(payment_id)s)",
+                {"payment_id": "pay-race"},
+                _UniqueViolation(),
+            )
+
+        monkeypatch.setattr(db, "commit", _commit_losing_race)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 409
+        assert "try again" in resp.json()["detail"]
+
+        # The flushed INSERT is gone — the handler rolled the session back.
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-race").first() is None
+
+    def test_sync_unrelated_integrity_error_500s(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A commit failure that isn't the mirror's payment_id unique index
+        (e.g. an FK violation) must not be mislabelled as a lost race — the
+        global SQLAlchemy handler turns it into a generic 500."""
+        from types import SimpleNamespace
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
+                return httpx.Response(
+                    200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+                )
+            return httpx.Response(200, json=_envelope([_payment_raw(id="pay-race2")]))
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+        _login_admin(test_client)
+
+        class _ForeignKeyViolation(Exception):
+            pgcode = "23503"  # SQLSTATE foreign_key_violation
+
+            def __init__(self):
+                super().__init__('insert or update on table "zeffy_payments" violates foreign key constraint "fk_zeffy_payments_seen_by"')
+                self.diag = SimpleNamespace(constraint_name="fk_zeffy_payments_seen_by")
+
+        def _commit_fk_violation():
+            raise IntegrityError(
+                "INSERT INTO zeffy_payments (payment_id) VALUES (%(payment_id)s)",
+                {"payment_id": "pay-race2"},
+                _ForeignKeyViolation(),
+            )
+
+        monkeypatch.setattr(db, "commit", _commit_fk_violation)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/zeffy/unmatched-summary — the dashboard banner
+# ---------------------------------------------------------------------------
+
+
+class TestUnmatchedSummary:
+    def test_counts_only_unmatched_unseen(self, test_client: TestClient, db: Session, admin_user):
+        d1 = _donor_row(db, DONOR1_EMAIL)
+        now = int(time.time())
+
+        # Counted: unmatched, never seen
+        _seed_mirror(db, _payment_raw(id="pay-count", created=now - 100, email=DONOR1_EMAIL))
+        _seed_mirror(db, _payment_raw(id="pay-count-2", created=now - 50, email=DONOR1_EMAIL))
+
+        # Not counted: matched (a live claim stores the id)
+        fam = _eligible_family(db, "Summary Family")
+        fam2 = _eligible_family(db, "Summary Family 2")
+        claim_live = _pending_cash_claim(db, d1, fam)
+        claim_live.zeffy_payment_id = "pay-matched"
+        claim_live.payment_status = ClaimPaymentStatus.paid
+        db.commit()
+        _seed_mirror(db, _payment_raw(id="pay-matched", created=now - 40, email=DONOR1_EMAIL))
+
+        # Not counted: seen
+        _seed_mirror(db, _payment_raw(id="pay-seen", created=now - 30, email=DONOR1_EMAIL), seen_at=datetime.now(timezone.utc))
+
+        # Counted: matched only by a soft-DELETED claim (a deleted match is
+        # not a match — the payment is waiting again)
+        claim_deleted = _pending_cash_claim(db, d1, fam2)
+        claim_deleted.zeffy_payment_id = "pay-deleted-match"
+        claim_deleted.payment_status = ClaimPaymentStatus.paid
+        claim_deleted.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        _seed_mirror(db, _payment_raw(id="pay-deleted-match", created=now - 20, email=DONOR1_EMAIL))
+
+        _login_admin(test_client)
+        resp = test_client.get("/api/admin/zeffy/unmatched-summary")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["count"] == 3  # pay-count, pay-count-2, pay-deleted-match
+        # Oldest of the counted rows (pay-count, now - 100)
+        assert body["oldest_created_at"] is not None
+
+    def test_empty(self, test_client: TestClient, db: Session, admin_user):
+        _login_admin(test_client)
+        resp = test_client.get("/api/admin/zeffy/unmatched-summary")
+        assert resp.status_code == 200
+        assert resp.json() == {"count": 0, "oldest_created_at": None}
+
+
+# ---------------------------------------------------------------------------
+# POST/DELETE /api/admin/zeffy/payments/{id}/seen — the banner acknowledgment
+# ---------------------------------------------------------------------------
+
+
+class TestSeen:
+    def test_mark_and_clear_roundtrip(self, test_client: TestClient, db: Session, admin_user):
+        _seed_mirror(db, _payment_raw(id="pay-s", email=DONOR1_EMAIL))
+        _login_admin(test_client)
+
+        # Baseline: the banner counts it
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 1
+
+        resp = test_client.post("/api/admin/zeffy/payments/pay-s/seen")
+        assert resp.status_code == 200
+        assert resp.json()["seen_at"] is not None
+        # Suppressed from the banner and the default list view
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 0
+        assert test_client.get("/api/admin/zeffy/payments").json()["total"] == 0
+        # …but still visible with show_matched (the row, with seen_at set)
+        item = test_client.get("/api/admin/zeffy/payments", params={"show_matched": "true"}).json()["payments"][0]
+        assert item["seen_at"] is not None
+
+        resp = test_client.delete("/api/admin/zeffy/payments/pay-s/seen")
+        assert resp.status_code == 200
+        assert resp.json()["seen_at"] is None
+        # Re-enters the banner while still unmatched
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 1
+
+    def test_clear_is_idempotent(self, test_client: TestClient, db: Session, admin_user):
+        _seed_mirror(db, _payment_raw(id="pay-s2", email=DONOR1_EMAIL))
+        _login_admin(test_client)
+        resp = test_client.delete("/api/admin/zeffy/payments/pay-s2/seen")
+        assert resp.status_code == 200
+        assert resp.json() == {"payment_id": "pay-s2", "seen_at": None}
+
+    def test_unknown_payment_404(self, test_client: TestClient, db: Session, admin_user):
+        _login_admin(test_client)
+        assert test_client.post("/api/admin/zeffy/payments/nope/seen").status_code == 404
+        assert test_client.delete("/api/admin/zeffy/payments/nope/seen").status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -405,11 +709,67 @@ class TestMatch:
         assert len(_sent_rows(db, EmailKind.payment_confirmed, DONOR1_EMAIL)) == 1
         assert len(_sent_rows(db, EmailKind.payment_confirmed, DONOR2_EMAIL)) == 1
 
-        # The payment now shows as matched in the list
-        resp = test_client.get("/api/admin/zeffy/payments")
+        # The payment now shows as matched in the list (behind the toggle —
+        # the default view is the banner's unmatched population)
+        resp = test_client.get("/api/admin/zeffy/payments", params={"show_matched": "true"})
         by_id = {p["id"]: p for p in resp.json()["payments"]}
         assert by_id[raw["id"]]["matched"] is True
         assert by_id[raw["id"]]["claim_ids"] == sorted([c1.id, c2.id])
+        assert by_id[raw["id"]]["seen_at"] is None  # apply path cleared it
+
+    def test_match_refreshes_mirror_and_persists_on_rejection(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """The fresh payment (succeeded, dedicated campaign) is mirrored (and
+        committed) BEFORE the business checks — a rejected match still leaves
+        the page with the fresh state (here: already matched, and the fresh
+        fetch shows a refund that landed after the webhook)."""
+        d1 = _donor_row(db, DONOR1_EMAIL)
+        f1 = _eligible_family(db, "Fresh Mirror Family")
+        f2 = _eligible_family(db, "Fresh Mirror Family 2")
+        c1 = _pending_cash_claim(db, d1, f1)
+        # The payment is already stored on another live claim
+        c_other = _pending_cash_claim(db, d1, f2, zeffy_payment_id="pay-fresh")
+        c_other.payment_status = ClaimPaymentStatus.paid
+        db.commit()
+
+        record = _seed_mirror(db, _payment_raw(id="pay-fresh", amount=50_000, email=DONOR1_EMAIL))
+
+        fresh = _payment_raw(id="pay-fresh", amount=50_000, email=DONOR1_EMAIL)
+        fresh["refund_status"] = "refunded"
+        _configure_zeffy(monkeypatch, payments=[fresh])
+        _login_admin(test_client)
+
+        resp = test_client.post("/api/admin/zeffy/payments/pay-fresh/match", json={"claim_ids": [c1.id]})
+        assert resp.status_code == 400
+        assert "already matched" in resp.json()["detail"]
+
+        db.refresh(record)
+        assert record.refund_status == "refunded"  # fresh state persisted despite the rejection
+        db.refresh(c1)
+        assert c1.payment_status == ClaimPaymentStatus.pending  # nothing applied
+
+    def test_match_clears_seen(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """Matching a payment the admin had marked seen clears the
+        acknowledgment — a later unmatch re-surfaces it in the banner."""
+        d1 = _donor_row(db, DONOR1_EMAIL)
+        f1 = _eligible_family(db, "Seen Match Family")
+        c1 = _pending_cash_claim(db, d1, f1)
+
+        raw = _payment_raw(id="pay-seen-match", amount=50_000, email=DONOR1_EMAIL)
+        _seed_mirror(db, raw, seen_at=datetime.now(timezone.utc))
+        _configure_zeffy(monkeypatch, payments=[raw])
+        _login_admin(test_client)
+
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 0  # seen
+        resp = test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/match", json={"claim_ids": [c1.id]})
+        assert resp.status_code == 200
+
+        db.expire_all()
+        record = db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == raw["id"]).first()
+        assert record.seen_at is None
+
+        # Unmatch → unmatched + un-seen → banner re-surfaces
+        assert test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/unmatch").status_code == 200
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 1
 
     async def test_partial_match_emails_cover_just_that_claim(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         """An admin partial match (payment → 1 of 2 cart claims) sends a
@@ -506,6 +866,8 @@ class TestMatch:
         resp = test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/match", json={"claim_ids": [c1.id]})
         assert resp.status_code == 400
         assert "hasn't completed" in resp.json()["detail"]
+        # Outside the mirror's population (succeeded only) — not mirrored
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-pending").first() is None
 
     def test_wrong_campaign_400(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         d1 = _donor_row(db, DONOR1_EMAIL)
@@ -517,6 +879,8 @@ class TestMatch:
         resp = test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/match", json={"claim_ids": [c1.id]})
         assert resp.status_code == 400
         assert "campaign" in resp.json()["detail"]
+        # Outside the mirror's population (dedicated campaign only) — not mirrored
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-other").first() is None
 
     def test_unconfigured_503(self, test_client: TestClient, db: Session, admin_user):
         _login_admin(test_client)
@@ -563,11 +927,14 @@ class TestUnmatch:
             # Fresh window: the lapsed claim is not immediately re-swept
             assert c.created_at >= datetime.now(timezone.utc) - timedelta(seconds=10)
 
-        # The payment is unmatched in the list again
+        # The payment is unmatched in the list again (the default view is
+        # the banner's population, so its mere presence is the assertion)
         resp = test_client.get("/api/admin/zeffy/payments")
         by_id = {p["id"]: p for p in resp.json()["payments"]}
         assert by_id[raw["id"]]["matched"] is False
         assert by_id[raw["id"]]["claim_ids"] == []
+        # …and the banner counts it again
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 1
 
     def test_unmatch_fulfilled_target_400(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         d1 = _donor_row(db, DONOR1_EMAIL)

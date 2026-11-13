@@ -1231,26 +1231,51 @@ describe("donor cart API functions", () => {
 describe("admin zeffy payments API functions", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("adminListZeffyPayments — GET /api/admin/zeffy/payments (cursor + CSV columns)", async () => {
-    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], has_more: false, next_cursor: null } });
+  it("adminListZeffyPayments — GET /api/admin/zeffy/payments (page + CSV columns + show_matched default)", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], total: 0, page: 1, page_size: 25, total_pages: 0 } });
     await apiModule.adminListZeffyPayments({
-      starting_after: "0195f3a2-bb0c-7b00-8000-0000000000ff",
-      limit: 25,
+      page: 2,
+      page_size: 25,
       columns: ["amount_cents", "buyer_email"],
     });
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/payments", {
       params: {
-        starting_after: "0195f3a2-bb0c-7b00-8000-0000000000ff",
-        limit: 25,
+        page: 2,
+        page_size: 25,
         columns: "amount_cents,buyer_email",
+        show_matched: false,
       },
     });
   });
 
   it("adminListZeffyPayments — omitting params sends none", async () => {
-    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], has_more: false, next_cursor: null } });
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { payments: [], total: 0, page: 1, page_size: 25, total_pages: 0 } });
     await apiModule.adminListZeffyPayments();
     expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/payments");
+  });
+
+  it("adminSyncZeffyPayments — POST /api/admin/zeffy/sync", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { new_count: 2, updated_count: 1 } });
+    const result = await apiModule.adminSyncZeffyPayments();
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/zeffy/sync");
+    expect(result).toEqual({ new_count: 2, updated_count: 1 });
+  });
+
+  it("adminListZeffyUnmatchedSummary — GET /api/admin/zeffy/unmatched-summary", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { count: 3, oldest_created_at: "2025-12-01T00:00:00Z" } });
+    const result = await apiModule.adminListZeffyUnmatchedSummary();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/zeffy/unmatched-summary");
+    expect(result).toEqual({ count: 3, oldest_created_at: "2025-12-01T00:00:00Z" });
+  });
+
+  it("adminMarkZeffyPaymentSeen / adminClearZeffyPaymentSeen — seen endpoints", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { payment_id: "pay-1", seen_at: "2025-12-11T09:00:00Z" } });
+    await apiModule.adminMarkZeffyPaymentSeen("pay-1");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/zeffy/payments/pay-1/seen");
+
+    mockAxiosInstance.delete.mockResolvedValueOnce({ data: {} });
+    await apiModule.adminClearZeffyPaymentSeen("pay-1");
+    expect(mockAxiosInstance.delete).toHaveBeenCalledWith("/api/admin/zeffy/payments/pay-1/seen");
   });
 
   it("adminListZeffyPendingClaims — GET /api/admin/zeffy/pending-claims", async () => {

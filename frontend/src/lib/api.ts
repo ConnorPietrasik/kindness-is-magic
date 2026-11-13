@@ -95,6 +95,9 @@ import type {
   ZeffyMatchResult,
   ZeffyPaymentsResponse,
   ZeffyPendingClaimsResponse,
+  ZeffySeenResult,
+  ZeffySyncResult,
+  ZeffyUnmatchedSummary,
   ZeffyUnmatchResult,
 } from "../types";
 import { normalizePayload } from "./utils";
@@ -911,10 +914,30 @@ export function donorCartConfirm(): Promise<CartConfirmResult> {
 // Admin — Zeffy Payments (unmatched-payment reconciliation)
 // ---------------------------------------------------------------------------
 
-/** List the dedicated campaign's succeeded payments (cursor-based Zeffy pagination). */
+/** The local mirror of the campaign's payments (standard pagination). Unmatched-only by default — the "Show matched" toggle flips ``show_matched``. */
 export function adminListZeffyPayments(params?: AdminZeffyPaymentsParams): Promise<ZeffyPaymentsResponse> {
-  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  const p = params ? { ...params, columns: params.columns?.join(","), show_matched: params.show_matched ?? false } : undefined;
   return apiGet("/api/admin/zeffy/payments", p);
+}
+
+/** Pull the campaign's payments into the local mirror now (the page's "Sync with Zeffy" button). */
+export function adminSyncZeffyPayments(): Promise<ZeffySyncResult> {
+  return apiPost("/api/admin/zeffy/sync");
+}
+
+/** The admin dashboard banner: payments waiting for action (no live match, no seen). */
+export function adminListZeffyUnmatchedSummary(): Promise<ZeffyUnmatchedSummary> {
+  return apiGet("/api/admin/zeffy/unmatched-summary");
+}
+
+/** Mark a payment seen — the admin's "no action needed" acknowledgment (suppresses the banner). */
+export function adminMarkZeffyPaymentSeen(paymentId: string): Promise<ZeffySeenResult> {
+  return apiPost(`/api/admin/zeffy/payments/${paymentId}/seen`);
+}
+
+/** Clear the seen acknowledgment — the payment re-enters the banner while still unmatched. */
+export function adminClearZeffyPaymentSeen(paymentId: string): Promise<void> {
+  return apiDelete(`/api/admin/zeffy/payments/${paymentId}/seen`);
 }
 
 /** Every active unpaid cash claim grouped by donor (match-modal data; works unconfigured). */

@@ -25,6 +25,11 @@
  *   - purchaser + delivery + admin assignments (wishes / families)
  *   - two display-mode deadlines for the admin deadlines page
  *   - a donor gift claim + a donor pending cash claim (cart)
+ *   - one unmatched payment in the Zeffy mock for the admin Zeffy-payments
+ *     page — the capture clicks "Sync with Zeffy" to pull it into the local
+ *     mirror (the mirror is append-only, and the hourly sync has been
+ *     collecting other runs' mock payments, so the table is filtered to this
+ *     run's row, like the sponsorships shot)
  *   - one demo email campaign (partially delivered, then canceled) for the
  *     admin email-campaigns page
  * Everything the script creates is cleaned up in afterAll (the golden rule)
@@ -36,7 +41,8 @@
  * in (restoring "no assignment" afterwards), and the referrer review queue is
  * left exactly as found (the queue family is deleted, its wish state reset
  * first). Run with the normal suite idle so concurrent tests don't pollute
- * shared lists (e.g. the admin sponsorships page).
+ * shared lists (e.g. the admin sponsorships page; the Zeffy mirror collects
+ * whatever the mock holds when its capture syncs).
  *
  * Clean captures: run on a freshly-wiped stack (`./run-compose.sh clear`, then
  * your normal `up`) — the email log and sponsorships lists accumulate
@@ -240,8 +246,10 @@ test.describe.serial("help page screenshots", () => {
     if (d.zeffyGate === null) {
       /* One unmatched payment for the admin Zeffy page (tag-scoped; reset in
          afterAll so the mock stays as found) */
+      /* Stable id: the local mirror is append-only (no delete), so re-runs
+         must upsert the same row instead of accumulating one per run */
       await mockSeedPayments("help-screenshots", [
-        { email: "help-zeffy@example.com", name: "Help Donor", amountUsd: 500 },
+        { id: "00000000-1111-4222-8333-0000000000f1", email: "help-zeffy@example.com", name: "Help Donor", amountUsd: 500 },
       ]);
       const checkout = await donorApi.post("/api/donor/cart/checkout", {
         data: { items: [{ family_id: thompson.id, includes_groceries: false }] },
@@ -443,7 +451,27 @@ test.describe.serial("help page screenshots", () => {
         );
       } }],
       ["admin-email-unsubscribes", "/admin/emails?tab=unsubscribes", { heading: "Emails" }],
-      ["admin-zeffy-payments", "/admin/zeffy-payments", { heading: "Zeffy Payments" }],
+      ["admin-zeffy-payments", "/admin/zeffy-payments", { heading: "Zeffy Payments", onSettled: async (p) => {
+        /* The page reads the local mirror (append-only) — the hourly sync
+           has been filling it with every e2e run's mock payments. Pull this
+           run's seeded payment in now and keep only its row, the way the
+           sponsorships shot filters to its own scenario rows */
+        if (d.zeffyGate === null) {
+          await p.getByRole("button", { name: "Sync with Zeffy" }).click();
+          /* Wait for the toast first (it renders before the list refetch
+             lands the row) so a mirror that was already up to date still
+             gets a clean frame */
+          await p.getByRole("alert").filter({ hasText: /new payment|Up to date/ }).first().waitFor({ state: "visible", timeout: 10_000 });
+          await p.locator("tr", { hasText: "help-zeffy@example.com" }).first().waitFor({ state: "visible", timeout: 15_000 });
+          /* Let the sync toast auto-dismiss so it doesn't share the frame */
+          await expect(p.locator('[role="alert"]')).toHaveCount(0, { timeout: 10_000 });
+        }
+        await p.locator("table tbody tr").evaluateAll((rows) => {
+          for (const row of rows) {
+            if (!(row.textContent ?? "").includes("help-zeffy@example.com")) row.style.display = "none";
+          }
+        });
+      } }],
       ["admin-sponsorships", "/admin/sponsorships", { heading: "Sponsorships", onSettled: async (p) => {
         /* Keep only this run's active sponsorships (the seeded donor's);
            the page also lists cancelled history from earlier runs */

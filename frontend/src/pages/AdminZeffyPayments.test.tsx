@@ -7,7 +7,7 @@ import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
 import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
-import type { User, ZeffyPayment, ZeffyPendingClaimsResponse } from "../types";
+import type { User, ZeffyPayment, ZeffyPaymentsResponse, ZeffyPendingClaimsResponse } from "../types";
 import AdminZeffyPayments from "./AdminZeffyPayments";
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +34,8 @@ const unmatchedPayment: ZeffyPayment = {
   receipt_url: "https://zeffy.example/receipt/1",
   claim_ids: [],
   matched: false,
+  seen_at: null,
+  refund_status: "none",
 };
 
 const matchedPayment: ZeffyPayment = {
@@ -46,7 +48,29 @@ const matchedPayment: ZeffyPayment = {
   receipt_url: null,
   claim_ids: [12, 13],
   matched: true,
+  seen_at: null,
+  refund_status: "none",
 };
+
+const seenPayment: ZeffyPayment = {
+  ...unmatchedPayment,
+  id: "0195f3a2-bb0c-7b00-8000-000000000004",
+  buyer_email: "seen@example.com",
+  seen_at: "2025-12-11T09:00:00Z",
+};
+
+const refundedPayment: ZeffyPayment = {
+  ...unmatchedPayment,
+  id: "0195f3a2-bb0c-7b00-8000-000000000005",
+  buyer_email: "refunded@example.com",
+  refund_status: "refunded",
+};
+
+/** Standard page envelope for a mocked list response. */
+function pageResponse(payments: ZeffyPayment[], page = 1, total?: number): ZeffyPaymentsResponse {
+  const t = total ?? payments.length;
+  return { payments, total: t, page, page_size: 25, total_pages: Math.max(1, Math.ceil(t / 25)) };
+}
 
 const pendingClaims: ZeffyPendingClaimsResponse = {
   donors: [
@@ -127,35 +151,38 @@ describe("AdminZeffyPayments", () => {
     localStorage.clear();
   });
 
-  it("shows unmatched payments by default and matched ones only after the toggle", async () => {
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({
-      payments: [unmatchedPayment, matchedPayment],
-      has_more: false,
-      next_cursor: null,
-    });
+  it("shows the server-filtered list (unmatched by default) and flips show_matched with the toggle", async () => {
+    const user = userEvent.setup();
+    const spy = vi
+      .spyOn(api, "adminListZeffyPayments")
+      .mockImplementation((params) =>
+        params?.show_matched
+          ? Promise.resolve(pageResponse([unmatchedPayment, matchedPayment]))
+          : Promise.resolve(pageResponse([unmatchedPayment]))
+      );
 
     wrap();
 
     // Unmatched row is visible
     expect(await screen.findByText("Alice Donor")).toBeInTheDocument();
     expect(screen.getByText("Unmatched")).toBeInTheDocument();
-    // Matched row is hidden by default
+    // Matched row is hidden by default (server-side filter — not fetched)
     expect(screen.queryByText("Bob Buyer")).not.toBeInTheDocument();
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ show_matched: false }));
 
-    const user = userEvent.setup();
-    const toggle = screen.getByLabelText("Show matched") as HTMLInputElement;
-    await user.click(toggle);
+    await user.click(screen.getByLabelText("Show matched") as HTMLInputElement);
 
     // Now both are visible, matched row with its claim links
-    expect(screen.getByText("Bob Buyer")).toBeInTheDocument();
+    expect(await screen.findByText("Bob Buyer")).toBeInTheDocument();
     // The "Matched" badge (the column header also says "Matched")
     expect(screen.getByText("Matched", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sponsorship 12" })).toHaveAttribute("href", "/donor/claims/12");
     expect(screen.getByRole("link", { name: "Sponsorship 13" })).toHaveAttribute("href", "/donor/claims/13");
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ show_matched: true }));
   });
 
-  it("passes the visible columns (comma-joined by the api layer) to the API", async () => {
-    const spy = vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({ payments: [], has_more: false, next_cursor: null });
+  it("passes the visible columns (comma-joined by the api layer) and pagination to the API", async () => {
+    const spy = vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([]));
 
     wrap();
 
@@ -165,63 +192,162 @@ describe("AdminZeffyPayments", () => {
     expect([...(params?.columns ?? [])].sort()).toEqual(
       ["created_at", "buyer_name", "buyer_email", "amount_cents", "currency", "matched", "id"].sort()
     );
-    expect(params?.limit).toBe(25);
+    expect(params?.page).toBe(1);
+    expect(params?.page_size).toBe(25);
+    expect(params?.show_matched).toBe(false);
   });
 
-  it("loads the next cursor page with Load more", async () => {
+  it("navigates pages with the shared pagination controls", async () => {
     const user = userEvent.setup();
-    const pageTwo: ZeffyPayment = { ...unmatchedPayment, id: "0195f3a2-bb0c-7b00-8000-000000000003", buyer_email: "c@example.com" };
-    const spy = vi.spyOn(api, "adminListZeffyPayments").mockImplementation((params) => {
-      if (params?.starting_after === "cur-2") {
-        return Promise.resolve({ payments: [pageTwo], has_more: false, next_cursor: null });
-      }
-      return Promise.resolve({ payments: [unmatchedPayment], has_more: true, next_cursor: "cur-2" });
-    });
+    // 30 rows at 25/page → two pages
+    const all = Array.from({ length: 30 }, (_, i) => ({
+      ...unmatchedPayment,
+      id: `page-item-${i}`,
+      buyer_email: `user${i}@example.com`,
+    }));
+    const spy = vi
+      .spyOn(api, "adminListZeffyPayments")
+      .mockImplementation((params) =>
+        params?.page === 2
+          ? Promise.resolve({ payments: all.slice(25), total: 30, page: 2, page_size: 25, total_pages: 2 })
+          : Promise.resolve({ payments: all.slice(0, 25), total: 30, page: 1, page_size: 25, total_pages: 2 })
+      );
 
     wrap();
 
-    await screen.findByText("Alice Donor");
-    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
-    // No second row yet
-    expect(screen.queryByText("c@example.com")).not.toBeInTheDocument();
+    expect(await screen.findByText("user0@example.com")).toBeInTheDocument();
+    // Two pages total → the page-2 control exists
+    expect(screen.getByRole("button", { name: "Page 2" })).toBeInTheDocument();
+    expect(screen.queryByText("user29@example.com")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Load more" }));
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
 
-    // The second page was requested with the cursor and appended
+    // Page 2 was requested and rendered
     await waitFor(() => {
-      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ starting_after: "cur-2" }));
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
     });
-    expect(await screen.findByText("c@example.com")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(await screen.findByText("user29@example.com")).toBeInTheDocument();
+  });
+
+  it("shows a refunded chip when the snapshot indicates a refund", async () => {
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([refundedPayment]));
+
+    wrap();
+
+    expect(await screen.findByText("refunded@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Refunded")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no unmatched payments", async () => {
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({ payments: [matchedPayment], has_more: false, next_cursor: null });
+    // The server returns nothing for the default (unmatched-only) view
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([]));
 
     wrap();
 
     expect(await screen.findByText("No unmatched payments.")).toBeInTheDocument();
   });
 
-  it("shows a graceful error page when Zeffy is unconfigured (503)", async () => {
+  it("shows a graceful error page when the list fails", async () => {
     const error = new Error("Request failed");
     (error as unknown as { response: { status: number; data: { detail: string } } }).response = {
-      status: 503,
-      data: { detail: "Zeffy is not configured. Set ZEFFY_API_KEY." },
+      status: 500,
+      data: { detail: "Something went wrong" },
     };
     vi.spyOn(api, "adminListZeffyPayments").mockRejectedValue(error);
 
     wrap();
 
     expect(await screen.findByText("Unable to Load Zeffy Payments")).toBeInTheDocument();
-    expect(screen.getByText("Zeffy is not configured. Set ZEFFY_API_KEY.")).toBeInTheDocument();
+  });
+
+  /* ── Sync with Zeffy ───────────────────────────────────────── */
+
+  it("syncs from Zeffy, toasts the new count, and refetches the list", async () => {
+    const user = userEvent.setup();
+    const listSpy = vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
+    const syncSpy = vi.spyOn(api, "adminSyncZeffyPayments").mockResolvedValue({ new_count: 2, updated_count: 1 });
+
+    wrap();
+
+    await screen.findByText("Alice Donor");
+    await user.click(await screen.findByRole("button", { name: "Sync with Zeffy" }));
+
+    await waitFor(() => expect(syncSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Found 2 new payments")).toBeInTheDocument();
+    // The list was refetched after the sync
+    await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("sync with nothing new toasts up-to-date", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([]));
+    vi.spyOn(api, "adminSyncZeffyPayments").mockResolvedValue({ new_count: 0, updated_count: 0 });
+
+    wrap();
+
+    await user.click(await screen.findByRole("button", { name: "Sync with Zeffy" }));
+    expect(await screen.findByText("Up to date")).toBeInTheDocument();
+  });
+
+  it("sync failure toasts the error (e.g. Zeffy unconfigured)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([]));
+    const error = new Error("Request failed");
+    (error as unknown as { response: { status: number; data: { detail: string } } }).response = {
+      status: 503,
+      data: { detail: "Zeffy is not configured" },
+    };
+    vi.spyOn(api, "adminSyncZeffyPayments").mockRejectedValue(error);
+
+    wrap();
+
+    await user.click(await screen.findByRole("button", { name: "Sync with Zeffy" }));
+    expect(await screen.findByText("Zeffy is not configured")).toBeInTheDocument();
+  });
+
+  /* ── Seen (the banner acknowledgment) ──────────────────────── */
+
+  it("marking a payment seen calls the API, toasts, and refetches", async () => {
+    const user = userEvent.setup();
+    const listSpy = vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
+    const seenSpy = vi.spyOn(api, "adminMarkZeffyPaymentSeen").mockResolvedValue({
+      payment_id: unmatchedPayment.id,
+      seen_at: "2025-12-11T09:00:00Z",
+    });
+
+    wrap();
+
+    await screen.findByText("Alice Donor");
+    await user.click(screen.getByRole("button", { name: "Seen" }));
+
+    await waitFor(() => expect(seenSpy).toHaveBeenCalledWith(unmatchedPayment.id));
+    expect(await screen.findByText("Payment marked seen")).toBeInTheDocument();
+    // The list was refetched (the row drops out of the default view)
+    await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("seen rows (behind the toggle) show the Seen badge and an Unseen action", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([seenPayment, matchedPayment]));
+    const clearSpy = vi.spyOn(api, "adminClearZeffyPaymentSeen").mockResolvedValue(undefined);
+
+    wrap();
+
+    await screen.findByText("seen@example.com");
+    // The badge (not the column header)
+    expect(screen.getByText("Seen", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Seen" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Unseen" }));
+    await waitFor(() => expect(clearSpy).toHaveBeenCalledWith(seenPayment.id));
+    expect(await screen.findByText("Payment back in the unmatched queue")).toBeInTheDocument();
   });
 
   /* ── Match modal ───────────────────────────────────────────── */
 
   it("groups pending claims by donor with select-all and per-claim amounts", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({ payments: [unmatchedPayment], has_more: false, next_cursor: null });
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
     vi.spyOn(api, "adminListZeffyPendingClaims").mockResolvedValue(pendingClaims);
 
     wrap();
@@ -250,7 +376,7 @@ describe("AdminZeffyPayments", () => {
 
   it("keeps confirm disabled until a claim is selected, then shows the expected-amount hints", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({ payments: [unmatchedPayment], has_more: false, next_cursor: null });
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
     vi.spyOn(api, "adminListZeffyPendingClaims").mockResolvedValue(pendingClaims);
 
     wrap();
@@ -273,7 +399,7 @@ describe("AdminZeffyPayments", () => {
 
   it("select-all toggles every claim for one donor", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({ payments: [unmatchedPayment], has_more: false, next_cursor: null });
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
     vi.spyOn(api, "adminListZeffyPendingClaims").mockResolvedValue(pendingClaims);
 
     wrap();
@@ -290,9 +416,7 @@ describe("AdminZeffyPayments", () => {
 
   it("confirms the match against the API, toasts, and refetches the payment list", async () => {
     const user = userEvent.setup();
-    const listSpy = vi
-      .spyOn(api, "adminListZeffyPayments")
-      .mockResolvedValue({ payments: [unmatchedPayment], has_more: false, next_cursor: null });
+    const listSpy = vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([unmatchedPayment]));
     vi.spyOn(api, "adminListZeffyPendingClaims").mockResolvedValue(pendingClaims);
     const matchSpy = vi.spyOn(api, "adminMatchZeffyPayment").mockResolvedValue({ payment_id: unmatchedPayment.id, claims: [] });
 
@@ -315,16 +439,16 @@ describe("AdminZeffyPayments", () => {
 
   it("shows Unmatch on matched rows only (behind the show-matched toggle)", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({
-      payments: [unmatchedPayment, matchedPayment],
-      has_more: false,
-      next_cursor: null,
-    });
+    vi.spyOn(api, "adminListZeffyPayments").mockImplementation((params) =>
+      params?.show_matched
+        ? Promise.resolve(pageResponse([unmatchedPayment, matchedPayment]))
+        : Promise.resolve(pageResponse([unmatchedPayment]))
+    );
 
     wrap();
 
     await screen.findByText("Alice Donor");
-    // Unmatched row: Match manually, no Unmatch (matched row is hidden anyway)
+    // Unmatched row: Match manually + Seen, no Unmatch (matched row is hidden anyway)
     expect(screen.getByRole("button", { name: "Match manually" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Unmatch" })).not.toBeInTheDocument();
 
@@ -339,7 +463,9 @@ describe("AdminZeffyPayments", () => {
     const user = userEvent.setup();
     const listSpy = vi
       .spyOn(api, "adminListZeffyPayments")
-      .mockResolvedValue({ payments: [matchedPayment], has_more: false, next_cursor: null });
+      .mockImplementation((params) =>
+        params?.show_matched ? Promise.resolve(pageResponse([matchedPayment])) : Promise.resolve(pageResponse([]))
+      );
     const unmatchSpy = vi.spyOn(api, "adminUnmatchZeffyPayment").mockResolvedValue({
       payment_id: matchedPayment.id,
       claim_ids: [12, 13],
@@ -373,11 +499,9 @@ describe("AdminZeffyPayments", () => {
 
   it("unmatch failure (e.g. a fulfilled claim) toasts the backend error", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue({
-      payments: [matchedPayment],
-      has_more: false,
-      next_cursor: null,
-    });
+    vi.spyOn(api, "adminListZeffyPayments").mockImplementation((params) =>
+      params?.show_matched ? Promise.resolve(pageResponse([matchedPayment])) : Promise.resolve(pageResponse([]))
+    );
     const error = new Error("Request failed");
     (error as unknown as { response: { status: number; data: { detail: string } } }).response = {
       status: 400,

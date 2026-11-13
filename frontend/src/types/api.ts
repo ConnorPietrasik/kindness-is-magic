@@ -137,12 +137,10 @@ export interface AdminCampaignRecipientsListParams extends AdminListParams {
   search?: string;
 }
 
-/** Query params for the admin Zeffy payment list (cursor-based Zeffy pagination, not page-based). */
-export interface AdminZeffyPaymentsParams {
-  /** Cursor from the previous page's next_cursor. */
-  starting_after?: string;
-  limit?: number;
-  columns?: string[]; // resolved backend field names (sent as comma-separated)
+/** Query params for the admin Zeffy payment list (the local mirror table — standard pagination). */
+export interface AdminZeffyPaymentsParams extends AdminListParams {
+  /** Include matched and seen payments (default: unmatched only — the banner's population). */
+  show_matched?: boolean;
 }
 
 // ---------------------------------------------------------------------------

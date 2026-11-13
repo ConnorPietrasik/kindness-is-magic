@@ -461,21 +461,29 @@ export default function HelpAdmin() {
           body: (
             <>
               <p>
-                Donors pay through Zeffy, a card processor. Payments for sponsorships come back here, and the app matches each one to the
-                donor's sponsorship automatically, by buyer email.
+                Donors pay through Zeffy, a card processor. The app keeps a local list of the campaign's succeeded payments and matches each
+                one to the donor's sponsorship automatically, by buyer email. While any payment is waiting for you, the admin dashboard
+                shows a banner.
               </p>
               <HelpImage
                 src={adminZeffyPayments}
-                alt="The Zeffy payments page with a table of payments and a Match manually button"
+                alt="The Zeffy payments page with a table of unmatched payments, a Sync with Zeffy button and a Match manually button"
                 caption="Unmatched payments need a manual match. The Show matched checkbox reveals the rest."
               />
               <p>
                 If a payment could not be matched (the donor used a different email, for example), it shows as Unmatched. Use{" "}
                 <strong>Match manually</strong> to attach it to the right sponsorship. Donors who pay an amount that differs from their cart
-                see a notice that an admin will review it, and you can find that payment here.
+                see a notice that an admin will review it, and you can find that payment here. For a payment that can't be matched at all (a
+                duplicate or a gift meant for another campaign, say), use <strong>Seen</strong> — it stops counting toward the banner while
+                keeping it in the history.
               </p>
               <p>
-                The table shows unmatched payments first. Tick <strong>Show matched</strong> to see the full history of processed payments.
+                The table shows unmatched payments by default. Tick <strong>Show matched</strong> to see the full history, including matched
+                and seen payments.
+              </p>
+              <p>
+                New payments appear as they arrive (and a background sync runs hourly). <strong>Sync with Zeffy</strong> pulls any missing
+                payments immediately — useful right after a donor pays.
               </p>
             </>
           ),

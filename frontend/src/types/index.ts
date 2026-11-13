@@ -132,6 +132,9 @@ export type {
   ZeffyPendingClaimItem,
   ZeffyPendingClaimsResponse,
   ZeffyPendingDonorGroup,
+  ZeffySeenResult,
+  ZeffySyncResult,
+  ZeffyUnmatchedSummary,
   ZeffyUnmatchResult,
 } from "./domain";
 export { getClaimStatus, isPendingCash, PERSON_ROLES, personRoleLabel, WISH_TYPE } from "./domain";

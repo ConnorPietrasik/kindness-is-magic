@@ -1,17 +1,19 @@
 /**
  * Admin — Zeffy Payments (unmatched-payment reconciliation)
  *
- * Lists the dedicated campaign's succeeded Zeffy payments (cursor-based
- * pass-through of the read API, enriched with local match state). Unmatched
- * payments are shown by default with a "show matched" toggle; "Match
- * manually" opens a modal fed by the pending cash claims grouped by donor
- * (per-donor checkboxes + expected amount) and marks the chosen claims paid.
- * "Unmatch" (matched rows, behind a confirm dialog) is the correction path:
- * it reverts the payment's claims to pending with a fresh payment window so
- * the payment can be re-matched to the right claims.
+ * Lists the dedicated campaign's mirrored payments (the local table — the
+ * webhook, the hourly sync, and "Sync with Zeffy" keep it fresh). Unmatched
+ * payments are shown by default (the admin banner's population) with a
+ * "Show matched" toggle; "Match manually" opens a modal fed by the pending
+ * cash claims grouped by donor (per-donor checkboxes + expected amount) and
+ * marks the chosen claims paid. "Unmatch" (matched rows, behind a confirm
+ * dialog) is the correction path: it reverts the payment's claims to
+ * pending with a fresh payment window so the payment can be re-matched to
+ * the right claims. "Seen" is the admin's "no action needed" acknowledgment
+ * for payments that can't be matched (suppresses the dashboard banner).
  */
 
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type React from "react";
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -23,21 +25,28 @@ import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
 import { MutationErrors } from "../components/MutationErrors";
 import { PageError } from "../components/PageError";
+import { Pagination } from "../components/Pagination";
 import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
+import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminListZeffyPayments, adminListZeffyPendingClaims, adminMatchZeffyPayment, adminUnmatchZeffyPayment } from "../lib/api";
+import {
+  adminClearZeffyPaymentSeen,
+  adminListZeffyPayments,
+  adminListZeffyPendingClaims,
+  adminMarkZeffyPaymentSeen,
+  adminMatchZeffyPayment,
+  adminSyncZeffyPayments,
+  adminUnmatchZeffyPayment,
+} from "../lib/api";
 import { CASH_CLAIM_PAYMENT_HOURS } from "../lib/constants";
-import { adminZeffyPayments, adminZeffyPendingClaims } from "../lib/queryKeys";
+import { adminZeffyPayments, adminZeffyPendingClaims, adminZeffyUnmatchedSummary } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { formatApiError, formatDateTime } from "../lib/utils";
 import type { ZeffyPayment } from "../types";
-
-/** Rows per Zeffy page (Zeffy allows up to 100). */
-const PAGE_LIMIT = 25;
 
 /** Format raw Zeffy cents as dollars for admin display. */
 function formatAmount(cents: number): string {
@@ -50,12 +59,77 @@ function formatAmount(cents: number): string {
 export default function AdminZeffyPayments() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const pagination = usePagination({ defaultPageSize: 25, pageSizeOptions: [20, 25, 50, 100] });
 
-  // Loaded pages — each cursor is its own query (null = first page).
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  // Unmatched-only by default (the banner's population); the toggle shows
+  // the full history (matched + seen rows).
   const [showMatched, setShowMatched] = useState(false);
   const [matchTarget, setMatchTarget] = useState<ZeffyPayment | null>(null);
   const [unmatchTarget, setUnmatchTarget] = useState<ZeffyPayment | null>(null);
+
+  // Column visibility + user column order
+  const { visibleColumns, apiColumns } = useColumnVisibility("adminZeffyPayments");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminZeffyPayments", visibleColumns);
+  const { widthClass } = useTableWidth("adminZeffyPayments");
+
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
+
+  const listParams = useMemo(
+    () => ({ ...pagination.params, columns: apiColumns, show_matched: showMatched }),
+    [pagination.params, apiColumns, showMatched]
+  );
+
+  const {
+    data: listData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: [...adminZeffyPayments, listParams],
+    queryFn: () => adminListZeffyPayments(listParams),
+    staleTime: 0, // live reconciliation view — always refetch when viewed
+  });
+
+  const pageInfo = useMemo(
+    () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
+    [listData?.total, pagination.page, pagination.pageSize]
+  );
+
+  const payments = listData?.payments ?? [];
+
+  // The page's "Sync with Zeffy" — pulls the campaign's payments into the
+  // local mirror now (the hourly background sync does the same in the
+  // background; the header refresh button only refetches local state).
+  const syncMut = useMutation({
+    mutationFn: adminSyncZeffyPayments,
+    onSuccess: (result) => {
+      toast.success(result.new_count > 0 ? `Found ${result.new_count} new payment${result.new_count === 1 ? "" : "s"}` : "Up to date");
+      void queryClient.invalidateQueries({ queryKey: adminZeffyPayments });
+      void queryClient.invalidateQueries({ queryKey: adminZeffyUnmatchedSummary });
+    },
+    onError: (err: unknown) => {
+      toast.error(formatApiError(err, "Sync failed — Zeffy may be unreachable"));
+    },
+  });
+
+  // The admin's "no action needed" acknowledgment (suppresses the banner).
+  const markSeenMut = useMutation({
+    mutationFn: (paymentId: string) => adminMarkZeffyPaymentSeen(paymentId),
+    onSuccess: () => {
+      toast.success("Payment marked seen");
+      void queryClient.invalidateQueries({ queryKey: adminZeffyPayments });
+      void queryClient.invalidateQueries({ queryKey: adminZeffyUnmatchedSummary });
+    },
+  });
+
+  const clearSeenMut = useMutation({
+    mutationFn: (paymentId: string) => adminClearZeffyPaymentSeen(paymentId),
+    onSuccess: () => {
+      toast.success("Payment back in the unmatched queue");
+      void queryClient.invalidateQueries({ queryKey: adminZeffyPayments });
+      void queryClient.invalidateQueries({ queryKey: adminZeffyUnmatchedSummary });
+    },
+  });
 
   // Correction path: revert the payment's claims to pending (fresh payment
   // window) so the payment can be re-matched to the right claims.
@@ -67,53 +141,23 @@ export default function AdminZeffyPayments() {
       );
       setUnmatchTarget(null);
       // The payment flips to unmatched (list) and the claims re-enter the
-      // pending pool (match-modal data) — invalidate both.
+      // pending pool (match-modal data) — invalidate both + the banner.
       void queryClient.invalidateQueries({ queryKey: adminZeffyPayments });
       void queryClient.invalidateQueries({ queryKey: adminZeffyPendingClaims });
+      void queryClient.invalidateQueries({ queryKey: adminZeffyUnmatchedSummary });
     },
   });
 
-  // Column visibility + user column order
-  const { visibleColumns, apiColumns } = useColumnVisibility("adminZeffyPayments");
-  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminZeffyPayments", visibleColumns);
-  const { widthClass } = useTableWidth("adminZeffyPayments");
-
-  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
-
-  const columnKey = apiColumns.join(",");
-  const pages = useQueries({
-    queries: cursors.map((cursor) => ({
-      queryKey: [...adminZeffyPayments, cursor, columnKey],
-      queryFn: () => adminListZeffyPayments({ starting_after: cursor ?? undefined, limit: PAGE_LIMIT, columns: apiColumns }),
-      staleTime: 0, // live reconciliation view — always refetch when viewed
-    })),
-  });
-
-  const firstError = pages.find((p) => p.isError)?.error ?? null;
-  const isLoading = pages.some((p) => p.isLoading);
-  const allPayments = pages.flatMap((p) => p.data?.payments ?? []);
-  const lastPage = pages[cursors.length - 1]?.data;
-  const hasMore = lastPage?.has_more ?? false;
-
-  // Unmatched-only by default (the matched rows hide behind the toggle)
-  const visiblePayments = allPayments.filter((p) => showMatched || !p.matched);
-
   if (isLoading) return <PageSpinner />;
 
-  if (firstError != null) {
-    // Includes the 503 "Zeffy not configured" dev/e2e default state
+  if (isError) {
     return (
       <div className="min-h-screen bg-slate-50">
         <HeaderBar />
-        <PageError error={firstError} heading="Unable to Load Zeffy Payments" fallback="Something went wrong. Please try again later." />
+        <PageError error={error} heading="Unable to Load Zeffy Payments" fallback="Something went wrong. Please try again later." />
       </div>
     );
   }
-
-  const loadMore = () => {
-    const next = lastPage?.next_cursor;
-    if (next != null) setCursors((prev) => [...prev, next]);
-  };
 
   const paymentHeaders: Record<string, React.ReactNode> = {
     created_at: "Date",
@@ -134,6 +178,9 @@ export default function AdminZeffyPayments() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Zeffy Payments</h2>
           <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={() => syncMut.mutate()} loading={syncMut.isPending}>
+              Sync with Zeffy
+            </Button>
             {!isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -146,7 +193,8 @@ export default function AdminZeffyPayments() {
         {/* Info note */}
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
           Succeeded payments on the dedicated sponsorship form. Payments that didn&apos;t auto-match to a donor&apos;s cart need a manual
-          match below.
+          match below — the admin dashboard shows a banner while any are waiting. Use <em>Sync with Zeffy</em> to pull new payments
+          immediately (a background sync also runs hourly).
         </div>
 
         {/* Filters */}
@@ -156,7 +204,10 @@ export default function AdminZeffyPayments() {
               id="show-matched"
               type="checkbox"
               checked={showMatched}
-              onChange={(e) => setShowMatched(e.target.checked)}
+              onChange={(e) => {
+                setShowMatched(e.target.checked);
+                pagination.goToPage(1);
+              }}
               className="h-4 w-4 rounded border-gray-300"
             />
             Show matched
@@ -164,9 +215,9 @@ export default function AdminZeffyPayments() {
         </div>
 
         {/* Table */}
-        {visiblePayments.length === 0 ? (
+        {payments.length === 0 ? (
           <Card>
-            <p className="py-8 text-center text-gray-400">{allPayments.length === 0 ? "No payments found." : "No unmatched payments."}</p>
+            <p className="py-8 text-center text-gray-400">{showMatched ? "No payments found." : "No unmatched payments."}</p>
           </Card>
         ) : (
           <Table>
@@ -179,7 +230,7 @@ export default function AdminZeffyPayments() {
               <Th>Actions</Th>
             </TableHead>
             <TableBody>
-              {visiblePayments.map((payment) => {
+              {payments.map((payment) => {
                 const paymentCells: Record<string, React.ReactNode> = {
                   created_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(payment.created_at)}</Td>,
                   buyer_name: (
@@ -207,28 +258,35 @@ export default function AdminZeffyPayments() {
                   matched: (
                     <Td>
                       {payment.matched ? (
-                        <div>
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                            Matched
-                          </span>
-                          {payment.claim_ids.length > 0 && (
-                            <div className="mt-0.5 flex flex-wrap gap-1">
-                              {payment.claim_ids.map((claimId) => (
-                                <Link
-                                  key={claimId}
-                                  to={route.donorClaimDetail(claimId)}
-                                  className="text-xs font-medium text-btn-start hover:underline"
-                                >
-                                  Sponsorship {claimId}
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                          Matched
+                        </span>
+                      ) : payment.seen_at ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          Seen
+                        </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
                           Unmatched
                         </span>
+                      )}
+                      {payment.refund_status !== "none" && (
+                        <span className="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                          Refunded
+                        </span>
+                      )}
+                      {payment.matched && payment.claim_ids.length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {payment.claim_ids.map((claimId) => (
+                            <Link
+                              key={claimId}
+                              to={route.donorClaimDetail(claimId)}
+                              className="text-xs font-medium text-btn-start hover:underline"
+                            >
+                              Sponsorship {claimId}
+                            </Link>
+                          ))}
+                        </div>
                       )}
                     </Td>
                   ),
@@ -239,15 +297,38 @@ export default function AdminZeffyPayments() {
                       <Fragment key={key}>{paymentCells[key]}</Fragment>
                     ))}
                     <Td>
-                      {payment.matched ? (
-                        <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setUnmatchTarget(payment)}>
-                          Unmatch
-                        </Button>
-                      ) : (
-                        <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setMatchTarget(payment)}>
-                          Match manually
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {payment.matched ? (
+                          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setUnmatchTarget(payment)}>
+                            Unmatch
+                          </Button>
+                        ) : (
+                          <>
+                            <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setMatchTarget(payment)}>
+                              Match manually
+                            </Button>
+                            {payment.seen_at ? (
+                              <Button
+                                variant="ghost"
+                                className="px-3 py-1 text-xs"
+                                loading={clearSeenMut.isPending && clearSeenMut.variables === payment.id}
+                                onClick={() => clearSeenMut.mutate(payment.id)}
+                              >
+                                Unseen
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                className="px-3 py-1 text-xs"
+                                loading={markSeenMut.isPending && markSeenMut.variables === payment.id}
+                                onClick={() => markSeenMut.mutate(payment.id)}
+                              >
+                                Seen
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </Td>
                   </Tr>
                 );
@@ -256,21 +337,26 @@ export default function AdminZeffyPayments() {
           </Table>
         )}
 
-        {/* Cursor "load more" */}
-        {hasMore && (
-          <div className="mt-4 text-center">
-            <Button variant="secondary" onClick={loadMore} loading={pages.some((p) => p.isFetching)}>
-              Load more
-            </Button>
-          </div>
-        )}
+        {/* Pagination */}
+        <Pagination
+          page={pagination.page}
+          totalPages={pageInfo.totalPages}
+          total={listData?.total ?? 0}
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.setPageSize}
+        />
       </main>
 
       {matchTarget && (
         <MatchPaymentModal
           payment={matchTarget}
           onClose={() => setMatchTarget(null)}
-          onMatched={() => void queryClient.invalidateQueries({ queryKey: adminZeffyPayments })}
+          onMatched={() => {
+            void queryClient.invalidateQueries({ queryKey: adminZeffyPayments });
+            void queryClient.invalidateQueries({ queryKey: adminZeffyUnmatchedSummary });
+          }}
         />
       )}
 
@@ -292,7 +378,7 @@ export default function AdminZeffyPayments() {
         confirmLabel="Yes, unmatch"
         loadingLabel="Unmatching…"
       />
-      <MutationErrors mutations={[unmatchMut]} />
+      <MutationErrors mutations={[unmatchMut, markSeenMut, clearSeenMut]} />
     </div>
   );
 }

@@ -1005,7 +1005,7 @@ export interface CartConfirmResult {
 // Admin — Zeffy payment reconciliation
 // ---------------------------------------------------------------------------
 
-/** One Zeffy payment on the dedicated campaign, enriched with local match state. */
+/** One mirrored Zeffy payment on the dedicated campaign, enriched with local match state. */
 export interface ZeffyPayment {
   id: string;
   created_at: string;
@@ -1014,16 +1014,40 @@ export interface ZeffyPayment {
   buyer_name: string | null;
   buyer_email: string | null;
   receipt_url: string | null;
-  /** The claims storing this payment id (matched payments list them). */
+  /** The live claims storing this payment id (matched payments list them). */
   claim_ids: number[];
   matched: boolean;
+  /** The admin's "no action needed" acknowledgment (null = still waiting). */
+  seen_at: string | null;
+  /** "none" | "refunded" | … — refreshed by the match endpoint and the sync walk's newest known row. */
+  refund_status: string;
 }
 
-/** Cursor-based (Zeffy pagination) payment list envelope — not the page envelope. */
+/** Standard admin page envelope — the local mirror table is the source (webhook, hourly sync, and Sync now keep it fresh). */
 export interface ZeffyPaymentsResponse {
   payments: ZeffyPayment[];
-  has_more: boolean;
-  next_cursor: string | null;
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** GET /api/admin/zeffy/unmatched-summary — the admin dashboard banner. */
+export interface ZeffyUnmatchedSummary {
+  count: number;
+  oldest_created_at: string | null;
+}
+
+/** POST /api/admin/zeffy/sync result. */
+export interface ZeffySyncResult {
+  new_count: number;
+  updated_count: number;
+}
+
+/** POST/DELETE /api/admin/zeffy/payments/{id}/seen result. */
+export interface ZeffySeenResult {
+  payment_id: string;
+  seen_at: string | null;
 }
 
 /** One active unpaid cash claim in the match-modal payload. */

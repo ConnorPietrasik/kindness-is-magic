@@ -3,17 +3,21 @@
  *
  * Two donors each hold a pending cash claim (created through the checkout
  * API in setup); the mock is seeded with their payments plus a stray one.
- * Covers the admin reconciliation page: the unmatched-default payment list,
- * the manual-match modal (pending claims grouped by donor + expected-amount
- * hint), the matched state (linked claim + hidden behind the toggle), the
- * donor's paid state, the donor waiting page picking up an admin match
- * through its ~15s cart poll (success panel with no confirm click), and the
- * unmatch correction (confirm dialog reverts the claim to pending and the
- * payment lists unmatched again, claim reads "Awaiting payment").
+ * The app's local mirror starts empty, so the admin pulls the seeded
+ * payments in with the page's "Sync with Zeffy" button. Covers the admin
+ * reconciliation page: the unmatched-default payment list, the manual-match
+ * modal (pending claims grouped by donor + expected-amount hint), the
+ * matched state (linked claim + hidden behind the toggle), the donor's paid
+ * state, the donor waiting page picking up an admin match through its ~15s
+ * cart poll (success panel with no confirm click), the unmatch correction
+ * (confirm dialog reverts the claim to pending and the payment lists
+ * unmatched again, claim reads "Awaiting payment"), the dashboard
+ * unmatched-payments banner, and the Seen suppression.
  *
  * Skips (with a reason) when the mock or its .env wiring is missing —
  * see e2e/AGENTS.md. Mock payments are tag-scoped: the suite runs fully
- * parallel against one shared mock.
+ * parallel against one shared mock (and one shared local mirror, so
+ * banner-count assertions match the alert text, not an exact number).
  */
 import { test, expect, request as playwrightRequest, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import {
@@ -181,8 +185,11 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       await page.goto("/admin/zeffy-payments");
       await expect(page.getByRole("heading", { name: "Zeffy Payments" })).toBeVisible({ timeout: 10_000 });
 
+      // The local mirror starts empty — pull the seeded mock payments in
+      await page.getByRole("button", { name: "Sync with Zeffy" }).click();
+
       const row1 = page.locator("tr").filter({ hasText: data.d1!.email });
-      await expect(row1).toContainText("$500.00");
+      await expect(row1).toContainText("$500.00", { timeout: 10_000 });
       await expect(row1).toContainText("Unmatched");
       await expect(row1.getByRole("button", { name: "Match manually" })).toBeVisible();
 
@@ -199,6 +206,44 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       // hiding matched rows
       await expect(page.locator("tbody").getByText("Matched", { exact: true })).toHaveCount(0);
       await expect(page.getByLabel("Show matched")).not.toBeChecked();
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("dashboard shows the unmatched-payments banner; Seen suppresses the payment", async ({ browser }) => {
+    if (data.gate) {
+      test.skip(true, data.gate);
+      return;
+    }
+    // The banner count is global (one shared mirror), so match the alert's
+    // wording rather than an exact number.
+    const alert = /\d+ unmatched Zeffy payment\w* waiting for a match/;
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+    try {
+      // The three synced payments are waiting → the banner is on the dashboard
+      await page.goto("/dashboard");
+      await expect(page.getByRole("link", { name: alert }).first()).toBeVisible({ timeout: 10_000 });
+
+      // Mark the stray payment Seen: it drops out of the default view…
+      await page.goto("/admin/zeffy-payments");
+      const stray = page.locator("tr").filter({ hasText: STRANGER_EMAIL });
+      await expect(stray.getByRole("button", { name: "Seen" })).toBeVisible({ timeout: 10_000 });
+      await stray.getByRole("button", { name: "Seen" }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "Payment marked seen" })).toBeVisible();
+      await expect(page.locator("tr").filter({ hasText: STRANGER_EMAIL })).toHaveCount(0, { timeout: 10_000 });
+
+      // …it returns behind the toggle, with an Unseen action…
+      await page.getByLabel("Show matched").check();
+      await expect(stray.getByText("Seen", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await stray.getByRole("button", { name: "Unseen" }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "Payment back in the unmatched queue" })).toBeVisible();
+
+      // …and the dashboard banner is still up (the other payments wait)
+      await page.getByLabel("Show matched").uncheck();
+      await page.goto("/dashboard");
+      await expect(page.getByRole("link", { name: alert }).first()).toBeVisible({ timeout: 10_000 });
     } finally {
       await context.close();
     }
@@ -284,6 +329,8 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       const page = await context.newPage();
       try {
         await page.goto("/admin/zeffy-payments");
+        // The new mock payment only exists locally after a sync
+        await page.getByRole("button", { name: "Sync with Zeffy" }).click();
         const row = page.locator("tr").filter({ hasText: data.d2!.email }).filter({ hasText: "$500.00" });
         await expect(row.getByRole("button", { name: "Match manually" })).toBeVisible({ timeout: 10_000 });
         await row.getByRole("button", { name: "Match manually" }).click();

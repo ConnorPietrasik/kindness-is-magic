@@ -36,9 +36,11 @@ from app.models import (
     User,
     Wish,
     WishType,
+    ZeffyPaymentRecord,
 )
 from app.schemas import (
     _CLEAR,
+    AdminZeffyPayment,
     DeadlineItem,
     DeadlineListResponse,
     DeliverySlipItem,
@@ -137,6 +139,28 @@ def build_claim_summary(claim: FamilyClaim, family: FamilyInfo, email_error: str
         zeffy_payment_id=claim.zeffy_payment_id,
         includes_groceries=claim.includes_groceries,
         email_error=email_error,
+    )
+
+
+def build_zeffy_payment_item(record: ZeffyPaymentRecord, claim_ids: list[int]) -> AdminZeffyPayment:
+    """One mirrored payment row for the reconciliation list.
+
+    ``matched`` is derived from the live claims storing the payment id —
+    ``claim_ids`` is passed in by the list endpoint's batched claim lookup
+    (a matched payment lists them; an unmatched one has none).
+    """
+    return AdminZeffyPayment(
+        id=record.payment_id,
+        created_at=record.created_at,
+        amount_cents=record.amount_cents,
+        currency=record.currency,
+        buyer_name=record.buyer_name,
+        buyer_email=record.buyer_email,
+        receipt_url=record.receipt_url,
+        claim_ids=sorted(claim_ids),
+        matched=bool(claim_ids),
+        seen_at=record.seen_at,
+        refund_status=record.refund_status,
     )
 
 

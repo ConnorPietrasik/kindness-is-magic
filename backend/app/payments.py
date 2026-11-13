@@ -1,4 +1,5 @@
-"""Cash-claim payment lifecycle: shared apply path and the hourly expiry sweep.
+"""Cash-claim payment lifecycle: shared apply path, the Zeffy payment
+mirror sync, and the hourly expiry sweep.
 
 The apply path is the single place a Zeffy payment gets marked onto claims
 (idempotent on the stored payment id) and the per-donor confirmation email
@@ -39,8 +40,9 @@ from app.mail import (
     send_email,
     send_admin_notification,
 )
-from app.models import ClaimPaymentStatus, CommitmentType, EmailKind, FamilyClaim, User
+from app.models import ClaimPaymentStatus, CommitmentType, EmailKind, FamilyClaim, User, ZeffyPaymentRecord
 from app.response_builders import batch_build_family_info
+import app.zeffy as zeffy
 from app.zeffy import ZeffyPayment
 
 logger = logging.getLogger(__name__)
@@ -176,6 +178,13 @@ async def apply_payment_to_claims(db: Session, claims: list[FamilyClaim], paymen
         claim.payment_status = ClaimPaymentStatus.paid
         claim.paid_at = paid_at
         claim.zeffy_payment_id = payment.id
+    # Mirror row (idempotent) so every applied payment — webhook, donor
+    # confirm, manual match — appears in the local reconciliation list, and
+    # clear any "seen" acknowledgment: the match resolves what the banner
+    # flagged, and a later unmatch re-surfaces the payment.
+    record = upsert_zeffy_payment(db, payment)
+    record.seen_at = None
+    record.seen_by = None
     db.commit()
     logger.info("Payment %s applied to claims %s", payment.id, [c.id for c in claims])
 
@@ -211,6 +220,118 @@ async def send_payment_confirmation_email(db: Session, claims: list[FamilyClaim]
         total = claims_total_usd(donor_claims)
         body = build_payment_confirmed_email(donor.display_name, lines, total)
         await _best_effort_payment_email(donor, f"Sponsorship Payment Confirmed — ${total:,.0f}", body, db, EmailKind.payment_confirmed)
+
+
+# ---------------------------------------------------------------------------
+# Zeffy payment mirror (local reconciliation list + admin banner)
+# ---------------------------------------------------------------------------
+
+
+def payment_buyer_name(payment: ZeffyPayment) -> str | None:
+    """The buyer's display name: first + last, falling back to the company."""
+    buyer = payment.buyer
+    if buyer is None:
+        return None
+    name = " ".join(n for n in (buyer.first_name, buyer.last_name) if n).strip()
+    return name or buyer.company_name
+
+
+def upsert_zeffy_payment(db: Session, payment: ZeffyPayment) -> ZeffyPaymentRecord:
+    """Insert or refresh the mirror row for *payment*; return the row.
+
+    Does not commit — the caller owns the transaction (the webhook commits
+    before its business checks, the match endpoint before its own, the sync
+    walk per row, the apply path together with the claim flip). Idempotent
+    on the Zeffy payment id: a concurrent first insert loses to the unique
+    constraint on the losing path's commit; every delivery/retry re-runs
+    this upsert, so the state converges. Refreshes snapshot fields only —
+    the ``seen_at``/``seen_by`` attention state survives syncs.
+    """
+    values = dict(
+        created_at=datetime.fromtimestamp(payment.created, tz=timezone.utc),
+        amount_cents=payment.amount,
+        currency=payment.currency,
+        buyer_email=payment.buyer.email if payment.buyer is not None else None,
+        buyer_name=payment_buyer_name(payment),
+        campaign_id=payment.campaign_id,
+        receipt_url=payment.receipt_url,
+        status=payment.status,
+        refund_status=payment.refund_status,
+    )
+    record = db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment.id).first()
+    if record is None:
+        record = ZeffyPaymentRecord(payment_id=payment.id, **values)
+        db.add(record)
+    else:
+        for field, value in values.items():
+            setattr(record, field, value)
+    return record
+
+
+def sync_zeffy_payments(db: Session) -> tuple[int, int]:
+    """One sync cycle: walk the dedicated campaign's succeeded payments
+    (newest first) and upsert rows until the first already-known one — the
+    newest-first ordering means everything older is already mirrored, so
+    the walk stops there (late webhook deliveries of older payments remain
+    the webhook's job). The first known row is upserted too, which refreshes
+    its snapshot fields (e.g. a recent refund that landed after the
+    webhook); older known rows are not revisited — the match endpoint
+    refreshes a row when it is acted on. Returns ``(new, refreshed)``.
+
+    Commits per row so a mid-walk failure keeps its progress. The
+    org-wide Zeffy rate budget applies (client throttle + one 429 retry);
+    the multi-page case is the one-time full-history backfill.
+    """
+    if not zeffy.ZEFFY_CAMPAIGN_ID:
+        return 0, 0
+
+    cursor: str | None = None
+    new_count = 0
+    refreshed = 0
+    while True:
+        page = zeffy.list_payments(campaign_id=zeffy.ZEFFY_CAMPAIGN_ID, status="succeeded", starting_after=cursor, limit=100)
+        stop = False
+        for payment in page.data:
+            record = upsert_zeffy_payment(db, payment)
+            is_new = record.id is None  # PK assigns on the commit below
+            db.commit()
+            if is_new:
+                new_count += 1
+            else:
+                refreshed += 1
+                stop = True  # known row — the rest of the walk is redundant
+                break
+        if stop or not page.has_more:
+            break
+        cursor = page.next_cursor
+    return new_count, refreshed
+
+
+SYNC_INTERVAL_SECONDS = 3600
+
+
+async def zeffy_payment_sync_loop() -> None:
+    """Sync the Zeffy payment mirror immediately, then hourly.
+
+    The immediate first run backfills history (a one-page no-op once
+    caught up — the walk stops at the first known row). Skips quietly
+    while Zeffy is unconfigured (the dev/e2e default state); API/DB errors
+    are logged and swallowed (the next run retries) — mirroring
+    ``claim_expiry_loop``.
+    """
+    while True:
+        if zeffy.ZEFFY_API_KEY and zeffy.ZEFFY_CAMPAIGN_ID:
+            try:
+                db = next(get_db())
+                try:
+                    new_count, refreshed = await asyncio.to_thread(sync_zeffy_payments, db)
+                    if new_count or refreshed:
+                        logger.info("Zeffy payment sync: %d new, %d refreshed", new_count, refreshed)
+                finally:
+                    db.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Zeffy payment sync failed (will retry at the next run): %s", exc)
+        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
 
 
 # ---------------------------------------------------------------------------
