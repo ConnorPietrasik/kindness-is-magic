@@ -247,7 +247,7 @@ def list_review_queue(
 def resolve_slip_families_by_ids(db: Session, family_ids: str) -> list[Family]:
     """Resolve the ``family_ids`` slip parameter to a family list.
 
-    Comma-separated DB IDs. 400 on non-numeric input, 404 if any ID is
+    Comma-separated DB IDs. 422 on non-numeric input, 404 if any ID is
     deleted or does not exist (the whole request fails — none are skipped).
     Survivors are filtered to verified only, in the order requested. An
     empty or whitespace-only param yields an empty list.
@@ -255,7 +255,7 @@ def resolve_slip_families_by_ids(db: Session, family_ids: str) -> list[Family]:
     try:
         requested_ids = [int(x.strip()) for x in family_ids.split(",") if x.strip()]
     except ValueError:
-        raise HTTPException(status_code=400, detail="family_ids must be a comma-separated list of numbers")
+        raise HTTPException(status_code=422, detail="family_ids must be a comma-separated list of numbers")
 
     if not requested_ids:
         return []
@@ -316,7 +316,7 @@ def get_delivery_slips(
       scope; 404 for any ID that is deleted or does not exist).
     * Without it, ``scope`` narrows the population: ``all`` (default) |
       ``assigned`` | ``unassigned``.
-    * ``delivery_user_id`` adds an equality filter on top of scope (400 on
+    * ``delivery_user_id`` adds an equality filter on top of scope (422 on
       non-numeric input; an empty value is treated as absent).
     """
     # --- Resolve families --------------------------------------------------- #
@@ -324,7 +324,7 @@ def get_delivery_slips(
         families = resolve_slip_families_by_ids(db, family_ids)
     else:
         if scope not in ("all", "assigned", "unassigned"):
-            raise HTTPException(status_code=400, detail="scope must be one of: all, assigned, unassigned")
+            raise HTTPException(status_code=422, detail="scope must be one of: all, assigned, unassigned")
 
         filters = [
             Family.deleted_at.is_(None),
@@ -339,7 +339,7 @@ def get_delivery_slips(
             try:
                 user_id = int(delivery_user_id.strip())
             except ValueError:
-                raise HTTPException(status_code=400, detail="delivery_user_id must be a number")
+                raise HTTPException(status_code=422, detail="delivery_user_id must be a number")
             get_active_or_404(db, User, user_id, "Delivery user not found")
             filters.append(Family.delivery_user_id == user_id)
 

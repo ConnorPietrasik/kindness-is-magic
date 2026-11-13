@@ -437,7 +437,7 @@ class TestPackingSlipsEdgeCases:
     def test_invalid_family_ids_param(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/packing-slips?family_ids=abc")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_family_with_no_people(self, test_client: TestClient, admin_user, db: Session, referrer_record):
         from app.models import FamilyVerificationStatus, WishLockLevel

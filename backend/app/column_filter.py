@@ -69,7 +69,7 @@ def apply_column_filter(
     class is inferred from the first item (validation is skipped for empty
     pages and dict items).
 
-    Raises 400 if any requested column name is not a valid field on the
+    Raises 422 if any requested column name is not a valid field on the
     response model (whitelist enforcement).
     """
     if columns is None:
@@ -93,7 +93,7 @@ def apply_column_filter(
         unknown = requested - allowed
         if unknown:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Unknown column(s): {', '.join(sorted(unknown))}",
             )
 

@@ -91,6 +91,13 @@ class TestAdminListUsers:
         body = resp.json()
         assert {u["role"] for u in body["users"]} == {"admin", "referrer"}
 
+    def test_filter_roles_invalid_422(self, test_client: TestClient, admin_user):
+        """An invalid roles value is rejected with 422, not a 500 from the DB."""
+        _admin_login(test_client)
+        for path in ("/api/admin/users", "/api/admin/users/deleted", "/api/admin/users/dropdown"):
+            resp = test_client.get(path, params={"roles": "bogus"})
+            assert resp.status_code == 422
+
     def test_search_by_email(self, test_client: TestClient, admin_user, referrer_user):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/users?search=admin@test")

@@ -275,9 +275,9 @@ class TestPaymentsList:
         assert "refund_status" in item
         assert "claim_ids" in item
 
-        # Unknown column → 400
+        # Unknown column → 422
         resp = test_client.get("/api/admin/zeffy/payments", params={"columns": "id,bogus"})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "bogus" in resp.json()["detail"]
 
     def test_pagination(self, test_client: TestClient, db: Session, admin_user):

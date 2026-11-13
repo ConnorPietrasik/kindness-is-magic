@@ -252,13 +252,13 @@ class TestAdminEmailsList:
         assert set(item.keys()) == {"id", "recipient_email", "kind", "status", "sent_at", "sender_name"}
         assert "failure_reason" not in item
 
-    def test_columns_unknown_field_400(self, test_client: TestClient, admin_user, db: Session):
+    def test_columns_unknown_field_422(self, test_client: TestClient, admin_user, db: Session):
         actor = _make_user(db, "actor_ref@test.com", "referrer", "Actor Ref")
         _seed(db, actor, "a@example.com", "family_invite")
 
         _admin_login(test_client)
         resp = test_client.get("/api/admin/emails", params={"columns": "nope"})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "nope" in resp.json()["detail"]
 
     def test_sender_name_variants(self, test_client: TestClient, admin_user, db: Session):
@@ -425,12 +425,12 @@ class TestEmailUnsubscribesList:
         # Requested column + always-include email
         assert set(item.keys()) == {"email", "unsubscribed_at"}
 
-    def test_columns_unknown_field_400(self, test_client: TestClient, admin_user, db: Session):
+    def test_columns_unknown_field_422(self, test_client: TestClient, admin_user, db: Session):
         _seed_pref(db, "a@example.com")
 
         _admin_login(test_client)
         resp = test_client.get("/api/admin/emails/unsubscribes", params={"columns": "nope"})
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "nope" in resp.json()["detail"]
 
 

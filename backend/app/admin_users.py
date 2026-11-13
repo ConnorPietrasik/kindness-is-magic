@@ -143,7 +143,15 @@ def _apply_role_filter(query, roles: str | None):
     (e.g. ``roles=admin,purchaser``).
     """
     if roles is not None:
-        role_values = [r.strip() for r in roles.split(",") if r.strip()]
+        role_values = []
+        for raw in roles.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                role_values.append(UserRole(name))
+            except ValueError:
+                raise HTTPException(status_code=422, detail=f"Invalid role: {name}")
         if role_values:
             query = query.filter(User.role.in_(role_values))
     return query

@@ -271,10 +271,10 @@ class TestDeliverySlipsScope:
         ids = {item["id"] for item in resp.json()}
         assert ids == {delivery_slip_families["fam3"].id}
 
-    def test_invalid_scope_400(self, test_client: TestClient, admin_user):
+    def test_invalid_scope_422(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/delivery-slips?scope=everyone")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
 
 class TestDeliverySlipsDeliveryUserId:
@@ -351,10 +351,10 @@ class TestDeliverySlipsDeliveryUserId:
             delivery_slip_families["fam3"].id,
         }
 
-    def test_invalid_delivery_user_id_400(self, test_client: TestClient, admin_user):
+    def test_invalid_delivery_user_id_422(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/delivery-slips?delivery_user_id=abc")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
 
 class TestDeliverySlipsFamilyIdsFilter:
@@ -403,10 +403,10 @@ class TestDeliverySlipsFamilyIdsFilter:
         resp = test_client.get("/api/admin/families/delivery-slips?family_ids=99999")
         assert resp.status_code == 404
 
-    def test_400_invalid_family_ids(self, test_client: TestClient, admin_user):
+    def test_422_invalid_family_ids(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/delivery-slips?family_ids=abc")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_filters_to_verified_only(self, test_client: TestClient, admin_user, delivery_slip_families):
         _admin_login(test_client)

@@ -156,16 +156,16 @@ class TestApplyColumnFilter:
         assert "family_name" in result[0]  # required
         assert "bio" in result[0]  # requested
 
-    def test_unknown_column_returns_400(self, family_item):
+    def test_unknown_column_returns_422(self, family_item):
         from app.column_filter import apply_column_filter
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             apply_column_filter([family_item], "id,nonexistent_field")
-        assert exc_info.value.status_code == 400
+        assert exc_info.value.status_code == 422
         assert "nonexistent_field" in exc_info.value.detail
 
-    def test_unknown_column_returns_400_on_empty_page(self, family_item):
+    def test_unknown_column_returns_422_on_empty_page(self, family_item):
         from app.column_filter import apply_column_filter
         from app.schemas import FamilyDetail
         from fastapi import HTTPException
@@ -173,7 +173,7 @@ class TestApplyColumnFilter:
         # With an explicit model, validation runs even when the page is empty
         with pytest.raises(HTTPException) as exc_info:
             apply_column_filter([], "bogus_column", model=FamilyDetail, always_include={"id"})
-        assert exc_info.value.status_code == 400
+        assert exc_info.value.status_code == 422
         assert "bogus_column" in exc_info.value.detail
 
     def test_filters_dict_items(self):
@@ -206,17 +206,17 @@ class TestAdminFamiliesColumns:
         assert "bio" not in family
         assert "referrer_notes" not in family
 
-    def test_unknown_column_returns_400(self, test_client: TestClient, admin_user, family_record):
+    def test_unknown_column_returns_422(self, test_client: TestClient, admin_user, family_record):
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families?columns=id,fake_field")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "fake_field" in resp.json()["detail"]
 
-    def test_unknown_column_returns_400_on_empty_list(self, test_client: TestClient, admin_user, family_record):
-        """An invalid column name 400s even when the list is empty (deleted list has no rows)."""
+    def test_unknown_column_returns_422_on_empty_list(self, test_client: TestClient, admin_user, family_record):
+        """An invalid column name 422s even when the list is empty (deleted list has no rows)."""
         _admin_login(test_client)
         resp = test_client.get("/api/admin/families/deleted?columns=fake_field")
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "fake_field" in resp.json()["detail"]
 
     def test_no_columns_returns_full(self, test_client: TestClient, admin_user, family_record):

@@ -1,4 +1,3 @@
-Add total family count
 Make the "general donation" link more obvious, but without distracting too much from the main family choice route
 Add batch email scheduling / drafting
 Change logo colors for wish cards
