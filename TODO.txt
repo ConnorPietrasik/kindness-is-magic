@@ -1,8 +1,12 @@
+Add total family count
+Make the "general donation" link more obvious, but without distracting too much from the main family choice route
+Add batch email scheduling / drafting
 Change logo colors for wish cards
 Add a "send reminder" button to email invited referrers
 Automated failure checks and admin emails
 Donor reminder emails before deadline
-EVENTUALLY - Email families a week before their pickup window
+More personal donor thank you email batch draft
+Make a way for families to upload thank you pictures / cards if they want to (which admins can forward to their donor)
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak
 BEFORE NEXT SEASON - Update versions (containers, python, etc)
