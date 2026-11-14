@@ -218,18 +218,18 @@ export default function FamilyWishCards() {
 function WishCardView({ card }: { card: WishCard }) {
   if (card.kind === "family") {
     return (
-      <article className="wish-card wish-card--family flex flex-col rounded-xl border-2 border-violet-400 bg-violet-50 p-5">
+      <article className="wish-card wish-card--family flex flex-col rounded-xl border-2 border-green-700 bg-green-50 p-5">
         {/* ID + logo oversized for distance readability — ID block ≈ 2/3 of
             the card width, logo the remaining 1/3 */}
         <div className="flex items-center">
           <div className="flex w-1/3 justify-center">
-            <Logo className="h-24 w-24" />
+            <Logo className="h-24 w-24" variant="print" />
           </div>
-          <span className="w-2/3 text-right font-mono text-4xl font-black leading-none text-violet-800">#{card.display_id}</span>
+          <span className="w-2/3 text-right font-mono text-4xl font-black leading-none text-green-900">#{card.display_id}</span>
         </div>
-        <h2 className="mt-4 text-2xl font-bold text-violet-900">Family Wish</h2>
+        <h2 className="mt-4 text-2xl font-bold text-green-900">Family Wish</h2>
         <p className="mt-3 flex-1 text-xl font-semibold leading-snug text-gray-900">{card.description}</p>
-        <div className="text-lg font-semibold text-violet-900">
+        <div className="text-lg font-semibold text-green-900">
           <SizeColorLines card={card} />
         </div>
       </article>
@@ -242,7 +242,7 @@ function WishCardView({ card }: { card: WishCard }) {
           the card width, logo the remaining 1/3 */}
       <div className="flex items-center">
         <div className="flex w-1/3 justify-center">
-          <Logo className="h-24 w-24" />
+          <Logo className="h-24 w-24" variant="print" />
         </div>
         <span className="w-2/3 text-right font-mono text-4xl font-black leading-none text-gray-700">#{card.display_id}</span>
       </div>

@@ -170,15 +170,15 @@ export default function AdminWishCards() {
 function BlankCardView({ card }: { card: BlankCard }) {
   if (card.kind === "family") {
     return (
-      <article className="wish-card wish-card--family flex flex-col rounded-xl border-2 border-violet-400 bg-violet-50 p-5">
-        <CardIdLine className="text-violet-800" />
-        <h2 className="mt-4 text-2xl font-bold text-violet-900">Family Wish</h2>
+      <article className="wish-card wish-card--family flex flex-col rounded-xl border-2 border-green-700 bg-green-50 p-5">
+        <CardIdLine className="text-green-900" />
+        <h2 className="mt-4 text-2xl font-bold text-green-900">Family Wish</h2>
         {/* Wish field — the label tops the rest of the card, which stays
             blank for handwriting */}
         <div className="mt-3 flex-1">
-          <p className="text-xl font-semibold text-violet-900">Wish:</p>
+          <p className="text-xl font-semibold text-green-900">Wish:</p>
         </div>
-        <div className="text-lg font-semibold text-violet-900">
+        <div className="text-lg font-semibold text-green-900">
           <SizeColorLines />
         </div>
       </article>
@@ -216,7 +216,7 @@ function CardIdLine({ className }: { className: string }) {
   return (
     <div className="flex items-center">
       <div className="flex w-1/3 justify-center">
-        <Logo className="h-24 w-24" />
+        <Logo className="h-24 w-24" variant="print" />
       </div>
       <span className={`w-2/3 font-mono text-4xl font-black leading-none ${className}`}>#</span>
     </div>
