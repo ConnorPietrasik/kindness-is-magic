@@ -70,7 +70,7 @@ export function normalizeKeyOrder(stored: unknown, defs: Array<{ key: string }>)
 const NULLABLE_FIELDS = new Set(["bio", "note", "pickup_window", "referrer_notes", "due_date"]);
 
 /** Datetime fields that need canonical comparison in `normalizeUpdatePayload`. */
-const DATETIME_FIELDS = new Set(["pickup_window"]);
+const DATETIME_FIELDS = new Set(["pickup_window", "scheduled_for"]);
 
 /**
  * normalizePayload — convert empty strings to `null` on known nullable fields.
@@ -97,6 +97,9 @@ export function normalizePayload<T>(data: T): T {
  * - Unchanged field                                  → omit from payload (backend skips)
  * - Changed field                                    → send new value
  *
+ * Arrays are compared by content (stable JSON), not by reference — a fresh
+ * array with the same elements is unchanged and omitted.
+ *
  * Treats `null` and `""` as equivalent for comparison since forms always
  * render nullable fields as controlled inputs with `""` defaults.
  *
@@ -118,6 +121,16 @@ export function normalizeUpdatePayload<T, O>(formData: T, original: O | null): P
       const formDt = typeof formValue === "string" && formValue ? new Date(formValue).toISOString() : "";
       const origDt = typeof originalValue === "string" && originalValue ? new Date(originalValue).toISOString() : "";
       if (formDt === origDt) {
+        continue; // unchanged — omit
+      }
+      result[key] = formValue;
+      continue;
+    }
+
+    // Arrays: content compare (stable JSON) — `===` would compare by
+    // reference and flag every fresh array as changed.
+    if (Array.isArray(formValue) || Array.isArray(originalValue)) {
+      if (Array.isArray(formValue) && Array.isArray(originalValue) && JSON.stringify(formValue) === JSON.stringify(originalValue)) {
         continue; // unchanged — omit
       }
       result[key] = formValue;

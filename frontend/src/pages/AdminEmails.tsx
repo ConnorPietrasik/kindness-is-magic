@@ -40,12 +40,12 @@ export default function AdminEmails() {
 
   const tab = parseTab(searchParams.get("tab"));
 
-  // Per-tab table width: the sent/unsubscribes tables honor the gear
-  // width preference (two resources, both hooked here so the page can size
-  // its wrapper); the campaigns tab (list and detail alike) is max-w-4xl.
+  // Per-tab table width: each tab honors its gear's width preference
+  // (three resources, all hooked here so the page can size its wrapper).
+  const { widthClass: campaignWidthClass } = useTableWidth("adminEmailCampaigns");
   const { widthClass: sentWidthClass } = useTableWidth("adminSentEmails");
   const { widthClass: unsubWidthClass } = useTableWidth("adminEmailUnsubscribes");
-  const widthClass = tab === "campaigns" ? "max-w-4xl" : tab === "sent" ? sentWidthClass : unsubWidthClass;
+  const widthClass = tab === "campaigns" ? campaignWidthClass : tab === "sent" ? sentWidthClass : unsubWidthClass;
 
   const selectTab = (next: EmailTab) => {
     const params = new URLSearchParams(searchParams);

@@ -13,6 +13,7 @@ import axios from "axios";
 import type {
   AdminCampaignCreatePayload,
   AdminCampaignRecipientsListParams,
+  AdminCampaignUpdatePayload,
   AdminClaimsListParams,
   AdminClaimsResponse,
   AdminEmailsListParams,
@@ -569,11 +570,34 @@ export function adminPreviewEmailCampaign(data: { roles: string[]; extra_emails:
  * Create an email campaign: freeze the recipient snapshot and queue delivery.
  *
  * A blank subject is sent as null (the server applies its default subject).
- * Delivery is paced by the background worker — this returns as soon as the
- * campaign is created (status "pending"), not when the emails finish.
+ * With `save_as_draft` the selection is stored without resolving (nothing
+ * is sent until the draft is sent). With `scheduled_for` the first send is
+ * delayed until that time. Delivery is paced by the background worker —
+ * this returns as soon as the campaign is created, not when the emails
+ * finish.
  */
 export function adminCreateEmailCampaign(data: AdminCampaignCreatePayload): Promise<EmailCampaignSummary> {
   return apiPost("/api/admin/email-campaigns", data);
+}
+
+/**
+ * Edit a campaign that has not started delivering (draft, or pending with
+ * nothing sent yet). Partial update — only the provided fields change;
+ * `scheduled_for: ""` clears the time (send as soon as possible). 409 once
+ * delivery has started.
+ */
+export function adminUpdateEmailCampaign(id: number, data: AdminCampaignUpdatePayload): Promise<EmailCampaignSummary> {
+  return apiPatch(`/api/admin/email-campaigns/${id}`, data);
+}
+
+/** Send a draft: resolve its recipients (frozen at send time) and queue delivery. */
+export function adminSendEmailCampaign(id: number): Promise<EmailCampaignSummary> {
+  return apiPost(`/api/admin/email-campaigns/${id}/send`);
+}
+
+/** Delete a draft (nothing was ever sent — no audit record to keep). 204 no body. */
+export function adminDeleteEmailCampaign(id: number): Promise<void> {
+  return apiDelete(`/api/admin/email-campaigns/${id}`);
 }
 
 /** Cancel a campaign: its pending recipients will not be emailed. */

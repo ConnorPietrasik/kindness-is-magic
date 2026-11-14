@@ -710,16 +710,60 @@ class AdminCampaignCreateRequest(CampaignSelection):
     ``message`` is plain text, never HTML (same cap/renderer as the single
     custom email); a blank subject falls back to the default subject
     server-side.
+
+    ``save_as_draft`` stores the selection without resolving or sending
+    (the draft can be edited and sent later — its recipients are resolved
+    at send time). ``scheduled_for`` (must be in the future) delays the
+    first send for an activated campaign; it may also be stored on a draft
+    as the intended send time. Both together: a draft to send later.
     """
 
     subject: str | None = Field(None, max_length=200)
     message: str = Field(..., min_length=1, max_length=5000)
+    save_as_draft: bool = False
+    scheduled_for: datetime | None = None
 
     @field_validator("message")
     @classmethod
     def check_message_not_blank(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("message must not be blank")
+        return v
+
+
+class AdminCampaignUpdateRequest(BaseModel):
+    """Admin edits a campaign that has not started delivering (draft, or
+    pending with no sent/failed recipients) — the route 409s otherwise.
+
+    Partial-update convention: omitted or ``null`` fields are no-ops.
+    ``subject``/``message`` update in place (a blank subject falls back to
+    the default, as at creation). Providing either of ``roles`` /
+    ``extra_emails`` replaces the selection (the other keeps its stored
+    value); the resulting selection must be non-empty, and for an activated
+    campaign the recipients are re-resolved. ``scheduled_for`` uses the
+    ``clearable_datetime`` convention: ``""`` clears the time (send ASAP).
+    """
+
+    subject: str | None = Field(None, max_length=200)
+    message: str | None = Field(None, min_length=1, max_length=5000)
+    roles: list[UserRole] | None = None
+    extra_emails: list[Annotated[str, StringConstraints(max_length=MAX_EMAIL_LENGTH)]] | None = None
+    scheduled_for: clearable_datetime()
+
+    @field_validator("message")
+    @classmethod
+    def check_message_not_blank(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("message must not be blank")
+        return v
+
+    @field_validator("extra_emails")
+    @classmethod
+    def check_extra_emails(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        for email in v:
+            validate_email(email)
         return v
 
 
@@ -748,7 +792,9 @@ class EmailCampaignSummary(BaseModel):
     """Campaign row for the admin list/detail views.
 
     ``pending_count`` / ``canceled_count`` are derived from the recipient
-    rows (the stored counters track only sent/failed).
+    rows (the stored counters track only sent/failed). ``scheduled_for``
+    is NULL for campaigns that send as soon as the worker can reach them;
+    drafts carry it as the intended send time.
     """
 
     id: int
@@ -762,15 +808,18 @@ class EmailCampaignSummary(BaseModel):
     canceled_count: int
     created_at: datetime
     completed_at: datetime | None
+    scheduled_for: datetime | None = None
     sender_name: str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class EmailCampaignDetail(EmailCampaignSummary):
-    """Full campaign view — the summary plus the stored message body."""
+    """Full campaign view — the summary plus the stored message body and,
+    for drafts (and edit prefill), the stored manual addresses."""
 
     message: str
+    extra_emails: list[str] = Field(default_factory=list)
 
 
 class EmailCampaignListResponse(BaseModel):

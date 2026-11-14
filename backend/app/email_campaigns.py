@@ -1,16 +1,20 @@
 """Email campaigns — admin batch email: creation core and the delivery worker.
 
-A campaign freezes its recipient set at creation (role selections resolve to
-the non-deleted users existing at that moment; manual entries are normalized
-and deduped against them) and is then delivered one recipient per worker
-cycle, with a fixed interval between consecutive sends of the same campaign,
-so a bulk send trickles out instead of bursting the SMTP account into a
-throttling block. The interval never spans campaigns: when an ongoing
-campaign settles (completes) or is canceled, the worker moves on instead of
-waiting out an interval it didn't cause. But two campaign emails of
-different campaigns are never sent closer together than one idle poll, so a
-queue of campaigns still trickles out (the next campaign's first send goes
-out at most two idle polls after the cancel).
+A campaign freezes its recipient set at *send time* (drafts store the raw
+selection and resolve nothing; activation and immediate creation resolve
+role selections to the non-deleted users existing at that moment, with
+manual entries normalized and deduped against them) and is then delivered
+one recipient per worker cycle, with a fixed interval between consecutive
+sends of the same campaign, so a bulk send trickles out instead of bursting
+the SMTP account into a throttling block. ``scheduled_for`` delays the
+first send: the worker only picks a campaign up once it is due
+(``scheduled_for IS NULL OR <= now``), among due campaigns earliest-due
+first. The interval never spans campaigns: when an ongoing campaign settles
+(completes) or is canceled, the worker moves on instead of waiting out an
+interval it didn't cause. But two campaign emails of different campaigns
+are never sent closer together than one idle poll, so a queue of campaigns
+still trickles out (the next campaign's first send goes out at most two idle
+polls after the cancel).
 
 Every send goes through the shared ``send_email`` path — the unsubscribe
 gate applies (unsubscribed recipients are recorded as failed, never
@@ -33,6 +37,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import (
@@ -59,8 +64,20 @@ logger = logging.getLogger(__name__)
 class CampaignResolutionError(Exception):
     """The campaign's selection resolved to an unusable recipient set.
 
-    Raised by ``create_campaign`` when there are no recipients at all or the
-    set exceeds the cap; the route layer converts it to a 422.
+    Raised by ``create_campaign`` / ``activate_campaign`` / ``update_campaign``
+    when there are no recipients at all, the set exceeds the cap, or a
+    selection edit leaves the campaign with no roles and no addresses; the
+    route layer converts it to a 422.
+    """
+
+
+class CampaignStateError(Exception):
+    """The campaign is in a state that rejects the operation.
+
+    Raised by ``update_campaign`` when the campaign is not editable
+    (something already settled, or it is terminal) and by
+    ``activate_campaign`` when the campaign is not a draft; the route layer
+    converts it to a 409.
     """
 
 
@@ -110,39 +127,37 @@ def resolve_campaign_recipients(
     return list(resolved.values())
 
 
-def create_campaign(
+def _normalize_manual_emails(raw: list[str]) -> list[str]:
+    """Normalize manual addresses for storage: strip + lowercase, drop
+    empties, dedupe (first occurrence wins)."""
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for entry in raw:
+        email = entry.strip().lower()
+        if email and email not in seen:
+            seen.add(email)
+            normalized.append(email)
+    return normalized
+
+
+def _resolve_recipients_or_raise(
     db: Session,
-    created_by: User,
-    subject: str | None,
-    message: str,
     roles: list[UserRole],
     extra_emails: list[str],
-) -> EmailCampaign:
-    """Create a campaign and its recipient snapshot in the caller's transaction.
-
-    Applies the default subject to a blank one, resolves the recipients,
-    and adds the campaign + recipient rows. Raises
-    ``CampaignResolutionError`` when the selection is empty or exceeds
-    ``EMAIL_CAMPAIGN_MAX_RECIPIENTS``. Does **not** commit — the caller
-    (the admin route, or a future background caller such as the remind
-    deadline hook) owns the transaction.
-    """
+) -> list[dict]:
+    """Resolve a selection, raising ``CampaignResolutionError`` when it is
+    empty or exceeds ``EMAIL_CAMPAIGN_MAX_RECIPIENTS`` (the shared check
+    behind create and activate)."""
     recipients = resolve_campaign_recipients(db, roles, extra_emails)
     if not recipients:
         raise CampaignResolutionError("No recipients: select at least one role or add at least one email address")
     if len(recipients) > EMAIL_CAMPAIGN_MAX_RECIPIENTS:
         raise CampaignResolutionError(f"Too many recipients ({len(recipients)} — the limit is {EMAIL_CAMPAIGN_MAX_RECIPIENTS})")
+    return recipients
 
-    campaign = EmailCampaign(
-        created_by=created_by.id,
-        subject=(subject or "").strip() or CUSTOM_EMAIL_DEFAULT_SUBJECT,
-        message=message,
-        roles=[role.value for role in roles],
-        total_recipients=len(recipients),
-    )
-    db.add(campaign)
-    db.flush()  # assign campaign.id for the recipient rows
 
+def _add_recipient_rows(db: Session, campaign: EmailCampaign, recipients: list[dict]) -> None:
+    """Create the snapshot rows for a resolved selection."""
     db.add_all(
         EmailCampaignRecipient(
             campaign_id=campaign.id,
@@ -152,6 +167,162 @@ def create_campaign(
         )
         for r in recipients
     )
+
+
+def create_campaign(
+    db: Session,
+    created_by: User,
+    subject: str | None,
+    message: str,
+    roles: list[UserRole],
+    extra_emails: list[str],
+    scheduled_for: datetime | None = None,
+) -> EmailCampaign:
+    """Create an activated campaign and its recipient snapshot in the
+    caller's transaction.
+
+    Applies the default subject to a blank one, resolves the recipients
+    (raising ``CampaignResolutionError`` when the selection is empty or
+    exceeds the cap), and adds the campaign + recipient rows.
+    ``scheduled_for`` (NULL = send ASAP) is the earliest send time — the
+    worker skips the campaign until it is due. Does **not** commit — the
+    caller (the admin route, or a future background caller such as the
+    remind deadline hook) owns the transaction.
+    """
+    recipients = _resolve_recipients_or_raise(db, roles, extra_emails)
+
+    campaign = EmailCampaign(
+        created_by=created_by.id,
+        subject=(subject or "").strip() or CUSTOM_EMAIL_DEFAULT_SUBJECT,
+        message=message,
+        roles=[role.value for role in roles],
+        extra_emails=_normalize_manual_emails(extra_emails),
+        scheduled_for=scheduled_for,
+        total_recipients=len(recipients),
+    )
+    db.add(campaign)
+    db.flush()  # assign campaign.id for the recipient rows
+    _add_recipient_rows(db, campaign, recipients)
+    return campaign
+
+
+def create_draft(
+    db: Session,
+    created_by: User,
+    subject: str | None,
+    message: str,
+    roles: list[UserRole],
+    extra_emails: list[str],
+    scheduled_for: datetime | None = None,
+) -> EmailCampaign:
+    """Create a draft campaign: store the raw selection, send nothing.
+
+    Unlike ``create_campaign`` nothing is resolved and no recipient rows
+    are created — the snapshot is frozen at send time, when activation
+    (``activate_campaign``) re-resolves the selection. A draft whose role
+    selection resolves to zero users is therefore a valid draft (users may
+    exist by activation time); the selection just must not be empty
+    (enforced by the schema — at least one role or one address). The
+    default subject applies to a blank one, as at creation. The stored
+    ``extra_emails`` are normalized (strip + lower, deduped). Does **not**
+    commit — the caller owns the transaction.
+    """
+    campaign = EmailCampaign(
+        created_by=created_by.id,
+        subject=(subject or "").strip() or CUSTOM_EMAIL_DEFAULT_SUBJECT,
+        message=message,
+        roles=[role.value for role in roles],
+        extra_emails=_normalize_manual_emails(extra_emails),
+        scheduled_for=scheduled_for,
+        status=EmailCampaignStatus.draft,
+    )
+    db.add(campaign)
+    return campaign
+
+
+def activate_campaign(db: Session, campaign: EmailCampaign) -> EmailCampaign:
+    """Activate a draft: resolve its selection, freeze the snapshot, queue it.
+
+    Runs the same resolution as ``create_campaign`` (a draft whose
+    selection resolves to nothing, or over the cap, cannot be sent —
+    ``CampaignResolutionError``), creates the recipient rows, sets
+    ``total_recipients``, and flips the status to ``pending``. A stored
+    future ``scheduled_for`` is kept (the worker waits for it); a past one
+    is simply due now. Raises ``CampaignStateError`` when the campaign is
+    not a draft. Does **not** commit — the caller owns the transaction.
+    """
+    if campaign.status != EmailCampaignStatus.draft:
+        raise CampaignStateError("Only drafts can be sent — the campaign is already active")
+    recipients = _resolve_recipients_or_raise(db, [UserRole(r) for r in campaign.roles], campaign.extra_emails)
+    _add_recipient_rows(db, campaign, recipients)
+    campaign.total_recipients = len(recipients)
+    campaign.status = EmailCampaignStatus.pending
+    return campaign
+
+
+def update_campaign(
+    db: Session,
+    campaign: EmailCampaign,
+    *,
+    subject: str | None = None,
+    message: str | None = None,
+    roles: list[UserRole] | None = None,
+    extra_emails: list[str] | None = None,
+    scheduled_for: datetime | None = None,
+    clear_scheduled_for: bool = False,
+) -> EmailCampaign:
+    """Apply an admin edit to a not-yet-delivering campaign.
+
+    Editable means ``status in (draft, pending)`` with nothing settled
+    (``sent_count`` / ``failed_count`` both 0) — otherwise
+    ``CampaignStateError``. ``subject`` (blank falls back to the default,
+    as at creation) and ``message`` update in place. A selection change —
+    either ``roles`` or ``extra_emails`` provided — replaces the stored
+    selection (normalized); the resulting selection must be non-empty
+    (``CampaignResolutionError``), and for an activated campaign the
+    recipients are re-resolved and its pending rows replaced
+    (``total_recipients`` updated) — a draft keeps only the stored
+    selection, its rows being created at activation. ``scheduled_for``:
+    ``None`` = no-op, ``clear_scheduled_for`` = clear (send ASAP), a value
+    = set. Does **not** commit — the caller owns the transaction (and holds
+    the campaign row lock, so no worker step can commit counter changes
+    under the editable check). One in-flight edge: a send already in flight
+    when the check ran has gone out — ``send_email`` commits the attempt
+    (SentEmail row) before the recipient row's settled status commits, so
+    that row is still ``pending`` and is replaced with the rest: the send
+    is counted (``sent_count``) but has no recipient audit row.
+    """
+    if campaign.status not in (EmailCampaignStatus.draft, EmailCampaignStatus.pending) or campaign.sent_count or campaign.failed_count:
+        raise CampaignStateError("Campaign is already delivering — it can no longer be edited")
+    if subject is not None:
+        campaign.subject = subject.strip() or CUSTOM_EMAIL_DEFAULT_SUBJECT
+    if message is not None:
+        campaign.message = message
+    if clear_scheduled_for:
+        campaign.scheduled_for = None
+    elif scheduled_for is not None:
+        campaign.scheduled_for = scheduled_for
+    if roles is not None or extra_emails is not None:
+        new_roles = [role.value for role in roles] if roles is not None else list(campaign.roles or [])
+        new_extra = _normalize_manual_emails(extra_emails) if extra_emails is not None else list(campaign.extra_emails or [])
+        if not new_roles and not new_extra:
+            raise CampaignResolutionError("No recipients: select at least one role or add at least one email address")
+        campaign.roles = new_roles
+        campaign.extra_emails = new_extra
+        if campaign.status == EmailCampaignStatus.pending:
+            recipients = _resolve_recipients_or_raise(db, [UserRole(r) for r in new_roles], new_extra)
+            # The bulk delete executes immediately (sessions run with
+            # autoflush off). It may wait out a worker's in-flight recipient
+            # row lock — released by send_email's mid-step commit, before
+            # the in-flight row's settled status commits — so an in-flight
+            # send is counted but its still-pending row is replaced like the
+            # rest (no audit row for that one send; see the docstring).
+            db.query(EmailCampaignRecipient).filter(
+                EmailCampaignRecipient.campaign_id == campaign.id,
+                EmailCampaignRecipient.status == EmailCampaignRecipientStatus.pending,
+            ).delete(synchronize_session=False)
+            _add_recipient_rows(db, campaign, recipients)
+            campaign.total_recipients = len(recipients)
     return campaign
 
 
@@ -193,10 +364,13 @@ def cancel_campaign(db: Session, campaign: EmailCampaign) -> EmailCampaign:
 
 
 async def process_next_campaign_email(db: Session) -> EmailCampaign | None:
-    """Deliver the next single recipient of the oldest active campaign.
+    """Deliver the next single recipient of the earliest-due active campaign.
 
-    Picks the oldest ``pending``/``sending`` campaign that still has a
-    pending recipient, marks it ``sending`` on first pickup, claims its
+    Picks the due ``pending``/``sending`` campaign (``scheduled_for`` is
+    NULL or in the past) that still has a pending recipient — among due
+    campaigns, earliest due first (``COALESCE(scheduled_for, created_at)``
+    generalizes the old id-order FIFO; immediate campaigns have NULL and
+    keep their order) —, marks it ``sending`` on first pickup, claims its
     lowest-id pending recipient (``FOR UPDATE`` — a concurrent cancel that
     commits first flips the row, Postgres re-checks the WHERE clause, and
     the worker claims the next row instead), sends it via the shared
@@ -205,15 +379,23 @@ async def process_next_campaign_email(db: Session) -> EmailCampaign | None:
     terminal state first. Commits each step (the worker owns its session;
     ``send_email`` also commits its own ``SentEmail`` log row).
 
-    Returns the campaign, or ``None`` when no campaign has work (the
+    A campaign whose ``scheduled_for`` has not come is simply not due: the
+    step returns ``None`` (the caller idles at the shorter poll interval),
+    so a scheduled campaign starts at most one idle poll after its time.
+
+    Returns the campaign, or ``None`` when no due campaign has work (the
     caller then idles at the shorter poll interval).
     """
+    now = datetime.now(timezone.utc)
     campaign = (
         db.query(EmailCampaign)
-        .filter(EmailCampaign.status.in_([EmailCampaignStatus.pending, EmailCampaignStatus.sending]))
+        .filter(
+            EmailCampaign.status.in_([EmailCampaignStatus.pending, EmailCampaignStatus.sending]),
+            (EmailCampaign.scheduled_for.is_(None)) | (EmailCampaign.scheduled_for <= now),
+        )
         .join(EmailCampaignRecipient, EmailCampaignRecipient.campaign_id == EmailCampaign.id)
         .filter(EmailCampaignRecipient.status == EmailCampaignRecipientStatus.pending)
-        .order_by(EmailCampaign.id)
+        .order_by(func.coalesce(EmailCampaign.scheduled_for, EmailCampaign.created_at).asc(), EmailCampaign.id)
         .first()
     )
     if campaign is None:

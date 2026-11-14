@@ -37,6 +37,7 @@ export type {
 } from "./csv";
 export type {
   AdminCampaignCreatePayload,
+  AdminCampaignUpdatePayload,
   AdminClaim,
   AdminClaimsListParams,
   AdminClaimsResponse,

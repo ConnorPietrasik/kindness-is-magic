@@ -2,11 +2,19 @@
 
 All endpoints are guarded with ``require_admin``.
 
-Campaigns are immutable after creation — the only post-creation mutation is
-cancel. The recipient set is a snapshot taken at creation (see
-``email_campaigns.create_campaign``); delivery is paced by the background
-worker (one recipient per cycle — see ``email_campaigns.campaign_worker_loop``),
-so creating a campaign returns immediately with the full progress shape.
+Campaigns are mutable only while nothing has settled — a draft (or a
+pending campaign with no sent/failed recipients) can be edited, and a
+draft can be sent (its recipients resolve at send time), rescheduled, or
+deleted. Once delivery has started the only post-creation mutation is
+cancel; an activated campaign is an immutable audit record (it is never
+deleted).
+
+The recipient set is a snapshot taken at activation/creation (see
+``email_campaigns.create_campaign`` / ``activate_campaign``); delivery is
+paced by the background worker (one recipient per cycle — see
+``email_campaigns.campaign_worker_loop``), optionally delayed by
+``scheduled_for``, so creating a campaign returns immediately with the
+full progress shape.
 
 Deliberate deviations from the admin list-endpoint convention: the campaign
 list has no pagination/``columns`` (a handful-of-rows table, like
@@ -14,19 +22,24 @@ deadlines) — the *recipient* list inside the detail is the paginated one.
 """
 
 import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.email_campaigns import (
     CampaignResolutionError,
+    CampaignStateError,
+    activate_campaign,
     cancel_campaign,
     create_campaign,
+    create_draft,
     resolve_campaign_recipients,
+    update_campaign,
 )
-from app.models import EmailCampaign, EmailCampaignRecipient, User
+from app.models import EmailCampaign, EmailCampaignRecipient, EmailCampaignStatus, User
 from app.permissions import require_admin
 from app.rate_limit import limiter
 from app.response_builders import (
@@ -39,10 +52,12 @@ from app.response_builders import (
 from app.schemas import (
     AdminCampaignCreateRequest,
     AdminCampaignPreviewRequest,
+    AdminCampaignUpdateRequest,
     EmailCampaignDetailResponse,
     EmailCampaignListResponse,
     EmailCampaignPreviewResponse,
     EmailCampaignRecipientSummary,
+    _CLEAR,
 )
 from app.search_sort import CAMPAIGN_RECIPIENT_SORT_FIELDS, build_sort_clause, escape_like
 
@@ -60,6 +75,32 @@ def _sender_name(db: Session, user_id: int | None) -> str | None:
         return None
     user = db.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
     return user.display_name if user else None
+
+
+def _validate_scheduled_for(value: datetime | None) -> datetime | None:
+    """Reject a past send time (422); treat a naive datetime as UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    if value <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=422, detail="scheduled_for must be in the future")
+    return value
+
+
+def _campaign_for_update(db: Session, campaign_id: int) -> EmailCampaign:
+    """Locked fetch or 404.
+
+    The callers check the campaign's state and mutate it in the same
+    transaction; the row lock keeps a concurrent request (or a worker step)
+    from changing that state between the check and the mutation — when the
+    lock is granted Postgres re-checks the latest committed row, so a lost
+    race surfaces as the caller's 409 rather than a duplicate mutation.
+    """
+    campaign = db.query(EmailCampaign).filter(EmailCampaign.id == campaign_id).with_for_update().first()
+    if campaign is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    return campaign
 
 
 # /preview must be registered before /{campaign_id} — "preview" would
@@ -94,31 +135,51 @@ def create_email_campaign(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    """Create an email campaign: freeze the recipient snapshot and queue it.
+    """Create an email campaign: queue it, or save it as a draft.
 
-    Delivery starts in the background worker (one recipient per paced
-    cycle). The 5/minute guard swallows accidental double-submits — each
-    create becomes many real emails.
+    Activated (``save_as_draft`` false): freeze the recipient snapshot and
+    queue delivery in the background worker (one recipient per paced cycle;
+    a ``scheduled_for`` delays the first send). Draft (``save_as_draft``
+    true): store the selection without resolving — it sends nothing until
+    sent (``POST /{id}/send``). The 5/minute guard swallows accidental
+    double-submits — each create becomes many real emails.
     """
+    scheduled_for = _validate_scheduled_for(body.scheduled_for)
     try:
-        campaign = create_campaign(
-            db,
-            created_by=admin,
-            subject=body.subject,
-            message=body.message,
-            roles=body.roles,
-            extra_emails=body.extra_emails,
-        )
+        if body.save_as_draft:
+            campaign = create_draft(
+                db,
+                created_by=admin,
+                subject=body.subject,
+                message=body.message,
+                roles=body.roles,
+                extra_emails=body.extra_emails,
+                scheduled_for=scheduled_for,
+            )
+        else:
+            campaign = create_campaign(
+                db,
+                created_by=admin,
+                subject=body.subject,
+                message=body.message,
+                roles=body.roles,
+                extra_emails=body.extra_emails,
+                scheduled_for=scheduled_for,
+            )
     except CampaignResolutionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     db.commit()
     db.refresh(campaign)
-    logger.info(
-        "Admin %s created email campaign (id=%s, recipients=%s)",
-        admin.id,
-        campaign.id,
-        campaign.total_recipients,
-    )
+    if body.save_as_draft:
+        logger.info("Admin %s saved email campaign draft (id=%s)", admin.id, campaign.id)
+    else:
+        logger.info(
+            "Admin %s created email campaign (id=%s, recipients=%s, scheduled=%s)",
+            admin.id,
+            campaign.id,
+            campaign.total_recipients,
+            scheduled_for,
+        )
     return build_campaign_summary(db, campaign, sender_name=admin.display_name)
 
 
@@ -193,6 +254,114 @@ def get_email_campaign(
     }
 
 
+@campaign_admin_router.patch("/{campaign_id}")
+def update_email_campaign(
+    campaign_id: int,
+    body: AdminCampaignUpdateRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Edit a campaign that has not started delivering yet.
+
+    Editable while nothing has settled — a draft, or a pending campaign
+    with no sent/failed recipients (409 once delivery has started or the
+    campaign is terminal): the subject, message, the recipient selection
+    (for an activated campaign the recipients are re-resolved, so a stale
+    queued campaign emails the current users) and the send time (``""``
+    clears it — send as soon as possible). The campaign row is locked for
+    the duration, so no worker step can commit counter changes between the
+    check and the update; a send already in flight when the check ran has
+    gone out (see ``update_campaign``).
+    """
+    campaign = _campaign_for_update(db, campaign_id)
+    if campaign.status not in (EmailCampaignStatus.draft, EmailCampaignStatus.pending) or campaign.sent_count or campaign.failed_count:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Campaign is already delivering — it can no longer be edited")
+
+    clear_scheduled = body.scheduled_for is _CLEAR
+    scheduled_for = None if clear_scheduled else _validate_scheduled_for(body.scheduled_for)
+    try:
+        update_campaign(
+            db,
+            campaign,
+            subject=body.subject,
+            message=body.message,
+            roles=body.roles,
+            extra_emails=body.extra_emails,
+            scheduled_for=scheduled_for,
+            clear_scheduled_for=clear_scheduled,
+        )
+    except CampaignResolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except CampaignStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(campaign)
+    logger.info("Admin %s updated email campaign (id=%s)", admin.id, campaign.id)
+    return build_campaign_summary(db, campaign, sender_name=_sender_name(db, campaign.created_by))
+
+
+@campaign_admin_router.post("/{campaign_id}/send")
+@limiter.limit("5/minute")
+def send_email_campaign(
+    request: Request,
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Send a draft: resolve its recipients and queue delivery.
+
+    The snapshot is frozen at send time (the stored selection is
+    re-resolved — a draft saved earlier emails the users existing now). A
+    stored future send time is honored (the worker waits for it); a past
+    one is simply due now. 409 for a non-draft — the campaign row is
+    locked, so a concurrent send of the same draft waits, re-checks, and
+    409s instead of building a second recipient snapshot (which would
+    email everyone twice); 422 when the selection resolves to nothing or
+    exceeds the cap.
+    """
+    campaign = _campaign_for_update(db, campaign_id)
+    if campaign.status != EmailCampaignStatus.draft:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only drafts can be sent — the campaign is already active")
+    try:
+        activate_campaign(db, campaign)
+    except CampaignResolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(campaign)
+    logger.info(
+        "Admin %s sent email campaign draft (id=%s, recipients=%s, scheduled=%s)",
+        admin.id,
+        campaign.id,
+        campaign.total_recipients,
+        campaign.scheduled_for,
+    )
+    return build_campaign_summary(db, campaign, sender_name=_sender_name(db, campaign.created_by))
+
+
+@campaign_admin_router.delete("/{campaign_id}", status_code=204)
+def delete_email_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Delete a draft — nothing was ever sent, so there is no audit record
+    to keep. 409 once activated: an activated campaign is an immutable
+    audit record (cancel it, don't delete it). The row lock makes the
+    check race-safe — a concurrent send that commits first flips the row
+    to pending under the delete, which then 409s.
+    """
+    campaign = _campaign_for_update(db, campaign_id)
+    if campaign.status != EmailCampaignStatus.draft:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only drafts can be deleted — activated campaigns are kept as an audit record",
+        )
+    logger.info("Admin %s deleted email campaign draft (id=%s)", admin.id, campaign_id)
+    db.delete(campaign)
+    db.commit()
+    return None
+
+
 @campaign_admin_router.post("/{campaign_id}/cancel")
 def cancel_email_campaign(
     campaign_id: int,
@@ -202,9 +371,16 @@ def cancel_email_campaign(
     """Cancel a campaign: its pending recipients will not be emailed.
 
     Idempotent — canceling a completed/canceled campaign is a 200 no-op.
-    Already-sent recipients are of course unaffected.
+    Already-sent recipients are of course unaffected. Drafts are not
+    canceled but deleted (409). The campaign row is locked for the
+    duration, so a concurrent edit (which holds the same lock) can't
+    replace recipients underneath: a cancel that loses the race re-checks
+    the latest committed row once the lock is granted and either cancels
+    the post-edit rows or 409s on the new state.
     """
-    campaign = get_or_404(db, EmailCampaign, campaign_id, "Campaign not found")
+    campaign = _campaign_for_update(db, campaign_id)
+    if campaign.status == EmailCampaignStatus.draft:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Drafts cannot be canceled — delete the draft instead")
     cancel_campaign(db, campaign)
     db.commit()
     db.refresh(campaign)

@@ -39,9 +39,9 @@
  *   - one demo email campaign (partially delivered, then canceled) for the
  *     admin email-campaigns page
  * Everything the script creates is cleaned up in afterAll (the golden rule)
- * — except the demo campaign: campaigns are append-only (no delete
- * endpoint), so it is left canceled and the capture filters to this run's
- * row.
+ * — except the demo campaign: it is activated, and an activated campaign is
+ * an immutable audit record (only drafts are deletable), so it is left
+ * canceled and the capture filters to this run's row.
  * Two seeded rows are touched reversibly: the seeded purchaser/delivery/admin
  * assignments are reset to unassigned before the script's own assignments go
  * in (restoring "no assignment" afterwards), and the referrer review queue is
@@ -447,9 +447,9 @@ test.describe.serial("help page screenshots", () => {
       ["admin-wish-cards", "/admin/wish-cards", { heading: "Blank Wish Cards" }],
       ["admin-emails", "/admin/emails", { heading: "Emails" }],
       ["admin-email-campaigns", "/admin/emails?tab=campaigns", { heading: "Emails", onSettled: async (p) => {
-        /* Keep only this run's demo campaign: campaigns are append-only
-           (no delete endpoint), so a crashed earlier run's canceled row
-           would otherwise share the frame */
+        /* Keep only this run's demo campaign: it is left behind (activated
+           campaigns can't be deleted), so a crashed earlier run's canceled
+           row would otherwise share the frame */
         await p.locator("table tbody tr").evaluateAll(
           (rows, subject) => {
             for (const row of rows) {
@@ -625,7 +625,7 @@ test.describe.serial("help page screenshots", () => {
       }
       /* Deadlines (hard delete) */
       for (const id of d.deadlineIds) await deleteDeadlineViaApi(api, id);
-      /* Demo campaign — append-only (no delete endpoint); cancel is
+      /* Demo campaign — activated campaigns can't be deleted; cancel is
          idempotent, a no-op once the setup already canceled it */
       if (d.demoCampaignId != null) {
         const cancel = await api.post(`/api/admin/email-campaigns/${d.demoCampaignId}/cancel`);

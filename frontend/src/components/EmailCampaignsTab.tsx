@@ -1,31 +1,49 @@
 /**
  * EmailCampaignsTab — the "Campaigns" tab of the admin Emails page
  *
- * List of every campaign with live delivery progress (the list refetches on
- * an interval while any campaign is still delivering), a "New email
+ * List of every campaign (drafts, scheduled, delivering, terminal) with
+ * live delivery progress (the list refetches on an interval while any
+ * campaign is still delivering or waiting for its send time), a "New email
  * campaign" dialog, and a per-campaign detail view with the paginated
- * recipient audit + cancel.
+ * recipient audit + cancel. Drafts can be edited, sent, or deleted from
+ * the detail; a scheduled campaign can be sent now (the stored time is
+ * cleared).
  *
  * Delivery is paced by the background worker (one recipient per cycle), so
  * a freshly created campaign ticks forward over time — hence the periodic
  * refetch while work remains.
  *
- * Rendered by AdminEmails (the page owns the shell and the tabs); the tab
- * is max-width 4xl via the page wrapper, so there is no page chrome here.
+ * Rendered by AdminEmails (the page owns the shell, the tabs, and the
+ * per-tab table width); the list's columns are registry-driven (toggle +
+ * drag-reorder via the gear, like the other admin tables).
  * The detail view is an in-tab sub-view (not a separate route).
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import type React from "react";
+import { Fragment, useMemo, useState } from "react";
+import { useColumnOrder } from "../hooks/useColumnOrder";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
-import { adminCancelEmailCampaign, adminGetEmailCampaign, adminListEmailCampaigns } from "../lib/api";
-import { adminEmailCampaign, adminEmailCampaigns } from "../lib/queryKeys";
+import {
+  adminCancelEmailCampaign,
+  adminDeleteEmailCampaign,
+  adminGetEmailCampaign,
+  adminListEmailCampaigns,
+  adminPreviewEmailCampaign,
+  adminSendEmailCampaign,
+  adminUpdateEmailCampaign,
+} from "../lib/api";
+import { adminEmailCampaign, adminEmailCampaignPreview, adminEmailCampaigns } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
-import type { EmailCampaignRecipientSummary, EmailCampaignStatus } from "../types";
+import type { EmailCampaignRecipientSummary, EmailCampaignStatus, EmailCampaignSummary } from "../types";
 import { AdminCampaignDialog } from "./AdminCampaignDialog";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { ColumnToggle } from "./ColumnToggle";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { DraggableTh } from "./DraggableTh";
 import { MutationErrors } from "./MutationErrors";
 import { Pagination } from "./Pagination";
 import { PageSpinner } from "./Spinner";
@@ -33,11 +51,30 @@ import { Table, TableBody, TableHead, Td, Tr } from "./Table";
 
 /** status → badge (label + pill classes). "Sending" rows tick over time. */
 const STATUS_BADGES = {
+  draft: { label: "Draft", className: "bg-amber-100 text-amber-700" },
   pending: { label: "Queued", className: "bg-gray-100 text-gray-600" },
   sending: { label: "Sending", className: "bg-blue-100 text-blue-700" },
   completed: { label: "Completed", className: "bg-green-100 text-green-700" },
   canceled: { label: "Canceled", className: "bg-gray-100 text-gray-400" },
 } as const satisfies Record<EmailCampaignStatus, { label: string; className: string }>;
+
+/** The "Scheduled" state is a queued campaign with a stored send time. */
+function statusBadge(campaign: EmailCampaignSummary): { label: string; className: string } {
+  if (campaign.status === "pending" && campaign.scheduled_for) {
+    return { label: "Scheduled", className: "bg-violet-100 text-violet-700" };
+  }
+  return STATUS_BADGES[campaign.status];
+}
+
+/** List header cell per column key (registry-driven render). */
+const CAMPAIGN_HEADERS: Record<string, React.ReactNode> = {
+  subject: "Subject",
+  roles: "Roles",
+  progress: "Progress",
+  status: "Status",
+  scheduled_for: "Scheduled",
+  created_at: "Created",
+};
 
 /** recipient status → inline cell (failure reason shown inline). */
 function RecipientStatusCell({ recipient }: { recipient: EmailCampaignRecipientSummary }) {
@@ -78,17 +115,32 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
   const queryClient = useQueryClient();
   const pagination = usePagination({ defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
   const [searchQuery, setSearchQuery] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
 
   const { data, isLoading } = useQuery({
     queryKey: [...adminEmailCampaign(campaignId), pagination.params, debouncedSearch || undefined],
     queryFn: () => adminGetEmailCampaign(campaignId, { ...pagination.params, search: debouncedSearch || undefined }),
     staleTime: 0, // progress ticks forward while delivering — always refetch when viewed
-    // Live progress: poll while this campaign is still delivering.
+    // Live progress: poll while this campaign is still delivering (or
+    // waiting for its send time — both are "pending").
     refetchInterval: (query) => {
       const status = query.state.data?.campaign.status;
       return status === "pending" || status === "sending" ? 5000 : false;
     },
+  });
+
+  // Drafts have no recipient rows until sent — show the live blast size
+  // with the same read-only preview the compose dialog uses, keyed on the
+  // stored selection.
+  const { data: draftPreview } = useQuery({
+    queryKey: adminEmailCampaignPreview({
+      roles: data?.campaign.roles ?? [],
+      extra_emails: data?.campaign.extra_emails ?? [],
+    }),
+    queryFn: () => adminPreviewEmailCampaign({ roles: data!.campaign.roles, extra_emails: data!.campaign.extra_emails }),
+    enabled: data?.campaign.status === "draft",
   });
 
   const cancelMutation = useMutation({
@@ -98,18 +150,47 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
     },
   });
 
+  // Draft: activate — the recipient snapshot is frozen at this moment.
+  const sendNowMutation = useMutation({
+    mutationFn: () => adminSendEmailCampaign(campaignId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminEmailCampaigns });
+    },
+  });
+
+  // Scheduled: clear the stored time — the worker sends ASAP.
+  const clearScheduleMutation = useMutation({
+    mutationFn: () => adminUpdateEmailCampaign(campaignId, { scheduled_for: "" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminEmailCampaigns });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => adminDeleteEmailCampaign(campaignId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminEmailCampaigns });
+      onBack();
+    },
+  });
+
   if (isLoading) return <PageSpinner />;
   if (!data) return null;
 
   const { campaign } = data;
-  const badge = STATUS_BADGES[campaign.status];
+  const badge = statusBadge(campaign);
+  const isDraft = campaign.status === "draft";
+  const isScheduled = campaign.status === "pending" && campaign.scheduled_for !== null;
   const isActive = campaign.status === "pending" || campaign.status === "sending";
+  // Same editability rule as the backend: nothing settled, not terminal.
+  const isEditable =
+    campaign.status === "draft" || (campaign.status === "pending" && campaign.sent_count === 0 && campaign.failed_count === 0);
 
   const pageInfo = getPaginationInfo(data.total, pagination.page, pagination.pageSize);
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={onBack}>
             ← Back
@@ -119,11 +200,33 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
             {badge.label}
           </span>
         </div>
-        {isActive && (
-          <Button variant="danger" onClick={() => cancelMutation.mutate()} loading={cancelMutation.isPending}>
-            Cancel campaign
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {isEditable && (
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>
+              Edit
+            </Button>
+          )}
+          {isDraft && (
+            <Button onClick={() => sendNowMutation.mutate()} loading={sendNowMutation.isPending}>
+              Send now
+            </Button>
+          )}
+          {isScheduled && (
+            <Button onClick={() => clearScheduleMutation.mutate()} loading={clearScheduleMutation.isPending}>
+              Send now
+            </Button>
+          )}
+          {isActive && (
+            <Button variant="danger" onClick={() => cancelMutation.mutate()} loading={cancelMutation.isPending}>
+              Cancel campaign
+            </Button>
+          )}
+          {isDraft && (
+            <Button variant="danger" onClick={() => setDeleteOpen(true)} loading={deleteMutation.isPending}>
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Campaign meta + message body */}
@@ -136,11 +239,27 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
           <div>
             <dt className="text-gray-400">Recipients</dt>
             <dd className="font-medium text-gray-800">
-              {campaign.sent_count}/{campaign.total_recipients} sent
-              {campaign.failed_count > 0 ? ` · ${campaign.failed_count} failed` : ""}
-              {campaign.canceled_count > 0 ? ` · ${campaign.canceled_count} canceled` : ""}
+              {isDraft ? (
+                draftPreview ? (
+                  <>Will send to {draftPreview.total}</>
+                ) : (
+                  "Counting…"
+                )
+              ) : (
+                <>
+                  {campaign.sent_count}/{campaign.total_recipients} sent
+                  {campaign.failed_count > 0 ? ` · ${campaign.failed_count} failed` : ""}
+                  {campaign.canceled_count > 0 ? ` · ${campaign.canceled_count} canceled` : ""}
+                </>
+              )}
             </dd>
           </div>
+          {isScheduled && (
+            <div>
+              <dt className="text-gray-400">Scheduled for</dt>
+              <dd className="font-medium text-gray-800">{formatDateTime(campaign.scheduled_for)}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-gray-400">Created</dt>
             <dd className="font-medium text-gray-800">{formatDateTime(campaign.created_at)}</dd>
@@ -156,60 +275,85 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
         </div>
       </Card>
 
-      {/* Recipient audit */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-gray-700">Recipients</h3>
-        <input
-          type="text"
-          placeholder="Search by email…"
-          aria-label="Search recipients by email"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
-          autoComplete="off"
-        />
-      </div>
-      <Table>
-        <TableHead>
-          <th>Email</th>
-          <th>Name</th>
-          <th>Source</th>
-          <th>Status</th>
-          <th>Sent</th>
-        </TableHead>
-        <TableBody>
-          {data.recipients.length === 0 ? (
-            <Tr>
-              <Td className="py-8 text-center text-gray-400" colSpan={5}>
-                No recipients match.
-              </Td>
-            </Tr>
-          ) : (
-            data.recipients.map((recipient) => (
-              <Tr key={recipient.id}>
-                <Td className="font-medium text-gray-900">{recipient.email}</Td>
-                <Td>{recipient.user_display_name ?? <span className="text-gray-400">—</span>}</Td>
-                <Td className="capitalize">{recipient.source}</Td>
-                <Td>
-                  <RecipientStatusCell recipient={recipient} />
-                </Td>
-                <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(recipient.sent_at)}</Td>
-              </Tr>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      <Pagination
-        page={pagination.page}
-        totalPages={pageInfo.totalPages}
-        total={data.total}
-        pageSize={pagination.pageSize}
-        onPageChange={pagination.goToPage}
-        onPageSizeChange={pagination.setPageSize}
+      {isDraft ? (
+        <Card className="mb-6">
+          <p className="py-4 text-sm text-gray-500">
+            Recipients are finalized when the campaign is sent — the exact list of people is frozen at that moment. Use{" "}
+            <strong>Send now</strong> to queue delivery, or <strong>Edit</strong> the draft first. While it is a draft it can also be
+            deleted.
+          </p>
+        </Card>
+      ) : (
+        <>
+          {/* Recipient audit */}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-700">Recipients</h3>
+            <input
+              type="text"
+              placeholder="Search by email…"
+              aria-label="Search recipients by email"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+              autoComplete="off"
+            />
+          </div>
+          <Table>
+            <TableHead>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Sent</th>
+            </TableHead>
+            <TableBody>
+              {data.recipients.length === 0 ? (
+                <Tr>
+                  <Td className="py-8 text-center text-gray-400" colSpan={5}>
+                    No recipients match.
+                  </Td>
+                </Tr>
+              ) : (
+                data.recipients.map((recipient) => (
+                  <Tr key={recipient.id}>
+                    <Td className="font-medium text-gray-900">{recipient.email}</Td>
+                    <Td>{recipient.user_display_name ?? <span className="text-gray-400">—</span>}</Td>
+                    <Td className="capitalize">{recipient.source}</Td>
+                    <Td>
+                      <RecipientStatusCell recipient={recipient} />
+                    </Td>
+                    <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(recipient.sent_at)}</Td>
+                  </Tr>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <Pagination
+            page={pagination.page}
+            totalPages={pageInfo.totalPages}
+            total={data.total}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.goToPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </>
+      )}
+
+      {/* Edit (prefilled) — drafts and not-yet-delivering campaigns */}
+      <AdminCampaignDialog open={editOpen} onClose={() => setEditOpen(false)} campaign={campaign} />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete this draft?"
+        description="The draft will be permanently removed. Nothing has been sent, so there is no record to keep."
+        onConfirm={() => deleteMutation.mutate()}
+        onCancel={() => setDeleteOpen(false)}
+        loading={deleteMutation.isPending}
+        confirmLabel="Yes, delete"
       />
 
       {/* Errors */}
-      <MutationErrors mutations={[cancelMutation]} />
+      <MutationErrors mutations={[cancelMutation, sendNowMutation, clearScheduleMutation, deleteMutation]} />
     </>
   );
 }
@@ -221,6 +365,15 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
 export function EmailCampaignsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // Column visibility + user column order (client-side rendering only — the
+  // campaign list takes no `columns` param: a handful-of-rows table, see the
+  // module doc's deliberate deviation from the admin list-endpoint convention).
+  const { visibleColumns } = useColumnVisibility("adminEmailCampaigns");
+  const { orderedKeys, reorder, moveBy, resetOrder, isDefaultOrder } = useColumnOrder("adminEmailCampaigns", visibleColumns);
+
+  // Visible columns in the user's custom order (drives header + row render).
+  const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   // Refetch while any campaign is still delivering so the progress ticks
   // forward; idle once everything is terminal.
@@ -243,15 +396,22 @@ export function EmailCampaignsTab() {
 
   return (
     <>
-      {/* Create action (Compose lives in the page header, for all tabs) */}
-      <div className="mb-4 flex items-center justify-end">
+      {/* Create + table controls (Compose lives in the page header, for all tabs) */}
+      <div className="mb-4 flex items-center justify-end gap-3">
+        {!isDefaultOrder && (
+          <Button variant="secondary" onClick={resetOrder}>
+            Reset order
+          </Button>
+        )}
+        <ColumnToggle resourceKey="adminEmailCampaigns" />
         <Button onClick={() => setDialogOpen(true)}>+ New campaign</Button>
       </div>
 
       {/* Info note */}
       <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
         A campaign emails every account in the selected roles (plus any extra addresses you add), delivered slowly over time so it doesn't
-        look like spam. Cancel any time — un-sent recipients are skipped.
+        look like spam. Schedule it for a later time, or save it as a draft to edit (or delete) any time before sending. Cancel any time —
+        un-sent recipients are skipped.
       </div>
 
       {/* Table */}
@@ -262,17 +422,17 @@ export function EmailCampaignsTab() {
       ) : (
         <Table>
           <TableHead>
-            <th>Subject</th>
-            <th>Roles</th>
-            <th>Progress</th>
-            <th>Status</th>
-            <th>Created</th>
+            {displayColumns.map((key) => (
+              <DraggableTh key={key} unit={[key]} onReorder={reorder} onMoveBy={moveBy}>
+                {CAMPAIGN_HEADERS[key]}
+              </DraggableTh>
+            ))}
           </TableHead>
           <TableBody>
             {campaigns.map((campaign) => {
-              const badge = STATUS_BADGES[campaign.status];
-              return (
-                <Tr key={campaign.id} className="cursor-pointer" onClick={() => setSelectedId(campaign.id)}>
+              const badge = statusBadge(campaign);
+              const cells: Record<string, React.ReactNode> = {
+                subject: (
                   <Td className="max-w-[220px]">
                     {/* Text button (not just a row click) so the detail is reachable by keyboard */}
                     <button
@@ -283,10 +443,18 @@ export function EmailCampaignsTab() {
                       {campaign.subject}
                     </button>
                   </Td>
-                  <Td className="text-gray-600">{campaign.roles.length > 0 ? campaign.roles.join(", ") : "manual only"}</Td>
+                ),
+                roles: <Td className="text-gray-600">{campaign.roles.length > 0 ? campaign.roles.join(", ") : "manual only"}</Td>,
+                progress: (
                   <Td>
-                    <CampaignProgress sent={campaign.sent_count} failed={campaign.failed_count} total={campaign.total_recipients} />
+                    {campaign.status === "draft" ? (
+                      <span className="text-sm text-gray-400">Draft</span>
+                    ) : (
+                      <CampaignProgress sent={campaign.sent_count} failed={campaign.failed_count} total={campaign.total_recipients} />
+                    )}
                   </Td>
+                ),
+                status: (
                   <Td>
                     <span
                       data-testid="campaign-status-badge"
@@ -295,7 +463,19 @@ export function EmailCampaignsTab() {
                       {badge.label}
                     </span>
                   </Td>
-                  <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(campaign.created_at)}</Td>
+                ),
+                scheduled_for: (
+                  <Td className="whitespace-nowrap text-sm text-gray-500">
+                    {campaign.scheduled_for ? formatDateTime(campaign.scheduled_for) : "—"}
+                  </Td>
+                ),
+                created_at: <Td className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(campaign.created_at)}</Td>,
+              };
+              return (
+                <Tr key={campaign.id} className="cursor-pointer" onClick={() => setSelectedId(campaign.id)}>
+                  {displayColumns.map((key) => (
+                    <Fragment key={key}>{cells[key]}</Fragment>
+                  ))}
                 </Tr>
               );
             })}

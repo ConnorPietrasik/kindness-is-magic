@@ -294,6 +294,7 @@ def build_campaign_summary(
         canceled_count=counts.get(EmailCampaignRecipientStatus.canceled, 0),
         created_at=campaign.created_at,
         completed_at=campaign.completed_at,
+        scheduled_for=campaign.scheduled_for,
         sender_name=sender_name,
     )
 
@@ -304,9 +305,10 @@ def build_campaign_detail(
     *,
     sender_name: str | None = None,
 ) -> EmailCampaignDetail:
-    """Full campaign view — the summary plus the stored message body."""
+    """Full campaign view — the summary plus the stored message body and
+    manual addresses (draft edit prefill)."""
     summary = build_campaign_summary(db, campaign, sender_name=sender_name)
-    return EmailCampaignDetail(**summary.model_dump(), message=campaign.message)
+    return EmailCampaignDetail(**summary.model_dump(), message=campaign.message, extra_emails=list(campaign.extra_emails or []))
 
 
 def build_campaign_recipient_item(

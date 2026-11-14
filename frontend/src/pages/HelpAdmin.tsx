@@ -431,19 +431,23 @@ export default function HelpAdmin() {
               <h3>Email campaigns</h3>
               <HelpImage
                 src={adminEmailCampaigns}
-                alt="The Emails page on its Campaigns tab, with a table of subject, roles, progress, status, and created time"
+                alt="The Emails page on its Campaigns tab, with a table of subject, roles, progress, status, scheduled time, and created time"
                 caption="A campaign delivers one recipient at a time until it finishes or is canceled."
               />
               <p>
                 When one message should reach many people at once — every donor, every referrer, a list of addresses — use a campaign
                 instead of composing one email at a time. <strong>+ New campaign</strong> opens a dialog where you pick the roles to include
-                and add any extra addresses by hand; before you commit, it counts exactly who will be emailed. The emails then go out
-                slowly, one at a time over the following minutes, so a bulk send doesn't look like spam.
+                and add any extra addresses by hand; before you commit, it counts exactly who will be emailed. You can also pick a send time
+                so the emails go out later, or <strong>Save as draft</strong> to finish (or edit) it any time before it is sent. The emails
+                go out slowly, one at a time over the following minutes, so a bulk send doesn't look like spam.
               </p>
               <p>
-                Open a campaign any time to see its message and a recipient-by-recipient record of who got it. Un-sent recipients can still
-                be skipped: <strong>Cancel campaign</strong> stops the delivery where it is, and everyone not yet emailed is marked
-                canceled. Unsubscribed addresses are never emailed — they show as Failed in the recipient list.
+                Open a campaign any time to see its message and a recipient-by-recipient record of who got it. A draft stores the people you
+                picked without sending anything — its recipient list is finalized the moment you press <strong>Send now</strong> (or save
+                &amp; schedule), and while it is still a draft it can be edited or deleted. A scheduled campaign waits for its time;
+                <strong>Send now</strong> clears the time so it sends as soon as possible. Un-sent recipients can still be skipped:
+                <strong>Cancel campaign</strong> stops the delivery where it is, and everyone not yet emailed is marked canceled.
+                Unsubscribed addresses are never emailed — they show as Failed in the recipient list.
               </p>
               <h3>Unsubscribed emails</h3>
               <HelpImage

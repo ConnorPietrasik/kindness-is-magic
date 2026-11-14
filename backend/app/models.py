@@ -523,13 +523,18 @@ class EmailPreference(Base):
 class EmailCampaignStatus(str, enum.Enum):
     """Lifecycle of an admin email campaign.
 
-    * ``pending`` — created, not yet picked up by the delivery worker.
+    * ``draft`` — saved, not yet active. Carries the raw selection
+      (``roles`` + ``extra_emails``) and no recipient rows; activation
+      resolves the recipients and flips it to ``pending``.
+    * ``pending`` — activated, not yet picked up by the delivery worker
+      (or picked up but not yet due — see ``scheduled_for``).
     * ``sending`` — the worker has started delivering recipients.
     * ``completed`` — every recipient row is processed (sent or failed).
     * ``canceled`` — an admin canceled it; its pending recipients were
       flipped to ``canceled``.
     """
 
+    draft = "draft"
     pending = "pending"
     sending = "sending"
     completed = "completed"
@@ -565,10 +570,19 @@ class EmailCampaign(Base):
     slowly over time to a snapshot of recipients (see
     ``EmailCampaignRecipient``).
 
-    The recipient set is frozen at creation — role selections resolve to the
-    users existing at that moment (soft-deleted users excluded), and the
-    delivery worker never re-queries roles. No ``deleted_at`` — a campaign is
-    an immutable audit record; the only post-creation mutation is cancel.
+    A ``draft`` campaign carries the *raw* selection (``roles`` +
+    ``extra_emails``) with no recipient rows; activation (send/schedule)
+    resolves the recipients and freezes the snapshot — so a draft sent later
+    emails the users existing *then*, not at draft time. Once activated the
+    recipient set is frozen — role selections resolve to the users existing
+    at activation (soft-deleted users excluded), and the delivery worker
+    never re-queries roles.
+
+    ``scheduled_for`` (NULL = send ASAP) is the earliest send time: the
+    worker only picks a campaign up once it is due. No ``deleted_at`` — an
+    activated campaign is an immutable audit record; the only post-activation
+    mutations are edit-while-nothing-settled and cancel. A draft (nothing
+    ever sent) is hard-deletable, as it holds no audit record.
     """
 
     __tablename__ = "email_campaigns"
@@ -586,12 +600,23 @@ class EmailCampaign(Base):
         server_default="pending",
         nullable=False,
     )
-    # The selected roles, for audit display only — the recipient rows are the
-    # truth of who was (and was not) emailed.
+    # The selected roles — for audit display on activated campaigns (the
+    # recipient rows are the truth of who was (and was not) emailed) and as
+    # the storable half of the raw selection on drafts (activation
+    # re-resolves it).
     roles: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # The manual (typed-in) addresses of the selection — the other half of
+    # the raw selection on drafts, retained after activation for audit and
+    # edit prefill (the recipient rows are the truth of who was emailed).
+    extra_emails: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Earliest send time (UTC). NULL = send as soon as the worker can reach
+    # the campaign. The delivery worker skips campaigns whose time has not
+    # come; a past time is simply due now.
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     # Progress counters, maintained transactionally with the recipient rows by
-    # the delivery worker and the cancel path. pending/canceled are derived
-    # (total - sent - failed - <other>) by the response builders.
+    # the delivery worker and the cancel path. 0 for drafts (no rows).
+    # pending/canceled are derived (total - sent - failed - <other>) by the
+    # response builders.
     total_recipients: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sent_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

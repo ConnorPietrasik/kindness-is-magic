@@ -546,7 +546,7 @@ export type EmailStatus = "sent" | "failed" | "reset";
 // ---------------------------------------------------------------------------
 
 /** Mirrors backend EmailCampaignStatus enum. */
-export type EmailCampaignStatus = "pending" | "sending" | "completed" | "canceled";
+export type EmailCampaignStatus = "draft" | "pending" | "sending" | "completed" | "canceled";
 
 /** Mirrors backend EmailCampaignRecipientSource enum. */
 export type CampaignRecipientSource = "role" | "manual";
@@ -563,17 +563,26 @@ export interface EmailCampaignSummary {
   total_recipients: number;
   sent_count: number;
   failed_count: number;
-  /** Derived from the recipient rows (total - sent - failed - canceled). */
+  /** Derived from the recipient rows (total - sent - failed - canceled). 0 for drafts. */
   pending_count: number;
   canceled_count: number;
   created_at: string;
   completed_at: string | null;
+  /**
+   * Earliest send time (ISO 8601). Null = send as soon as the worker can
+   * reach the campaign; on a draft it is the intended send time.
+   */
+  scheduled_for: string | null;
   sender_name: string | null;
 }
 
-/** Full campaign view (detail page) — the summary plus the stored message body. */
+/**
+ * Full campaign view (detail page) — the summary plus the stored message
+ * body and, for drafts (and edit prefill), the stored manual addresses.
+ */
 export interface EmailCampaignDetail extends EmailCampaignSummary {
   message: string;
+  extra_emails: string[];
 }
 
 /** One recipient row of a campaign (the delivery progress audit). Mirrors EmailCampaignRecipientSummary. */
@@ -606,6 +615,23 @@ export interface AdminCampaignCreatePayload {
   subject: string | null;
   /** Plain text, never HTML. */
   message: string;
+  /** Store without resolving or sending — the draft can be edited and sent later. */
+  save_as_draft?: boolean;
+  /** Earliest send time (ISO 8601) — must be in the future; null/omitted = send ASAP. */
+  scheduled_for?: string | null;
+}
+
+/**
+ * Payload for editing a not-yet-delivering campaign. Mirrors
+ * AdminCampaignUpdateRequest — partial update: only the provided fields
+ * change ("" clears scheduled_for to send ASAP).
+ */
+export interface AdminCampaignUpdatePayload {
+  subject?: string | null;
+  message?: string | null;
+  roles?: UserRole[];
+  extra_emails?: string[];
+  scheduled_for?: string | null;
 }
 
 /** Resolved recipient counts for a campaign selection (no campaign created). Mirrors EmailCampaignPreviewResponse. */

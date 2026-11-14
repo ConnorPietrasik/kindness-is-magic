@@ -73,6 +73,14 @@ if _engine_schema:
         cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{_engine_schema}"')
         cursor.execute(f'SET search_path TO "{_engine_schema}"')
         cursor.close()
+        # Commit the implicit transaction: without this, the SET search_path
+        # only survives while that transaction stays open — the pool's
+        # reset-on-return (ROLLBACK) would undo it, and a connection
+        # re-checked-out later would silently point at the default schema
+        # ("public") and fail with "relation does not exist". Tests keep one
+        # session/connection open for a test's whole duration, which masks
+        # this; any session returned to the pool mid-test exposes it.
+        dbapi_conn.commit()
 
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

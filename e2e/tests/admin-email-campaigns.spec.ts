@@ -1,20 +1,23 @@
 /**
  * Admin email campaigns (batch email) — an admin creates a campaign from a
  * role selection plus manual addresses, watches the paced delivery progress,
- * verifies the sent-email log, and cancels a campaign mid-flight.
+ * verifies the sent-email log, cancels a campaign mid-flight, edits/sends/
+ * deletes a draft, and waits out a scheduled campaign's send time.
  *
- * Self-contained: the campaigns it creates are append-only (no delete
- * endpoint), and their delivery by-products (recipient audit rows, SentEmail
- * log rows) stay — the log is append-only by design. The run's role campaign
- * is canceled in afterAll so its paced deliveries stop at the end of the run;
- * beforeAll cancels any *active* campaigns left over from earlier interrupted
- * runs (no other spec creates campaigns) so this spec's delivery waits are
- * deterministic.
+ * Self-contained: an activated campaign is an immutable audit record (only
+ * drafts are deletable), so afterAll cancels any of the run's campaigns
+ * still active (a failed attempt may have left one mid-flight) and deletes
+ * the run's leftover drafts. beforeAll cancels any *active* campaigns left
+ * over from earlier interrupted runs (no other spec creates campaigns) so
+ * this spec's delivery waits are deterministic. The delivery by-products
+ * (recipient audit rows, SentEmail log rows) stay — the log is append-only
+ * by design.
  *
- * Test order matters: the worker delivers campaigns FIFO (oldest active
- * first), so the cancel campaign runs first and reaches a terminal state
- * before the role campaign is created — otherwise the role campaign's
- * deliveries would queue behind it.
+ * Test order matters: the worker is a single sequential loop (earliest-due
+ * campaign first; oldest first among un-scheduled ones), so a campaign that
+ * is still delivering holds the worker and queues everything else behind it
+ * — the cancel campaign runs first and reaches a terminal state before the
+ * later tests create theirs.
  *
  * Determinism notes:
  * - The "Admins" role campaign does NOT assert an exact recipient count —
@@ -25,12 +28,15 @@
  *   claims by row id, so the first "role" row in the recipient table is
  *   always the campaign's first delivery.
  * - Delivery is paced per campaign: one email per worker cycle, and a
- *   campaign's consecutive sends are EMAIL_CAMPAIGN_INTERVAL_SECONDS (30s
- *   in the dev stack) apart — but the interval never spans campaigns. When
- *   a campaign settles or is canceled, the worker moves on after at most
- *   one idle poll (~10s) — the minimum gap between two campaigns' sends —
- *   so a campaign created right after another is canceled gets its first
- *   send within one idle poll (~10s) of its own creation: the worker picks
+ *   campaign's consecutive sends are EMAIL_CAMPAIGN_INTERVAL_SECONDS (15s
+ *   in the dev stack — .env tunes the default 30s down so these tests stay
+ *   fast; it must stay well above the UI's 5s progress refetch, since the
+ *   cancel tests detect the first send through the UI) apart — but the
+ *   interval never spans campaigns. When a campaign settles or is canceled,
+ *   the worker moves on after at most one idle poll (~2s) — the minimum
+ *   gap between two campaigns' sends — so a campaign created right after
+ *   another is canceled gets its first send within one idle poll (~2s) of
+ *   its own creation: the worker picks
  *   it up at the previous campaign's pacing exit (if still inside it — the
  *   exit is measured from the earlier cancel, so it can't extend this
  *   wait) or on the next idle poll (≤ two idle polls after the cancel,
@@ -40,6 +46,16 @@
  *   The cancel test waits for the first
  *   delivery, then cancels inside the pacing gap — the rest of the
  *   recipients are deterministically skipped.
+ * - The draft test runs second (right after the cancel test): its draft's
+ *   "Send now" first send lands within one idle poll, because the worker
+ *   is idle at that point (the cancel test's campaign is terminal and the
+ *   draft sends nothing until activated).
+ * - The schedule test's time is minute-precision (the picker), so it
+ *   schedules for the next whole minute plus one (60–120s out). The first
+ *   send can only land AT or AFTER the time, at most one idle poll later —
+ *   so the wait is capped at ~180s (120s + 2s + headroom). Before the
+ *   wait, the first recipient must still read "Pending": an early send
+ *   (before the time) fails the test immediately instead of after 180s.
  * - Campaign names are per-attempt (test.info().retry). A serial-group
  *   retry re-runs beforeAll — which cancels every active campaign — and
  *   then re-runs the whole group. Fixed names would re-create same-subject
@@ -81,6 +97,11 @@ let campaignSubject = "";
 let campaignMessage = "";
 let campaignTotal = 0;
 let setupAttempt = -1;
+let scheduleSubject = "";
+// The draft test's campaigns: its send-now campaign is canceled in-test,
+// but a failed attempt may leave it active — or the drafts un-deleted.
+let draftSubject = "";
+let throwawaySubject = "";
 let firstRoleEmail: string | undefined;
 
 test.describe.serial("Admin email campaigns", () => {
@@ -101,11 +122,19 @@ test.describe.serial("Admin email campaigns", () => {
 
   test.afterAll(async ({ request: req }) => {
     const authed = await loginViaApi(req);
-    // Stop the last attempt's role campaign (the detail tests leave it
-    // mid-flight) so nothing keeps sending after the run.
+    // Stop the last attempt's still-active campaigns (the detail tests leave
+    // the role campaign mid-flight; the schedule and draft tests usually
+    // cancel theirs in-test, a failed attempt may not have) so nothing
+    // keeps sending after the run, and delete leftover drafts — a draft
+    // never sent, so there is no audit record to keep.
     const { campaigns } = await authed.get("/api/admin/email-campaigns").then((r) => r.json());
+    const activeSubjects = [campaignSubject, scheduleSubject, draftSubject];
+    const draftSubjects = [draftSubject, throwawaySubject];
     for (const c of campaigns) {
-      if (campaignSubject && c.subject === campaignSubject && (c.status === "pending" || c.status === "sending")) {
+      const subject = c.subject as string;
+      if (draftSubjects.some((s) => s && subject === s) && c.status === "draft") {
+        await authed.delete(`/api/admin/email-campaigns/${c.id}`);
+      } else if (activeSubjects.some((s) => s && subject === s) && (c.status === "pending" || c.status === "sending")) {
         await authed.post(`/api/admin/email-campaigns/${c.id}/cancel`);
       }
     }
@@ -137,8 +166,8 @@ test.describe.serial("Admin email campaigns", () => {
     await expect(page.getByRole("alert").filter({ hasText: "Campaign queued" })).toBeVisible();
 
     /* Open the detail and wait for the first (and soon only) delivery.
-       45s: the first send goes out within one idle poll (~10s) of
-       creation — even on a retry where the worker is still exiting the
+       45s: the first send goes out within one idle poll (~2s)
+       of creation — even on a retry where the worker is still exiting the
        previous attempt's campaign (canceled by the retry's beforeAll;
        that pacing exit is measured from the earlier cancel, so it can't
        extend the wait from here). */
@@ -147,7 +176,7 @@ test.describe.serial("Admin email campaigns", () => {
     const firstRow = page.getByRole("row").filter({ hasText: CANCEL_A });
     await expect(firstRow).toContainText("Sent", { timeout: 45_000 });
 
-    /* We are now inside the 30s pacing gap before the next send — cancel
+    /* We are now inside the 15s pacing gap before the next send — cancel
        immediately so the remaining recipients are deterministically
        pending and get flipped to canceled. */
     await page.getByRole("button", { name: "Cancel campaign" }).click();
@@ -164,6 +193,146 @@ test.describe.serial("Admin email campaigns", () => {
     await expect(page.getByRole("row").filter({ hasText: CANCEL_A })).toContainText("Sent");
     /* The cancel affordance is gone for a terminal campaign */
     await expect(page.getByRole("button", { name: "Cancel campaign" })).not.toBeVisible();
+
+    await context.close();
+  });
+
+  test("drafts can be edited, sent now, and deleted", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const s = attemptSuffix();
+    const DRAFT_SUBJECT = `E2E draft ${s}`;
+    const EDITED_SUBJECT = `E2E draft edited ${s}`;
+    const DRAFT_A = `e2e-draft-a-${s}@example.com`;
+    const DRAFT_B = `e2e-draft-b-${s}@example.com`;
+    const THROWAWAY_SUBJECT = `E2E draft throwaway ${s}`;
+    const THROWAWAY_A = `e2e-draft-x-${s}@example.com`;
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/emails?tab=campaigns");
+
+    /* Create a manual-only draft (exact count — two addresses). */
+    await page.getByRole("button", { name: "+ New campaign" }).click();
+    const dialog = page.getByRole("dialog", { name: "New email campaign" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel("Extra email addresses").fill(`${DRAFT_A}\n${DRAFT_B}`);
+    await expect(dialog.getByText(/Will send to 2 recipients/)).toBeVisible();
+    await dialog.getByLabel("Subject (optional)").fill(DRAFT_SUBJECT);
+    await dialog.getByLabel("Message").fill(`Draft message ${s}.`);
+    await dialog.getByRole("button", { name: "Save as draft" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Draft saved" })).toBeVisible();
+    await expect(dialog).not.toBeVisible();
+    draftSubject = DRAFT_SUBJECT;
+
+    /* Listed with a Draft badge (the Progress cell says Draft, too). */
+    const draftRow = page.getByRole("row").filter({ hasText: DRAFT_SUBJECT });
+    await expect(draftRow).toBeVisible();
+    await expect(draftRow.getByTestId("campaign-status-badge")).toHaveText("Draft");
+
+    /* Detail: live recipient count + the "no audit yet" note. */
+    await draftRow.click();
+    await expect(page.getByTestId("campaign-status-badge")).toHaveText("Draft");
+    await expect(page.getByText("Will send to 2")).toBeVisible();
+    await expect(page.getByText(/Recipients are finalized when the campaign is sent/)).toBeVisible();
+
+    /* Edit: change the subject, save the changes (no send). */
+    await page.getByRole("button", { name: "Edit" }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit campaign" });
+    await expect(editDialog).toBeVisible();
+    const subjectInput = editDialog.getByLabel("Subject");
+    await expect(subjectInput).toHaveValue(DRAFT_SUBJECT);
+    await subjectInput.fill(EDITED_SUBJECT);
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Campaign updated" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: EDITED_SUBJECT })).toBeVisible();
+    draftSubject = EDITED_SUBJECT; // the edit renamed it — track the new subject
+
+    /* Send now: the snapshot freezes at this moment and delivery starts
+       right away (the worker is idle here — the cancel test's campaign is
+       terminal and a draft sends nothing until activated). */
+    await page.getByRole("button", { name: "Send now" }).click();
+    const rowA = page.getByRole("row").filter({ hasText: DRAFT_A });
+    await expect(rowA).toContainText("Sent", { timeout: 45_000 });
+
+    /* Cancel inside the pacing gap — the second recipient is skipped. */
+    await page.getByRole("button", { name: "Cancel campaign" }).click();
+    await expect(page.getByTestId("campaign-status-badge")).toHaveText("Canceled");
+    await expect(page.getByText("1/2 sent · 1 canceled")).toBeVisible();
+
+    /* A throwaway draft can be deleted (with confirmation). */
+    await page.getByRole("button", { name: "← Back" }).click();
+    await page.getByRole("button", { name: "+ New campaign" }).click();
+    const draft2 = page.getByRole("dialog", { name: "New email campaign" });
+    await draft2.getByLabel("Extra email addresses").fill(THROWAWAY_A);
+    await draft2.getByLabel("Subject (optional)").fill(THROWAWAY_SUBJECT);
+    await draft2.getByLabel("Message").fill(`Throwaway ${s}.`);
+    await draft2.getByRole("button", { name: "Save as draft" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Draft saved" })).toBeVisible();
+    throwawaySubject = THROWAWAY_SUBJECT;
+
+    const throwawayRow = page.getByRole("row").filter({ hasText: THROWAWAY_SUBJECT });
+    await expect(throwawayRow).toBeVisible();
+    await throwawayRow.click();
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await page.getByRole("button", { name: "Yes, delete" }).click();
+
+    /* Back in the list — the draft is gone. */
+    await expect(page.getByRole("row").filter({ hasText: THROWAWAY_SUBJECT })).toHaveCount(0);
+
+    await context.close();
+  });
+
+  test("scheduled campaigns wait for their send time", async ({ browser }) => {
+    test.setTimeout(300_000);
+    const s = attemptSuffix();
+    const subject = `E2E scheduled ${s}`;
+    scheduleSubject = subject;
+    const SCHED_A = `e2e-sched-a-${s}@example.com`;
+    const SCHED_B = `e2e-sched-b-${s}@example.com`;
+
+    /* Next whole minute plus one: 60–120s out (the picker is
+       minute-precision — truncating to the minute can only move the time
+       back within the same minute, so the +2 minutes guarantees the
+       future). */
+    const t = new Date();
+    t.setSeconds(0, 0);
+    t.setMinutes(t.getMinutes() + 2);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const localTime = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/emails?tab=campaigns");
+    await page.getByRole("button", { name: "+ New campaign" }).click();
+    const dialog = page.getByRole("dialog", { name: "New email campaign" });
+    await dialog.getByLabel("Extra email addresses").fill(`${SCHED_A}\n${SCHED_B}`);
+    await dialog.getByLabel("Subject (optional)").fill(subject);
+    await dialog.getByLabel("Message").fill(`Scheduled message ${s}.`);
+    await dialog.locator('input[type="datetime-local"]').fill(localTime);
+
+    /* The picked time relabels the primary button. */
+    await dialog.getByRole("button", { name: "Schedule campaign" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /Campaign scheduled for/ })).toBeVisible();
+
+    /* Scheduled: the badge, and the first recipient is NOT sent yet — an
+       early send (before the time) fails immediately, not after the wait. */
+    const row = page.getByRole("row").filter({ hasText: subject });
+    await expect(row.getByTestId("campaign-status-badge")).toHaveText("Scheduled");
+    await row.click();
+    await expect(page.getByTestId("campaign-status-badge")).toHaveText("Scheduled");
+    const firstRow = page.getByRole("row").filter({ hasText: SCHED_A });
+    await expect(firstRow).toContainText("Pending");
+
+    /* The first send lands at or after the time, at most one idle poll
+       after it (cap: 119s + 2s + headroom). */
+    await expect(firstRow).toContainText("Sent", { timeout: 180_000 });
+
+    /* Cancel inside the pacing gap — the second recipient is skipped. */
+    await page.getByRole("button", { name: "Cancel campaign" }).click();
+    await expect(page.getByTestId("campaign-status-badge")).toHaveText("Canceled");
 
     await context.close();
   });
@@ -256,7 +425,7 @@ test.describe.serial("Admin email campaigns", () => {
     expect(firstRoleEmail).toBe(ADMIN_EMAIL);
 
     /* Delivery is paced per campaign: this campaign's first send goes out
-       within one idle poll (~10s) of creation — the worker picks it up at
+       within one idle poll (~2s) of creation — the worker picks it up at
        the previous campaign's pacing exit (if still inside it) or on the
        next idle poll. 45s is headroom for a slow/contended worker. */
     await expect(firstRoleRow).toContainText("Sent", { timeout: 45_000 });

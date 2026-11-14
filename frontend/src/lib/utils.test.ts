@@ -318,6 +318,24 @@ describe("normalizeUpdatePayload", () => {
     const result = normalizeUpdatePayload(form, original);
     expect(result.pickup_window).toBe("");
   });
+
+  it("omits an unchanged array compared by content (a fresh array is not a change)", () => {
+    const original = { roles: [] as string[], extra_emails: ["a@example.com", "b@example.com"] };
+    const form = { roles: [] as string[], extra_emails: ["a@example.com", "b@example.com"] };
+    const result = normalizeUpdatePayload(form, original);
+    expect(result).toEqual({});
+  });
+
+  it("includes a changed or reordered array", () => {
+    const original = { roles: ["donor", "family"] };
+    expect(normalizeUpdatePayload({ roles: ["donor", "referrer"] }, original).roles).toEqual(["donor", "referrer"]);
+    expect(normalizeUpdatePayload({ roles: ["family", "donor"] }, original).roles).toEqual(["family", "donor"]);
+  });
+
+  it("includes an array when the original is not an array", () => {
+    const result = normalizeUpdatePayload({ roles: ["donor"] }, { roles: null });
+    expect(result.roles).toEqual(["donor"]);
+  });
 });
 
 describe("toDatetimeLocalValue / fromDatetimeLocalValue", () => {

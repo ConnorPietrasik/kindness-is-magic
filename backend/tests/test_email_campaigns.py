@@ -13,7 +13,7 @@ test_admin_custom_email.py pattern.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -23,10 +23,14 @@ from sqlalchemy.orm import Session
 import app.email_campaigns as ec
 from app.email_campaigns import (
     CampaignResolutionError,
+    CampaignStateError,
+    activate_campaign,
     cancel_campaign,
     create_campaign,
+    create_draft,
     process_next_campaign_email,
     resolve_campaign_recipients,
+    update_campaign,
 )
 from app.models import (
     EmailCampaign,
@@ -464,6 +468,339 @@ class TestProcessNextCampaignEmail:
         db.commit()
         db.refresh(campaign)
         assert campaign.status == EmailCampaignStatus.canceled
+
+    async def test_scheduled_campaign_not_due_is_skipped(self, db: Session, admin_user):
+        # Only campaign has pending rows but its time has not come → no work.
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Later",
+            message="Body",
+            roles=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+
+        assert await process_next_campaign_email(db) is None
+        assert _recipients(db, _campaigns(db)[0].id)[0].status == EmailCampaignRecipientStatus.pending
+
+    async def test_scheduled_campaign_due_is_processed(self, db: Session, admin_user):
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Now",
+            message="Body",
+            roles=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=5),  # past = due
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+
+        result = await process_next_campaign_email(db)
+
+        assert result.id == campaign.id
+        assert _recipients(db, campaign.id)[0].status == EmailCampaignRecipientStatus.sent
+
+    async def test_earliest_due_ordering(self, db: Session, admin_user):
+        # Immediate campaign created first, scheduled campaign (due in the
+        # past) created second: the scheduled one is due earlier, so it goes
+        # first even though it is younger.
+        create_campaign(db, created_by=admin_user, subject="First", message="B", roles=[], extra_emails=["first@example.com"])
+        db.flush()
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Second",
+            message="B",
+            roles=[],
+            extra_emails=["second@example.com"],
+            scheduled_for=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        db.commit()
+        first, second = _campaigns(db)
+
+        result = await process_next_campaign_email(db)
+
+        assert result.id == second.id
+        assert _recipients(db, second.id)[0].status == EmailCampaignRecipientStatus.sent
+        assert _recipients(db, first.id)[0].status == EmailCampaignRecipientStatus.pending
+
+
+# ---------------------------------------------------------------------------
+# Drafts: create / activate / update
+# ---------------------------------------------------------------------------
+
+
+class TestCreateDraft:
+    def test_draft_stores_selection_without_recipients(self, db: Session, admin_user):
+        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject=None,
+            message="Draft body",
+            roles=[UserRole.donor],
+            extra_emails=["  A@Example.COM ", "a@example.com", "b@example.com"],
+            scheduled_for=scheduled,
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.draft
+        # Blank subject falls back to the shared default, as at creation.
+        assert campaign.subject == "A message from Kindness Is Magic ✨"
+        assert campaign.roles == ["donor"]
+        # Manual entries are normalized and deduped for storage.
+        assert campaign.extra_emails == ["a@example.com", "b@example.com"]
+        assert campaign.scheduled_for == scheduled
+        # No resolution: no rows, zero total.
+        assert campaign.total_recipients == 0
+        assert campaign.sent_count == 0
+        assert campaign.failed_count == 0
+        assert campaign.completed_at is None
+        assert _recipients(db, campaign.id) == []
+
+    def test_draft_without_schedule(self, db: Session, admin_user):
+        campaign = create_draft(db, created_by=admin_user, subject="Later", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.draft
+        assert campaign.scheduled_for is None
+        assert campaign.roles == []
+        assert campaign.extra_emails == ["a@example.com"]
+
+
+class TestActivateCampaign:
+    def test_activate_resolves_and_queues(self, db: Session, admin_user):
+        donor = _make_user(db, "donor1@example.com", UserRole.donor)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[UserRole.donor],
+            extra_emails=["extra@example.com"],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        activate_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 2
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.source, r.user_id, r.status) for r in rows] == [
+            ("donor1@example.com", EmailCampaignRecipientSource.role, donor.id, EmailCampaignRecipientStatus.pending),
+            ("extra@example.com", EmailCampaignRecipientSource.manual, None, EmailCampaignRecipientStatus.pending),
+        ]
+
+    def test_activate_honors_stored_scheduled_for(self, db: Session, admin_user):
+        scheduled = datetime.now(timezone.utc) + timedelta(days=2)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=scheduled,
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        activate_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.scheduled_for == scheduled
+
+    def test_activate_empty_selection_raises(self, db: Session, admin_user):
+        # No purchaser users exist in this test's schema — a valid draft
+        # (selection non-empty) whose resolution is empty cannot be sent.
+        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[UserRole.purchaser], extra_emails=[])
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            activate_campaign(db, campaign)
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
+
+    def test_activate_over_cap_raises(self, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr("app.email_campaigns.EMAIL_CAMPAIGN_MAX_RECIPIENTS", 1)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            extra_emails=["a@example.com", "b@example.com"],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            activate_campaign(db, campaign)
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
+
+    def test_activate_non_draft_raises(self, db: Session, admin_user):
+        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            activate_campaign(db, campaign)
+            assert False, "expected CampaignStateError"
+        except CampaignStateError:
+            pass
+
+
+class TestUpdateCampaign:
+    def test_draft_selection_swap(self, db: Session, admin_user):
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Old",
+            message="Old body",
+            roles=[UserRole.donor],
+            extra_emails=["a@example.com"],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        update_campaign(
+            db,
+            campaign,
+            subject="New",
+            message="New body",
+            roles=[],
+            extra_emails=["  B@Example.com "],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.draft  # still a draft
+        assert campaign.subject == "New"
+        assert campaign.message == "New body"
+        assert campaign.roles == []
+        assert campaign.extra_emails == ["b@example.com"]
+        # No resolution happens until activation — still no rows.
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+    def test_draft_scheduled_for_set_and_clear(self, db: Session, admin_user):
+        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        scheduled = datetime.now(timezone.utc) + timedelta(days=3)
+        update_campaign(db, campaign, scheduled_for=scheduled)
+        db.commit()
+        db.refresh(campaign)
+        assert campaign.scheduled_for == scheduled
+
+        update_campaign(db, campaign, clear_scheduled_for=True)
+        db.commit()
+        db.refresh(campaign)
+        assert campaign.scheduled_for is None
+
+    def test_blank_subject_falls_back_to_default(self, db: Session, admin_user):
+        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        update_campaign(db, campaign, subject="   ")
+        db.commit()
+        db.refresh(campaign)
+        assert campaign.subject == "A message from Kindness Is Magic ✨"
+
+    def test_pending_campaign_reresolves_and_replaces_rows(self, db: Session, admin_user):
+        campaign = create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com", "b@example.com"]
+        )
+        db.commit()
+        db.refresh(campaign)
+        assert campaign.total_recipients == 2
+
+        update_campaign(db, campaign, extra_emails=["c@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 1
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.status) for r in rows] == [("c@example.com", EmailCampaignRecipientStatus.pending)]
+
+    def test_pending_campaign_keeps_scheduled_for_on_selection_edit(self, db: Session, admin_user):
+        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=scheduled,
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        update_campaign(db, campaign, extra_emails=["b@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.scheduled_for == scheduled
+        assert [r.email for r in _recipients(db, campaign.id)] == ["b@example.com"]
+
+    def test_update_empty_selection_raises(self, db: Session, admin_user):
+        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            update_campaign(db, campaign, roles=[], extra_emails=[])
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
+
+    def test_update_raises_on_sending_campaign(self, db: Session, admin_user):
+        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+        # Simulate the worker having settled one recipient.
+        campaign.status = EmailCampaignStatus.sending
+        campaign.sent_count = 1
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            update_campaign(db, campaign, message="Changed")
+            assert False, "expected CampaignStateError"
+        except CampaignStateError:
+            pass
+
+    def test_update_raises_on_terminal_campaigns(self, db: Session, admin_user):
+        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        db.commit()
+        db.refresh(campaign)
+        campaign.status = EmailCampaignStatus.completed
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            update_campaign(db, campaign, message="Changed")
+            assert False, "expected CampaignStateError"
+        except CampaignStateError:
+            pass
 
 
 class TestPaceOngoingCampaign:
