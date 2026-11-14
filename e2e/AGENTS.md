@@ -49,6 +49,14 @@ wiring is needed for the donor cart capture):
 npx playwright test --config=playwright.screenshots.config.ts
 ```
 
+Re-capture only the screens you touched (keeps git limited to those files instead of the full set — slugs are the `frontend/src/assets/help/` file names without extension):
+
+```bash
+CAPTURE="admin-zeffy-payments" npx playwright test --config=playwright.screenshots.config.ts
+```
+
+Setup and cleanup still run in full (the filtered captures need the scenario data); unlisted shots are skipped before navigation.
+
 - Run on a freshly-wiped stack for clean captures
 - Captures are deterministic: fresh contexts (default tiles/columns), fixed
   1440x1000 viewport, locale `en-US`, timezone `America/Los_Angeles`, deadline

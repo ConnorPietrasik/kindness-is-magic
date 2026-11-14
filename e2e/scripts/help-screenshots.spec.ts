@@ -5,6 +5,12 @@
  * must be wired for the donor cart capture):
  *   npx playwright test --config=playwright.screenshots.config.ts
  *
+ * To re-capture just the screens you touched (so git only shows those files
+ * instead of the full set), pass CAPTURE with comma-separated slugs:
+ *   CAPTURE="admin-zeffy-payments" npx playwright test --config=playwright.screenshots.config.ts
+ * Setup and cleanup still run in full (filtered captures need the scenario
+ * data); only the listed files are overwritten.
+ *
  * Captures every screen the per-role help guides reference into
  * frontend/src/assets/help/ (committed; the Vite import hashes them), plus
  * the README's public-wish-list.png (the README's dashboard shot reuses
@@ -73,7 +79,6 @@ import {
   deleteClaimViaApi,
   deleteDeadlineViaApi,
   deleteFamilyViaApi,
-  deletePersonViaApi,
   deleteReferrerViaApi,
   deleteUserViaApi,
   listFamiliesViaApi,
@@ -91,6 +96,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUTPUT_DIR = path.resolve(__dirname, "../../frontend/src/assets/help");
 
+/** Slugs to re-capture when the CAPTURE env var is set (comma-separated, e.g.
+ * CAPTURE="admin-zeffy-payments"); empty = capture everything. Setup and
+ * cleanup run in full either way — the filtered captures need the scenario
+ * data — but unlisted shots are skipped before navigation. */
+const CAPTURE_SLUGS = (process.env.CAPTURE ?? "").split(",").map((slug) => slug.trim()).filter(Boolean);
+
 const PASSWORD = "Password123!";
 /** The demo-CSV donor account (seeded, no storageState file). */
 const DONOR_EMAIL = "olivia.reynolds@example.com";
@@ -103,7 +114,6 @@ const DEMO_CAMPAIGN_SUBJECT = "Thank you for your support";
 const d: {
   adminApi: APIRequestContext | null;
   queueFamilyId?: number;
-  queuePersonId?: number;
   queueUserId?: number;
   queueFamilyEmail: string;
   pendingFamilyId?: number;
@@ -155,14 +165,13 @@ test.describe.serial("help page screenshots", () => {
       address: "1 Screenshot Lane",
     });
     d.queueFamilyId = family.familyId;
-    const person = await createPersonViaApi(api, family.familyId, {
+    await createPersonViaApi(api, family.familyId, {
       givenName: "Jordan",
       role: "son",
       age: 9,
       wish: "A soccer ball",
       funWish: "A puzzle set",
     });
-    d.queuePersonId = person.personId;
     const famUser = await createFamilyUserViaApi(api, {
       email: d.queueFamilyEmail,
       password: PASSWORD,
@@ -601,12 +610,12 @@ test.describe.serial("help page screenshots", () => {
         if (!revoke.ok()) console.warn(`[help-screenshots] invite revoke (${id}) returned ${revoke.status()}`);
       }
       if (d.inviteReferrerId != null) await deleteReferrerViaApi(api, d.inviteReferrerId);
-      /* Queue family */
+      /* Queue family — the family delete cascades to its people (Jordan),
+         so only the user account needs its own delete */
       if (d.queueFamilyId != null) {
         await resetFamilyWishState(api, d.queueFamilyId);
         await deleteFamilyViaApi(api, d.queueFamilyId);
       }
-      if (d.queuePersonId != null) await deletePersonViaApi(api, d.queuePersonId);
       if (d.queueUserId != null) await deleteUserViaApi(api, d.queueUserId);
       /* Assignments back to unassigned */
       if (d.purchaserWishIds.length > 0) await batchAssignWishesViaApi(api, d.purchaserWishIds, 0);
@@ -809,6 +818,11 @@ async function capture(
     assert?: (page: Page) => Promise<void>;
   },
 ): Promise<void> {
+  if (CAPTURE_SLUGS.length > 0 && !CAPTURE_SLUGS.includes(slug)) {
+    console.log(`[help-screenshots] skip ${slug}.png (not in CAPTURE)`);
+    return;
+  }
+
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
   await page.goto(url, { waitUntil: "load" });

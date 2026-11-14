@@ -309,7 +309,7 @@ export default function AdminZeffyPayments() {
                             </Button>
                             {payment.seen_at ? (
                               <Button
-                                variant="ghost"
+                                variant="secondary"
                                 className="px-3 py-1 text-xs"
                                 loading={clearSeenMut.isPending && clearSeenMut.variables === payment.id}
                                 onClick={() => clearSeenMut.mutate(payment.id)}
@@ -318,7 +318,7 @@ export default function AdminZeffyPayments() {
                               </Button>
                             ) : (
                               <Button
-                                variant="ghost"
+                                variant="secondary"
                                 className="px-3 py-1 text-xs"
                                 loading={markSeenMut.isPending && markSeenMut.variables === payment.id}
                                 onClick={() => markSeenMut.mutate(payment.id)}
