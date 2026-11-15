@@ -68,7 +68,7 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       route: ROUTES.ADMIN_DEADLINES,
       icon: "📅",
       label: "Deadlines",
-      desc: "Event deadlines: banners, reminders & enforcement",
+      desc: "Event deadlines: banners & enforcement",
       visible: true,
     },
     { key: "wishes", route: ROUTES.ADMIN_WISHES, icon: "🎁", label: "Manage Wishes", desc: "Assign & track gift purchases", visible: true },

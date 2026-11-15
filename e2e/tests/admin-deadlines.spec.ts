@@ -7,8 +7,8 @@
  * delete as a safety net for partial failure (describe.serial skips the
  * remaining tests after a failure, which would otherwise strand the row).
  *
- * Only `display` and `remind` modes are exercised. `enforced` rows change
- * live app behaviour (claim gates, auto-promotion) and would race other
+ * Only the `display` mode is exercised. `enforced` rows change live app
+ * behaviour (claim gates, auto-promotion once armed) and would race other
  * tests' data, so they stay out of e2e — backend tests cover them, and
  * deadlines-banner.spec.ts gives the same reasoning for the banner
  * (display-channel) coverage.
@@ -115,15 +115,15 @@ test.describe.serial("Admin Deadlines — settings page", () => {
     const saveButton = row.getByRole("button", { name: "Save" });
     await expect(saveButton).toBeDisabled();
 
-    /* Mode → Reminders (banner-inert), due date → yesterday */
-    await row.locator("select").selectOption({ label: "Reminders (no email yet)" });
+    /* Due date → yesterday (mode stays Display only — a past-dated enforced
+       row would arm and change live behaviour, so e2e keeps it out) */
     await row.locator('input[type="date"]').fill(PAST_DATE);
     await expect(saveButton).toBeEnabled();
 
     await saveButton.click();
     await expect(page.getByText("Deadline saved", { exact: true })).toBeVisible();
 
-    await expect(row.locator("select")).toHaveValue("remind");
+    await expect(row.locator("select")).toHaveValue("display");
     await expect(row.locator('input[type="date"]')).toHaveValue(PAST_DATE);
     await expect(row.getByText("Past due", { exact: true })).toBeVisible();
 

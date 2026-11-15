@@ -358,12 +358,12 @@ export default function HelpAdmin() {
                   sponsorships.
                 </li>
               </ul>
-              <h3>Display, reminders, enforced</h3>
+              <h3>Display and enforced</h3>
               <p>
-                <strong>Display only</strong> and <strong>Enforced</strong> show a banner with your label across the app.
-                <strong>Reminders</strong> is reserved for reminder emails that are planned but not built yet — a reminders row never shows
-                a banner. An enforced deadline's automatic action kicks in at 1:00 AM Pacific on the day after its due date; the banner's
-                deadline day itself stays in effect through the end of that day. A deadline with no due date is inert.
+                <strong>Display only</strong> and <strong>Enforced</strong> show a banner with your label across the app. An enforced
+                deadline's automatic action kicks in at 1:00 AM Pacific on the day after its due date; the banner's deadline day itself
+                stays in effect through the end of that day. A deadline with no due date is inert. Reminder emails are not a deadline mode —
+                schedule an email campaign instead; it targets roles and sends at an exact time.
               </p>
             </>
           ),

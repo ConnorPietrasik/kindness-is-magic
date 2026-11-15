@@ -1,10 +1,9 @@
 /**
  * Pure helpers for deadline display (banner deadline selection).
  *
- * The banner deadline (per type) is the nearest dated row with mode
- * `display` or `enforced`: earliest future date if any exists, else the most
- * recent past one (renders as "deadline was …"), else none. `remind` rows are
- * the email channel and never feed the banner; undated rows are inert.
+ * The banner deadline (per type) is the nearest dated row: earliest future
+ * date if any exists, else the most recent past one (renders as "deadline
+ * was …"), else none. Undated rows are inert.
  */
 
 import type { Deadline, DeadlineType } from "../types";
@@ -38,10 +37,7 @@ export function localDateKey(date: Date): string {
  */
 export function getBannerDeadline(rows: Deadline[] | null | undefined, type: DeadlineType, now: Date = new Date()): BannerDeadline | null {
   const today = localDateKey(now);
-  const candidates = (rows ?? []).filter(
-    (row): row is Deadline & { due_date: string } =>
-      row.type === type && row.due_date != null && (row.mode === "display" || row.mode === "enforced")
-  );
+  const candidates = (rows ?? []).filter((row): row is Deadline & { due_date: string } => row.type === type && row.due_date != null);
   if (candidates.length === 0) return null;
 
   const future = candidates.filter((row) => row.due_date >= today);

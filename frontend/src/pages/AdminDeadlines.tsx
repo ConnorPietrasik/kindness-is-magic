@@ -52,7 +52,6 @@ const DEADLINE_TYPES = Object.keys(DEADLINE_TYPE_META) as DeadlineType[];
 
 const MODE_OPTIONS: { value: DeadlineMode; label: string }[] = [
   { value: "display", label: "Display only" },
-  { value: "remind", label: "Reminders (no email yet)" },
   { value: "enforced", label: "Enforced" },
 ];
 
@@ -161,7 +160,7 @@ export default function AdminDeadlines() {
 
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
           A deadline stays in effect through the end of its due date; enforced deadlines take effect at 1:00 AM Pacific on the day after.
-          Undated rows are inert, and "Reminders" rows send no email yet — reminder emails are planned.
+          Undated rows are inert. For email reminders, schedule an email campaign instead — deadlines only handle banners and enforcement.
         </div>
 
         <CreateDeadlineForm onSubmit={(payload) => createMut.mutate(payload)} loading={createMut.isPending} />

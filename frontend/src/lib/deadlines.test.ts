@@ -83,18 +83,6 @@ describe("getBannerDeadline", () => {
     expect(result).toEqual({ label: "Family information", dueDate: "2026-12-01", status: "upcoming" });
   });
 
-  it("ignores remind rows (the email channel never feeds the banner)", () => {
-    expect(getBannerDeadline([makeDeadline({ mode: "remind", due_date: "2026-12-15" })], "family_info", NOW)).toBeNull();
-
-    // A remind row must not shadow a past enforced row either.
-    const result = getBannerDeadline(
-      [makeDeadline({ id: 1, mode: "remind", due_date: "2026-12-15" }), makeDeadline({ id: 2, mode: "enforced", due_date: "2026-05-02" })],
-      "family_info",
-      NOW
-    );
-    expect(result).toEqual({ label: "Family information", dueDate: "2026-05-02", status: "past" });
-  });
-
   it("ignores undated rows (they are inert)", () => {
     expect(getBannerDeadline([makeDeadline({ due_date: null })], "family_info", NOW)).toBeNull();
   });

@@ -351,9 +351,8 @@ class TestArmedCheck:
         _seed_deadline(db, DeadlineType.family_info, DeadlineMode.enforced, FUTURE_DUE)
         assert is_type_armed(db, DeadlineType.family_info) is False
 
-    @pytest.mark.parametrize("mode", [DeadlineMode.display, DeadlineMode.remind])
-    def test_not_armed_by_display_or_remind_rows(self, db: Session, mode: DeadlineMode):
-        _seed_deadline(db, DeadlineType.gift_dropoff, mode, PAST_DUE)
+    def test_not_armed_by_display_row(self, db: Session):
+        _seed_deadline(db, DeadlineType.gift_dropoff, DeadlineMode.display, PAST_DUE)
         assert is_type_armed(db, DeadlineType.gift_dropoff) is False
 
     def test_not_armed_by_undated_enforced_row(self, db: Session):
@@ -615,11 +614,10 @@ class TestGiftClaimGate:
         assert resp.status_code == 201
         assert resp.json()["commitment_type"] == "gifts"
 
-    def test_display_and_remind_rows_do_not_block(self, test_client: TestClient, db: Session, admin_user):
+    def test_display_rows_do_not_block(self, test_client: TestClient, db: Session, admin_user):
         _admin_login(test_client)
         fam = _create_claimable_family(db)
         _create_deadline(test_client, type="gift_dropoff", label="Display", due_date=PAST_DUE, mode="display")
-        _create_deadline(test_client, type="gift_dropoff", label="Remind", due_date=PAST_DUE, mode="remind")
         _create_user(test_client, "freeclaim@test.com", "donor")
         login_as(test_client, "freeclaim@test.com", ROLE_PASSWORD)
 

@@ -56,7 +56,7 @@ def deadline_cutoff(due_date: date) -> datetime:
 def is_type_armed(db: Session, dl_type: DeadlineType, now: datetime | None = None) -> bool:
     """True if any enforced, dated row of this type is at or past its cutoff.
 
-    ``display``/``remind`` rows and undated rows never arm a type. A type
+    ``display`` rows and undated rows never arm a type. A type
     with multiple enforced rows arms when the *first* cutoff passes.
     """
     now = now or datetime.now(timezone.utc)

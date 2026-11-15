@@ -1130,7 +1130,7 @@ export interface FamilyClaimUpdate {
 export type DeadlineType = "family_info" | "referrer_review" | "gift_dropoff";
 
 /** Mirrors backend DeadlineMode enum. */
-export type DeadlineMode = "display" | "remind" | "enforced";
+export type DeadlineMode = "display" | "enforced";
 
 /** Mirrors backend DeadlineItem — one deadline row (shared public/admin shape). */
 export interface Deadline {

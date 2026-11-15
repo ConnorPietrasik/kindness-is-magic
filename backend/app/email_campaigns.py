@@ -186,8 +186,7 @@ def create_campaign(
     exceeds the cap), and adds the campaign + recipient rows.
     ``scheduled_for`` (NULL = send ASAP) is the earliest send time — the
     worker skips the campaign until it is due. Does **not** commit — the
-    caller (the admin route, or a future background caller such as the
-    remind deadline hook) owns the transaction.
+    caller (the admin route, or a future background caller) owns the transaction.
     """
     recipients = _resolve_recipients_or_raise(db, roles, extra_emails)
 
