@@ -94,7 +94,7 @@ export const adminEmailCampaigns = ["adminEmailCampaigns"] as const;
 export const adminEmailCampaign = (id: number) => ["adminEmailCampaigns", id] as const;
 
 /** The dialog's recipient preview for a candidate selection (read-only). */
-export const adminEmailCampaignPreview = (selection: { roles: string[]; extra_emails: string[] }) =>
+export const adminEmailCampaignPreview = (selection: { roles: string[]; segments: string[]; extra_emails: string[] }) =>
   ["adminEmailCampaigns", "preview", selection] as const;
 
 // ---------------------------------------------------------------------------

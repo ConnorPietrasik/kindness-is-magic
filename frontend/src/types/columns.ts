@@ -140,6 +140,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
   adminEmailCampaigns: [
     { key: "subject", label: "Subject", visible: true },
     { key: "roles", label: "Roles", visible: true },
+    { key: "state_groups", label: "State groups", visible: true },
     { key: "progress", label: "Progress", visible: true },
     { key: "status", label: "Status", visible: true },
     { key: "scheduled_for", label: "Scheduled", visible: true },

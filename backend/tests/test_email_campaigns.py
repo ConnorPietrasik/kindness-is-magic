@@ -33,6 +33,8 @@ from app.email_campaigns import (
     update_campaign,
 )
 from app.models import (
+    ClaimPaymentStatus,
+    CommitmentType,
     EmailCampaign,
     EmailCampaignRecipient,
     EmailCampaignRecipientSource,
@@ -40,10 +42,16 @@ from app.models import (
     EmailCampaignStatus,
     EmailKind,
     EmailPreference,
+    FamilyClaim,
+    Referrer,
+    ReferrerApprovalStatus,
+    RecipientSegment,
     SentEmail,
     User,
     UserRole,
+    WishLockLevel,
 )
+from tests.conftest import make_family
 
 
 def _make_user(db: Session, email: str, role: UserRole, **kwargs) -> User:
@@ -60,6 +68,29 @@ def _make_user(db: Session, email: str, role: UserRole, **kwargs) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def _make_family(db: Session, name: str, **kwargs):
+    """A family (plus its family wish) in a given review state.
+
+    Defaults to the unsubmitted state (family lock, no review request).
+    """
+    fam = make_family(db, family_name=name, family_wish="A wish", contact_name="Contact", **kwargs)
+    db.flush()
+    return fam
+
+
+def _make_referrer(db: Session, name: str, code: str) -> Referrer:
+    ref = Referrer(
+        name=name,
+        family_limit=10,
+        phone_number="555-000-0000",
+        family_invite_code=code,
+        approval_status=ReferrerApprovalStatus.approved,
+    )
+    db.add(ref)
+    db.flush()
+    return ref
 
 
 def _campaigns(db: Session) -> list[EmailCampaign]:
@@ -87,7 +118,7 @@ class TestResolveCampaignRecipients:
         _make_user(db, "purchaser1@example.com", UserRole.purchaser)
         _make_user(db, "delivery1@example.com", UserRole.delivery)
 
-        resolved = resolve_campaign_recipients(db, [UserRole.donor], [])
+        resolved = resolve_campaign_recipients(db, [UserRole.donor], [], [])
 
         assert [r["email"] for r in resolved] == ["donor1@example.com"]
         assert resolved[0]["user_id"] == donor.id
@@ -99,12 +130,12 @@ class TestResolveCampaignRecipients:
         donor.deleted_at = datetime.now(timezone.utc)
         db.commit()
 
-        resolved = resolve_campaign_recipients(db, [UserRole.donor], [])
+        resolved = resolve_campaign_recipients(db, [UserRole.donor], [], [])
 
         assert [r["email"] for r in resolved] == ["donor2@example.com"]
 
     def test_manual_entries_normalized_and_deduped(self, db: Session):
-        resolved = resolve_campaign_recipients(db, [], ["  A@Example.COM ", "a@example.com", "b@example.com"])
+        resolved = resolve_campaign_recipients(db, [], [], ["  A@Example.COM ", "a@example.com", "b@example.com"])
 
         assert [r["email"] for r in resolved] == ["a@example.com", "b@example.com"]
         assert all(r["user_id"] is None for r in resolved)
@@ -113,7 +144,7 @@ class TestResolveCampaignRecipients:
     def test_dedup_role_and_manual_manual_wins(self, db: Session):
         donor = _make_user(db, "donor1@example.com", UserRole.donor)
 
-        resolved = resolve_campaign_recipients(db, [UserRole.donor], ["DONOR1@example.com"])
+        resolved = resolve_campaign_recipients(db, [UserRole.donor], [], ["DONOR1@example.com"])
 
         assert len(resolved) == 1
         assert resolved[0]["source"] == EmailCampaignRecipientSource.manual
@@ -126,9 +157,229 @@ class TestResolveCampaignRecipients:
         _make_user(db, "z-donor@example.com", UserRole.donor)
         _make_user(db, "a-donor@example.com", UserRole.donor)
 
-        resolved = resolve_campaign_recipients(db, [UserRole.donor], ["manual@example.com"])
+        resolved = resolve_campaign_recipients(db, [UserRole.donor], [], ["manual@example.com"])
 
         assert [r["email"] for r in resolved] == ["z-donor@example.com", "a-donor@example.com", "manual@example.com"]
+
+
+# ---------------------------------------------------------------------------
+# State-segment resolution
+# ---------------------------------------------------------------------------
+
+
+class TestResolveSegments:
+    def test_families_not_submitted_resolves_family_users(self, db: Session):
+        open_fam = _make_family(db, "Open")
+        family_user = _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        # Submitted (referrer lock) — excluded.
+        submitted = _make_family(db, "Submitted", wish_lock_level=WishLockLevel.referrer)
+        _make_user(db, "fam2@example.com", UserRole.family, family_id=submitted.id)
+        # Soft-deleted — excluded.
+        deleted = _make_family(db, "Deleted")
+        _make_user(db, "fam3@example.com", UserRole.family, family_id=deleted.id)
+        deleted.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.families_not_submitted_for_review], [])
+
+        assert [r["email"] for r in resolved] == ["fam1@example.com"]
+        assert resolved[0]["source"] == EmailCampaignRecipientSource.segment
+        assert resolved[0]["segment"] == "families_not_submitted_for_review"
+        assert resolved[0]["user_id"] == family_user.id
+
+    def test_families_with_pending_request_do_not_match(self, db: Session):
+        pending = _make_family(db, "Pending request")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=pending.id)
+        pending.wish_review_requested_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.families_not_submitted_for_review], [])
+
+        assert resolved == []
+
+    def test_families_sent_back_with_rejection_match(self, db: Session):
+        sent_back = _make_family(db, "Sent back")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=sent_back.id)
+        sent_back.wish_rejection_reason = "Fix the sizes"
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.families_not_submitted_for_review], [])
+
+        assert [r["email"] for r in resolved] == ["fam1@example.com"]
+
+    def test_families_without_users_contribute_nothing(self, db: Session):
+        _make_family(db, "No users")
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.families_not_submitted_for_review], [])
+
+        assert resolved == []
+
+    def test_referrers_families_not_submitted_resolves_referrer_users(self, db: Session):
+        active_ref = _make_referrer(db, "Active", "KFI-SEGAA1")
+        idle_ref = _make_referrer(db, "Idle", "KFI-SEGBA2")
+        active_user = _make_user(db, "ref1@example.com", UserRole.referrer, referrer_id=active_ref.id)
+        _make_user(db, "ref2@example.com", UserRole.referrer, referrer_id=idle_ref.id)
+        # active: an unsubmitted family (matches — the family hasn't
+        # requested yet, the referrer hasn't submitted it) and a submitted
+        # one (no effect on the outcome).
+        _make_family(db, "Unsubmitted", referrer_id=active_ref.id)
+        _make_family(db, "Submitted", referrer_id=active_ref.id, wish_lock_level=WishLockLevel.referrer)
+        # idle: only submitted families → not in the segment.
+        _make_family(db, "Only submitted", referrer_id=idle_ref.id, wish_lock_level=WishLockLevel.referrer)
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.referrers_families_not_submitted], [])
+
+        assert [r["email"] for r in resolved] == ["ref1@example.com"]
+        assert resolved[0]["user_id"] == active_user.id
+
+    def test_referrer_segment_skips_referrerless_and_deleted_referrers(self, db: Session):
+        dead_ref = _make_referrer(db, "Deleted", "KFI-SEGC33")
+        _make_user(db, "ref1@example.com", UserRole.referrer, referrer_id=dead_ref.id)
+        # Unsubmitted family with no referrer — attributes to no one.
+        _make_family(db, "Orphan")
+        # Unsubmitted family of a soft-deleted referrer — excluded.
+        _make_family(db, "Deleted referrer's", referrer_id=dead_ref.id)
+        dead_ref.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.referrers_families_not_submitted], [])
+
+        assert resolved == []
+
+    def test_donors_unfulfilled_gift_claims_resolves_claimant_accounts(self, db: Session):
+        donor2 = _make_user(db, "donor2@example.com", UserRole.donor)  # no claims
+        donor1 = _make_user(db, "donor1@example.com", UserRole.donor)
+        donor3 = _make_user(db, "donor3@example.com", UserRole.donor)  # fulfilled only
+        donor4 = _make_user(db, "donor4@example.com", UserRole.donor)  # deleted claim only
+        purchaser = _make_user(db, "purch1@example.com", UserRole.purchaser)
+        fams = [_make_family(db, name) for name in ("Gift", "Cash", "Fulfilled", "Purchaser gift", "Dead claim")]
+        db.add_all(
+            [
+                # Unfulfilled gift claim (a donor) — matches.
+                FamilyClaim(
+                    donor_user_id=donor1.id,
+                    family_id=fams[0].id,
+                    commitment_type=CommitmentType.gifts,
+                    payment_status=ClaimPaymentStatus.paid,
+                ),
+                # Pending cash claim (not a gift claim) — excluded.
+                FamilyClaim(
+                    donor_user_id=donor2.id,
+                    family_id=fams[1].id,
+                    commitment_type=CommitmentType.cash,
+                    payment_status=ClaimPaymentStatus.pending,
+                ),
+                # Fulfilled gift claim — excluded.
+                FamilyClaim(
+                    donor_user_id=donor3.id,
+                    family_id=fams[2].id,
+                    commitment_type=CommitmentType.gifts,
+                    payment_status=ClaimPaymentStatus.paid,
+                    fulfilled_at=datetime.now(timezone.utc),
+                ),
+                # Unfulfilled gift claim held by a non-donor claimant —
+                # still matches (any claim-capable role can claim).
+                FamilyClaim(
+                    donor_user_id=purchaser.id,
+                    family_id=fams[3].id,
+                    commitment_type=CommitmentType.gifts,
+                    payment_status=ClaimPaymentStatus.paid,
+                ),
+            ]
+        )
+        dead_claim = FamilyClaim(
+            donor_user_id=donor4.id, family_id=fams[4].id, commitment_type=CommitmentType.gifts, payment_status=ClaimPaymentStatus.paid
+        )
+        db.add(dead_claim)
+        db.flush()
+        dead_claim.deleted_at = datetime.now(timezone.utc)  # soft-deleted — excluded
+        db.commit()
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.donors_unfulfilled_gift_claims], [])
+
+        emails = {r["email"] for r in resolved}
+        assert emails == {"donor1@example.com", "purch1@example.com"}
+
+    def test_segment_beats_role_in_dedup(self, db: Session):
+        open_fam = _make_family(db, "Open")
+        user = _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        resolved = resolve_campaign_recipients(db, [UserRole.family], [RecipientSegment.families_not_submitted_for_review], [])
+
+        assert len(resolved) == 1
+        assert resolved[0]["source"] == EmailCampaignRecipientSource.segment
+        # The account id survives the overwrite (recipient shows the name).
+        assert resolved[0]["user_id"] == user.id
+
+    def test_manual_beats_segment_in_dedup(self, db: Session):
+        open_fam = _make_family(db, "Open")
+        user = _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        resolved = resolve_campaign_recipients(db, [], [RecipientSegment.families_not_submitted_for_review], ["FAM1@example.com"])
+
+        assert len(resolved) == 1
+        assert resolved[0]["source"] == EmailCampaignRecipientSource.manual
+        assert resolved[0]["user_id"] == user.id
+
+    def test_duplicate_segments_collapsed(self, db: Session):
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        resolved = resolve_campaign_recipients(
+            db,
+            [],
+            [RecipientSegment.families_not_submitted_for_review, RecipientSegment.families_not_submitted_for_review],
+            [],
+        )
+
+        assert [r["email"] for r in resolved] == ["fam1@example.com"]
+
+    def test_winning_segment_is_last_enum_match(self, db: Session):
+        # A user matching all three segments is attributed to the last one
+        # in enum order (families < referrers < donors) — the by_segment
+        # tally's key.
+        open_fam = _make_family(db, "Open")
+        ref = _make_referrer(db, "Multi", "KFI-SEGMM1")
+        user = _make_user(db, "multi@example.com", UserRole.donor, family_id=open_fam.id, referrer_id=ref.id)
+        _make_family(db, "Referrer family", referrer_id=ref.id)
+        claim_fam = _make_family(db, "Claim family")
+        db.add(
+            FamilyClaim(
+                donor_user_id=user.id, family_id=claim_fam.id, commitment_type=CommitmentType.gifts, payment_status=ClaimPaymentStatus.paid
+            )
+        )
+        db.commit()
+
+        resolved = resolve_campaign_recipients(
+            db,
+            [],
+            [
+                RecipientSegment.families_not_submitted_for_review,
+                RecipientSegment.referrers_families_not_submitted,
+                RecipientSegment.donors_unfulfilled_gift_claims,
+            ],
+            [],
+        )
+
+        assert [r["email"] for r in resolved] == ["multi@example.com"]
+        assert resolved[0]["segment"] == "donors_unfulfilled_gift_claims"
+
+    def test_send_order_roles_then_segments_then_manual(self, db: Session):
+        open_fam = _make_family(db, "Open")
+        # Created first → lowest id → first in the role bucket (both users
+        # have the donor role; the segment match only changes the source).
+        segment_user = _make_user(db, "seg@example.com", UserRole.donor, family_id=open_fam.id)
+        _make_user(db, "role@example.com", UserRole.donor)
+
+        resolved = resolve_campaign_recipients(
+            db, [UserRole.donor], [RecipientSegment.families_not_submitted_for_review], ["m@example.com"]
+        )
+
+        assert [r["email"] for r in resolved] == ["seg@example.com", "role@example.com", "m@example.com"]
+        assert resolved[0]["source"] == EmailCampaignRecipientSource.segment
+        assert resolved[0]["user_id"] == segment_user.id
+        assert resolved[1]["source"] == EmailCampaignRecipientSource.role
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +397,7 @@ class TestCreateCampaign:
             subject=None,
             message="Hello all",
             roles=[UserRole.donor],
+            segments=[],
             extra_emails=["extra@example.com"],
         )
         db.commit()
@@ -175,13 +427,14 @@ class TestCreateCampaign:
             subject="  Drive results  ",
             message="Hi",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com"],
         )
         assert campaign.subject == "Drive results"
 
     def test_create_empty_selection_raises(self, db: Session, admin_user):
         try:
-            create_campaign(db, created_by=admin_user, subject=None, message="Hi", roles=[], extra_emails=[])
+            create_campaign(db, created_by=admin_user, subject=None, message="Hi", roles=[], segments=[], extra_emails=[])
             assert False, "expected CampaignResolutionError"
         except CampaignResolutionError:
             pass
@@ -189,7 +442,7 @@ class TestCreateCampaign:
     def test_create_roles_with_no_matching_users_raises(self, db: Session, admin_user):
         # No purchaser users exist in this test's schema.
         try:
-            create_campaign(db, created_by=admin_user, subject=None, message="Hi", roles=[UserRole.purchaser], extra_emails=[])
+            create_campaign(db, created_by=admin_user, subject=None, message="Hi", roles=[UserRole.purchaser], segments=[], extra_emails=[])
             assert False, "expected CampaignResolutionError"
         except CampaignResolutionError:
             pass
@@ -204,11 +457,79 @@ class TestCreateCampaign:
                 subject=None,
                 message="Hi",
                 roles=[],
+                segments=[],
                 extra_emails=["a@example.com", "b@example.com"],
             )
             assert False, "expected CampaignResolutionError"
         except CampaignResolutionError:
             pass
+
+    def test_create_union_over_cap_raises(self, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr("app.email_campaigns.EMAIL_CAMPAIGN_MAX_RECIPIENTS", 1)
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        # The cap counts the deduped union across all three halves.
+        try:
+            create_campaign(
+                db,
+                created_by=admin_user,
+                subject=None,
+                message="Hi",
+                roles=[],
+                segments=[RecipientSegment.families_not_submitted_for_review],
+                extra_emails=["a@example.com"],
+            )
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
+
+    def test_create_scheduled_stores_selection_without_resolving(self, db: Session, admin_user):
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        # The selection is stored, nothing resolved — the worker resolves
+        # it at send time (a state segment must match who is in that state
+        # *then*, not at creation).
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.segments == ["families_not_submitted_for_review"]
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+    def test_create_scheduled_zero_match_selection_is_valid(self, db: Session, admin_user):
+        # No purchaser users exist in this test's schema — the selection
+        # matches nothing today, which is fine for a scheduled campaign
+        # (the state may change by send time). Immediate creation would
+        # 422 the same selection.
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[UserRole.purchaser],
+            segments=[],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +541,182 @@ class TestProcessNextCampaignEmail:
     async def test_no_work_returns_none(self, db: Session):
         assert await process_next_campaign_email(db) is None
 
+    # -- Scheduled campaigns resolve their selection at send time ---------
+
+    async def test_due_unresolved_campaign_resolves_at_send_time(self, db: Session, admin_user):
+        # The family is submitted at creation (the segment matches nothing
+        # then) and sent back before the send time — the snapshot freezes
+        # at send time, so it matches *then*.
+        fam = _make_family(db, "Submitted", wish_lock_level=WishLockLevel.referrer)
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=fam.id)
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+        assert _recipients(db, campaign.id) == []
+
+        # The state changes (the family is sent back) and the time comes.
+        fam.wish_lock_level = WishLockLevel.family
+        campaign.scheduled_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+
+        campaign_result = await process_next_campaign_email(db)
+
+        assert campaign_result.id == campaign.id
+        db.refresh(campaign)
+        # The single recipient is sent in the same step — the campaign
+        # settles to completed (resolve, send, no rows left).
+        assert campaign.status == EmailCampaignStatus.completed
+        assert campaign.total_recipients == 1
+        assert campaign.sent_count == 1
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.source, r.status) for r in rows] == [
+            ("fam1@example.com", EmailCampaignRecipientSource.segment, EmailCampaignRecipientStatus.sent)
+        ]
+
+    async def test_activated_future_time_resolves_at_send_time(self, db: Session, admin_user):
+        # The family is submitted when the draft activates (the segment
+        # matches nothing then) and is sent back before the send time —
+        # the snapshot freezes at send time, so it matches *then*.
+        fam = _make_family(db, "Submitted", wish_lock_level=WishLockLevel.referrer)
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=fam.id)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        activate_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+        # Activated unresolved — nothing matches at activation, and a
+        # future-time activation never 422s on an empty match.
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+        # The state changes (the family is sent back) and the time comes.
+        fam.wish_lock_level = WishLockLevel.family
+        campaign.scheduled_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+
+        campaign_result = await process_next_campaign_email(db)
+
+        assert campaign_result.id == campaign.id
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.completed
+        assert campaign.total_recipients == 1
+        assert campaign.sent_count == 1
+
+    async def test_not_yet_due_unresolved_campaign_not_touched(self, db: Session, admin_user):
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+
+        assert await process_next_campaign_email(db) is None
+
+        # No resolution before the time — even though the segment matches
+        # right now.
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+    async def test_due_unresolved_empty_selection_completes_with_zero_sent(self, db: Session, admin_user):
+        # No purchaser users exist in this test's schema — the selection
+        # matches nothing at send time: a reminder nobody needs is a
+        # success, not an error.
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[UserRole.purchaser],
+            segments=[],
+            extra_emails=[],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+        # The time comes.
+        campaign.scheduled_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+
+        assert await process_next_campaign_email(db) is None
+
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.completed
+        assert campaign.completed_at is not None
+        assert campaign.sent_count == 0
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+        # Nothing left to do.
+        assert await process_next_campaign_email(db) is None
+
+    async def test_due_unresolved_over_cap_canceled(self, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr("app.email_campaigns.EMAIL_CAMPAIGN_MAX_RECIPIENTS", 1)
+        # Two manual addresses: a valid selection at creation (no
+        # resolution), over the cap at send time — the safety cap is
+        # never silently clamped.
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com", "b@example.com"],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+        # The time comes.
+        campaign.scheduled_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+
+        assert await process_next_campaign_email(db) is None
+
+        db.refresh(campaign)
+        assert campaign.status == EmailCampaignStatus.canceled
+        assert campaign.sent_count == 0
+        assert _recipients(db, campaign.id) == []
+        assert await process_next_campaign_email(db) is None
+
     async def test_sends_one_recipient_per_call(self, db: Session, admin_user):
         create_campaign(
-            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com", "b@example.com"]
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
         campaign = _campaigns(db)[0]
@@ -251,7 +745,13 @@ class TestProcessNextCampaignEmail:
 
     async def test_second_call_sends_next_recipient_and_completes(self, db: Session, admin_user):
         create_campaign(
-            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com", "b@example.com"]
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
         campaign = _campaigns(db)[0]
@@ -273,9 +773,11 @@ class TestProcessNextCampaignEmail:
         assert await process_next_campaign_email(db) is None
 
     async def test_oldest_campaign_processed_first(self, db: Session, admin_user):
-        create_campaign(db, created_by=admin_user, subject="First", message="B", roles=[], extra_emails=["first@example.com"])
+        create_campaign(db, created_by=admin_user, subject="First", message="B", roles=[], segments=[], extra_emails=["first@example.com"])
         db.flush()
-        create_campaign(db, created_by=admin_user, subject="Second", message="B", roles=[], extra_emails=["second@example.com"])
+        create_campaign(
+            db, created_by=admin_user, subject="Second", message="B", roles=[], segments=[], extra_emails=["second@example.com"]
+        )
         db.commit()
         first, second = _campaigns(db)
 
@@ -289,7 +791,13 @@ class TestProcessNextCampaignEmail:
         db.add(EmailPreference(email="a@example.com", unsubscribed_at=datetime.now(timezone.utc)))
         db.commit()
         create_campaign(
-            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com", "b@example.com"]
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
         campaign = _campaigns(db)[0]
@@ -316,7 +824,7 @@ class TestProcessNextCampaignEmail:
         assert campaign.sent_count == 1
 
     async def test_smtp_error_marks_failed(self, db: Session, admin_user):
-        create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"])
         db.commit()
         campaign = _campaigns(db)[0]
 
@@ -343,7 +851,13 @@ class TestProcessNextCampaignEmail:
         # the worker on this recipient forever), and the campaign must
         # continue with the next recipient.
         create_campaign(
-            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.test", "b@example.com"]
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.test", "b@example.com"],
         )
         db.commit()
         campaign = _campaigns(db)[0]
@@ -373,6 +887,7 @@ class TestProcessNextCampaignEmail:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com", "b@example.com", "c@example.com"],
         )
         db.commit()
@@ -402,6 +917,7 @@ class TestProcessNextCampaignEmail:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com", "b@example.com", "c@example.com"],
         )
         db.commit()
@@ -433,6 +949,7 @@ class TestProcessNextCampaignEmail:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
@@ -453,8 +970,38 @@ class TestProcessNextCampaignEmail:
         assert campaign.status == EmailCampaignStatus.completed
         assert campaign.completed_at is not None
 
+    async def test_cancel_unresolved_campaign_settles_canceled(self, db: Session, admin_user):
+        # An unresolved scheduled campaign (no recipient rows) canceled
+        # before it became due: nothing was sent or even queued, so the
+        # honest terminal state is canceled — not a green completed.
+        create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        db.commit()
+        campaign = _campaigns(db)[0]
+        assert campaign.status == EmailCampaignStatus.pending
+        assert _recipients(db, campaign.id) == []
+
+        cancel_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.canceled
+        assert campaign.completed_at is None
+        assert campaign.sent_count == 0
+        assert _recipients(db, campaign.id) == []
+
     async def test_cancel_is_idempotent_on_terminal_campaigns(self, db: Session, admin_user):
-        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -470,20 +1017,24 @@ class TestProcessNextCampaignEmail:
         assert campaign.status == EmailCampaignStatus.canceled
 
     async def test_scheduled_campaign_not_due_is_skipped(self, db: Session, admin_user):
-        # Only campaign has pending rows but its time has not come → no work.
+        # The campaign has frozen rows (an immediate create the admin
+        # rescheduled) but its time has not come → no work.
         create_campaign(
             db,
             created_by=admin_user,
             subject="Later",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com"],
-            scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1),
         )
+        db.commit()
+        campaign = _campaigns(db)[0]
+        update_campaign(db, campaign, scheduled_for=datetime.now(timezone.utc) + timedelta(hours=1))
         db.commit()
 
         assert await process_next_campaign_email(db) is None
-        assert _recipients(db, _campaigns(db)[0].id)[0].status == EmailCampaignRecipientStatus.pending
+        assert _recipients(db, campaign.id)[0].status == EmailCampaignRecipientStatus.pending
 
     async def test_scheduled_campaign_due_is_processed(self, db: Session, admin_user):
         create_campaign(
@@ -492,11 +1043,14 @@ class TestProcessNextCampaignEmail:
             subject="Now",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com"],
-            scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=5),  # past = due
         )
         db.commit()
         campaign = _campaigns(db)[0]
+        # Rescheduled into the past = due now.
+        update_campaign(db, campaign, scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=5))
+        db.commit()
 
         result = await process_next_campaign_email(db)
 
@@ -504,22 +1058,18 @@ class TestProcessNextCampaignEmail:
         assert _recipients(db, campaign.id)[0].status == EmailCampaignRecipientStatus.sent
 
     async def test_earliest_due_ordering(self, db: Session, admin_user):
-        # Immediate campaign created first, scheduled campaign (due in the
-        # past) created second: the scheduled one is due earlier, so it goes
-        # first even though it is younger.
-        create_campaign(db, created_by=admin_user, subject="First", message="B", roles=[], extra_emails=["first@example.com"])
+        # Immediate campaign created first, rescheduled campaign (due in
+        # the past) rescheduled second: the scheduled one is due earlier,
+        # so it goes first even though it is younger.
+        create_campaign(db, created_by=admin_user, subject="First", message="B", roles=[], segments=[], extra_emails=["first@example.com"])
         db.flush()
         create_campaign(
-            db,
-            created_by=admin_user,
-            subject="Second",
-            message="B",
-            roles=[],
-            extra_emails=["second@example.com"],
-            scheduled_for=datetime.now(timezone.utc) - timedelta(hours=1),
+            db, created_by=admin_user, subject="Second", message="B", roles=[], segments=[], extra_emails=["second@example.com"]
         )
         db.commit()
         first, second = _campaigns(db)
+        update_campaign(db, second, scheduled_for=datetime.now(timezone.utc) - timedelta(hours=1))
+        db.commit()
 
         result = await process_next_campaign_email(db)
 
@@ -542,6 +1092,7 @@ class TestCreateDraft:
             subject=None,
             message="Draft body",
             roles=[UserRole.donor],
+            segments=[],
             extra_emails=["  A@Example.COM ", "a@example.com", "b@example.com"],
             scheduled_for=scheduled,
         )
@@ -563,7 +1114,9 @@ class TestCreateDraft:
         assert _recipients(db, campaign.id) == []
 
     def test_draft_without_schedule(self, db: Session, admin_user):
-        campaign = create_draft(db, created_by=admin_user, subject="Later", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_draft(
+            db, created_by=admin_user, subject="Later", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -571,6 +1124,29 @@ class TestCreateDraft:
         assert campaign.scheduled_for is None
         assert campaign.roles == []
         assert campaign.extra_emails == ["a@example.com"]
+
+    def test_draft_stores_segments_without_resolving(self, db: Session, admin_user):
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.draft
+        assert campaign.roles == []
+        assert campaign.segments == ["families_not_submitted_for_review"]
+        # No resolution until activation — the state may change by send time.
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
 
 
 class TestActivateCampaign:
@@ -582,6 +1158,7 @@ class TestActivateCampaign:
             subject="Subj",
             message="Body",
             roles=[UserRole.donor],
+            segments=[],
             extra_emails=["extra@example.com"],
         )
         db.commit()
@@ -599,7 +1176,9 @@ class TestActivateCampaign:
             ("extra@example.com", EmailCampaignRecipientSource.manual, None, EmailCampaignRecipientStatus.pending),
         ]
 
-    def test_activate_honors_stored_scheduled_for(self, db: Session, admin_user):
+    def test_activate_future_time_defers_resolution(self, db: Session, admin_user):
+        # A draft with a future send time activates unresolved — like a
+        # scheduled creation, the worker resolves it at send time.
         scheduled = datetime.now(timezone.utc) + timedelta(days=2)
         campaign = create_draft(
             db,
@@ -607,6 +1186,7 @@ class TestActivateCampaign:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com"],
             scheduled_for=scheduled,
         )
@@ -619,11 +1199,86 @@ class TestActivateCampaign:
 
         assert campaign.status == EmailCampaignStatus.pending
         assert campaign.scheduled_for == scheduled
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+    def test_activate_past_time_resolves_now(self, db: Session, admin_user):
+        # A stored time that has passed is due now — activation resolves
+        # immediately (no deferral to the worker).
+        scheduled = datetime.now(timezone.utc) - timedelta(hours=1)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=scheduled,
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        activate_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.scheduled_for == scheduled
+        assert campaign.total_recipients == 1
+        assert [(r.email, r.source) for r in _recipients(db, campaign.id)] == [("a@example.com", EmailCampaignRecipientSource.manual)]
+
+    def test_activate_resolves_segments(self, db: Session, admin_user):
+        open_fam = _make_family(db, "Open")
+        user = _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        activate_campaign(db, campaign)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.status == EmailCampaignStatus.pending
+        assert campaign.total_recipients == 1
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.source, r.user_id) for r in rows] == [("fam1@example.com", EmailCampaignRecipientSource.segment, user.id)]
+
+    def test_activate_segment_resolving_to_nothing_raises(self, db: Session, admin_user):
+        # No families exist — a valid draft (selection non-empty) whose
+        # segment resolves to nothing cannot be sent.
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            activate_campaign(db, campaign)
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
 
     def test_activate_empty_selection_raises(self, db: Session, admin_user):
         # No purchaser users exist in this test's schema — a valid draft
         # (selection non-empty) whose resolution is empty cannot be sent.
-        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[UserRole.purchaser], extra_emails=[])
+        campaign = create_draft(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[UserRole.purchaser], segments=[], extra_emails=[]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -641,6 +1296,7 @@ class TestActivateCampaign:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
@@ -653,7 +1309,9 @@ class TestActivateCampaign:
             pass
 
     def test_activate_non_draft_raises(self, db: Session, admin_user):
-        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -672,6 +1330,7 @@ class TestUpdateCampaign:
             subject="Old",
             message="Old body",
             roles=[UserRole.donor],
+            segments=[],
             extra_emails=["a@example.com"],
         )
         db.commit()
@@ -683,6 +1342,7 @@ class TestUpdateCampaign:
             subject="New",
             message="New body",
             roles=[],
+            segments=[],
             extra_emails=["  B@Example.com "],
         )
         db.commit()
@@ -698,7 +1358,9 @@ class TestUpdateCampaign:
         assert _recipients(db, campaign.id) == []
 
     def test_draft_scheduled_for_set_and_clear(self, db: Session, admin_user):
-        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_draft(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -714,7 +1376,9 @@ class TestUpdateCampaign:
         assert campaign.scheduled_for is None
 
     def test_blank_subject_falls_back_to_default(self, db: Session, admin_user):
-        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_draft(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
 
@@ -725,7 +1389,13 @@ class TestUpdateCampaign:
 
     def test_pending_campaign_reresolves_and_replaces_rows(self, db: Session, admin_user):
         campaign = create_campaign(
-            db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com", "b@example.com"]
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com", "b@example.com"],
         )
         db.commit()
         db.refresh(campaign)
@@ -748,9 +1418,65 @@ class TestUpdateCampaign:
             subject="Subj",
             message="Body",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com"],
-            scheduled_for=scheduled,
         )
+        db.commit()
+        db.refresh(campaign)
+
+        # Reschedule + selection edit in one update: the rows are
+        # re-resolved/replaced, the schedule survives.
+        update_campaign(db, campaign, extra_emails=["b@example.com"], scheduled_for=scheduled)
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.scheduled_for == scheduled
+        assert [r.email for r in _recipients(db, campaign.id)] == ["b@example.com"]
+
+    def test_draft_segments_swap_keeps_other_halves(self, db: Session, admin_user):
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Old",
+            message="Old body",
+            roles=[UserRole.donor],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=["a@example.com"],
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        # Replacing the segment half leaves the other halves stored.
+        update_campaign(db, campaign, segments=[])
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.segments == []
+        assert campaign.roles == ["donor"]
+        assert campaign.extra_emails == ["a@example.com"]
+        # No resolution happens until activation — still no rows.
+        assert campaign.total_recipients == 0
+
+    def test_pending_campaign_segment_edit_reresolves_state(self, db: Session, admin_user):
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=[],
+        )
+        db.commit()
+        db.refresh(campaign)
+        assert campaign.total_recipients == 1
+
+        # The state changes (the family requests review) and the admin edits
+        # the selection: the segment re-resolves to nothing, so the only
+        # remaining recipient is the new manual address.
+        open_fam.wish_review_requested_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(campaign)
 
@@ -758,22 +1484,72 @@ class TestUpdateCampaign:
         db.commit()
         db.refresh(campaign)
 
-        assert campaign.scheduled_for == scheduled
-        assert [r.email for r in _recipients(db, campaign.id)] == ["b@example.com"]
+        assert campaign.total_recipients == 1
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.source) for r in rows] == [("b@example.com", EmailCampaignRecipientSource.manual)]
 
-    def test_update_empty_selection_raises(self, db: Session, admin_user):
-        campaign = create_draft(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+    def test_unresolved_pending_selection_edit_stores_only(self, db: Session, admin_user):
+        # A scheduled campaign has no rows — a selection edit stores the
+        # new selection without resolving (it may match nothing, e.g. no
+        # purchaser users exist in this test's schema).
+        campaign = create_campaign(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[],
+            extra_emails=["a@example.com"],
+            scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        update_campaign(db, campaign, roles=[UserRole.purchaser], segments=[], extra_emails=[])
+        db.commit()
+        db.refresh(campaign)
+
+        assert campaign.roles == ["purchaser"]
+        assert campaign.extra_emails == []
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
+
+    def test_update_empty_across_all_three_halves_raises(self, db: Session, admin_user):
+        campaign = create_draft(
+            db,
+            created_by=admin_user,
+            subject="Subj",
+            message="Body",
+            roles=[],
+            segments=[RecipientSegment.families_not_submitted_for_review],
+            extra_emails=["a@example.com"],
+        )
         db.commit()
         db.refresh(campaign)
 
         try:
-            update_campaign(db, campaign, roles=[], extra_emails=[])
+            update_campaign(db, campaign, roles=[], segments=[], extra_emails=[])
+            assert False, "expected CampaignResolutionError"
+        except CampaignResolutionError:
+            pass
+
+    def test_update_empty_selection_raises(self, db: Session, admin_user):
+        campaign = create_draft(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
+        db.commit()
+        db.refresh(campaign)
+
+        try:
+            update_campaign(db, campaign, roles=[], segments=[], extra_emails=[])
             assert False, "expected CampaignResolutionError"
         except CampaignResolutionError:
             pass
 
     def test_update_raises_on_sending_campaign(self, db: Session, admin_user):
-        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
         # Simulate the worker having settled one recipient.
@@ -789,7 +1565,9 @@ class TestUpdateCampaign:
             pass
 
     def test_update_raises_on_terminal_campaigns(self, db: Session, admin_user):
-        campaign = create_campaign(db, created_by=admin_user, subject="Subj", message="Body", roles=[], extra_emails=["a@example.com"])
+        campaign = create_campaign(
+            db, created_by=admin_user, subject="Subj", message="Body", roles=[], segments=[], extra_emails=["a@example.com"]
+        )
         db.commit()
         db.refresh(campaign)
         campaign.status = EmailCampaignStatus.completed
@@ -820,6 +1598,7 @@ class TestPaceOngoingCampaign:
             subject=subject,
             message="Body.",
             roles=[],
+            segments=[],
             extra_emails=["a@example.com", "b@example.com", "c@example.com"],
         )
         db.commit()

@@ -12,6 +12,7 @@ const summary: EmailCampaignSummary = {
   id: 1,
   subject: "S",
   roles: [],
+  segments: [],
   status: "pending",
   total_recipients: 1,
   sent_count: 0,
@@ -92,7 +93,7 @@ describe("AdminCampaignDialog preview", () => {
   });
 
   it("shows the total plus the per-role/manual breakdown once the preview resolves", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 5, by_role: { donor: 2, admin: 3 }, manual: 0 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 5, by_role: { donor: 2, admin: 3 }, by_segment: {}, manual: 0 });
     const user = userEvent.setup();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -109,6 +110,64 @@ describe("AdminCampaignDialog preview", () => {
     // The preview fires after the 500ms debounce.
     await screen.findByText(/Will send to/, {}, { timeout: 2000 });
     expect(screen.getByText(/2 donors, 3 admins/)).toBeInTheDocument();
+  });
+});
+
+describe("AdminCampaignDialog state groups", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("a toggled state group travels in the preview and create payloads, and its tally shows in the breakdown", async () => {
+    const preview = vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({
+      total: 2,
+      by_role: {},
+      by_segment: { families_not_submitted_for_review: 1 },
+      manual: 1,
+    });
+    const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue(summary);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByRole("checkbox", { name: "Families that haven't submitted for review" }));
+    await user.type(screen.getByLabelText("Extra email addresses (optional)"), "a@example.com");
+    await user.type(screen.getByLabelText("Message"), "Body");
+
+    // The preview fires after the 500ms debounce.
+    await screen.findByText(/Will send to/, {}, { timeout: 2000 });
+    expect(preview).toHaveBeenCalledWith(
+      expect.objectContaining({ roles: [], segments: ["families_not_submitted_for_review"], extra_emails: ["a@example.com"] })
+    );
+    // The breakdown lists the segment's tally (label lowercased).
+    expect(screen.getByText(/1 families that haven't submitted for review, 1 manual/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create campaign" }));
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ roles: [], segments: ["families_not_submitted_for_review"], extra_emails: ["a@example.com"] })
+    );
+  });
+
+  it("a state-group-only selection is a valid selection", async () => {
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({
+      total: 1,
+      by_role: {},
+      by_segment: { referrers_families_not_submitted: 1 },
+      manual: 0,
+    });
+    const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue(summary);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByRole("checkbox", { name: "Referrers with families not yet submitted for review" }));
+    await user.type(screen.getByLabelText("Message"), "Body");
+
+    await user.click(screen.getByRole("button", { name: "Create campaign" }));
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ roles: [], segments: ["referrers_families_not_submitted"], extra_emails: [] })
+    );
   });
 });
 
@@ -144,7 +203,7 @@ describe("AdminCampaignDialog delivery modes (create)", () => {
   });
 
   it("save as draft stores the selection without sending, with the picked time", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue({ ...summary, status: "draft" });
     const user = userEvent.setup();
     renderDialog();
@@ -163,10 +222,12 @@ describe("AdminCampaignDialog delivery modes (create)", () => {
         scheduled_for: expect.stringMatching(/^2030-01-15T\d{2}:\d{2}:\d{2}Z$/),
       })
     );
+    // Drafts never send on their own — the toast must not promise it.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Draft saved — it won't send until you send it.");
   });
 
   it("a picked time relabels the primary button and schedules the campaign", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue(summary);
     const user = userEvent.setup();
     renderDialog();
@@ -186,10 +247,12 @@ describe("AdminCampaignDialog delivery modes (create)", () => {
         scheduled_for: expect.stringMatching(/^2030-01-15T\d{2}:\d{2}:\d{2}Z$/),
       })
     );
+    // No frozen recipient count — the snapshot is taken when it sends.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/recipients are finalized when it sends/);
   });
 
   it("an empty time creates an immediate campaign", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue(summary);
     const user = userEvent.setup();
     renderDialog();
@@ -206,7 +269,7 @@ describe("AdminCampaignDialog delivery modes (create)", () => {
   });
 
   it("a picked time in the past creates an immediate campaign (the backend 422s a past time)", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const create = vi.spyOn(api, "adminCreateEmailCampaign").mockResolvedValue(summary);
     const user = userEvent.setup();
     renderDialog();
@@ -239,6 +302,7 @@ describe("AdminCampaignDialog edit mode", () => {
     id: 7,
     subject: "Old subject",
     roles: [],
+    segments: [],
     status: "draft",
     total_recipients: 0,
     sent_count: 0,
@@ -264,8 +328,14 @@ describe("AdminCampaignDialog edit mode", () => {
     expect(screen.getByRole("button", { name: "Save & send now" })).toBeInTheDocument();
   });
 
+  it("prefills the state-group checkboxes from the campaign", () => {
+    renderDialog({ campaign: { ...draft, segments: ["donors_unfulfilled_gift_claims"] } });
+    expect(screen.getByRole("checkbox", { name: "Sponsors with unfulfilled gift sponsorships" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Families that haven't submitted for review" })).not.toBeChecked();
+  });
+
   it("save changes sends a minimal patch (unchanged fields omitted)", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const update = vi.spyOn(api, "adminUpdateEmailCampaign").mockResolvedValue({ ...summary, status: "draft" });
     const send = vi.spyOn(api, "adminSendEmailCampaign");
     const user = userEvent.setup();
@@ -289,7 +359,7 @@ describe("AdminCampaignDialog edit mode", () => {
   });
 
   it("save & send now patches, then activates the draft", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     vi.spyOn(api, "adminUpdateEmailCampaign").mockResolvedValue({ ...summary, status: "draft" });
     const send = vi.spyOn(api, "adminSendEmailCampaign").mockResolvedValue(summary);
     const user = userEvent.setup();
@@ -304,8 +374,28 @@ describe("AdminCampaignDialog edit mode", () => {
     expect(send).toHaveBeenCalledWith(7);
   });
 
+  it("save & schedule activates unresolved — the toast drops the recipient count", async () => {
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
+    vi.spyOn(api, "adminUpdateEmailCampaign").mockResolvedValue({ ...summary, status: "draft" });
+    // A future-time activation stays unresolved — 0 recipients until the
+    // worker resolves the selection at send time.
+    const send = vi.spyOn(api, "adminSendEmailCampaign").mockResolvedValue({ ...summary, total_recipients: 0, pending_count: 0 });
+    const user = userEvent.setup();
+    renderDialog({ campaign: draft });
+
+    const sendAt = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    await user.type(sendAt, "2030-01-15T09:30");
+
+    // A time → the draft's primary button is "Save & schedule".
+    await user.click(screen.getByRole("button", { name: "Save & schedule" }));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send).toHaveBeenCalledWith(7);
+    // No frozen recipient count — the snapshot is taken when it sends.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/recipients are finalized when it sends/);
+  });
+
   it("picking a past time on a scheduled draft clears the stored time and sends", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const update = vi.spyOn(api, "adminUpdateEmailCampaign").mockResolvedValue({ ...summary, status: "draft" });
     const send = vi.spyOn(api, "adminSendEmailCampaign").mockResolvedValue(summary);
     const user = userEvent.setup();
@@ -329,7 +419,7 @@ describe("AdminCampaignDialog edit mode", () => {
   });
 
   it("an activated campaign offers only save changes (no send action)", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const update = vi.spyOn(api, "adminUpdateEmailCampaign").mockResolvedValue(summary);
     const send = vi.spyOn(api, "adminSendEmailCampaign");
     const user = userEvent.setup();
@@ -359,7 +449,7 @@ describe("AdminCampaignDialog edit mode", () => {
   });
 
   it("a blanked message disables the save buttons in edit mode", async () => {
-    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, manual: 1 });
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({ total: 1, by_role: {}, by_segment: {}, manual: 1 });
     const update = vi.spyOn(api, "adminUpdateEmailCampaign");
     const send = vi.spyOn(api, "adminSendEmailCampaign");
     const user = userEvent.setup();

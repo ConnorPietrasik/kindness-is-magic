@@ -3,17 +3,22 @@
  * email) or editing one that has not started delivering (a draft, or a
  * pending campaign with nothing sent yet).
  *
- * The recipient selection is role checkboxes (any subset of the six roles)
- * plus an optional free-text list of extra addresses. A debounced preview
- * shows the resolved blast size before the admin commits; the preview is a
- * bonus display — a failing preview never blocks the buttons (the backend
- * re-resolves and validates at creation/activation).
+ * The recipient selection is role checkboxes, state-group checkboxes
+ * (state-aware audiences — families/referrers/sponsors matching a review
+ * or sponsorship state), plus an optional free-text list of extra
+ * addresses. A debounced preview shows the resolved blast size before the
+ * admin commits; the preview is a bonus display — a failing preview never
+ * blocks the buttons (the backend re-resolves and validates at
+ * creation/activation).
  *
  * Delivery: the optional "Send at" picker sets the earliest send time —
- * empty means send as soon as possible (for a draft, the intended send
- * time). A time in the past is due now and is stored as send-as-soon-as-
- * possible (create: null; edit: the stored time is cleared). Create mode
- * offers Save as draft / Create campaign (relabeling to
+ * empty means send as soon as possible. A campaign with a future send
+ * time finalizes its recipients when it sends (a state group matches who
+ * is in that state then) — whether created scheduled or activated from a
+ * draft; without one, activation finalizes immediately. A draft never
+ * sends on its own. A time in the past is due now and is stored as
+ * send-as-possible (create: null; edit: the stored time is cleared).
+ * Create mode offers Save as draft / Create campaign (relabeling to
  * Schedule campaign when a time is picked). Edit mode offers Save changes
  * plus, for a draft, Save & send now (or Save & schedule): the patch is
  * persisted first, then the draft is activated. An already-activated
@@ -29,7 +34,7 @@ import { useDebouncedState } from "../hooks/useDebouncedState";
 import { adminCreateEmailCampaign, adminPreviewEmailCampaign, adminSendEmailCampaign, adminUpdateEmailCampaign } from "../lib/api";
 import { adminEmailCampaignPreview, adminEmailCampaigns } from "../lib/queryKeys";
 import { formatApiError, formatDateTime, normalizeUpdatePayload } from "../lib/utils";
-import type { AdminCampaignUpdatePayload, EmailCampaignDetail, UserRole } from "../types";
+import type { AdminCampaignUpdatePayload, EmailCampaignDetail, RecipientSegment, UserRole } from "../types";
 import { Button } from "./Button";
 import { DatePicker } from "./DatePicker";
 import { FormField } from "./FormField";
@@ -49,13 +54,42 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
 ];
 
 /**
- * Per-role + manual breakdown of a resolved preview, e.g. "2 donors, 3 manual".
- * Non-empty whenever the preview's total is non-zero (the counts sum to it).
+ * State groups offered as checkboxes, in the order shown. Values mirror
+ * the backend RecipientSegment enum (closed set — see
+ * backend/app/models.py); labels use user-facing terminology (a donor's
+ * claim is a "sponsorship"). ``label`` is the full sentence for form and
+ * prose contexts; ``shortLabel`` is the table-column form (full label on
+ * hover).
  */
-function previewBreakdown(preview: { by_role: Partial<Record<UserRole, number>>; manual: number }): string {
+export const SEGMENT_OPTIONS: { value: RecipientSegment; label: string; shortLabel: string }[] = [
+  { value: "families_not_submitted_for_review", label: "Families that haven't submitted for review", shortLabel: "Unsubmitted families" },
+  {
+    value: "referrers_families_not_submitted",
+    label: "Referrers with families not yet submitted for review",
+    shortLabel: "Referrers with unsubmitted families",
+  },
+  { value: "donors_unfulfilled_gift_claims", label: "Sponsors with unfulfilled gift sponsorships", shortLabel: "Unfulfilled sponsorships" },
+];
+
+/**
+ * Per-role, per-state-group + manual breakdown of a resolved preview, e.g.
+ * "2 donors, 2 families that haven't submitted for review, 3 manual".
+ * Non-empty whenever the preview's total is non-zero (the counts sum to
+ * it — a recipient in several selections is counted in the winning bucket
+ * only).
+ */
+function previewBreakdown(preview: {
+  by_role: Partial<Record<UserRole, number>>;
+  by_segment: Partial<Record<RecipientSegment, number>>;
+  manual: number;
+}): string {
   const parts: string[] = [];
   for (const { value, label } of ROLE_OPTIONS) {
     const count = preview.by_role[value];
+    if (count) parts.push(`${count} ${label.toLowerCase()}`);
+  }
+  for (const { value, label } of SEGMENT_OPTIONS) {
+    const count = preview.by_segment[value];
     if (count) parts.push(`${count} ${label.toLowerCase()}`);
   }
   if (preview.manual) parts.push(`${preview.manual} manual`);
@@ -107,6 +141,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
   const isEdit = campaign !== undefined;
 
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(campaign?.roles ?? []);
+  const [selectedSegments, setSelectedSegments] = useState<RecipientSegment[]>(campaign?.segments ?? []);
   const [manualEmailsText, setManualEmailsText] = useState((campaign?.extra_emails ?? []).join("\n"));
   const [subject, setSubject] = useState(campaign?.subject ?? "");
   const [message, setMessage] = useState(campaign?.message ?? "");
@@ -128,11 +163,12 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
   // The debounced selection drives the preview query (a new object per
   // keystroke — React Query hashes the key structurally).
   const selection = useMemo(
-    () => ({ roles: selectedRoles, extra_emails: parseManualEmails(manualEmailsText) }),
-    [selectedRoles, manualEmailsText]
+    () => ({ roles: selectedRoles, segments: selectedSegments, extra_emails: parseManualEmails(manualEmailsText) }),
+    [selectedRoles, selectedSegments, manualEmailsText]
   );
   const debouncedSelection = useDebouncedState(selection, 500);
-  const hasSelection = debouncedSelection.roles.length > 0 || debouncedSelection.extra_emails.length > 0;
+  const hasSelection =
+    debouncedSelection.roles.length > 0 || debouncedSelection.segments.length > 0 || debouncedSelection.extra_emails.length > 0;
   const { data: preview, isError: previewError } = useQuery({
     queryKey: adminEmailCampaignPreview(debouncedSelection),
     queryFn: () => adminPreviewEmailCampaign(debouncedSelection),
@@ -145,7 +181,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
   // create/update routes 422 on it.
   const sendsLater = scheduledFor !== "" && new Date(scheduledFor).getTime() > Date.now();
 
-  const selectionEmpty = selectedRoles.length === 0 && parseManualEmails(manualEmailsText).length === 0;
+  const selectionEmpty = selectedRoles.length === 0 && selectedSegments.length === 0 && parseManualEmails(manualEmailsText).length === 0;
   // A blank message is invalid in both modes (the update route 422s it),
   // so it disables the save buttons instead of failing on submit.
   const messageBlank = message.trim().length === 0;
@@ -163,6 +199,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
         subject,
         message,
         roles: selectedRoles,
+        segments: selectedSegments,
         extra_emails: parseManualEmails(manualEmailsText),
         scheduled_for: effectiveScheduledFor,
       },
@@ -170,6 +207,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
         subject: campaign.subject,
         message: campaign.message,
         roles: campaign.roles,
+        segments: campaign.segments,
         extra_emails: campaign.extra_emails,
         scheduled_for: campaign.scheduled_for,
       }
@@ -191,6 +229,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
     mutationFn: (asDraft: boolean) =>
       adminCreateEmailCampaign({
         roles: selectedRoles,
+        segments: selectedSegments,
         extra_emails: parseManualEmails(manualEmailsText),
         subject: subject.trim() ? subject : null,
         message,
@@ -201,11 +240,13 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
     onSuccess: (created, asDraft) => {
       queryClient.invalidateQueries({ queryKey: adminEmailCampaigns });
       if (asDraft) {
-        toast.success(sendsLater ? `Draft saved — will send on ${formatDateTime(scheduledFor)}.` : "Draft saved.");
+        // Drafts never send on their own — the stored time is the intended
+        // send time if the admin ever activates the draft.
+        toast.success(sendsLater ? "Draft saved — it won't send until you send it." : "Draft saved.");
       } else if (sendsLater) {
-        toast.success(
-          `Campaign scheduled for ${formatDateTime(scheduledFor)} — ${created.total_recipients} recipient${created.total_recipients === 1 ? "" : "s"}.`
-        );
+        // No recipient count — a scheduled campaign finalizes its
+        // recipients when it sends (a state group matches the state then).
+        toast.success(`Campaign scheduled for ${formatDateTime(scheduledFor)} — recipients are finalized when it sends.`);
       } else {
         toast.success(`Campaign queued — ${created.total_recipients} recipient${created.total_recipients === 1 ? "" : "s"}.`);
       }
@@ -231,11 +272,9 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
       queryClient.invalidateQueries({ queryKey: adminEmailCampaigns });
       if (send) {
         if (sendsLater) {
-          toast.success(
-            `Campaign scheduled for ${formatDateTime(scheduledFor)}${
-              sent ? ` — ${sent.total_recipients} recipient${sent.total_recipients === 1 ? "" : "s"}` : ""
-            }.`
-          );
+          // No recipient count — a scheduled campaign finalizes its
+          // recipients when it sends (a state group matches the state then).
+          toast.success(`Campaign scheduled for ${formatDateTime(scheduledFor)} — recipients are finalized when it sends.`);
         } else {
           toast.success(
             sent
@@ -255,6 +294,10 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
 
   const toggleRole = (role: UserRole) => {
     setSelectedRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
+  };
+
+  const toggleSegment = (segment: RecipientSegment) => {
+    setSelectedSegments((prev) => (prev.includes(segment) ? prev.filter((s) => s !== segment) : [...prev, segment]));
   };
 
   const primaryLabel = !isEdit
@@ -299,6 +342,23 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
           </div>
         </div>
 
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-gray-700">Send to state groups</span>
+          <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            {SEGMENT_OPTIONS.map(({ value, label }) => (
+              <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={selectedSegments.includes(value)}
+                  onChange={() => toggleSegment(value)}
+                  className="h-4 w-4 shrink-0 rounded border-gray-300 text-btn-start focus:ring-btn-start/30"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
         <FormField
           label="Extra email addresses"
           labelSuffix="(optional)"
@@ -322,7 +382,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
               "Preview unavailable — check the extra addresses. You can still save the campaign."
             ) : preview ? (
               preview.total === 0 ? (
-                "No matching users — select at least one role or add an address."
+                "No matching users — select at least one role or state group, or add an address."
               ) : (
                 <>
                   Will send to <strong>{preview.total}</strong> recipient{preview.total === 1 ? "" : "s"} · {previewBreakdown(preview)}
@@ -332,7 +392,7 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
               "Counting recipients…"
             )
           ) : (
-            "Select roles or add addresses to see how many people will be emailed."
+            "Select roles, state groups, or add addresses to see how many people will be emailed."
           )}
         </div>
 

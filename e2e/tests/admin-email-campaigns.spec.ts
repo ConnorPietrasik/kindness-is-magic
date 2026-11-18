@@ -54,8 +54,9 @@
  *   schedules for the next whole minute plus one (60–120s out). The first
  *   send can only land AT or AFTER the time, at most one idle poll later —
  *   so the wait is capped at ~180s (120s + 2s + headroom). Before the
- *   wait, the first recipient must still read "Pending": an early send
- *   (before the time) fails the test immediately instead of after 180s.
+ *   wait, no recipient rows exist yet (a scheduled campaign finalizes its
+ *   recipients at send time): an early send (before the time) fails the
+ *   test immediately instead of after 180s.
  * - Campaign names are per-attempt (test.info().retry). A serial-group
  *   retry re-runs beforeAll — which cancels every active campaign — and
  *   then re-runs the whole group. Fixed names would re-create same-subject
@@ -317,17 +318,19 @@ test.describe.serial("Admin email campaigns", () => {
     await dialog.getByRole("button", { name: "Schedule campaign" }).click();
     await expect(page.getByRole("alert").filter({ hasText: /Campaign scheduled for/ })).toBeVisible();
 
-    /* Scheduled: the badge, and the first recipient is NOT sent yet — an
-       early send (before the time) fails immediately, not after the wait. */
+    /* Scheduled: the badge, and no recipient rows exist yet (an early
+       send before the time fails immediately, not after the wait). */
     const row = page.getByRole("row").filter({ hasText: subject });
     await expect(row.getByTestId("campaign-status-badge")).toHaveText("Scheduled");
+    await expect(row).toContainText("At send time");
     await row.click();
     await expect(page.getByTestId("campaign-status-badge")).toHaveText("Scheduled");
-    const firstRow = page.getByRole("row").filter({ hasText: SCHED_A });
-    await expect(firstRow).toContainText("Pending");
-
+    // No recipient audit yet — the list is finalized at send time.
+    await expect(page.getByText(/Recipients are finalized when the campaign sends/)).toBeVisible();
     /* The first send lands at or after the time, at most one idle poll
-       after it (cap: 119s + 2s + headroom). */
+       after it (cap: 119s + 2s + headroom). The recipient rows only exist
+       once the worker resolves the selection at that moment. */
+    const firstRow = page.getByRole("row").filter({ hasText: SCHED_A });
     await expect(firstRow).toContainText("Sent", { timeout: 180_000 });
 
     /* Cancel inside the pacing gap — the second recipient is skipped. */

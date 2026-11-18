@@ -36,6 +36,7 @@ from app.models import (
     PHONE_NUMBER_MAX_LENGTH,
     PersonRole,
     REFERRER_NAME_MAX_LENGTH,
+    RecipientSegment,
     ReferrerApprovalStatus,
     UserRole,
     WISH_COLOR_MAX_LENGTH,
@@ -682,11 +683,13 @@ class AdminResubscribeRequest(BaseModel):
 class CampaignSelection(BaseModel):
     """Recipient selection shared by the create and preview requests.
 
-    ``roles`` + ``extra_emails`` — at least one is required. Every
-    ``extra_emails`` entry is validated and normalized (strip + lower).
+    ``roles`` + ``segments`` (state-aware audiences) + ``extra_emails`` —
+    at least one is required. Every ``extra_emails`` entry is validated
+    and normalized (strip + lower).
     """
 
     roles: list[UserRole] = Field(default_factory=list)
+    segments: list[RecipientSegment] = Field(default_factory=list)
     extra_emails: list[Annotated[str, StringConstraints(max_length=MAX_EMAIL_LENGTH)]] = Field(default_factory=list)
 
     @field_validator("extra_emails")
@@ -698,8 +701,8 @@ class CampaignSelection(BaseModel):
 
     @model_validator(mode="after")
     def check_has_recipients(self) -> "CampaignSelection":
-        if not self.roles and not self.extra_emails:
-            raise ValueError("Select at least one role or add at least one email address")
+        if not self.roles and not self.segments and not self.extra_emails:
+            raise ValueError("Select at least one role or state segment, or add an email address")
         return self
 
 
@@ -737,16 +740,19 @@ class AdminCampaignUpdateRequest(BaseModel):
 
     Partial-update convention: omitted or ``null`` fields are no-ops.
     ``subject``/``message`` update in place (a blank subject falls back to
-    the default, as at creation). Providing either of ``roles`` /
-    ``extra_emails`` replaces the selection (the other keeps its stored
-    value); the resulting selection must be non-empty, and for an activated
-    campaign the recipients are re-resolved. ``scheduled_for`` uses the
-    ``clearable_datetime`` convention: ``""`` clears the time (send ASAP).
+    the default, as at creation). Providing any of ``roles`` /
+    ``segments`` / ``extra_emails`` replaces that dimension of the selection
+    (the others keep their stored values); the resulting selection must be
+    non-empty, and for an activated campaign whose snapshot is frozen (it
+    has recipient rows) the recipients are re-resolved. ``scheduled_for``
+    uses the ``clearable_datetime`` convention: ``""`` clears the time
+    (send ASAP).
     """
 
     subject: str | None = Field(None, max_length=200)
     message: str | None = Field(None, min_length=1, max_length=5000)
     roles: list[UserRole] | None = None
+    segments: list[RecipientSegment] | None = None
     extra_emails: list[Annotated[str, StringConstraints(max_length=MAX_EMAIL_LENGTH)]] | None = None
     scheduled_for: clearable_datetime()
 
@@ -778,13 +784,17 @@ class AdminCampaignPreviewRequest(CampaignSelection):
 class EmailCampaignPreviewResponse(BaseModel):
     """Resolved recipient counts for a campaign selection (no campaign created).
 
-    ``by_role`` counts recipients whose source is the role resolution, keyed
-    by role; ``manual`` counts explicit addresses. An address in both is
-    counted once, in ``manual`` (the explicit entry wins).
+    ``by_role`` counts recipients whose final source is the role
+    resolution, keyed by role; ``by_segment`` counts those whose final
+    source is a segment, keyed by the winning segment; ``manual`` counts
+    explicit addresses. An address in several selections is counted once,
+    in the winning bucket (manual > segment > role) — the tallies sum to
+    ``total``.
     """
 
     total: int
     by_role: dict[str, int]
+    by_segment: dict[str, int]
     manual: int
 
 
@@ -800,6 +810,7 @@ class EmailCampaignSummary(BaseModel):
     id: int
     subject: str
     roles: list[str]
+    segments: list[str]
     status: EmailCampaignStatus
     total_recipients: int
     sent_count: int

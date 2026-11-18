@@ -37,8 +37,8 @@ import {
 } from "../lib/api";
 import { adminEmailCampaign, adminEmailCampaignPreview, adminEmailCampaigns } from "../lib/queryKeys";
 import { formatDateTime } from "../lib/utils";
-import type { EmailCampaignRecipientSummary, EmailCampaignStatus, EmailCampaignSummary } from "../types";
-import { AdminCampaignDialog } from "./AdminCampaignDialog";
+import type { EmailCampaignRecipientSummary, EmailCampaignStatus, EmailCampaignSummary, RecipientSegment } from "../types";
+import { AdminCampaignDialog, SEGMENT_OPTIONS } from "./AdminCampaignDialog";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { ColumnToggle } from "./ColumnToggle";
@@ -70,11 +70,31 @@ function statusBadge(campaign: EmailCampaignSummary): { label: string; className
 const CAMPAIGN_HEADERS: Record<string, React.ReactNode> = {
   subject: "Subject",
   roles: "Roles",
+  state_groups: "State groups",
   progress: "Progress",
   status: "Status",
   scheduled_for: "Scheduled",
   created_at: "Created",
 };
+
+/** Stored segment values → the shared full labels (", " -joined) — detail
+ * view, where the sentences have room. */
+function segmentLabels(segments: RecipientSegment[]): string {
+  return segments.map((s) => SEGMENT_OPTIONS.find((o) => o.value === s)?.label ?? s).join(", ");
+}
+
+/** Table cell: compact labels, full label on hover (", " -joined). */
+function segmentShortLabels(segments: RecipientSegment[]): React.ReactNode {
+  return segments.map((s, i) => {
+    const opt = SEGMENT_OPTIONS.find((o) => o.value === s);
+    return (
+      <span key={s}>
+        {i > 0 ? ", " : null}
+        <span title={opt?.label ?? s}>{opt?.shortLabel ?? s}</span>
+      </span>
+    );
+  });
+}
 
 /** recipient status → inline cell (failure reason shown inline). */
 function RecipientStatusCell({ recipient }: { recipient: EmailCampaignRecipientSummary }) {
@@ -131,16 +151,24 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
     },
   });
 
-  // Drafts have no recipient rows until sent — show the live blast size
-  // with the same read-only preview the compose dialog uses, keyed on the
-  // stored selection.
-  const { data: draftPreview } = useQuery({
+  // Drafts and unresolved scheduled campaigns have no recipient rows yet
+  // — show the live blast size with the same read-only preview the compose
+  // dialog uses, keyed on the stored selection. Whenever resolution is
+  // still ahead it is an estimate: the snapshot freezes when the campaign
+  // sends.
+  const { data: selectionPreview } = useQuery({
     queryKey: adminEmailCampaignPreview({
       roles: data?.campaign.roles ?? [],
+      segments: data?.campaign.segments ?? [],
       extra_emails: data?.campaign.extra_emails ?? [],
     }),
-    queryFn: () => adminPreviewEmailCampaign({ roles: data!.campaign.roles, extra_emails: data!.campaign.extra_emails }),
-    enabled: data?.campaign.status === "draft",
+    queryFn: () =>
+      adminPreviewEmailCampaign({
+        roles: data!.campaign.roles,
+        segments: data!.campaign.segments,
+        extra_emails: data!.campaign.extra_emails,
+      }),
+    enabled: data?.campaign.status === "draft" || (data?.campaign.status === "pending" && data.campaign.total_recipients === 0),
   });
 
   const cancelMutation = useMutation({
@@ -181,6 +209,9 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
   const badge = statusBadge(campaign);
   const isDraft = campaign.status === "draft";
   const isScheduled = campaign.status === "pending" && campaign.scheduled_for !== null;
+  // A scheduled campaign that the worker hasn't reached yet: no recipient
+  // rows — the selection is resolved when it becomes due.
+  const isUnresolved = campaign.status === "pending" && campaign.total_recipients === 0;
   const isActive = campaign.status === "pending" || campaign.status === "sending";
   // Same editability rule as the backend: nothing settled, not terminal.
   const isEditable =
@@ -237,11 +268,19 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
             <dd className="font-medium text-gray-800">{campaign.roles.length > 0 ? campaign.roles.join(", ") : "—"}</dd>
           </div>
           <div>
+            <dt className="text-gray-400">State groups</dt>
+            <dd className="font-medium text-gray-800">{campaign.segments.length > 0 ? segmentLabels(campaign.segments) : "—"}</dd>
+          </div>
+          <div>
             <dt className="text-gray-400">Recipients</dt>
             <dd className="font-medium text-gray-800">
-              {isDraft ? (
-                draftPreview ? (
-                  <>Will send to {draftPreview.total}</>
+              {isDraft || isUnresolved ? (
+                selectionPreview ? (
+                  isDraft ? (
+                    <>Will send to {selectionPreview.total}</>
+                  ) : (
+                    <>~{selectionPreview.total} today — finalized when it sends</>
+                  )
                 ) : (
                   "Counting…"
                 )
@@ -281,6 +320,13 @@ function CampaignDetail({ campaignId, onBack }: { campaignId: number; onBack: ()
             Recipients are finalized when the campaign is sent — the exact list of people is frozen at that moment. Use{" "}
             <strong>Send now</strong> to queue delivery, or <strong>Edit</strong> the draft first. While it is a draft it can also be
             deleted.
+          </p>
+        </Card>
+      ) : isUnresolved ? (
+        <Card className="mb-6">
+          <p className="py-4 text-sm text-gray-500">
+            Recipients are finalized when the campaign sends — the exact list of people is frozen at that moment, so state groups match who
+            is in that state then.
           </p>
         </Card>
       ) : (
@@ -409,15 +455,17 @@ export function EmailCampaignsTab() {
 
       {/* Info note */}
       <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
-        A campaign emails every account in the selected roles (plus any extra addresses you add), delivered slowly over time so it doesn't
-        look like spam. Schedule it for a later time, or save it as a draft to edit (or delete) any time before sending. Cancel any time —
-        un-sent recipients are skipped.
+        A campaign emails every account in the selected roles and state groups (plus any extra addresses you add), delivered slowly over
+        time so it doesn't look like spam. Schedule it for a later time — its recipients are finalized when it sends — or save it as a
+        draft, which won't send until you open it and send it. Cancel any time — un-sent recipients are skipped.
       </div>
 
       {/* Table */}
       {campaigns.length === 0 ? (
         <Card>
-          <p className="py-8 text-center text-gray-400">No email campaigns yet. Create one to send a batch email to selected roles.</p>
+          <p className="py-8 text-center text-gray-400">
+            No email campaigns yet. Create one to send a batch email to selected roles or state groups.
+          </p>
         </Card>
       ) : (
         <Table>
@@ -444,11 +492,20 @@ export function EmailCampaignsTab() {
                     </button>
                   </Td>
                 ),
-                roles: <Td className="text-gray-600">{campaign.roles.length > 0 ? campaign.roles.join(", ") : "manual only"}</Td>,
+                roles: (
+                  <Td className="text-gray-600">
+                    {campaign.roles.length > 0 ? campaign.roles.join(", ") : campaign.segments.length > 0 ? "—" : "manual only"}
+                  </Td>
+                ),
+                state_groups: (
+                  <Td className="text-gray-600">{campaign.segments.length > 0 ? segmentShortLabels(campaign.segments) : "—"}</Td>
+                ),
                 progress: (
                   <Td>
                     {campaign.status === "draft" ? (
                       <span className="text-sm text-gray-400">Draft</span>
+                    ) : campaign.status === "pending" && campaign.total_recipients === 0 ? (
+                      <span className="text-sm text-gray-400">At send time</span>
                     ) : (
                       <CampaignProgress sent={campaign.sent_count} failed={campaign.failed_count} total={campaign.total_recipients} />
                     )}

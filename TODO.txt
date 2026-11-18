@@ -1,4 +1,4 @@
-Add more state-aware options for email scheduling; like families that haven't submitted for review, referrers that have unreviewed families, donors with gift claims that haven't been delivered, etc.
+Add a longer delay for admin search before refresh (users page)
 Add a "send reminder" button to email invited referrers
 Make personal thank you email drafts per sponsor + track and include general donations from the other link too
 Make a way for families to upload thank you pictures / cards if they want to (which admins can forward to their donor)

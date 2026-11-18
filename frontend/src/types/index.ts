@@ -102,6 +102,7 @@ export type {
   PublicFamilySummary,
   PurchaserWishSummary,
   PurchaserWishUpdate,
+  RecipientSegment,
   ReferrerApprovalStatus,
   ReferrerDetail,
   ReferrerFamilyInviteResponse,

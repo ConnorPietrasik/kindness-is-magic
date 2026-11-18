@@ -520,14 +520,46 @@ class EmailPreference(Base):
 # ---------------------------------------------------------------------------
 
 
+class RecipientSegment(str, enum.Enum):
+    """State-aware recipient audiences a campaign can target.
+
+    Like ``UserRole`` and ``DeadlineType``, the set is defined in code —
+    admins select from it, they don't create it. Each segment is a (state
+    predicate, user mapping) resolved at send time (see
+    ``email_campaigns.SEGMENT_RESOLVERS``):
+
+    * ``families_not_submitted_for_review`` — families still at the family
+      lock with no review request pending (a referrer rejection sends the
+      family back there; an admin rejection keeps it at the referrer lock
+      until the referrer re-submits). Recipients: the families' user
+      accounts.
+    * ``referrers_families_not_submitted`` — referrers with at least one
+      family still at the family lock (not yet approved into review),
+      whether or not the family has requested it. Recipients: the
+      referrers' user accounts.
+    * ``donors_unfulfilled_gift_claims`` — accounts with an active gift
+      claim not yet fulfilled (claims can be made by any claim-capable
+      role, not only ``donor``). Recipients: the claim donor accounts.
+    """
+
+    families_not_submitted_for_review = "families_not_submitted_for_review"
+    referrers_families_not_submitted = "referrers_families_not_submitted"
+    donors_unfulfilled_gift_claims = "donors_unfulfilled_gift_claims"
+
+
 class EmailCampaignStatus(str, enum.Enum):
     """Lifecycle of an admin email campaign.
 
     * ``draft`` — saved, not yet active. Carries the raw selection
-      (``roles`` + ``extra_emails``) and no recipient rows; activation
-      resolves the recipients and flips it to ``pending``.
+      (``roles`` + ``segments`` + ``extra_emails``) and no recipient rows;
+      activation flips it to ``pending`` (resolving the recipients then,
+      or at send time for a future ``scheduled_for``).
     * ``pending`` — activated, not yet picked up by the delivery worker
-      (or picked up but not yet due — see ``scheduled_for``).
+      (or picked up but not yet due — see ``scheduled_for``). A campaign
+      with a future ``scheduled_for`` starts here unresolved (no recipient
+      rows): the worker resolves its selection at send time, completing it
+      with zero sent if nothing matches then, or canceling it if the set
+      exceeds the cap.
     * ``sending`` — the worker has started delivering recipients.
     * ``completed`` — every recipient row is processed (sent or failed).
     * ``canceled`` — an admin canceled it; its pending recipients were
@@ -543,9 +575,11 @@ class EmailCampaignStatus(str, enum.Enum):
 
 class EmailCampaignRecipientSource(str, enum.Enum):
     """How a recipient got onto a campaign: resolved from a selected role,
-    or typed in by the admin by hand."""
+    resolved from a selected state segment, or typed in by the admin by
+    hand."""
 
     role = "role"
+    segment = "segment"
     manual = "manual"
 
 
@@ -571,12 +605,15 @@ class EmailCampaign(Base):
     ``EmailCampaignRecipient``).
 
     A ``draft`` campaign carries the *raw* selection (``roles`` +
-    ``extra_emails``) with no recipient rows; activation (send/schedule)
-    resolves the recipients and freezes the snapshot — so a draft sent later
-    emails the users existing *then*, not at draft time. Once activated the
-    recipient set is frozen — role selections resolve to the users existing
-    at activation (soft-deleted users excluded), and the delivery worker
-    never re-queries roles.
+    ``segments`` + ``extra_emails``) with no recipient rows; activation
+    (send/schedule) resolves the recipients and freezes the snapshot — so a
+    draft sent later emails the users existing *then*, not at draft time.
+    A campaign with a future ``scheduled_for`` (created or activated with
+    one) carries the raw selection and stays unresolved (no rows) until
+    the worker reaches its time: the snapshot freezes at send time, so a
+    state segment matches who is in that state *then*. Once resolved the
+    recipient set is frozen (soft-deleted users excluded), and the delivery
+    worker never re-queries roles or segments.
 
     ``scheduled_for`` (NULL = send ASAP) is the earliest send time: the
     worker only picks a campaign up once it is due. No ``deleted_at`` — an
@@ -602,12 +639,17 @@ class EmailCampaign(Base):
     )
     # The selected roles — for audit display on activated campaigns (the
     # recipient rows are the truth of who was (and was not) emailed) and as
-    # the storable half of the raw selection on drafts (activation
-    # re-resolves it).
+    # the role half of the raw selection on drafts (activation re-resolves
+    # it).
     roles: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    # The manual (typed-in) addresses of the selection — the other half of
-    # the raw selection on drafts, retained after activation for audit and
-    # edit prefill (the recipient rows are the truth of who was emailed).
+    # The selected state segments (``RecipientSegment`` values) — the
+    # segment half of the raw selection, same audit/draft semantics as
+    # ``roles``.
+    segments: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # The manual (typed-in) addresses of the selection — the address half
+    # of the raw selection on drafts, retained after activation for audit
+    # and edit prefill (the recipient rows are the truth of who was
+    # emailed).
     extra_emails: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     # Earliest send time (UTC). NULL = send as soon as the worker can reach
     # the campaign. The delivery worker skips campaigns whose time has not
@@ -694,7 +736,8 @@ class DeadlineMode(str, enum.Enum):
       cutoff (01:00 Pacific the day after the due date) has passed.
 
     Reminder emails are not a deadline mode — schedule an email campaign
-    for those (it targets roles and sends at an exact time).
+    for those (it targets roles and state segments and sends at an exact
+    time).
     """
 
     display = "display"

@@ -31,7 +31,7 @@ def _admin_login(client: TestClient) -> dict:
     return login_as(client, "admin@test.com", "AdminPass123!")
 
 
-def _make_user(db: Session, email: str, role: UserRole) -> User:
+def _make_user(db: Session, email: str, role: UserRole, **kwargs) -> User:
     from app.auth import get_password_hash
 
     user = User(
@@ -39,11 +39,24 @@ def _make_user(db: Session, email: str, role: UserRole) -> User:
         hashed_password=get_password_hash("Passw0rd!abc"),
         role=role,
         display_name=None,
+        **kwargs,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
+
+
+def _make_family(db: Session, name: str, **kwargs):
+    """A family (plus its family wish) in a given review state.
+
+    Defaults to the unsubmitted state (family lock, no review request).
+    """
+    from tests.conftest import make_family
+
+    fam = make_family(db, family_name=name, family_wish="A wish", contact_name="Contact", **kwargs)
+    db.flush()
+    return fam
 
 
 def _campaigns(db: Session) -> list[EmailCampaign]:
@@ -147,6 +160,8 @@ class TestCreateCampaign:
         assert test_client.post(BASE, json={"message": "Hi", "extra_emails": ["a@example.com"], "subject": "x" * 201}).status_code == 422
         # No roles and no emails
         assert test_client.post(BASE, json={"message": "Hi"}).status_code == 422
+        # Unknown segment (the set is closed — it must 422, not be ignored)
+        assert test_client.post(BASE, json={"message": "Hi", "segments": ["not_a_segment"]}).status_code == 422
 
     def test_create_over_cap_422(self, test_client: TestClient, admin_user, db: Session, monkeypatch):
         monkeypatch.setattr("app.email_campaigns.EMAIL_CAMPAIGN_MAX_RECIPIENTS", 1)
@@ -162,6 +177,26 @@ class TestCreateCampaign:
         assert resp.status_code == 422
         assert "No recipients" in resp.json()["detail"]
 
+    def test_create_segments_201(self, test_client: TestClient, admin_user, db: Session):
+        open_fam = _make_family(db, "Open")
+        family_user = _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        _admin_login(test_client)
+
+        resp = test_client.post(BASE, json={"message": "Hi", "segments": ["families_not_submitted_for_review"]})
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["status"] == "pending"
+        assert body["roles"] == []
+        assert body["segments"] == ["families_not_submitted_for_review"]
+        assert body["total_recipients"] == 1
+
+        campaign = _campaigns(db)[0]
+        assert campaign.segments == ["families_not_submitted_for_review"]
+        rows = _recipients(db, campaign.id)
+        assert [(r.email, r.source, r.user_id) for r in rows] == [
+            ("fam1@example.com", EmailCampaignRecipientSource.segment, family_user.id)
+        ]
+
     def test_create_scheduled_201(self, test_client: TestClient, admin_user, db: Session):
         _admin_login(test_client)
         scheduled = datetime.now(timezone.utc) + timedelta(days=1)
@@ -172,14 +207,40 @@ class TestCreateCampaign:
         assert resp.status_code == 201
         body = resp.json()
         assert body["status"] == "pending"
-        assert body["total_recipients"] == 1
+        assert body["total_recipients"] == 0
         assert datetime.fromisoformat(body["scheduled_for"]) == scheduled
 
-        # Recipients are resolved at creation (the campaign is activated);
-        # the schedule only delays the worker's pickup.
+        # A scheduled campaign stores the selection and resolves nothing —
+        # the worker resolves it at send time, so the schedule delays both
+        # the first send and the snapshot.
         campaign = _campaigns(db)[0]
-        assert len(_recipients(db, campaign.id)) == 1
+        assert _recipients(db, campaign.id) == []
         assert campaign.scheduled_for == scheduled
+
+    def test_create_scheduled_segments_201_unresolved(self, test_client: TestClient, admin_user, db: Session):
+        # A segment matching users right now still creates without rows —
+        # the recipients are whoever matches when it sends.
+        open_fam = _make_family(db, "Open")
+        _make_user(db, "fam1@example.com", UserRole.family, family_id=open_fam.id)
+        _admin_login(test_client)
+        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
+
+        resp = test_client.post(
+            BASE,
+            json={
+                "message": "Hi",
+                "segments": ["families_not_submitted_for_review"],
+                "scheduled_for": scheduled.isoformat(),
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["status"] == "pending"
+        assert body["segments"] == ["families_not_submitted_for_review"]
+        assert body["total_recipients"] == 0
+
+        campaign = _campaigns(db)[0]
+        assert _recipients(db, campaign.id) == []
 
     def test_create_past_scheduled_for_422(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -223,6 +284,7 @@ class TestCreateCampaign:
         # The raw selection is stored (normalized + deduped) for later
         # activation and edit prefill.
         assert campaign.roles == ["donor"]
+        assert campaign.segments == []
         assert campaign.extra_emails == ["a@example.com", "b@example.com"]
 
     def test_create_draft_blank_subject_uses_default(self, test_client: TestClient, admin_user):
@@ -307,11 +369,7 @@ class TestUpdateCampaign:
 
     def test_update_pending_campaign_reresolves_recipients(self, test_client: TestClient, admin_user, db: Session):
         _admin_login(test_client)
-        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
-        created = test_client.post(
-            BASE,
-            json={"message": "Hi", "extra_emails": ["a@example.com", "b@example.com"], "scheduled_for": scheduled.isoformat()},
-        )
+        created = test_client.post(BASE, json={"message": "Hi", "extra_emails": ["a@example.com", "b@example.com"]})
         campaign_id = created.json()["id"]
 
         resp = test_client.patch(f"{BASE}/{campaign_id}", json={"extra_emails": ["c@example.com"]})
@@ -320,10 +378,33 @@ class TestUpdateCampaign:
         assert resp.json()["status"] == "pending"
 
         campaign = _campaigns(db)[0]
-        # The pending rows were replaced; the schedule survived the edit.
+        # The pending rows were replaced.
         rows = _recipients(db, campaign.id)
         assert [(r.email, r.status) for r in rows] == [("c@example.com", EmailCampaignRecipientStatus.pending)]
         assert campaign.total_recipients == 1
+
+    def test_update_unresolved_scheduled_stores_selection_only(self, test_client: TestClient, admin_user, db: Session):
+        _admin_login(test_client)
+        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
+        created = test_client.post(
+            BASE,
+            json={"message": "Hi", "extra_emails": ["a@example.com", "b@example.com"], "scheduled_for": scheduled.isoformat()},
+        )
+        campaign_id = created.json()["id"]
+
+        # A scheduled campaign has no rows — the edit stores the new
+        # selection only (the worker resolves it at send time); the
+        # schedule survives the edit.
+        resp = test_client.patch(f"{BASE}/{campaign_id}", json={"extra_emails": ["c@example.com"]})
+        assert resp.status_code == 200
+        assert resp.json()["total_recipients"] == 0
+        assert resp.json()["status"] == "pending"
+        assert datetime.fromisoformat(resp.json()["scheduled_for"]) == scheduled
+
+        campaign = _campaigns(db)[0]
+        assert campaign.extra_emails == ["c@example.com"]
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
         assert campaign.scheduled_for == scheduled
 
     def test_update_past_scheduled_for_422(self, test_client: TestClient, admin_user):
@@ -336,12 +417,48 @@ class TestUpdateCampaign:
         assert resp.status_code == 422
         assert "future" in resp.json()["detail"]
 
+    def test_update_replaces_segments_half(self, test_client: TestClient, admin_user, db: Session):
+        _admin_login(test_client)
+        created = test_client.post(
+            BASE,
+            json={
+                "message": "Hi",
+                "roles": ["donor"],
+                "segments": ["families_not_submitted_for_review"],
+                "save_as_draft": True,
+            },
+        )
+        campaign_id = created.json()["id"]
+
+        resp = test_client.patch(f"{BASE}/{campaign_id}", json={"segments": ["donors_unfulfilled_gift_claims"]})
+        assert resp.status_code == 200
+        assert resp.json()["segments"] == ["donors_unfulfilled_gift_claims"]
+
+        campaign = _campaigns(db)[0]
+        # Only the segment half was replaced — the other halves are kept.
+        assert campaign.roles == ["donor"]
+        assert campaign.segments == ["donors_unfulfilled_gift_claims"]
+        assert campaign.extra_emails == []
+
     def test_update_empty_selection_422(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         created = test_client.post(BASE, json={"message": "Hi", "extra_emails": ["a@example.com"], "save_as_draft": True})
         campaign_id = created.json()["id"]
 
         resp = test_client.patch(f"{BASE}/{campaign_id}", json={"roles": [], "extra_emails": []})
+        assert resp.status_code == 422
+        assert "No recipients" in resp.json()["detail"]
+
+    def test_update_empty_with_segments_422(self, test_client: TestClient, admin_user):
+        _admin_login(test_client)
+        created = test_client.post(
+            BASE,
+            json={"message": "Hi", "roles": ["donor"], "segments": ["families_not_submitted_for_review"], "save_as_draft": True},
+        )
+        campaign_id = created.json()["id"]
+
+        # Clearing every half of the selection 422s.
+        resp = test_client.patch(f"{BASE}/{campaign_id}", json={"roles": [], "segments": [], "extra_emails": []})
         assert resp.status_code == 422
         assert "No recipients" in resp.json()["detail"]
 
@@ -413,7 +530,7 @@ class TestSendCampaign:
             ("extra@example.com", EmailCampaignRecipientSource.manual, EmailCampaignRecipientStatus.pending),
         ]
 
-    def test_send_draft_honors_stored_scheduled_for(self, test_client: TestClient, admin_user, db: Session):
+    def test_send_draft_future_time_defers_resolution(self, test_client: TestClient, admin_user, db: Session):
         _admin_login(test_client)
         scheduled = datetime.now(timezone.utc) + timedelta(days=2)
         created = test_client.post(
@@ -426,7 +543,13 @@ class TestSendCampaign:
         assert resp.status_code == 200
         assert resp.json()["status"] == "pending"
         assert datetime.fromisoformat(resp.json()["scheduled_for"]) == scheduled
-        assert _campaigns(db)[0].scheduled_for == scheduled
+        assert resp.json()["total_recipients"] == 0
+        # Activated with a future time — unresolved: no rows until the
+        # worker resolves the selection at send time.
+        campaign = _campaigns(db)[0]
+        assert campaign.scheduled_for == scheduled
+        assert campaign.total_recipients == 0
+        assert _recipients(db, campaign.id) == []
 
     def test_send_non_draft_409(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
@@ -612,7 +735,31 @@ class TestPreviewCampaign:
         )
         assert resp.status_code == 200
         # donor2 via role, donor1 deduped to manual, other manual.
-        assert resp.json() == {"total": 3, "by_role": {"donor": 1}, "manual": 2}
+        assert resp.json() == {"total": 3, "by_role": {"donor": 1}, "by_segment": {}, "manual": 2}
+        # No side effects.
+        assert _campaigns(db) == []
+
+    def test_preview_counts_segments(self, test_client: TestClient, admin_user, db: Session):
+        open_fam = _make_family(db, "Open")
+        # A user in an unsubmitted family (segment match) who also has the
+        # donor role (role match) — deduped to the segment, counted once.
+        _make_user(db, "fam1@example.com", UserRole.donor, family_id=open_fam.id)
+        _make_user(db, "donor2@example.com", UserRole.donor)
+        _admin_login(test_client)
+
+        resp = test_client.post(
+            BASE + "/preview",
+            json={"roles": ["donor"], "segments": ["families_not_submitted_for_review"], "extra_emails": ["other@example.com"]},
+        )
+        assert resp.status_code == 200
+        # donor2 via role; fam1 in role+segment → the segment wins; other
+        # manual. The tallies sum to the total.
+        assert resp.json() == {
+            "total": 3,
+            "by_role": {"donor": 1},
+            "by_segment": {"families_not_submitted_for_review": 1},
+            "manual": 1,
+        }
         # No side effects.
         assert _campaigns(db) == []
 
@@ -667,6 +814,7 @@ class TestListAndDetail:
             json={
                 "message": "Hi",
                 "roles": ["donor"],
+                "segments": ["referrers_families_not_submitted"],
                 "extra_emails": ["A@Example.com", "b@example.com"],
                 "save_as_draft": True,
                 "scheduled_for": scheduled.isoformat(),
@@ -679,6 +827,7 @@ class TestListAndDetail:
         assert campaign["status"] == "draft"
         assert datetime.fromisoformat(campaign["scheduled_for"]) == scheduled
         assert campaign["roles"] == ["donor"]
+        assert campaign["segments"] == ["referrers_families_not_submitted"]
         assert campaign["extra_emails"] == ["a@example.com", "b@example.com"]
         # A draft has no recipient audit yet.
         assert body["total"] == 0
@@ -738,6 +887,26 @@ class TestCancelCampaign:
 
         rows = _recipients(db, campaign_id)
         assert all(r.status == EmailCampaignRecipientStatus.canceled for r in rows)
+
+    def test_cancel_unresolved_scheduled_settles_canceled(self, test_client: TestClient, admin_user, db: Session):
+        # A scheduled campaign has no recipient rows until it sends —
+        # canceling it before its time must show canceled, not completed.
+        _admin_login(test_client)
+        scheduled = datetime.now(timezone.utc) + timedelta(days=1)
+        created = test_client.post(
+            BASE,
+            json={"message": "Hi", "extra_emails": ["a@example.com"], "scheduled_for": scheduled.isoformat()},
+        )
+        campaign_id = created.json()["id"]
+
+        resp = test_client.post(f"{BASE}/{campaign_id}/cancel")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "canceled"
+
+        campaign = _campaigns(db)[0]
+        assert campaign.status == EmailCampaignStatus.canceled
+        assert campaign.completed_at is None
+        assert _recipients(db, campaign_id) == []
 
     def test_cancel_keeps_sent_rows_sent(self, test_client: TestClient, admin_user, db: Session):
         import asyncio

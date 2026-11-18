@@ -562,7 +562,11 @@ export function adminGetEmailCampaign(id: number, params?: AdminCampaignRecipien
  * Resolve a campaign selection to recipient counts without creating — the
  * blast size an admin sees before committing. No side effects.
  */
-export function adminPreviewEmailCampaign(data: { roles: string[]; extra_emails: string[] }): Promise<EmailCampaignPreview> {
+export function adminPreviewEmailCampaign(data: {
+  roles: string[];
+  segments: string[];
+  extra_emails: string[];
+}): Promise<EmailCampaignPreview> {
   return apiPost("/api/admin/email-campaigns/preview", data);
 }
 

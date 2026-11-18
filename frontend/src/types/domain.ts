@@ -549,16 +549,23 @@ export type EmailStatus = "sent" | "failed" | "reset";
 export type EmailCampaignStatus = "draft" | "pending" | "sending" | "completed" | "canceled";
 
 /** Mirrors backend EmailCampaignRecipientSource enum. */
-export type CampaignRecipientSource = "role" | "manual";
+export type CampaignRecipientSource = "role" | "segment" | "manual";
 
 /** Mirrors backend EmailCampaignRecipientStatus enum. */
 export type CampaignRecipientStatus = "pending" | "sent" | "failed" | "canceled";
+
+/**
+ * State-aware recipient audiences a campaign can target. Mirrors backend
+ * RecipientSegment enum (closed set — admins select from it).
+ */
+export type RecipientSegment = "families_not_submitted_for_review" | "referrers_families_not_submitted" | "donors_unfulfilled_gift_claims";
 
 /** One row of the admin campaign list. Mirrors EmailCampaignSummary. */
 export interface EmailCampaignSummary {
   id: number;
   subject: string;
   roles: UserRole[];
+  segments: RecipientSegment[];
   status: EmailCampaignStatus;
   total_recipients: number;
   sent_count: number;
@@ -610,6 +617,7 @@ export interface EmailCampaignDetailResponse {
 /** Payload for creating an email campaign. Mirrors AdminCampaignCreateRequest. */
 export interface AdminCampaignCreatePayload {
   roles: UserRole[];
+  segments: RecipientSegment[];
   extra_emails: string[];
   /** Blank ("") subjects are sent as null — the server applies its default subject. */
   subject: string | null;
@@ -630,6 +638,7 @@ export interface AdminCampaignUpdatePayload {
   subject?: string | null;
   message?: string | null;
   roles?: UserRole[];
+  segments?: RecipientSegment[];
   extra_emails?: string[];
   scheduled_for?: string | null;
 }
@@ -638,6 +647,7 @@ export interface AdminCampaignUpdatePayload {
 export interface EmailCampaignPreview {
   total: number;
   by_role: Partial<Record<UserRole, number>>;
+  by_segment: Partial<Record<RecipientSegment, number>>;
   manual: number;
 }
 

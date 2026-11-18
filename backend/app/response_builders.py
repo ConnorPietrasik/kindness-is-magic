@@ -286,6 +286,7 @@ def build_campaign_summary(
         id=campaign.id,
         subject=campaign.subject,
         roles=list(campaign.roles or []),
+        segments=list(campaign.segments or []),
         status=campaign.status,
         total_recipients=campaign.total_recipients,
         sent_count=campaign.sent_count,

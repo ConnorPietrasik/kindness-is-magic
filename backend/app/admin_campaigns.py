@@ -4,17 +4,20 @@ All endpoints are guarded with ``require_admin``.
 
 Campaigns are mutable only while nothing has settled — a draft (or a
 pending campaign with no sent/failed recipients) can be edited, and a
-draft can be sent (its recipients resolve at send time), rescheduled, or
+draft can be sent (its recipients resolve at activation), rescheduled, or
 deleted. Once delivery has started the only post-creation mutation is
 cancel; an activated campaign is an immutable audit record (it is never
-deleted).
+deleted). Drafts never send on their own — activation is a human action.
 
-The recipient set is a snapshot taken at activation/creation (see
-``email_campaigns.create_campaign`` / ``activate_campaign``); delivery is
-paced by the background worker (one recipient per cycle — see
-``email_campaigns.campaign_worker_loop``), optionally delayed by
-``scheduled_for``, so creating a campaign returns immediately with the
-full progress shape.
+The recipient set is a snapshot taken when the campaign starts (see
+``email_campaigns.create_campaign`` / ``activate_campaign``): an
+unscheduled campaign at creation or draft activation, and a campaign with
+a future ``scheduled_for`` at send time — created or activated with one,
+the worker resolves it when it becomes due. Delivery is paced by the
+background worker (one recipient per cycle — see
+``email_campaigns.campaign_worker_loop``), so creating a campaign returns
+immediately with the full progress shape (an unresolved scheduled
+campaign reports 0 recipients until then).
 
 Deliberate deviations from the admin list-endpoint convention: the campaign
 list has no pagination/``columns`` (a handful-of-rows table, like
@@ -39,7 +42,7 @@ from app.email_campaigns import (
     resolve_campaign_recipients,
     update_campaign,
 )
-from app.models import EmailCampaign, EmailCampaignRecipient, EmailCampaignStatus, User
+from app.models import EmailCampaign, EmailCampaignRecipient, EmailCampaignRecipientSource, EmailCampaignStatus, User
 from app.permissions import require_admin
 from app.rate_limit import limiter
 from app.response_builders import (
@@ -113,18 +116,24 @@ def preview_email_campaign(
 ) -> EmailCampaignPreviewResponse:
     """Resolve the selection without creating — the blast size before commit.
 
-    Same resolution as create (roles + manual dedup, soft-deletes excluded),
-    no side effects. An address in both selections counts once, as manual.
+    Same resolution as create applies at send time (roles + segments +
+    manual dedup, soft-deletes excluded), no side effects — an estimate
+    for a scheduled campaign, whose recipients are finalized when it
+    sends. An address in several selections counts once, in the winning
+    bucket (manual > segment > role).
     """
-    resolved = resolve_campaign_recipients(db, body.roles, body.extra_emails)
+    resolved = resolve_campaign_recipients(db, body.roles, body.segments, body.extra_emails)
     by_role: dict[str, int] = {}
+    by_segment: dict[str, int] = {}
     manual = 0
     for r in resolved:
-        if r["source"].value == "role" and r["role"] is not None:
+        if r["source"] == EmailCampaignRecipientSource.role and r["role"] is not None:
             by_role[r["role"]] = by_role.get(r["role"], 0) + 1
+        elif r["source"] == EmailCampaignRecipientSource.segment and r["segment"] is not None:
+            by_segment[r["segment"]] = by_segment.get(r["segment"], 0) + 1
         else:
             manual += 1
-    return EmailCampaignPreviewResponse(total=len(resolved), by_role=by_role, manual=manual)
+    return EmailCampaignPreviewResponse(total=len(resolved), by_role=by_role, by_segment=by_segment, manual=manual)
 
 
 @campaign_admin_router.post("", status_code=201)
@@ -137,11 +146,13 @@ def create_email_campaign(
 ):
     """Create an email campaign: queue it, or save it as a draft.
 
-    Activated (``save_as_draft`` false): freeze the recipient snapshot and
-    queue delivery in the background worker (one recipient per paced cycle;
-    a ``scheduled_for`` delays the first send). Draft (``save_as_draft``
-    true): store the selection without resolving — it sends nothing until
-    sent (``POST /{id}/send``). The 5/minute guard swallows accidental
+    Activated (``save_as_draft`` false): queue delivery in the background
+    worker (one recipient per paced cycle). Send ASAP: the recipient
+    snapshot is frozen at creation. A future ``scheduled_for`` delays both
+    the first send and the snapshot — the worker resolves the selection at
+    send time. Draft (``save_as_draft`` true): store the selection without
+    resolving — it sends nothing until a human sends it
+    (``POST /{id}/send``). The 5/minute guard swallows accidental
     double-submits — each create becomes many real emails.
     """
     scheduled_for = _validate_scheduled_for(body.scheduled_for)
@@ -153,6 +164,7 @@ def create_email_campaign(
                 subject=body.subject,
                 message=body.message,
                 roles=body.roles,
+                segments=body.segments,
                 extra_emails=body.extra_emails,
                 scheduled_for=scheduled_for,
             )
@@ -163,6 +175,7 @@ def create_email_campaign(
                 subject=body.subject,
                 message=body.message,
                 roles=body.roles,
+                segments=body.segments,
                 extra_emails=body.extra_emails,
                 scheduled_for=scheduled_for,
             )
@@ -286,6 +299,7 @@ def update_email_campaign(
             subject=body.subject,
             message=body.message,
             roles=body.roles,
+            segments=body.segments,
             extra_emails=body.extra_emails,
             scheduled_for=scheduled_for,
             clear_scheduled_for=clear_scheduled,
@@ -308,15 +322,16 @@ def send_email_campaign(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    """Send a draft: resolve its recipients and queue delivery.
+    """Send a draft: queue delivery.
 
-    The snapshot is frozen at send time (the stored selection is
-    re-resolved — a draft saved earlier emails the users existing now). A
-    stored future send time is honored (the worker waits for it); a past
-    one is simply due now. 409 for a non-draft — the campaign row is
-    locked, so a concurrent send of the same draft waits, re-checks, and
-    409s instead of building a second recipient snapshot (which would
-    email everyone twice); 422 when the selection resolves to nothing or
+    The stored selection is re-resolved and the snapshot freezes at the
+    send time: immediately when the draft has no send time (or a past one
+    — due now), at the stored time when it is in the future (the worker
+    resolves it then — a draft saved earlier emails the users existing
+    then). 409 for a non-draft — the campaign row is locked, so a
+    concurrent send of the same draft waits, re-checks, and 409s instead
+    of building a second recipient snapshot (which would email everyone
+    twice); 422 when an immediate send's selection resolves to nothing or
     exceeds the cap.
     """
     campaign = _campaign_for_update(db, campaign_id)
