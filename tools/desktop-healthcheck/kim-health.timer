@@ -1,0 +1,17 @@
+# Poll every 5 min. OnBootSec=1min is boot-relative, so the first slot is
+# long past by the time your session starts — Persistent=true therefore
+# fires one catch-up poll at session start (and on wake from sleep) instead
+# of waiting for the next 5-min slot.
+#
+# Runs only while your user session is active — which is all it is good for:
+# without a desktop there is no notification to show.
+[Unit]
+Description=Kindness Is Magic healthcheck timer
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

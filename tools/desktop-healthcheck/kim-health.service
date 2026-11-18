@@ -1,0 +1,20 @@
+# One poll of the live site; kim-health.timer runs this every 5 min.
+#
+# Set KIM_HOST to your PUBLIC_HOSTNAME (from the Pi's .env — the apex,
+# not www) before enabling.
+#
+# Deliberately quiet: stdout/stderr go to null and the exit code is always
+# 0 — the desktop notification is the whole interface (see healthcheck.sh).
+[Unit]
+Description=Kindness Is Magic site healthcheck (one poll, desktop notification)
+
+[Service]
+Type=oneshot
+# A user timer does not inherit the login session's environment, so point
+# notify-send at the per-user session bus explicitly (or every notification
+# fails to connect and dies silently into StandardError=null).
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+Environment=KIM_HOST=
+ExecStart=%h/.local/bin/kim-healthcheck
+StandardOutput=null
+StandardError=null

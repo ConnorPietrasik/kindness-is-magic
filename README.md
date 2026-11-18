@@ -43,6 +43,7 @@ e2e/       Playwright end-to-end tests
 docker-compose.yml      Dev stack: Traefik + Postgres + backend + frontend + zeffy-mock
 docker-compose.prod.yml Production stack (nginx + 2-worker backend + Traefik HTTPS)
 deploy/                 Production deploy scripts (CD entrypoint, server setup, SSH wrapper)
+tools/                  Local-machine helpers (desktop healthcheck notification)
 run-compose.sh          Wrapper that always runs docker compose from the repo root
 demo_import.csv         Sample CSV for the admin bulk import page
 AGENTS.md               Agent instructions (root, backend/, frontend/, e2e/)
