@@ -438,10 +438,11 @@ export default function HelpAdmin() {
                 When one message should reach many people at once — every donor, every referrer, the families that haven't submitted for
                 review, a list of addresses — use a campaign instead of composing one email at a time. <strong>+ New campaign</strong> opens
                 a dialog where you pick the roles to include, the state groups to include (accounts matching a review or sponsorship state),
-                and add any extra addresses by hand; before you commit, it counts who will be emailed. You can also pick a send time so the
-                emails go out later — the exact recipients are finalized when it sends, so a state group matches who is in that state then —
-                or <strong>Save as draft</strong>, which won't send anything until you open the draft and send it. The emails go out slowly,
-                one at a time over the following minutes, so a bulk send doesn't look like spam.
+                and add any extra addresses by hand; before you commit, it counts who will be emailed and previews the email in the app's
+                branded style. You can also pick a send time so the emails go out later — the exact recipients are finalized when it sends,
+                so a state group matches who is in that state then — or <strong>Save as draft</strong>, which won't send anything until you
+                open the draft and send it. The emails go out slowly, one at a time over the following minutes, so a bulk send doesn't look
+                like spam.
               </p>
               <p>
                 Open a campaign any time to see its message and a recipient-by-recipient record of who got it. A draft stores the people you

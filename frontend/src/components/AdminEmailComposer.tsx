@@ -33,18 +33,13 @@ import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { useToast } from "../context/ToastContext";
 import { DEFAULT_PANEL_WIDTH, getMaxPanelWidth, MIN_PANEL_WIDTH, PARKED_PANEL_WIDTH, useResizablePanel } from "../hooks/useResizablePanel";
 import { adminSendCustomEmail } from "../lib/api";
-import { splitMessageParagraphs } from "../lib/emailPreview";
+import { CUSTOM_EMAIL_DEFAULT_SUBJECT, splitMessageParagraphs } from "../lib/emailPreview";
 import { adminSentEmails } from "../lib/queryKeys";
 import { formatApiError } from "../lib/utils";
 import type { AdminSendEmailPayload } from "../types";
 import { Button } from "./Button";
 import { EmailPreviewFrame } from "./EmailPreviewFrame";
 import { FormField } from "./FormField";
-
-// COUPLING: mirrors CUSTOM_EMAIL_DEFAULT_SUBJECT in backend/app/mail.py —
-// shown as the Subject placeholder and in the preview whenever the subject is
-// blank (the server applies the same default).
-const DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨";
 
 /** Select value for the "Other…" free-text recipient option. */
 const OTHER = "other";
@@ -375,7 +370,7 @@ export function AdminEmailComposer({
                   fieldProps={{
                     value: subject,
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value),
-                    placeholder: DEFAULT_SUBJECT,
+                    placeholder: CUSTOM_EMAIL_DEFAULT_SUBJECT,
                     autoComplete: "off",
                     // Keep in sync with subject max_length on AdminSendEmailRequest (backend/app/schemas.py)
                     maxLength: 200,
@@ -407,7 +402,7 @@ export function AdminEmailComposer({
               </div>
 
               {/* Live preview — same line-break rule as the server's rendering */}
-              <EmailPreviewFrame to={trimmedRecipient || null} subject={subject.trim() || DEFAULT_SUBJECT}>
+              <EmailPreviewFrame to={trimmedRecipient || null} subject={subject.trim() || CUSTOM_EMAIL_DEFAULT_SUBJECT}>
                 {paragraphs.length > 0 ? (
                   paragraphs.map((lines, i) => (
                     <p key={i} className="mb-3">

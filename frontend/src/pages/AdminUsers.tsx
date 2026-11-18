@@ -29,6 +29,7 @@ import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
+import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useFamiliesDropdown, useReferrersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
@@ -80,16 +81,18 @@ export default function AdminUsers() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
+  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+
   // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
       roles: roleFilter || undefined,
-      search: searchQuery || undefined,
+      search: debouncedSearch || undefined,
       sort: sortField || undefined,
     }),
-    [pagination.params, apiColumns, roleFilter, searchQuery, sortField]
+    [pagination.params, apiColumns, roleFilter, debouncedSearch, sortField]
   );
 
   // CRUD manager for users
@@ -270,10 +273,7 @@ export default function AdminUsers() {
               aria-label="Search email or name"
               autoComplete="off"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                pagination.goToPage(1);
-              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             />
           </div>

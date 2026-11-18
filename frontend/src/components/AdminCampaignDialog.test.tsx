@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastContainer } from "../context/ToastContext";
@@ -193,6 +193,115 @@ describe("AdminCampaignDialog Escape", () => {
     // window-level listener must catch it.
     await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AdminCampaignDialog backdrop", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  function renderWithBackdrop() {
+    const onClose = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const utils = render(
+      <QueryClientProvider client={queryClient}>
+        <ToastContainer>
+          <AdminCampaignDialog open onClose={onClose} />
+        </ToastContainer>
+      </QueryClientProvider>
+    );
+    // The fixed backdrop is the outermost element the dialog renders.
+    const backdrop = utils.container.children[0] as HTMLElement;
+    return { onClose, backdrop };
+  }
+
+  it("stays open when a drag-selection releases on the backdrop (the reported bug)", () => {
+    const { onClose, backdrop } = renderWithBackdrop();
+
+    // After a cross-element drag the browser fires click on the common
+    // ancestor of press and release — the backdrop — so the click target
+    // check alone used to close the dialog.
+    fireEvent.pointerDown(screen.getByLabelText("Message"));
+    fireEvent.pointerUp(backdrop);
+    fireEvent.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "New email campaign" })).toBeInTheDocument();
+  });
+
+  it("stays open when a press starts on the backdrop and releases inside", () => {
+    const { onClose, backdrop } = renderWithBackdrop();
+
+    fireEvent.pointerDown(backdrop);
+    fireEvent.pointerUp(screen.getByLabelText("Message"));
+    fireEvent.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "New email campaign" })).toBeInTheDocument();
+  });
+
+  it("closes on a press that starts and ends on the backdrop", async () => {
+    const user = userEvent.setup();
+    const { onClose, backdrop } = renderWithBackdrop();
+
+    await user.click(backdrop);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AdminCampaignDialog email preview", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows the placeholder (and no To: line) until the message is typed", () => {
+    renderDialog();
+    expect(screen.getByText("Your message will appear here as you type.")).toBeInTheDocument();
+    expect(screen.queryByText(/^To: /)).not.toBeInTheDocument();
+  });
+
+  it("renders the message with the server's line-break rule (blank lines split paragraphs)", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(screen.getByLabelText("Message"), "Line one\n\nLine two");
+
+    expect(screen.getByText("Line one")).toBeInTheDocument();
+    expect(screen.getByText("Line two")).toBeInTheDocument();
+  });
+
+  it("shows the default subject and the resolved count in the preview's meta line", async () => {
+    vi.spyOn(api, "adminPreviewEmailCampaign").mockResolvedValue({
+      total: 3,
+      by_role: {},
+      by_segment: {},
+      manual: 3,
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(screen.getByLabelText("Extra email addresses (optional)"), "a@example.com\nb@example.com\nc@example.com");
+    await user.type(screen.getByLabelText("Message"), "Body");
+
+    // The meta line lands once the debounced preview resolves (blank
+    // subject → the shared default, same as the compose drawer).
+    await screen.findByText("To: 3 recipients — Subject: A message from Kindness Is Magic ✨", {}, { timeout: 2000 });
+  });
+
+  it("caps the subject and message at the backend limits, with a live counter", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    expect(screen.getByLabelText("Subject (optional)")).toHaveAttribute("maxlength", "200");
+    expect(screen.getByLabelText("Message")).toHaveAttribute("maxlength", "5000");
+    expect(screen.getByText("0/5000")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Message"), "Body");
+    expect(screen.getByText("4/5000")).toBeInTheDocument();
   });
 });
 

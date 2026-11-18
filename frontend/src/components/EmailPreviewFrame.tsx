@@ -17,8 +17,9 @@ export interface EmailPreviewFrameProps {
  * EmailPreviewFrame — branded header + white content + gray unsubscribe
  * footer, mirroring app/mail.py::_wrap_email.
  *
- * Shared by InviteEmailPreview and AdminEmailComposer so both previews show
- * the same chrome as the actual emails.
+ * Shared by InviteEmailPreview, AdminEmailComposer, and
+ * AdminCampaignDialog so all previews show the same chrome as the actual
+ * emails.
  */
 export function EmailPreviewFrame({ to, subject, children }: EmailPreviewFrameProps) {
   return (

@@ -25,23 +25,30 @@
  * campaign only offers Save changes — sending is not a save action (the
  * detail's "Send now" clears the stored time instead; clearing it in the
  * picker and saving has the same effect).
+ *
+ * The form borrows the generic compose drawer's presentation: a live
+ * preview in the branded email frame (same line-break rule as the
+ * server), the same subject/message caps (the backend enforces identical
+ * limits on both send paths), and its heading/field styling. The
+ * recipient model (roles, state groups, manual addresses), the
+ * draft/schedule/activate lifecycle, and the resolved-count preview are
+ * campaign-specific, so this stays its own modal rather than a mode of
+ * AdminEmailComposer.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "../context/ToastContext";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { adminCreateEmailCampaign, adminPreviewEmailCampaign, adminSendEmailCampaign, adminUpdateEmailCampaign } from "../lib/api";
+import { CUSTOM_EMAIL_DEFAULT_SUBJECT, splitMessageParagraphs } from "../lib/emailPreview";
 import { adminEmailCampaignPreview, adminEmailCampaigns } from "../lib/queryKeys";
 import { formatApiError, formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { AdminCampaignUpdatePayload, EmailCampaignDetail, RecipientSegment, UserRole } from "../types";
 import { Button } from "./Button";
 import { DatePicker } from "./DatePicker";
+import { EmailPreviewFrame } from "./EmailPreviewFrame";
 import { FormField } from "./FormField";
-
-/** COUPLING: mirrors CUSTOM_EMAIL_DEFAULT_SUBJECT in backend/app/mail.py —
- * shown as the Subject placeholder (the server applies the same default). */
-const DEFAULT_SUBJECT = "A message from Kindness Is Magic ✨";
 
 /** Roles offered as checkboxes, in the order shown. */
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -118,14 +125,33 @@ export interface AdminCampaignDialogProps {
 }
 
 export function AdminCampaignDialog({ open, onClose, campaign }: AdminCampaignDialogProps) {
+  // A drag that starts inside the dialog and ends on the backdrop (e.g.
+  // releasing a text selection) fires click on the backdrop — the common
+  // ancestor of the press and release — so a bare target check on the
+  // click would close the dialog. Track the gesture: close only when both
+  // the pointer-down and the pointer-up stayed on the backdrop.
+  const backdropPressRef = useRef({ down: false, up: false });
+
   if (!open) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
+    const press = backdropPressRef.current;
+    backdropPressRef.current = { down: false, up: false };
+    if (e.target === e.currentTarget && press.down && press.up) onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={handleBackdropClick} role="presentation">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+      role="presentation"
+      onPointerDown={(e) => {
+        backdropPressRef.current.down = e.target === e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        backdropPressRef.current.up = e.target === e.currentTarget;
+      }}
+      onClick={handleBackdropClick}
+    >
       {/* All hooks live in the content component (mounted only while open,
           per the ClaimModal pattern) so a conditional early return never
           changes the hook count. Closing unmounts it — the draft resets. */}
@@ -174,6 +200,12 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
     queryFn: () => adminPreviewEmailCampaign(debouncedSelection),
     enabled: hasSelection,
   });
+
+  // Live email preview (the compose drawer's shared parts): the server's
+  // line-break rule + the branded frame, with the resolved count in the
+  // frame's "To:" line once the debounced preview has counted it.
+  const paragraphs = splitMessageParagraphs(message);
+  const previewTo = preview && preview.total > 0 ? `${preview.total} recipient${preview.total === 1 ? "" : "s"}` : null;
 
   // A picked time in the past is due now — treat it as send-as-soon-as-
   // possible everywhere (create sends null; an edit clears the stored
@@ -312,124 +344,164 @@ function CampaignDialogContent({ onClose, campaign }: { onClose: () => void; cam
 
   return (
     <div
-      className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"
+      className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"
       role="dialog"
       aria-modal="true"
       aria-label={isEdit ? "Edit campaign" : "New email campaign"}
     >
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-violet-950">{isEdit ? "Edit campaign" : "New email campaign"}</h3>
-        <button type="button" onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600" aria-label="Close">
+        <h3 className="text-base font-semibold text-gray-900">{isEdit ? "Edit campaign" : "New email campaign"}</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          aria-label="Close"
+        >
           ✕
         </button>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <span className="mb-1.5 block text-sm font-medium text-gray-700">Send to roles</span>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-3">
-            {ROLE_OPTIONS.map(({ value, label }) => (
-              <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={selectedRoles.includes(value)}
-                  onChange={() => toggleRole(value)}
-                  className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start/30"
-                />
-                {label}
-              </label>
-            ))}
+      {/* Single column: form above, preview below. The two-column split
+          borrowed from the compose drawer was awkward at this dialog's
+          height (both sides scrolling), so the wider max-w-3xl just gives
+          the form and the framed preview more room. */}
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-gray-700">Send to roles</span>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-3">
+              {ROLE_OPTIONS.map(({ value, label }) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedRoles.includes(value)}
+                    onChange={() => toggleRole(value)}
+                    className="h-4 w-4 rounded border-gray-300 text-btn-start focus:ring-btn-start/30"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
+
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-gray-700">Send to state groups</span>
+            <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              {SEGMENT_OPTIONS.map(({ value, label }) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedSegments.includes(value)}
+                    onChange={() => toggleSegment(value)}
+                    className="h-4 w-4 shrink-0 rounded border-gray-300 text-btn-start focus:ring-btn-start/30"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <FormField
+            label="Extra email addresses"
+            labelSuffix="(optional)"
+            as="textarea"
+            fieldProps={{
+              value: manualEmailsText,
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setManualEmailsText(e.target.value),
+              placeholder: "One address per line, or comma-separated…",
+              rows: 3,
+              autoComplete: "off",
+            }}
+          />
+
+          <FormField
+            label="Subject"
+            labelSuffix={isEdit ? undefined : "(optional)"}
+            fieldProps={{
+              value: subject,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value),
+              placeholder: CUSTOM_EMAIL_DEFAULT_SUBJECT,
+              autoComplete: "off",
+              // Keep in sync with subject max_length on the campaign create/update requests (backend/app/schemas.py)
+              maxLength: 200,
+            }}
+          />
+
+          <div>
+            <FormField
+              label="Message"
+              as="textarea"
+              fieldProps={{
+                value: message,
+                onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value),
+                placeholder: "Plain text — blank lines start a new paragraph.",
+                rows: 8,
+                autoComplete: "off",
+                // Keep in sync with message max_length on the campaign create/update requests (backend/app/schemas.py)
+                maxLength: 5000,
+              }}
+            />
+            <p className="mt-1 text-right text-xs text-gray-400">{message.length}/5000</p>
+          </div>
+
+          <DatePicker label="Send at" isOptional value={scheduledFor || null} onChange={setScheduledFor} />
+          <p className="-mt-2 text-xs text-gray-500">Leave empty to send as soon as possible.</p>
         </div>
 
+        {/* Preview — the resolved count and the email as the recipients
+            will see it (branded frame, server's line-break rule), like
+            the generic compose drawer. */}
         <div>
-          <span className="mb-1.5 block text-sm font-medium text-gray-700">Send to state groups</span>
-          <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            {SEGMENT_OPTIONS.map(({ value, label }) => (
-              <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={selectedSegments.includes(value)}
-                  onChange={() => toggleSegment(value)}
-                  className="h-4 w-4 shrink-0 rounded border-gray-300 text-btn-start focus:ring-btn-start/30"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <FormField
-          label="Extra email addresses"
-          labelSuffix="(optional)"
-          as="textarea"
-          fieldProps={{
-            value: manualEmailsText,
-            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setManualEmailsText(e.target.value),
-            placeholder: "One address per line, or comma-separated…",
-            rows: 3,
-            autoComplete: "off",
-          }}
-        />
-
-        {/* Recipient preview — a bonus display; a failing preview is
-            ignored (the backend re-validates at creation/activation). */}
-        <div className="rounded-lg bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
-          {hasSelection ? (
-            previewError ? (
-              // Usually an invalid manual address (422) — the backend
-              // re-validates and surfaces the exact error, so this never blocks.
-              "Preview unavailable — check the extra addresses. You can still save the campaign."
-            ) : preview ? (
-              preview.total === 0 ? (
-                "No matching users — select at least one role or state group, or add an address."
+          {/* Recipient preview — a bonus display; a failing preview is
+              ignored (the backend re-validates at creation/activation). */}
+          <div className="rounded-lg bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
+            {hasSelection ? (
+              previewError ? (
+                // Usually an invalid manual address (422) — the backend
+                // re-validates and surfaces the exact error, so this never blocks.
+                "Preview unavailable — check the extra addresses. You can still save the campaign."
+              ) : preview ? (
+                preview.total === 0 ? (
+                  "No matching users — select at least one role or state group, or add an address."
+                ) : (
+                  <>
+                    Will send to <strong>{preview.total}</strong> recipient{preview.total === 1 ? "" : "s"} · {previewBreakdown(preview)}
+                  </>
+                )
               ) : (
-                <>
-                  Will send to <strong>{preview.total}</strong> recipient{preview.total === 1 ? "" : "s"} · {previewBreakdown(preview)}
-                </>
+                "Counting recipients…"
               )
             ) : (
-              "Counting recipients…"
-            )
-          ) : (
-            "Select roles, state groups, or add addresses to see how many people will be emailed."
-          )}
+              "Select roles, state groups, or add addresses to see how many people will be emailed."
+            )}
+          </div>
+
+          <EmailPreviewFrame to={previewTo} subject={subject.trim() || CUSTOM_EMAIL_DEFAULT_SUBJECT}>
+            {paragraphs.length > 0 ? (
+              paragraphs.map((lines, i) => (
+                <p key={i} className="mb-3">
+                  {lines.map((line, j) => (
+                    <Fragment key={j}>
+                      {j > 0 && <br />}
+                      {line}
+                    </Fragment>
+                  ))}
+                </p>
+              ))
+            ) : (
+              <p className="italic text-gray-400">Your message will appear here as you type.</p>
+            )}
+          </EmailPreviewFrame>
+
+          <p className="mt-4 text-xs text-gray-500">
+            {isEdit
+              ? "Recipients are finalized when the campaign is sent. You can cancel a campaign any time before it finishes — un-sent recipients are skipped."
+              : "Emails are delivered slowly over time so they don't look like spam. You can cancel a campaign any time before it finishes — un-sent recipients are skipped."}
+          </p>
         </div>
-
-        <FormField
-          label="Subject"
-          labelSuffix={isEdit ? undefined : "(optional)"}
-          fieldProps={{
-            value: subject,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value),
-            placeholder: DEFAULT_SUBJECT,
-            autoComplete: "off",
-          }}
-        />
-
-        <FormField
-          label="Message"
-          as="textarea"
-          fieldProps={{
-            value: message,
-            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value),
-            placeholder: "Plain text — blank lines start a new paragraph.",
-            rows: 6,
-            autoComplete: "off",
-          }}
-        />
-
-        <DatePicker label="Send at" isOptional value={scheduledFor || null} onChange={setScheduledFor} />
-        <p className="-mt-2 text-xs text-gray-500">Leave empty to send as soon as possible.</p>
       </div>
 
-      <p className="mt-3 text-xs text-gray-500">
-        {isEdit
-          ? "Recipients are finalized when the campaign is sent. You can cancel a campaign any time before it finishes — un-sent recipients are skipped."
-          : "Emails are delivered slowly over time so they don't look like spam. You can cancel a campaign any time before it finishes — un-sent recipients are skipped."}
-      </p>
-
-      <div className="mt-5 flex flex-wrap justify-end gap-2">
+      <div className="mt-5 flex flex-wrap justify-end gap-3">
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
