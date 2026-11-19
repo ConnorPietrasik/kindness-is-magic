@@ -58,6 +58,7 @@ describe("KIND_LABELS", () => {
   const ALL_KINDS: EmailKind[] = [
     "family_invite",
     "referrer_invite",
+    "referrer_invite_reminder",
     "password_reset",
     "family_pending",
     "family_verified",

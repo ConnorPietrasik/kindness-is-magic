@@ -279,6 +279,82 @@ test.describe("Invite and self-registration", () => {
 
     await adminContext.close();
   });
+
+  /**
+   * Remind a pending email-locked invite, through the Invite Codes page.
+   *
+   * Revoked on the way in (the same trick as the extend test: revocation
+   * stores the same state as natural expiry, so revoke → remind exercises
+   * the re-arm path, and the expiry moves past the column's
+   * minute-granularity formatting in both directions). The code stays
+   * unredeemed, so there is nothing to clean up; the SentEmail rows are
+   * permanent log records.
+   */
+  test("admin sends a reminder for a lapsed locked invite; it re-arms and lands in the email log", async ({ browser }) => {
+    const adminContext = await browser.newContext({
+      storageState: "storage/admin.json",
+    });
+    const adminPage = await adminContext.newPage();
+
+    /* ── Generate a locked invite (the generator lives on the Referrers page) ── */
+    await adminPage.goto("/admin/referrers");
+    await expect(adminPage.getByRole("heading", { name: "Manage Referrers" })).toBeVisible();
+    await adminPage.getByRole("button", { name: "Invite referrers" }).click();
+    await adminPage.getByLabel("Family Limit").fill("3");
+    await adminPage.getByLabel("Email (optional)").fill(`e2e-remind-${SUFFIX}@example.com`);
+    await adminPage.getByRole("button", { name: "Generate" }).click();
+    await expect(adminPage.getByText("Invite Code Generated")).toBeVisible({ timeout: 10_000 });
+
+    const inviteCode = (await adminPage.locator("div.font-mono.font-bold").textContent())!.trim();
+    expect(inviteCode).toMatch(/^KRI-/);
+
+    /* ── Invite Codes page (search is debounced ~1s, so wait on the row) ── */
+    await adminPage.goto("/admin/invite-codes");
+    await adminPage.getByLabel("Search by code or email").fill(inviteCode);
+
+    const row = adminPage.getByRole("row").filter({ hasText: inviteCode });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+
+    /* Column order is per-admin, so locate the expiry cell by its header. */
+    const headers = await adminPage.getByRole("columnheader").allTextContents();
+    const expiresIndex = headers.findIndex((h) => h.trim() === "Expires");
+    expect(expiresIndex).toBeGreaterThan(-1);
+    const expiryCell = row.getByRole("cell").nth(expiresIndex);
+    const expiryText = async () => (((await expiryCell.textContent()) ?? "").replace("Expired", "").trim());
+
+    const expiryLive = await expiryText();
+    await expect(row.getByText("Expired")).toHaveCount(0);
+
+    /* ── Revoke (same-state stand-in for natural expiry) ── */
+    await row.getByRole("button", { name: "Revoke" }).click();
+    await adminPage.getByRole("button", { name: "Yes, revoke" }).click();
+    await expect(row.getByText("Expired")).toBeVisible();
+    const expiryRevoked = await expiryText();
+    await expect(expiryCell).not.toHaveText(expiryLive);
+
+    /* ── Send reminder: re-arms (badge clears, expiry moves) and toasts ── */
+    await row.getByRole("button", { name: "Send reminder" }).click();
+    // Whole-string match (the toast ends with a locale-formatted expiry, so anchor both ends)
+    await expect(
+      adminPage.getByText(new RegExp(`^Reminder sent to e2e-remind-${SUFFIX}@example\\.com — invite re-armed, now expires .+$`))
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText("Expired")).toHaveCount(0);
+    await expect(expiryCell).not.toHaveText(expiryRevoked);
+
+    /* ── Sent email log: the reminder row for the invitee ──
+       The original invite email shares the recipient, so narrow to the
+       reminder kind (its label is unique to this row in the search). */
+    await adminPage.goto("/admin/emails");
+    await adminPage.getByLabel("Search by recipient email").fill(`e2e-remind-${SUFFIX}@example.com`);
+    const logRow = adminPage
+      .getByRole("row")
+      .filter({ hasText: `e2e-remind-${SUFFIX}@example.com` })
+      .filter({ hasText: "Referrer Invite Reminder" });
+    await expect(logRow).toBeVisible({ timeout: 10_000 });
+    await expect(logRow).toContainText("Sent");
+
+    await adminContext.close();
+  });
 });
 
 /**

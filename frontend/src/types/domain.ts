@@ -116,6 +116,13 @@ export interface ReferrerInviteSummary {
   referrer_approval_status: ReferrerApprovalStatus | null;
 }
 
+/** Mirrors ReferrerInviteRemindResponse: the remind action's updated summary
+ * plus the soft send-failure note (null when the reminder went out — a blocked
+ * send still applied the re-arm, so the expiry may have moved). */
+export interface ReferrerInviteRemindResponse extends ReferrerInviteSummary {
+  email_error: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Family
 // ---------------------------------------------------------------------------
@@ -524,6 +531,7 @@ export interface FamilyReviewQueueItem {
 export type EmailKind =
   | "family_invite"
   | "referrer_invite"
+  | "referrer_invite_reminder"
   | "password_reset"
   | "family_pending"
   | "family_verified"

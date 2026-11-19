@@ -6,17 +6,19 @@ All endpoints are guarded with ``require_admin``.
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import or_ as sql_or
 from sqlalchemy.orm import Session
 
 from app.auth import INVITE_EXPIRY_HOURS
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
-from app.models import Referrer, ReferrerInviteToken, User
+from app.mail import build_invite_reminder_email, send_email
+from app.models import EmailKind, Referrer, ReferrerInviteToken, User
 from app.permissions import require_admin
+from app.rate_limit import limiter
 from app.response_builders import get_or_404
-from app.schemas import InviteListResponse, ReferrerInviteSummary
+from app.schemas import InviteListResponse, ReferrerInviteRemindResponse, ReferrerInviteSummary
 from app.search_sort import INVITE_SORT_FIELDS, build_sort_clause, escape_like
 
 logger = logging.getLogger(__name__)
@@ -214,3 +216,70 @@ def extend_invite(
     logger.info("Admin extended invite %s (id=%s)", invite.code, invite_id)
     admin_map, referrer_map = _resolve_invite_relations(invite, db)
     return _build_invite_summary(invite, admin_map, referrer_map)
+
+
+@invite_admin_router.post("/{invite_id}/remind", status_code=200)
+@limiter.limit("5/minute")
+async def remind_invite(
+    request: Request,
+    invite_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> ReferrerInviteRemindResponse:
+    """Remind a pending email-locked invitee: re-arm a lapsed code, then re-send the invite email.
+
+    Only meaningful for an unredeemed token with a ``locked_email`` — that
+    address is the recipient, and the code + Get Started link are the point
+    (400 otherwise). A lapsed or revoked invite is re-armed to the full
+    window first (the same rule as extend) so the link the reminder carries
+    is live; a still-valid invite keeps its existing expiry. The re-arm
+    commits before the send — a registration that follows the email must
+    see the new expiry, not the lapsed one.
+
+    The send goes through the shared ``send_email`` path (unsubscribe gate,
+    sent-email log, kind ``referrer_invite_reminder``) and never raises:
+    a blocked send returns 200 with ``email_error`` (the re-arm still
+    applied), mirroring the create flow's soft-failure convention. The
+    5/minute guard is for accidental double-clicks — each call is a real
+    email.
+    """
+    invite = get_or_404(db, ReferrerInviteToken, invite_id, "Invite not found")
+
+    if invite.redeemed_by_user_id is not None:
+        raise HTTPException(status_code=400, detail="This invite has already been used and can't be reminded")
+    if invite.locked_email is None:
+        raise HTTPException(status_code=400, detail="This invite has no locked email address to remind")
+
+    now = datetime.now(timezone.utc)
+    re_armed = invite.expires_at < now
+    if re_armed:
+        invite.expires_at = now + timedelta(hours=INVITE_EXPIRY_HOURS)
+        db.commit()
+        db.refresh(invite)
+
+    html_body = build_invite_reminder_email(
+        code=invite.code,
+        family_limit=invite.family_limit,
+        expires_at=invite.expires_at,
+        email=invite.locked_email,
+    )
+    result = await send_email(
+        to=invite.locked_email,
+        subject="Reminder: you're invited to join Kindness Is Magic",
+        html_body=html_body,
+        db=db,
+        kind=EmailKind.referrer_invite_reminder,
+        user_id=admin.id,
+    )
+    email_error: str | None = None
+    if not result["sent"]:
+        if result["reason"] == "unsubscribed":
+            email_error = "Email not sent (recipient unsubscribed)."
+        else:
+            email_error = "Email not sent (SMTP error)."
+
+    # No email address in the log — PII rule; the code identifies the invite.
+    logger.info("Admin reminded pending invite %s (id=%s, re_armed=%s)", invite.code, invite_id, re_armed)
+    admin_map, referrer_map = _resolve_invite_relations(invite, db)
+    summary = _build_invite_summary(invite, admin_map, referrer_map)
+    return ReferrerInviteRemindResponse(**summary.model_dump(), email_error=email_error)

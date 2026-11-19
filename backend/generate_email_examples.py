@@ -25,6 +25,7 @@ from app.mail import (
     build_family_rejected_email,
     build_family_verified_email,
     build_invite_email,
+    build_invite_reminder_email,
     build_password_reset_email,
     build_payment_confirmed_email,
     build_payment_email_failure_notice,
@@ -65,13 +66,26 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "03-password-reset.html",
+        # The reminder counterpart to the locked invite above: same code,
+        # limit, and recipient — only the reminder prose differs.
+        "filename": "03-referrer-invite-reminder.html",
+        "label": "Referrer Invite Reminder",
+        "body": build_invite_reminder_email(
+            code="KRI-XYZ98GHI",
+            family_limit=3,
+            expires_at=datetime(2025, 8, 1, 9, 30),
+            email="locked@example.com",
+        ),
+        "unsubscribe": True,
+    },
+    {
+        "filename": "04-password-reset.html",
         "label": "Password Reset",
         "body": build_password_reset_email(reset_link="https://kindnessismagic.love/reset-password?token=eyJhbGciOiJIUzI1NiJ9.example"),
         "unsubscribe": False,  # exempt from unsubscribe
     },
     {
-        "filename": "04-family-pending.html",
+        "filename": "05-family-pending.html",
         "label": "Family Pending Verification (to referrer)",
         "body": build_family_pending_email(
             family_name="The Rodriguez Family",
@@ -80,7 +94,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "05-family-verified.html",
+        "filename": "06-family-verified.html",
         "label": "Family Verified (to family)",
         "body": build_family_verified_email(
             family_name="The Rodriguez Family",
@@ -89,7 +103,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "06-family-rejected.html",
+        "filename": "07-family-rejected.html",
         "label": "Family Rejected (to family)",
         "body": build_family_rejected_email(
             family_name="The Rodriguez Family",
@@ -98,7 +112,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "07-family-invite.html",
+        "filename": "08-family-invite.html",
         "label": "Family Invite (from referrer)",
         "body": build_family_invite_email(
             code="KFI-JKL34MNO",
@@ -108,7 +122,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "08-referrer-approved.html",
+        "filename": "09-referrer-approved.html",
         "label": "Referrer Approved",
         "body": build_referrer_approved_email(
             referrer_name="David Park",
@@ -116,7 +130,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "09-referrer-rejected.html",
+        "filename": "10-referrer-rejected.html",
         "label": "Referrer Rejected",
         "body": build_referrer_rejected_email(
             referrer_name="David Park",
@@ -124,7 +138,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "10-claim-confirmation.html",
+        "filename": "11-claim-confirmation.html",
         "label": "Donor Claim Confirmation",
         "body": build_claim_confirmation_email(
             donor_name="Alex Thompson",
@@ -163,7 +177,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "11-admin-email-failure.html",
+        "filename": "12-admin-email-failure.html",
         "label": "Admin Email Failure Notice",
         "body": build_admin_email_failure_notice(
             donor_email="alex.thompson@example.com",
@@ -176,7 +190,7 @@ EXAMPLES = [
     # Payment-flow emails share a two-family cart (one with the groceries
     # add-on) so the line table, totals row, and plural copy are all visible.
     {
-        "filename": "12-payment-request.html",
+        "filename": "13-payment-request.html",
         "label": "Payment Request (please-pay nudge)",
         "body": build_payment_request_email(
             donor_name="Alex Thompson",
@@ -191,7 +205,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "13-payment-confirmed.html",
+        "filename": "14-payment-confirmed.html",
         "label": "Payment Confirmed (off by default — Zeffy sends its own receipt)",
         "body": build_payment_confirmed_email(
             donor_name="Alex Thompson",
@@ -204,7 +218,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "14-payment-expired.html",
+        "filename": "15-payment-expired.html",
         "label": "Payment Expired (window closed)",
         "body": build_payment_expired_email(
             donor_name="Alex Thompson",
@@ -216,7 +230,7 @@ EXAMPLES = [
         "unsubscribe": True,
     },
     {
-        "filename": "15-admin-payment-failure.html",
+        "filename": "16-admin-payment-failure.html",
         "label": "Admin Payment Email Failure Notice",
         "body": build_payment_email_failure_notice(
             donor_email="alex.thompson@example.com",

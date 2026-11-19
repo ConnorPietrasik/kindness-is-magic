@@ -440,6 +440,9 @@ class EmailKind(str, enum.Enum):
 
     family_invite = "family_invite"
     referrer_invite = "referrer_invite"
+    # Re-send of an email-locked referrer invite that hasn't been redeemed
+    # yet (the "send reminder" action — see admin_invites.remind_invite).
+    referrer_invite_reminder = "referrer_invite_reminder"
     password_reset = "password_reset"
     family_pending = "family_pending"
     family_verified = "family_verified"

@@ -32,6 +32,7 @@ import { Table, TableBody, TableHead, Td, Tr } from "./Table";
 export const KIND_LABELS: Record<EmailKind, string> = {
   family_invite: "Family Invite",
   referrer_invite: "Referrer Invite",
+  referrer_invite_reminder: "Referrer Invite Reminder",
   password_reset: "Password Reset",
   family_pending: "Family Pending Verification",
   family_verified: "Family Verified",

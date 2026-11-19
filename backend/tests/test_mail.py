@@ -388,6 +388,57 @@ class TestEmailTemplates:
         )
         assert "\n\n" not in html
 
+    def test_invite_reminder_email_contains_code_and_expiry(self):
+        from app.mail import build_invite_reminder_email
+
+        html = build_invite_reminder_email(
+            code="KMG-RMD001",
+            family_limit=5,
+            expires_at=datetime(2026, 6, 15, 9, 30, tzinfo=timezone.utc),
+            email="ref@example.com",
+        )
+        assert "KMG-RMD001" in html
+        assert "June 15, 2026" in html
+        assert "Get Started" in html
+
+    def test_invite_reminder_email_link_contains_code_and_email(self):
+        """The Get Started link re-opens registration with code+email, like the original invite."""
+        from app.mail import build_invite_reminder_email
+
+        html = build_invite_reminder_email(
+            code="KMG-RMD002",
+            family_limit=10,
+            expires_at=datetime(2026, 12, 25, 12, 0, tzinfo=timezone.utc),
+            email="test@example.com",
+        )
+        assert "register-referrer?code=KMG-RMD002&email=test%40example.com" in html
+
+    def test_invite_reminder_email_reads_as_reminder_not_invite(self):
+        """Reminder prose, no inviter name, no custom-message slot — the original invite carried both."""
+        from app.mail import build_invite_reminder_email
+
+        html = build_invite_reminder_email(
+            code="KMG-RMD003",
+            family_limit=3,
+            expires_at=datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
+            email="ref@example.com",
+        )
+        assert "haven't registered yet" in html
+        assert "invited by" not in html
+        # The original invite's default prose is not repeated
+        assert "Thank you for being part of something wonderful" not in html
+
+    def test_invite_reminder_email_singular_family(self):
+        from app.mail import build_invite_reminder_email
+
+        html = build_invite_reminder_email(
+            code="KMG-RMD004",
+            family_limit=1,
+            expires_at=datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
+        )
+        assert "<strong>1</strong> family." in html
+        assert "families" not in html
+
     def test_family_invite_email_contains_code_and_name(self):
         from app.mail import build_family_invite_email
 

@@ -554,6 +554,17 @@ class ReferrerInviteSummary(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ReferrerInviteRemindResponse(ReferrerInviteSummary):
+    """Remind response: the updated summary plus the soft send-failure note.
+
+    ``email_error`` is null when the reminder went out; set when the send
+    was blocked (unsubscribed / SMTP) — the re-arm still applied, mirroring
+    the create flow's soft-failure convention (``ReferrerInviteResponse``).
+    """
+
+    email_error: str | None = None
+
+
 class InviteListResponse(BaseModel):
     invites: list[ReferrerInviteSummary]
     total: int = 0

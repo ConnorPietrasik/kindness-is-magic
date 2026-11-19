@@ -403,7 +403,9 @@ export default function HelpAdmin() {
               </p>
               <p>
                 Use the checkboxes to see redeemed, unredeemed, or expired codes. <strong>Extend</strong> re-arms a lapsed or revoked code
-                with the same code text, and <strong>Revoke</strong> expires a code immediately.
+                with the same code text, and <strong>Revoke</strong> expires a code immediately. For a locked code,{" "}
+                <strong>Send reminder</strong> re-arms it if it has lapsed and re-sends the invite email (code and Get Started link) to its
+                locked address.
               </p>
             </>
           ),

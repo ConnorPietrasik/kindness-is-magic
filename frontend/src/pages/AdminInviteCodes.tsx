@@ -1,10 +1,10 @@
 /**
  * Admin — Invite Codes Management
  *
- * List, filter, revoke, extend invite codes. New codes are generated from the
- * Referrers page (InviteGenerator).
- * Uses useCrudManager for list query and revoke mutation; extend is a
- * standalone mutation (non-destructive, no confirm dialog).
+ * List, filter, revoke, extend, and remind invite codes. New codes are
+ * generated from the Referrers page (InviteGenerator).
+ * Uses useCrudManager for list query and revoke mutation; extend and remind
+ * are standalone mutations (non-destructive, no confirm dialog).
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,7 +28,7 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminExtendInvite, adminListInvites, adminRevokeInvite } from "../lib/api";
+import { adminExtendInvite, adminListInvites, adminRemindInvite, adminRevokeInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
 import { formatDateTime, isExpiredInvite } from "../lib/utils";
 import type { InviteListParams } from "../types";
@@ -93,6 +93,27 @@ export default function AdminInviteCodes() {
     },
   });
 
+  // Standalone mutation (like extend): re-arms a lapsed locked code if needed
+  // and re-sends the invite email to its locked address. A blocked send is a
+  // soft failure — a successful response with `email_error` (the re-arm still
+  // applied), surfaced as an info toast like the generator's email_error.
+  const remindMut = useMutation({
+    mutationFn: ({ id }: { id: number; previousExpiry: string }) => adminRemindInvite(id),
+    onSuccess: (data, vars) => {
+      void queryClient.invalidateQueries({ queryKey: adminInvites });
+      if (data.email_error) {
+        toast.info(data.email_error);
+        return;
+      }
+      const re_armed = data.expires_at !== vars.previousExpiry;
+      toast.success(
+        re_armed
+          ? `Reminder sent to ${data.locked_email} — invite re-armed, now expires ${formatDateTime(data.expires_at)}`
+          : `Reminder sent to ${data.locked_email}`
+      );
+    },
+  });
+
   const pageInfo = useMemo(
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
@@ -139,7 +160,8 @@ export default function AdminInviteCodes() {
         {/* Info note */}
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
           Email-locked codes are auto-approved when redeemed. Unlocked codes require manual approval. Extend re-arms an unredeemed code —
-          lapsed or revoked — with the code unchanged, but the expiry date in the invitee's email is not resent.
+          lapsed or revoked — with the code unchanged, but the expiry date in the invitee's email is not resent. Send reminder re-arms a
+          lapsed locked code (if needed) and re-sends the invite email — code and Get Started link — to its locked address.
         </div>
 
         {/* Filters */}
@@ -252,12 +274,23 @@ export default function AdminInviteCodes() {
                     <Td>
                       {!invite.redeemed && (
                         <div className="flex items-center gap-2">
+                          {invite.locked_email && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => remindMut.mutate({ id: invite.id, previousExpiry: invite.expires_at })}
+                              disabled={remindMut.isPending || revokeMut.isPending || extendMut.isPending}
+                            >
+                              Send reminder
+                            </Button>
+                          )}
                           <Button
                             variant="secondary"
                             size="sm"
                             className="px-3 py-1.5 text-xs"
                             onClick={() => extendMut.mutate(invite.id)}
-                            disabled={extendMut.isPending || revokeMut.isPending}
+                            disabled={extendMut.isPending || revokeMut.isPending || remindMut.isPending}
                           >
                             Extend
                           </Button>
@@ -266,7 +299,7 @@ export default function AdminInviteCodes() {
                             size="sm"
                             className="px-3 py-1.5 text-xs"
                             onClick={() => setRevokeConfirm(invite.id)}
-                            disabled={revokeMut.isPending || extendMut.isPending}
+                            disabled={revokeMut.isPending || extendMut.isPending || remindMut.isPending}
                           >
                             Revoke
                           </Button>
@@ -309,7 +342,7 @@ export default function AdminInviteCodes() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[revokeMut, extendMut]} />
+        <MutationErrors mutations={[revokeMut, extendMut, remindMut]} />
       </main>
     </div>
   );

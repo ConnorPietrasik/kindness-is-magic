@@ -108,6 +108,7 @@ export type {
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteEmailItem,
+  ReferrerInviteRemindResponse,
   ReferrerInviteResponse,
   ReferrerInviteSummary,
   ReferrerPayload,

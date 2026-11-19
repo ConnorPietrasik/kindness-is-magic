@@ -77,6 +77,7 @@ import type {
   ReferrerFamilyInviteResponse,
   ReferrerInviteCreatePayload,
   ReferrerInviteEmailItem,
+  ReferrerInviteRemindResponse,
   ReferrerInviteResponse,
   ReferrerInviteSummary,
   ReferrerListResponse,
@@ -503,6 +504,16 @@ export function adminRevokeInvite(id: number): Promise<ReferrerInviteSummary> {
  */
 export function adminExtendInvite(id: number): Promise<ReferrerInviteSummary> {
   return apiPost(`/api/admin/invites/${id}/extend`);
+}
+
+/**
+ * Remind a pending email-locked invitee: re-arms a lapsed code (if needed)
+ * and re-sends the invite email — code, Get Started link, expiry — to the
+ * locked address. Soft-failure like invite creation: a blocked send (unsubscribed
+ * / SMTP) resolves with `email_error` set; the re-arm still applied.
+ */
+export function adminRemindInvite(id: number): Promise<ReferrerInviteRemindResponse> {
+  return apiPost(`/api/admin/invites/${id}/remind`);
 }
 
 // ---------------------------------------------------------------------------

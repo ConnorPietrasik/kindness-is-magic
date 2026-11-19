@@ -313,6 +313,29 @@ def build_invite_email(
 <p style="margin-top:16px;">Thank you for being part of something wonderful. Together, we can make kindness magical.</p>"""
 
 
+def build_invite_reminder_email(
+    code: str,
+    family_limit: int,
+    expires_at: datetime,
+    email: str | None = None,
+) -> str:
+    """Build the HTML body for a referrer invite reminder email.
+
+    Reminder variant of ``build_invite_email`` for an email-locked invite
+    that hasn't been redeemed yet: reminder prose (no inviter name — the
+    original invite already said who invited them — and no custom message)
+    plus the same functional block, so the Get Started link re-opens
+    registration with the code and locked email. The expiry shown is the
+    one the endpoint passed in, i.e. the re-armed window when the invite
+    had lapsed.
+    """
+    family_word = "family" if family_limit == 1 else "families"
+    return f"""<p>You've been invited to help make a difference with <strong>Kindness Is Magic</strong> ✨, but you haven't registered yet.</p>
+<p>We wanted to make sure you didn't miss it. As a referrer, you'll be able to connect up to <strong>{family_limit}</strong> {family_word}. They deserve the kindness they need most. Here's your unique invite code again:</p>
+{_invite_email_functional_block(code, expires_at, email, "")}
+<p style="margin-top:16px;">If you've already registered, or no longer wish to join, this email is safe to ignore.</p>"""
+
+
 def build_password_reset_email(reset_link: str) -> str:
     """Build the HTML body for a password reset email."""
     return f"""<p>We received a request to reset your password for <strong>Kindness Is Magic</strong>.</p>

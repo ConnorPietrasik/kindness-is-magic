@@ -38,13 +38,14 @@ def _create_locked_invite(client: TestClient, email: str = "locked@test.com") ->
     return resp.json()["code"]
 
 
-def _create_expired_invite(db: Session, admin_user, code: str):
+def _create_expired_invite(db: Session, admin_user, code: str, locked_email: str | None = None):
     """Seed an expired, unredeemed invite token directly and return it."""
     from app.models import ReferrerInviteToken
 
     token = ReferrerInviteToken(
         code=code,
         family_limit=5,
+        locked_email=locked_email,
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
         created_by_admin_id=admin_user.id,
     )
@@ -1071,3 +1072,192 @@ class TestAdminInviteCRUD:
         resp = test_client.post(f"/api/admin/invites/{live_token.id}/revoke")
         assert resp.status_code == 400
         assert resp.json()["detail"] == "This invite has already been used and can't be revoked"
+
+
+# ---------------------------------------------------------------------------
+# TestAdminInviteRemind
+# ---------------------------------------------------------------------------
+
+
+class TestAdminInviteRemind:
+    """Admin invite remind endpoint (re-send for pending email-locked invites)."""
+
+    def test_remind_locked_invite_keeps_expiry_and_sends(self, test_client: TestClient, admin_user, db: Session):
+        """A still-valid locked invite: expiry unchanged, reminder sent to the locked email."""
+        from unittest.mock import patch
+
+        from app.models import EmailKind, ReferrerInviteToken
+
+        code = _create_locked_invite(test_client, "remind@test.com")
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+        original_expiry = token.expires_at
+
+        _admin_login(test_client)
+        captured: dict = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured.update(_kw)
+            return {"sent": True, "reason": None}
+
+        with patch("app.admin_invites.send_email", side_effect=fake_send_email):
+            resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == code
+        assert body["redeemed"] is False
+        assert body["email_error"] is None
+        assert captured["to"] == "remind@test.com"
+        assert captured["kind"] is EmailKind.referrer_invite_reminder
+
+        db.refresh(token)
+        assert token.expires_at == original_expiry
+
+    def test_remind_lapsed_invite_re_arms_then_sends(self, test_client: TestClient, admin_user, db: Session):
+        """A lapsed locked invite is re-armed first, and the email shows the new expiry."""
+        from unittest.mock import patch
+
+        from app.auth import INVITE_EXPIRY_HOURS
+
+        token = _create_expired_invite(db, admin_user, code="KRI-RMDLP1", locked_email="lapsed@test.com")
+        original_expiry = token.expires_at
+
+        _admin_login(test_client)
+        captured: dict = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured.update(_kw)
+            return {"sent": True, "reason": None}
+
+        with patch("app.admin_invites.send_email", side_effect=fake_send_email):
+            resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+
+        assert resp.status_code == 200
+        assert resp.json()["email_error"] is None
+
+        db.refresh(token)
+        # Re-anchored at now + the configured window (tolerance for clock skew)
+        now = datetime.now(timezone.utc)
+        assert token.expires_at > original_expiry
+        delta = token.expires_at - now
+        assert timedelta(hours=INVITE_EXPIRY_HOURS - 1) < delta <= timedelta(hours=INVITE_EXPIRY_HOURS)
+        # The email carries the re-armed expiry, not the lapsed one
+        assert token.expires_at.strftime("%B %d, %Y") in captured["html_body"]
+        assert original_expiry.strftime("%B %d, %Y") not in captured["html_body"]
+
+    def test_remind_email_carries_code_and_register_link(self, test_client: TestClient, admin_user, db: Session):
+        """The reminder (real template) re-opens registration with code+email."""
+        from unittest.mock import patch
+
+        from app.models import ReferrerInviteToken
+
+        code = _create_locked_invite(test_client, "link@test.com")
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+
+        _admin_login(test_client)
+        captured: dict = {}
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            captured.update(_kw)
+            return {"sent": True, "reason": None}
+
+        with patch("app.admin_invites.send_email", side_effect=fake_send_email):
+            resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+
+        assert resp.status_code == 200
+        assert captured["subject"] == "Reminder: you're invited to join Kindness Is Magic"
+        assert f"register-referrer?code={code}&email=link%40test.com" in captured["html_body"]
+
+    def test_remind_redeemed_invite_400(self, test_client: TestClient, admin_user, db: Session):
+        """A redeemed token is refused, with its expiry left alone."""
+        from app.models import ReferrerInviteToken
+
+        code = _create_locked_invite(test_client, "redeemed_remind@test.com")
+        registered = _register_referrer(test_client, code, "redeemed_remind@test.com", name="Redeemed Remind Ref", phone="555-777-7781")
+        assert registered.status_code == 201
+
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+        original_expiry = token.expires_at
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "This invite has already been used and can't be reminded"
+
+        db.refresh(token)
+        assert token.expires_at == original_expiry
+
+    def test_remind_unlocked_invite_400(self, test_client: TestClient, admin_user, db: Session):
+        """A token without a locked email has nowhere to send — 400."""
+        from app.models import ReferrerInviteToken
+
+        code = _create_unlocked_invite(test_client)
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+        assert resp.status_code == 400
+        assert "no locked email" in resp.json()["detail"].lower()
+
+    def test_remind_nonexistent_invite(self, test_client: TestClient, admin_user):
+        """Reminding a non-existent invite returns 404."""
+        _admin_login(test_client)
+        resp = test_client.post("/api/admin/invites/99999/remind")
+        assert resp.status_code == 404
+
+    def test_remind_unsubscribed_returns_email_error(self, test_client: TestClient, admin_user, db: Session):
+        """Unsubscribed recipient: 200 with email_error (shared send gate)."""
+        from app.models import EmailPreference, ReferrerInviteToken
+
+        db.add(EmailPreference(email="unsub_remind@test.com", unsubscribed_at=datetime.now(timezone.utc)))
+        db.commit()
+
+        code = _create_locked_invite(test_client, "unsub_remind@test.com")
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["email_error"] is not None
+        assert "unsubscribed" in body["email_error"].lower()
+
+    def test_remind_smtp_failure_returns_email_error(self, test_client: TestClient, admin_user, db: Session):
+        """SMTP failure: 200 with email_error (the invite row is untouched)."""
+        from unittest.mock import patch
+
+        from app.models import ReferrerInviteToken
+
+        code = _create_locked_invite(test_client, "smtp_remind@test.com")
+        token = db.query(ReferrerInviteToken).filter_by(code=code).first()
+        original_expiry = token.expires_at
+
+        _admin_login(test_client)
+
+        def fake_send_email(*_args, **_kw):  # noqa: ANN002, ANN003
+            return {"sent": False, "reason": "smtp_error"}
+
+        with patch("app.admin_invites.send_email", side_effect=fake_send_email):
+            resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["email_error"] is not None
+        assert "SMTP error" in body["email_error"]
+
+        db.refresh(token)
+        assert token.expires_at == original_expiry
+
+    def test_remind_requires_admin(self, test_client: TestClient, admin_user, db: Session, referrer_user, family_user):
+        """Unauthenticated 401; referrer/family 403."""
+        # Seeded directly (no client login) so the first post is unauthenticated.
+        token = _create_expired_invite(db, admin_user, code="KRI-RMDNAP", locked_email="noperm_remind@test.com")
+
+        resp = test_client.post(f"/api/admin/invites/{token.id}/remind")
+        assert resp.status_code == 401
+
+        login_as(test_client, "referrer@test.com", "RefPass1234!")
+        assert test_client.post(f"/api/admin/invites/{token.id}/remind").status_code == 403
+
+        login_as(test_client, "family@test.com", "FamPass1234!")
+        assert test_client.post(f"/api/admin/invites/{token.id}/remind").status_code == 403
