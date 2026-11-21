@@ -294,6 +294,100 @@ class TestValidateConfiguredCampaign:
             zeffy.validate_configured_campaign()
         assert len(requests) == 2  # each call retried the lookup
 
+    def test_general_campaign_typo_does_not_affect_dedicated_validation(self, monkeypatch: pytest.MonkeyPatch):
+        """Checkout's gate: a typo'd general campaign must not fail it —
+        the optional general id is only validated on the sync paths
+        (validate_sync_campaigns)."""
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general-typo")
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            if req.url.path == "/api/v1/campaigns/c-general-typo":
+                return httpx.Response(404, json={"error": {"code": "resource_not_found", "message": "nope"}})
+            return httpx.Response(
+                200, json={"id": "c-dedicated", "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+            )
+
+        requests = _install_transport(monkeypatch, handler)
+        campaign = zeffy.validate_configured_campaign()
+        assert campaign.id == "c-dedicated"
+        assert [r.url.path for r in requests] == ["/api/v1/campaigns/c-dedicated"]  # general never fetched
+
+
+# ---------------------------------------------------------------------------
+# Sync-path campaign validation (dedicated + optional general)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSyncCampaigns:
+    """The sync paths' gate: validates the dedicated campaign and the
+    general-donation campaign (when set) — where a typo in the optional
+    general one is supposed to fail loudly (the donor checkout never does)."""
+
+    def _campaign_raw(self, cid: str) -> dict:
+        return {"id": cid, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
+
+    def test_no_key_raises(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        requests = _install_transport(monkeypatch, lambda req: httpx.Response(200, json={}))
+        with pytest.raises(zeffy.ZeffyNotConfiguredError):
+            zeffy.validate_sync_campaigns()
+        assert requests == []
+
+    def test_no_campaigns_configured_no_ops(self, monkeypatch: pytest.MonkeyPatch):
+        """Unconfigured dev/e2e default: nothing to validate, nothing fetched."""
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        requests = _install_transport(monkeypatch, lambda req: httpx.Response(200, json={}))
+        assert zeffy.validate_sync_campaigns() == []
+        assert requests == []
+
+    def test_validates_both_campaigns_in_walk_order(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general")
+        requests = _install_transport(monkeypatch, lambda req: httpx.Response(200, json=self._campaign_raw(req.url.path.rsplit("/", 1)[1])))
+        campaigns = zeffy.validate_sync_campaigns()
+        assert [c.id for c in campaigns] == ["c-dedicated", "c-general"]
+        assert [r.url.path for r in requests] == ["/api/v1/campaigns/c-dedicated", "/api/v1/campaigns/c-general"]
+
+    def test_repeated_id_counts_as_one_campaign(self, monkeypatch: pytest.MonkeyPatch):
+        """A general id equal to the dedicated one is a misconfig that walks once."""
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-same")
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-same")
+        requests = _install_transport(monkeypatch, lambda req: httpx.Response(200, json=self._campaign_raw("c-same")))
+        campaigns = zeffy.validate_sync_campaigns()
+        assert [c.id for c in campaigns] == ["c-same"]
+        assert len(requests) == 1
+
+    def test_general_typo_fails_naming_its_setting(self, monkeypatch: pytest.MonkeyPatch):
+        """The typo's consequence: a 404 naming ZEFFY_GENERAL_CAMPAIGN_ID
+        (the dedicated campaign passed first, and is cached)."""
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general-typo")
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            if req.url.path == "/api/v1/campaigns/c-general-typo":
+                return httpx.Response(404, json={"error": {"code": "resource_not_found", "message": "nope"}})
+            return httpx.Response(200, json=self._campaign_raw("c-dedicated"))
+
+        _install_transport(monkeypatch, handler)
+        with pytest.raises(zeffy.ZeffyCampaignNotFoundError, match="ZEFFY_GENERAL_CAMPAIGN_ID"):
+            zeffy.validate_sync_campaigns()
+
+    def test_success_shared_with_dedicated_validation_cache(self, monkeypatch: pytest.MonkeyPatch):
+        """One GET per campaign id per process: the checkout gate's cached
+        success serves the sync's dedicated lookup."""
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "k")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general")
+        requests = _install_transport(monkeypatch, lambda req: httpx.Response(200, json=self._campaign_raw(req.url.path.rsplit("/", 1)[1])))
+        zeffy.validate_configured_campaign()
+        zeffy.validate_sync_campaigns()
+        assert [r.url.path for r in requests] == ["/api/v1/campaigns/c-dedicated", "/api/v1/campaigns/c-general"]
+
 
 # ---------------------------------------------------------------------------
 # find_cart_payment — reconciliation rule

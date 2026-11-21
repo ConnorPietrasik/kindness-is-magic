@@ -46,7 +46,11 @@ async def zeffy_webhook(
     local ``zeffy_payments`` table *before* the business checks (committed
     here, so the "ignored" returns below persist the row): the payments
     that fail those checks are exactly what the admin unmatched-payments
-    banner is for.
+    banner is for. A payment on the separate general-donation campaign
+    (``ZEFFY_GENERAL_CAMPAIGN_ID``, when configured) is mirrored the same
+    way and then acked without any business checks — a general donation is
+    never a cart payment; it feeds the admin thank-you list, not the
+    reconciliation banner.
 
     Business-level ignores (other event type, other campaign/status, unknown
     donor, empty cart, non-exact amount) log + 200: the donor-initiated
@@ -83,6 +87,19 @@ async def zeffy_webhook(
     data = envelope.get("data") or {}
     if data.get("status") != "succeeded":
         logger.info("Zeffy webhook: payment %s status %s — ignoring", data.get("id"), data.get("status"))
+        return {"status": "ignored"}
+    # General-donation campaign (when configured): mirror only — the
+    # thank-you list's population. No business checks, no apply: a general
+    # donation can never satisfy a cart. An id equal to the dedicated one
+    # counts as unset, so a misconfig can't shadow cart apply.
+    if (
+        zeffy.ZEFFY_GENERAL_CAMPAIGN_ID
+        and zeffy.ZEFFY_GENERAL_CAMPAIGN_ID != zeffy.ZEFFY_CAMPAIGN_ID
+        and data.get("campaign_id") == zeffy.ZEFFY_GENERAL_CAMPAIGN_ID
+    ):
+        upsert_zeffy_payment(db, zeffy.parse_payment(data))
+        db.commit()
+        logger.info("Zeffy webhook: general-donation payment %s mirrored (thank-you list) — not applicable to a cart", data.get("id"))
         return {"status": "ignored"}
     if zeffy.ZEFFY_CAMPAIGN_ID and data.get("campaign_id") != zeffy.ZEFFY_CAMPAIGN_ID:
         logger.info(

@@ -492,6 +492,35 @@ class TestCheckout:
         user = db.query(User).filter(User.email == DONOR_EMAIL).first()
         assert db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).count() == 0
 
+    def test_general_campaign_typo_does_not_fail_checkout(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A typo in ZEFFY_GENERAL_CAMPAIGN_ID must not 503 the donor's
+        checkout — the checkout gate validates the dedicated campaign only;
+        the optional general campaign is validated on the sync paths, where a
+        typo costs the thank-you list a campaign, not the donor their cart."""
+        _create_donor(test_client)
+        fam = _eligible_family(db, "General Typo Family")
+        requests = _configure_zeffy(monkeypatch)
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general-typo")
+        # 404 the general campaign while the dedicated one stays healthy
+        inner = zeffy._transport_override.handler
+        monkeypatch.setattr(
+            zeffy,
+            "_transport_override",
+            httpx.MockTransport(
+                lambda req: (
+                    httpx.Response(404, json={"error": {"code": "resource_not_found", "message": "nope"}})
+                    if req.url.path == "/api/v1/campaigns/c-general-typo"
+                    else inner(req)
+                )
+            ),
+        )
+
+        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam.id}]})
+        assert resp.status_code == 200
+        assert resp.json()["claim_ids"]
+        # The checkout path never even tried to resolve the general campaign
+        assert not any("c-general-typo" in r.url.path for r in requests)
+
     def test_rejected_api_key_returns_502(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         """A 401 from Zeffy (bad key) maps to 502, same as the confirm endpoint."""
         _create_donor(test_client)
@@ -1094,6 +1123,38 @@ class TestWebhook:
         assert claim.payment_status == ClaimPaymentStatus.pending
         # Other campaigns are filtered BEFORE the mirror — no row
         assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == payment["id"]).first() is None
+
+    def test_general_campaign_mirrored_not_applied(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A general-donation-campaign payment is mirrored (the thank-you
+        list's population) but never applied to a cart — even when it exactly
+        matches one (same buyer email, exact cart amount, USD)."""
+        _create_donor(test_client)
+        fam = _eligible_family(db, "General Campaign Family")
+        from app.models import User
+
+        user = db.query(User).filter(User.email == DONOR_EMAIL).first()
+        _pending_cash_claim(db, user.id, fam.id)
+        _configure_zeffy(monkeypatch)
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "c-general")
+        monkeypatch.setattr(zeffy, "ZEFFY_WEBHOOK_SECRET", "whsec_test_secret")
+
+        # Deliberately an exact cart match ($500 payment, $500 cart) — proves
+        # the general-campaign path skips the cart business checks entirely.
+        payment = _payment_raw(id="pay-gen", campaign_id="c-general", amount=50_000, created=int(time.time()))
+        body = _completed_body(payment)
+        resp = test_client.post("/api/zeffy/webhook", content=body, headers=_webhook_headers(body))
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ignored"
+
+        claim = db.query(FamilyClaim).filter(FamilyClaim.donor_user_id == user.id).first()
+        assert claim.payment_status == ClaimPaymentStatus.pending
+        assert claim.zeffy_payment_id is None
+        # No confirmation email (nothing was applied)
+        assert _sent_rows(db, EmailKind.payment_confirmed, DONOR_EMAIL) == []
+        # Mirrored for the thank-you list, tagged with its campaign
+        record = db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-gen").first()
+        assert record is not None
+        assert record.campaign_id == "c-general"
 
     def test_known_donor_with_matching_payment_applies(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
         _create_donor(test_client)

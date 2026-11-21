@@ -32,10 +32,18 @@
  *   - two display-mode deadlines for the admin deadlines page
  *   - a donor gift claim + a donor pending cash claim (cart)
  *   - one unmatched payment in the Zeffy mock for the admin Zeffy-payments
- *     page — the capture clicks "Sync with Zeffy" to pull it into the local
- *     mirror (the mirror is append-only, and the hourly sync has been
- *     collecting other runs' mock payments, so the table is filtered to this
- *     run's row, like the sponsorships shot)
+ *     page (on the dedicated campaign) — the capture clicks "Sync with
+ *     Zeffy" to pull it into the local mirror (the mirror is append-only,
+ *     and the hourly sync has been collecting other runs' mock payments, so
+ *     the table is filtered to this run's row, like the sponsorships shot)
+ *   - one payment on the mock's separate general-donation campaign for the
+ *     admin thank-you page's general-donor row (pulled in by the same sync;
+ *     it never appears on the Zeffy-payments page)
+ *   - the seeded donor's gift claim is fulfilled for the admin thank-you
+ *     page (its fulfilled-sponsor row; fulfillment is email-silent, so the
+ *     email-log shot stays clean), and the thank-you capture marks the
+ *     general-donor-campaign buyer thanked through the page's own button so
+ *     the shot shows both thanked states (unmarked again in afterAll)
  *   - one demo email campaign (partially delivered, then canceled) for the
  *     admin email-campaigns page
  * Everything the script creates is cleaned up in afterAll (the golden rule)
@@ -90,7 +98,7 @@ import {
   resetFamilyWishState,
 } from "../helpers/api";
 import { getAdminEmail, getBaseUrl } from "../helpers/env";
-import { mockReset, mockSeedPayments, zeffyMockGate } from "../helpers/zeffy-mock";
+import { getZeffyGeneralCampaignId, mockReset, mockSeedPayments, zeffyMockGate } from "../helpers/zeffy-mock";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,6 +117,12 @@ const REFERRER_EMAIL = "sarah.chen@example.com";
 /** Demo campaign for the admin email-campaigns capture (fixed subject so the
  * shot is recognizable; manual-only so its recipient set is exact). */
 const DEMO_CAMPAIGN_SUBJECT = "Thank you for your support";
+/** The unmatched Zeffy-mock payment for the Zeffy-payments capture (dedicated
+ * campaign — an unmatched sponsorship payment on the reconciliation page). */
+const HELP_ZEFFY_EMAIL = "help-zeffy@example.com";
+/** The general-donation-campaign payment for the thank-you capture's
+ * general-donor row (the org's real setup: the general link's own campaign). */
+const HELP_GENERAL_EMAIL = "help-general@example.com";
 
 /** Data created by the setup phase, used for cleanup in afterAll. */
 const d: {
@@ -134,6 +148,8 @@ const d: {
   inviteReferrerId?: number;
   demoCampaignId?: number;
   zeffyGate: string | null;
+  /** True once the thank-you capture marked the general donor thanked (afterAll unmarks it). */
+  thankYouMarked: boolean;
 } = {
   adminApi: null,
   queueFamilyEmail: "queue.contact@example.com",
@@ -143,6 +159,7 @@ const d: {
   inviteTokenIds: [],
   inviteCodes: [],
   zeffyGate: null,
+  thankYouMarked: false,
 };
 
 test.describe.serial("help page screenshots", () => {
@@ -250,15 +267,21 @@ test.describe.serial("help page screenshots", () => {
     const claim = await donorApi.post(`/api/families/${martinez.id}/claim`, { data: { commitment_type: "gifts" } });
     expect(claim.status(), `gift claim failed (${claim.status()}): ${await claim.text()}`).toBe(201);
     d.donorGiftClaimId = ((await claim.json()) as { id: number }).id;
+    /* Fulfil it: the admin thank-you capture needs a fulfilled sponsor
+       (fulfillment is email-silent, so the email-log shot stays clean) */
+    const fulfill = await api.post(`/api/donor/claims/${d.donorGiftClaimId}/fulfill`);
+    expect(fulfill.ok(), `fulfill failed (${fulfill.status()}): ${await fulfill.text()}`).toBeTruthy();
 
     d.zeffyGate = await zeffyMockGate();
     if (d.zeffyGate === null) {
-      /* One unmatched payment for the admin Zeffy page (tag-scoped; reset in
-         afterAll so the mock stays as found) */
-      /* Stable id: the local mirror is append-only (no delete), so re-runs
-         must upsert the same row instead of accumulating one per run */
+      /* One unmatched dedicated-campaign payment for the admin Zeffy page
+         (tag-scoped; reset in afterAll so the mock stays as found) + one
+         general-donation-campaign payment for the thank-you page. Stable
+         ids: the local mirror is append-only (no delete), so re-runs must
+         upsert the same rows instead of accumulating one per run */
       await mockSeedPayments("help-screenshots", [
-        { id: "00000000-1111-4222-8333-0000000000f1", email: "help-zeffy@example.com", name: "Help Donor", amountUsd: 500 },
+        { id: "00000000-1111-4222-8333-0000000000f1", email: HELP_ZEFFY_EMAIL, name: "Help Donor", amountUsd: 500 },
+        { id: "00000000-1111-4222-8333-0000000000f2", email: HELP_GENERAL_EMAIL, name: "Help General", amountUsd: 120, campaignId: getZeffyGeneralCampaignId() },
       ]);
       const checkout = await donorApi.post("/api/donor/cart/checkout", {
         data: { items: [{ family_id: thompson.id, includes_groceries: false }] },
@@ -471,10 +494,12 @@ test.describe.serial("help page screenshots", () => {
              lands the row) so a mirror that was already up to date still
              gets a clean frame */
           await p.getByRole("alert").filter({ hasText: /new payment|Up to date/ }).first().waitFor({ state: "visible", timeout: 10_000 });
-          await p.locator("tr", { hasText: "help-zeffy@example.com" }).first().waitFor({ state: "visible", timeout: 15_000 });
+          await p.locator("tr", { hasText: HELP_ZEFFY_EMAIL }).first().waitFor({ state: "visible", timeout: 15_000 });
           /* Let the sync toast auto-dismiss so it doesn't share the frame */
           await expect(p.locator('[role="alert"]')).toHaveCount(0, { timeout: 10_000 });
         }
+        /* Literal, not the constant: evaluateAll runs in the browser, where
+           module scope is invisible */
         await p.locator("table tbody tr").evaluateAll((rows) => {
           for (const row of rows) {
             if (!(row.textContent ?? "").includes("help-zeffy@example.com")) row.style.display = "none";
@@ -493,6 +518,53 @@ test.describe.serial("help page screenshots", () => {
             }
           },
           DONOR_EMAIL,
+        );
+      } }],
+      ["admin-thank-you", "/admin/thank-you", { heading: "Thank-You Emails", prep: async (p) => {
+        /* The general-donor row needs the seeded general-campaign payment in
+           the local mirror. The admin-zeffy-payments capture's "Sync with
+           Zeffy" click pulls it in on a full run; a filtered capture on a
+           wiped stack (no webhook in dev, and the hourly loop's startup pass
+           ran before seeding) must sync itself first. Idempotent — a full
+           run just gets an "Up to date" toast */
+        if (d.zeffyGate === null) {
+          await p.goto("/admin/zeffy-payments", { waitUntil: "load" });
+          await p.getByRole("button", { name: "Sync with Zeffy" }).click();
+          await p.getByRole("alert").filter({ hasText: /new payment|Up to date/ }).first().waitFor({ state: "visible", timeout: 10_000 });
+          await p.goto("/admin/thank-you", { waitUntil: "load" });
+        }
+        /* Seven columns don't fit the default 960px table width — the page
+           scrolls horizontally and the Actions column would be clipped out
+           of the frame (and clicking a row action scrolls the container); widen
+           it the way the gear menu does */
+        await p.evaluate(() => window.localStorage.setItem("kim:tableWidth:adminThankYou", "full"));
+        await p.reload({ waitUntil: "load" });
+      }, onSettled: async (p) => {
+        /* One row shows the thanked state: mark the general-donor-campaign
+           buyer (prep synced it into the mirror when the zeffy capture
+           didn't) through the page's own button, so the shot shows both
+           states. The mark must land before the row filter: the click's
+           refetch re-renders the rows and would drop the hidden styles. No
+           general row (no mock) means nothing to mark */
+        const generalRow = p.locator("tr", { hasText: HELP_GENERAL_EMAIL }).first();
+        if ((await generalRow.count()) > 0) {
+          await generalRow.getByRole("button", { name: "Mark thanked" }).click();
+          await p.getByRole("alert").filter({ hasText: "Marked as thanked" }).waitFor({ state: "visible", timeout: 10_000 });
+          /* Let the toast auto-dismiss so it doesn't share the frame */
+          await expect(p.locator('[role="alert"]')).toHaveCount(0, { timeout: 10_000 });
+          d.thankYouMarked = true;
+        }
+        /* Keep only this run's donors (the seeded donor's fulfilled claim +
+           the seeded general-campaign payment); a re-run without a wipe
+           leaves earlier runs' payments in the append-only mirror */
+        await p.locator("table tbody tr").evaluateAll(
+          (rows, keep) => {
+            for (const row of rows) {
+              const text = row.textContent ?? "";
+              if (!keep.some((email) => text.includes(email))) row.style.display = "none";
+            }
+          },
+          [DONOR_EMAIL, HELP_GENERAL_EMAIL],
         );
       } }],
     ];
@@ -633,6 +705,12 @@ test.describe.serial("help page screenshots", () => {
       }
       /* Seeded mock payment (tag-scoped reset) */
       if (d.zeffyGate === null) await mockReset("help-screenshots");
+      /* The thank-you capture's UI mark (the row is per-email — independent
+         of the claim delete above) */
+      if (d.thankYouMarked) {
+        const unmark = await api.post("/api/admin/thank-you/unthanked", { data: { email: HELP_GENERAL_EMAIL } });
+        if (!unmark.ok()) console.warn(`[help-screenshots] thank-you unmark returned ${unmark.status()}`);
+      }
       console.log("[help-screenshots] Cleanup complete.");
     } catch (err) {
       console.warn(`[help-screenshots] Cleanup incomplete: ${String(err).split("\n")[0]}`);

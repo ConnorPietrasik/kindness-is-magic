@@ -201,6 +201,21 @@ export function formatDay(date: string | null | undefined): string {
 }
 
 /**
+ * formatUsd — format whole-dollar cents for display.
+ *
+ * Whole dollars (with a thousands separator) when there are no cents, two
+ * decimals otherwise ("$75", "$1,250", "$99.50"). Shared by list pages and
+ * email drafts so the same amount renders identically everywhere.
+ */
+export function formatUsd(cents: number): string {
+  const hasCents = cents % 100 !== 0;
+  return `$${(cents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0,
+  })}`;
+}
+
+/**
  * formatEmailStatus — format an email send status for display.
  *
  * Failed sends show the backend failure reason when available; reset rows

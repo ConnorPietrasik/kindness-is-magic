@@ -991,6 +991,46 @@ export interface AdminClaimsResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Admin thank-you emails (fulfilled sponsors + general-donation donors)
+// ---------------------------------------------------------------------------
+
+/** One donor on the thank-you list (one row per donor email). */
+export interface ThankYouDonor {
+  email: string;
+  /** The donor account's display name, or the newest general-donation buyer name. */
+  display_name: string | null;
+  /** claims = fulfilled sponsorships, general = general donations, both = has both sides. */
+  source: "claims" | "general" | "both";
+  // Fulfilled-sponsorship side (zeros while the donor has none).
+  claim_count: number;
+  /** Sponsored family names, in fulfillment order. */
+  claim_family_names: string[];
+  latest_fulfilled_at: string | null;
+  // General-donation side (zeros while the donor has none).
+  general_payment_count: number;
+  general_total_cents: number;
+  latest_donation_at: string | null;
+  /** Null until the admin marks the donor thanked (manual or via send). */
+  thanked_at: string | null;
+  thanked_by_name: string | null;
+}
+
+/** Envelope for the thank-you donor list. */
+export interface ThankYouDonorsResponse {
+  donors: ThankYouDonor[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Result of marking a donor thanked / clearing the mark. */
+export interface ThankYouThankedResponse {
+  email: string;
+  thanked_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Donor cart (cash sponsorship checkout)
 // ---------------------------------------------------------------------------
 

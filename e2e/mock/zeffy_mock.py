@@ -5,10 +5,18 @@ the full cash-sponsorship flow — checkout, manual confirm, admin
 unmatched-payments page, manual match — works end to end without a single
 call to the real, org-rate-limited Zeffy API.
 
+Two campaigns are modeled, mirroring the org's real setup: the dedicated
+sponsorship campaign (``MOCK_CAMPAIGN_ID``, wired from ``ZEFFY_CAMPAIGN_ID``)
+and the separate general-donation campaign (``MOCK_GENERAL_CAMPAIGN_ID``,
+wired from ``ZEFFY_GENERAL_CAMPAIGN_ID``). Seeded payments default to the
+dedicated campaign; pass ``campaign_id`` in the seed payload to seed the
+general one (the ``campaignId`` option of the e2e helper's
+``mockSeedPayments`` maps to it).
+
 Endpoints implemented (subset of https://api.zeffy.com/api/v1 the backend
 uses — read-only):
 
-* ``GET /api/v1/campaigns/{id}``  — 200 for the configured campaign, 404 else
+* ``GET /api/v1/campaigns/{id}``  — 200 for either configured campaign, 404 else
 * ``GET /api/v1/payments``        — filters: campaign, status, created[gte],
                                     starting_after, limit; newest-first;
                                     cursor envelope {object, data, has_more,
@@ -57,6 +65,7 @@ PORT = int(os.environ.get("MOCK_PORT", "8931"))
 # Defaults mirror the committed .env.example values; compose passes the
 # stack's real ZEFFY_* values through so the two never drift apart.
 MOCK_CAMPAIGN_ID = os.environ.get("MOCK_CAMPAIGN_ID", "11111111-1111-4111-8111-111111111111")
+MOCK_GENERAL_CAMPAIGN_ID = os.environ.get("MOCK_GENERAL_CAMPAIGN_ID", "22222222-2222-4222-8222-222222222222")
 MOCK_API_KEY = os.environ.get("MOCK_API_KEY", "e2e-mock-zeffy-key")
 
 _lock = threading.Lock()
@@ -99,11 +108,11 @@ def _public_payment(payment: dict) -> dict:
     return {k: v for k, v in payment.items() if not k.startswith("_")}
 
 
-def _campaign_response() -> dict:
+def _campaign_response(campaign_id: str, title: str) -> dict:
     return {
-        "id": MOCK_CAMPAIGN_ID,
+        "id": campaign_id,
         "object": "campaign",
-        "title": "E2E mock campaign",
+        "title": title,
         "url": "/form",
         "status": "open",
         "type": "donation-form",
@@ -152,7 +161,16 @@ class ZeffyMockHandler(BaseHTTPRequestHandler):
         if path == "/":
             with _lock:
                 count = len(_payments)
-            self._send_json(200, {"status": "ok", "campaign_id": MOCK_CAMPAIGN_ID, "payments": count, "now": int(time.time())})
+            self._send_json(
+                200,
+                {
+                    "status": "ok",
+                    "campaign_id": MOCK_CAMPAIGN_ID,
+                    "general_campaign_id": MOCK_GENERAL_CAMPAIGN_ID,
+                    "payments": count,
+                    "now": int(time.time()),
+                },
+            )
             return
 
         if path == "/form":
@@ -178,7 +196,9 @@ class ZeffyMockHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/v1/campaigns/"):
             campaign_id = path.removeprefix("/api/v1/campaigns/")
             if campaign_id == MOCK_CAMPAIGN_ID:
-                self._send_json(200, _campaign_response())
+                self._send_json(200, _campaign_response(campaign_id, "E2E mock campaign"))
+            elif campaign_id == MOCK_GENERAL_CAMPAIGN_ID:
+                self._send_json(200, _campaign_response(campaign_id, "E2E mock general donations"))
             else:
                 self._send_error_json(404, "not_found", "campaign not found")
             return
@@ -304,7 +324,7 @@ compose service. No real payment happens here.</p>
 
 
 def main() -> None:
-    _log(f"mock Zeffy API + form on 0.0.0.0:{PORT} (campaign {MOCK_CAMPAIGN_ID})")
+    _log(f"mock Zeffy API + form on 0.0.0.0:{PORT} (campaign {MOCK_CAMPAIGN_ID}, general {MOCK_GENERAL_CAMPAIGN_ID})")
     ThreadingHTTPServer(("0.0.0.0", PORT), ZeffyMockHandler).serve_forever()
 
 

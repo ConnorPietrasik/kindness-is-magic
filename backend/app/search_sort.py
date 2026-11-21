@@ -67,6 +67,24 @@ def build_sort_clause(
     return col.desc() if descending else col.asc()
 
 
+def parse_sort_field(sort_param: str | None, allowed: frozenset[str], default: str) -> tuple[str, bool]:
+    """Parse a ``sort`` query param into ``(field, descending)``.
+
+    Same param format as :func:`build_sort_clause` (``field`` ascending,
+    ``-field`` descending). Missing, empty, or unknown fields yield
+    *default* ascending. For list endpoints that sort in Python
+    (derived/aggregated rows) instead of via a SQLAlchemy column registry.
+    """
+    if not sort_param:
+        return default, False
+
+    descending = sort_param.startswith("-")
+    field = sort_param[1:] if descending else sort_param
+    if field not in allowed:
+        return default, False
+    return field, descending
+
+
 def wish_grouped_order(direct_family: AliasedClass) -> list[ColumnElement]:
     """Grouped default order for wish list endpoints.
 

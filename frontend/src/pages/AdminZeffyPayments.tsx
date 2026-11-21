@@ -45,13 +45,8 @@ import {
 import { CASH_CLAIM_PAYMENT_HOURS } from "../lib/constants";
 import { adminZeffyPayments, adminZeffyPendingClaims, adminZeffyUnmatchedSummary } from "../lib/queryKeys";
 import { route } from "../lib/routes";
-import { formatApiError, formatDateTime } from "../lib/utils";
+import { formatApiError, formatDateTime, formatUsd } from "../lib/utils";
 import type { ZeffyPayment } from "../types";
-
-/** Format raw Zeffy cents as dollars for admin display. */
-function formatAmount(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -237,7 +232,7 @@ export default function AdminZeffyPayments() {
                     <Td className="font-medium text-gray-900">{payment.buyer_name ?? <span className="text-gray-400">—</span>}</Td>
                   ),
                   buyer_email: <Td>{payment.buyer_email ?? <span className="text-gray-400">—</span>}</Td>,
-                  amount_cents: <Td className="whitespace-nowrap font-semibold text-gray-900">{formatAmount(payment.amount_cents)}</Td>,
+                  amount_cents: <Td className="whitespace-nowrap font-semibold text-gray-900">{formatUsd(payment.amount_cents)}</Td>,
                   currency: <Td className="uppercase text-gray-500">{payment.currency}</Td>,
                   receipt_url: payment.receipt_url ? (
                     <Td>
@@ -440,7 +435,7 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true">
         <h3 className="text-base font-semibold text-gray-900">Match payment manually</h3>
         <p className="mt-1 text-sm text-gray-600">
-          {formatAmount(payment.amount_cents)} {payment.currency.toUpperCase()}
+          {formatUsd(payment.amount_cents)} {payment.currency.toUpperCase()}
           {payment.buyer_email ? ` from ${payment.buyer_email}` : ""} · {formatDateTime(payment.created_at)}
         </p>
 
@@ -509,7 +504,7 @@ function MatchPaymentModal({ payment, onClose, onMatched }: { payment: ZeffyPaym
           <p className={`mt-3 text-sm ${exactMatch ? "text-emerald-700" : "text-amber-700"}`}>
             {exactMatch
               ? "Selected total matches the payment amount."
-              : `Selected total (${formatAmount(selectedTotalCents)}) differs from the payment amount — use your judgment.`}
+              : `Selected total (${formatUsd(selectedTotalCents)}) differs from the payment amount — use your judgment.`}
           </p>
         )}
 

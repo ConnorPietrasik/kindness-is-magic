@@ -1295,6 +1295,51 @@ describe("admin zeffy payments API functions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Admin — Thank-you emails
+// ---------------------------------------------------------------------------
+describe("admin thank-you API functions", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("adminListThankYouDonors — GET /api/admin/thank-you with filters + CSV columns", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { donors: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListThankYouDonors({
+      page: 1,
+      page_size: 50,
+      columns: ["email", "source"],
+      search: "ada",
+      source: "general",
+      thanked: false,
+    });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/thank-you", {
+      params: {
+        page: 1,
+        page_size: 50,
+        columns: "email,source",
+        search: "ada",
+        source: "general",
+        thanked: false,
+      },
+    });
+  });
+
+  it("adminListThankYouDonors — omitting params sends none", async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({ data: { donors: [], total: 0, page: 1, page_size: 50, total_pages: 0 } });
+    await apiModule.adminListThankYouDonors();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/admin/thank-you");
+  });
+
+  it("adminMarkDonorThanked / adminUnmarkDonorThanked — email rides in the body, not the path", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { email: "ada@example.com", thanked_at: "2025-12-11T09:00:00Z" } });
+    await apiModule.adminMarkDonorThanked("ada@example.com");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/thank-you/thanked", { email: "ada@example.com" });
+
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { email: "ada@example.com", thanked_at: null } });
+    await apiModule.adminUnmarkDonorThanked("ada@example.com");
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/thank-you/unthanked", { email: "ada@example.com" });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Public — Claim Family
 // ---------------------------------------------------------------------------
 describe("claim family API functions", () => {

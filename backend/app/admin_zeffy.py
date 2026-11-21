@@ -2,17 +2,19 @@
 
 All endpoints are guarded with ``require_admin``.
 
-* ``GET /payments`` — the local mirror table (refreshed by the webhook,
-  the hourly sync, and ``POST /sync``), enriched with local match state;
-  unmatched-only by default (the admin banner's population),
-  ``show_matched`` includes the rest; standard page envelope, ``columns``
-  supported. Local read — works unconfigured.
+* ``GET /payments`` — the dedicated campaign's rows of the local mirror
+  table (refreshed by the webhook, the hourly sync, and ``POST /sync``),
+  enriched with local match state; unmatched-only by default (the admin
+  banner's population), ``show_matched`` includes the rest; standard page
+  envelope, ``columns`` supported. Rows from the separate general-donation
+  campaign are never shown here (the thank-you page is where they
+  surface). Local read — works unconfigured.
 * ``GET /pending-claims`` — local read only (works unconfigured): every
   active unpaid cash claim grouped by donor; feeds the match modal.
 * ``POST /sync`` — pull the campaign's succeeded payments into the mirror
   now (the hourly background loop does the same in the background).
-* ``GET /unmatched-summary`` — count + oldest of the payments waiting for
-  action; feeds the admin dashboard banner.
+* ``GET /unmatched-summary`` — count + oldest of the dedicated campaign's
+  payments waiting for action; feeds the admin dashboard banner.
 * ``POST /payments/{id}/seen`` / ``DELETE /payments/{id}/seen`` — the
   admin's "no action needed" acknowledgment (suppresses the banner).
 * ``POST /payments/{id}/match`` — manual match: mark the chosen unpaid cash
@@ -126,6 +128,18 @@ def _is_mirror_payment_race(exc: IntegrityError) -> bool:
     return getattr(orig, "pgcode", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_zeffy_payments_payment_id"
 
 
+def _dedicated_campaign_filter() -> list:
+    """The reconciliation surface's campaign scope: the dedicated campaign
+    only. When a separate general-donation campaign is configured, its rows
+    are excluded (the thank-you page is where they surface); rows without a
+    stored campaign id (legacy) stay visible. Empty in the classic
+    single-campaign setup — nothing to exclude.
+    """
+    if not zeffy.ZEFFY_GENERAL_CAMPAIGN_ID:
+        return []
+    return [(ZeffyPaymentRecord.campaign_id == zeffy.ZEFFY_CAMPAIGN_ID) | ZeffyPaymentRecord.campaign_id.is_(None)]
+
+
 def _unmatched_conditions(db: Session) -> list:
     """The banner's filter conditions: no "seen" acknowledgment and no live
     claim storing the payment id (a soft-deleted claim does not count as a
@@ -149,9 +163,11 @@ def list_zeffy_payments(
 ) -> dict:
     """The dedicated campaign's mirrored payments (newest first), enriched
     with local match state. Unmatched-only by default — the admin banner's
-    population; ``show_matched`` includes matched and seen rows. Standard
-    page envelope; ``columns`` supported. Local read: works unconfigured."""
-    query = db.query(ZeffyPaymentRecord)
+    population; ``show_matched`` includes matched and seen rows. Rows from
+    the separate general-donation campaign are never shown (the thank-you
+    page is where they surface). Standard page envelope; ``columns``
+    supported. Local read: works unconfigured."""
+    query = db.query(ZeffyPaymentRecord).filter(*_dedicated_campaign_filter())
     if not show_matched:
         query = query.filter(*_unmatched_conditions(db))
 
@@ -259,11 +275,15 @@ def sync_payments(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> AdminZeffySyncResponse:
-    """Pull the dedicated campaign's succeeded payments into the local
+    """Pull the configured campaigns' succeeded payments into the local
     mirror now (the page's "Sync with Zeffy" button; the hourly background
     loop does the same in the background). Returns the number of rows
-    inserted / refreshed. Steady state is one Zeffy call (the walk stops
-    at the first known row)."""
+    inserted / refreshed, summed across campaigns. Steady state is one
+    Zeffy call per campaign (each walk stops at its first known row).
+    503 (naming the setting) when a configured campaign ID doesn't exist in
+    Zeffy — including the optional general-donation campaign, whose typo
+    must not fail the donor's checkout and so is only validated here.
+    """
     _require_zeffy_configured()
 
     try:
@@ -280,6 +300,8 @@ def sync_payments(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Another sync is in progress — please try again")
     except zeffy.ZeffyAuthError:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Zeffy is misconfigured — please try again later.")
+    except zeffy.ZeffyCampaignNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except zeffy.ZeffyError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not sync payments: {exc}")
 
@@ -292,10 +314,14 @@ def unmatched_summary(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> AdminZeffyUnmatchedSummary:
-    """How many mirrored payments are waiting for admin action (no live
-    match, no "seen" acknowledgment) plus the oldest — the admin dashboard
-    banner. Local read; works unconfigured."""
-    row = db.query(func.count(ZeffyPaymentRecord.id), func.min(ZeffyPaymentRecord.created_at)).filter(*_unmatched_conditions(db)).first()
+    """How many dedicated-campaign mirrored payments are waiting for admin
+    action (no live match, no "seen" acknowledgment) plus the oldest — the
+    admin dashboard banner. Local read; works unconfigured."""
+    row = (
+        db.query(func.count(ZeffyPaymentRecord.id), func.min(ZeffyPaymentRecord.created_at))
+        .filter(*_dedicated_campaign_filter(), *_unmatched_conditions(db))
+        .first()
+    )
     count, oldest = row if row is not None else (0, None)
     return AdminZeffyUnmatchedSummary(count=count, oldest_created_at=oldest)
 
@@ -344,14 +370,15 @@ async def match_payment(
     """Manual match: mark the chosen unpaid cash claims paid with the payment.
 
     The payment is fetched fresh from the read API and checked first —
-    exists, succeeded, on the dedicated campaign: the mirror's population
-    (a payment outside it is never mirrored). Its mirror row is then
-    refreshed + committed *before* the remaining business checks — a
-    rejected match still leaves the page with the fresh state (e.g. a
-    refund that landed after the webhook). Not-yet-matched and active-claim
-    checks are local. A partial match (a $600 payment covering one $500
-    claim) is allowed. The shared apply path does the single commit +
-    per-donor confirmation email covering exactly the matched claims (a
+    exists, succeeded, on the dedicated campaign: the only campaign a
+    sponsorship payment can come from (the mirror also holds general-
+    donation-campaign rows, but those are never matched to claims). Its
+    mirror row is then refreshed + committed *before* the remaining
+    business checks — a rejected match still leaves the page with the fresh
+    state (e.g. a refund that landed after the webhook). Not-yet-matched and
+    active-claim checks are local. A partial match (a $600 payment covering
+    one $500 claim) is allowed. The shared apply path does the single commit
+    + per-donor confirmation email covering exactly the matched claims (a
     re-match after unmatch re-emails).
     """
     if not data.claim_ids:

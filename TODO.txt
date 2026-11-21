@@ -1,4 +1,3 @@
-Make personal thank you email drafts per sponsor + track and include general donations from the other link too
 Make a way for families to upload thank you pictures / cards if they want to (which admins can forward to their donor)
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak

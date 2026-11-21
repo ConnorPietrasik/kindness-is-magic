@@ -41,6 +41,13 @@ export function getZeffyCampaignId(): string {
   return id;
 }
 
+/** The configured ZEFFY_GENERAL_CAMPAIGN_ID (mock general-donation campaign UUID in dev/e2e). */
+export function getZeffyGeneralCampaignId(): string {
+  const id = getEnvValue("ZEFFY_GENERAL_CAMPAIGN_ID");
+  if (!id) throw new Error("ZEFFY_GENERAL_CAMPAIGN_ID is not set in .env — see e2e/AGENTS.md");
+  return id;
+}
+
 /**
  * Gate for the full-flow tests: null when the mock is usable, otherwise the
  * reason to skip. Checks the .env the stack's backend loads (ZEFFY_API_BASE

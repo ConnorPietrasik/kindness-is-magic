@@ -143,6 +143,16 @@ export interface AdminZeffyPaymentsParams extends AdminListParams {
   show_matched?: boolean;
 }
 
+/** Query params for the admin thank-you donor list. */
+export interface AdminThankYouDonorsListParams extends AdminListParams {
+  /** Email, display name, or a sponsored family name. */
+  search?: string;
+  /** Narrow to a candidate kind (both = has both sides). */
+  source?: "claims" | "general" | "both";
+  /** Filter by the thanked state (omitted = all). */
+  thanked?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Paginated list responses
 // ---------------------------------------------------------------------------

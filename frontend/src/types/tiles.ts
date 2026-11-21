@@ -113,6 +113,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "thank-you",
+      route: ROUTES.ADMIN_THANK_YOU,
+      icon: "🙏",
+      label: "Thank-You Emails",
+      desc: "Draft thanks for fulfilled sponsors & general donors",
+      visible: true,
+    },
+    {
       key: "zeffy-payments",
       route: ROUTES.ADMIN_ZEFFY_PAYMENTS,
       icon: "💳",

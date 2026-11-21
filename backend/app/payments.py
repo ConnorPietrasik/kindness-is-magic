@@ -268,28 +268,25 @@ def upsert_zeffy_payment(db: Session, payment: ZeffyPayment) -> ZeffyPaymentReco
     return record
 
 
-def sync_zeffy_payments(db: Session) -> tuple[int, int]:
-    """One sync cycle: walk the dedicated campaign's succeeded payments
-    (newest first) and upsert rows until the first already-known one — the
-    newest-first ordering means everything older is already mirrored, so
-    the walk stops there (late webhook deliveries of older payments remain
-    the webhook's job). The first known row is upserted too, which refreshes
-    its snapshot fields (e.g. a recent refund that landed after the
-    webhook); older known rows are not revisited — the match endpoint
-    refreshes a row when it is acted on. Returns ``(new, refreshed)``.
+def _walk_campaign(db: Session, campaign_id: str) -> tuple[int, int]:
+    """Walk one campaign's succeeded payments (newest first) and upsert rows
+    until the first already-known one — the newest-first ordering means
+    everything older is already mirrored, so the walk stops there (late
+    webhook deliveries of older payments remain the webhook's job). The first
+    known row is upserted too, which refreshes its snapshot fields (e.g. a
+    recent refund that landed after the webhook); older known rows are not
+    revisited — the match endpoint refreshes a row when it is acted on.
+    Returns ``(new, refreshed)``.
 
     Commits per row so a mid-walk failure keeps its progress. The
     org-wide Zeffy rate budget applies (client throttle + one 429 retry);
     the multi-page case is the one-time full-history backfill.
     """
-    if not zeffy.ZEFFY_CAMPAIGN_ID:
-        return 0, 0
-
     cursor: str | None = None
     new_count = 0
     refreshed = 0
     while True:
-        page = zeffy.list_payments(campaign_id=zeffy.ZEFFY_CAMPAIGN_ID, status="succeeded", starting_after=cursor, limit=100)
+        page = zeffy.list_payments(campaign_id=campaign_id, status="succeeded", starting_after=cursor, limit=100)
         stop = False
         for payment in page.data:
             record = upsert_zeffy_payment(db, payment)
@@ -307,20 +304,45 @@ def sync_zeffy_payments(db: Session) -> tuple[int, int]:
     return new_count, refreshed
 
 
+def sync_zeffy_payments(db: Session) -> tuple[int, int]:
+    """One sync cycle: validate then walk the configured campaigns' succeeded
+    payments (the dedicated sponsorship campaign, plus the general-donation
+    campaign when ``ZEFFY_GENERAL_CAMPAIGN_ID`` is set). Each campaign is
+    walked independently (newest-first, stopping at its first known row), so
+    a backlog in one never delays the other. Returns the summed
+    ``(new, refreshed)`` across campaigns.
+
+    Validation is up front (``validate_sync_campaigns``): a typo in either ID
+    — the optional general one in particular, which the donor checkout never
+    validates — fails loudly here (admin sync 503, hourly loop's logged
+    error) instead of the walk silently mirroring nothing. Returns
+    ``(0, 0)`` while no campaign is configured (the unconfigured dev/e2e
+    default state).
+    """
+    campaigns = zeffy.validate_sync_campaigns()
+    new_count = 0
+    refreshed = 0
+    for campaign in campaigns:
+        new, ref = _walk_campaign(db, campaign.id)
+        new_count += new
+        refreshed += ref
+    return new_count, refreshed
+
+
 SYNC_INTERVAL_SECONDS = 3600
 
 
 async def zeffy_payment_sync_loop() -> None:
     """Sync the Zeffy payment mirror immediately, then hourly.
 
-    The immediate first run backfills history (a one-page no-op once
-    caught up — the walk stops at the first known row). Skips quietly
-    while Zeffy is unconfigured (the dev/e2e default state); API/DB errors
-    are logged and swallowed (the next run retries) — mirroring
-    ``claim_expiry_loop``.
+    The immediate first run backfills history (a one-page no-op per
+    campaign once caught up — the walk stops at the first known row).
+    Skips quietly while Zeffy is unconfigured (the dev/e2e default state);
+    API/DB errors are logged and swallowed (the next run retries) —
+    mirroring ``claim_expiry_loop``.
     """
     while True:
-        if zeffy.ZEFFY_API_KEY and zeffy.ZEFFY_CAMPAIGN_ID:
+        if zeffy.ZEFFY_API_KEY and (zeffy.ZEFFY_CAMPAIGN_ID or zeffy.ZEFFY_GENERAL_CAMPAIGN_ID):
             try:
                 db = next(get_db())
                 try:

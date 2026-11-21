@@ -851,13 +851,45 @@ class FamilyClaim(Base):
     family: Mapped["Family"] = relationship("Family")
 
 
+class DonorThank(Base):
+    """The "thanked" state of the admin thank-you-emails section.
+
+    One row per donor email (stored lowercase), covering both candidate
+    kinds: sponsors with fulfilled claims and general-donation buyers. The
+    row's existence *is* the thanked state — set when a thank-you email
+    goes out, or by the admin's manual mark (out-of-band thanking).
+
+    Unmarking is a hard delete — a small status table like
+    ``EmailPreference`` (nothing references it, no audit history needed),
+    so the domain soft-delete convention doesn't apply.
+    """
+
+    __tablename__ = "donor_thanks"
+
+    email: Mapped[str] = mapped_column(String(120), primary_key=True)
+    thanked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    # The acting admin. SET NULL like SentEmail.user_id: the row survives
+    # even if the admin account is ever hard-deleted.
+    thanked_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    thanked_by_user: Mapped["User | None"] = relationship("User", foreign_keys=[thanked_by])
+
+    @validates("email")
+    def _normalize_email(self, _key: str, value: str) -> str:
+        """Always store the donor email in lowercase for consistent lookups."""
+        return value.strip().lower()
+
+
 # ---------------------------------------------------------------------------
 # Zeffy payment mirror (admin unmatched-payments banner + local reconciliation)
 # ---------------------------------------------------------------------------
 
 
 class ZeffyPaymentRecord(Base):
-    """Local mirror of a Zeffy payment observed on the dedicated campaign.
+    """Local mirror of a Zeffy payment observed on the org's mirrored
+    campaigns: the dedicated sponsorship campaign, plus the separate
+    general-donation campaign when ``ZEFFY_GENERAL_CAMPAIGN_ID`` is set.
 
     One row per Zeffy payment id, upserted by every path that fetches a
     payment (webhook, hourly sync walk, admin "sync now", shared apply
@@ -865,7 +897,10 @@ class ZeffyPaymentRecord(Base):
     here** — a payment is matched when a live (non-deleted) claim stores
     its ``payment_id`` on ``FamilyClaim.zeffy_payment_id`` — so match and
     unmatch via the existing endpoints keep the banner and the local list
-    in sync for free.
+    in sync for free. Only dedicated-campaign payments can ever be matched
+    (manual match and the apply paths reject the others); general-donation
+    campaign rows feed the admin thank-you list and stay out of the
+    reconciliation page and banner.
 
     ``seen_at``/``seen_by`` are the admin's explicit "no action needed"
     acknowledgment; the banner shows payments with no live match and no

@@ -24,6 +24,7 @@ from app.models import (
     ClaimPaymentStatus,
     CommitmentType,
     Deadline,
+    DonorThank,
     EmailCampaign,
     EmailCampaignRecipient,
     EmailCampaignRecipientStatus,
@@ -51,6 +52,7 @@ from app.schemas import (
     FamilyInfo,
     PackingSlipItem,
     PackingSlipPersonItem,
+    ThankYouDonor,
     WishCreate,
     WishSummary,
 )
@@ -161,6 +163,29 @@ def build_zeffy_payment_item(record: ZeffyPaymentRecord, claim_ids: list[int]) -
         matched=bool(claim_ids),
         seen_at=record.seen_at,
         refund_status=record.refund_status,
+    )
+
+
+def build_thank_you_donor(candidate: dict, thanks: DonorThank | None, thanked_by_name: str | None) -> ThankYouDonor:
+    """One thank-you list row from the endpoint's merged candidate dict.
+
+    ``source`` is derived from the two sides' counts; ``thanked_at``/actor
+    come from the donor's ``DonorThank`` row (None while unthanked).
+    """
+    has_claims = candidate["claim_count"] > 0
+    has_general = candidate["general_payment_count"] > 0
+    return ThankYouDonor(
+        email=candidate["email"],
+        display_name=candidate["display_name"],
+        source="both" if (has_claims and has_general) else ("claims" if has_claims else "general"),
+        claim_count=candidate["claim_count"],
+        claim_family_names=candidate["claim_family_names"],
+        latest_fulfilled_at=candidate["latest_fulfilled_at"],
+        general_payment_count=candidate["general_payment_count"],
+        general_total_cents=candidate["general_total_cents"],
+        latest_donation_at=candidate["latest_donation_at"],
+        thanked_at=thanks.thanked_at if thanks is not None else None,
+        thanked_by_name=thanked_by_name,
     )
 
 

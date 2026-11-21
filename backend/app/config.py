@@ -72,6 +72,12 @@ ZEFFY_FORM_URL = os.environ.get("ZEFFY_FORM_URL", "")
 # UUID of the dedicated campaign the form belongs to — stable, no runtime
 # lookup. Validated once per process via GET /campaigns/{id}.
 ZEFFY_CAMPAIGN_ID = os.environ.get("ZEFFY_CAMPAIGN_ID", "")
+# UUID of the org's separate general-donation campaign (the general
+# donation link's form), when it exists. Its payments are mirrored for the
+# admin thank-you list but never reconciled to carts. Empty = the classic
+# single-campaign setup (every mirrored payment is a sponsorship candidate
+# or a wrong-form general donation).
+ZEFFY_GENERAL_CAMPAIGN_ID = os.environ.get("ZEFFY_GENERAL_CAMPAIGN_ID", "")
 # whsec_... webhook secret (Settings → Integrations → Webhook) used to verify
 # the Zeffy-Signature header on POST /api/zeffy/webhook.
 ZEFFY_WEBHOOK_SECRET = os.environ.get("ZEFFY_WEBHOOK_SECRET", "")

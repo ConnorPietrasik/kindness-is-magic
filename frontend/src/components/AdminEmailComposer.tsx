@@ -21,7 +21,12 @@
  * them plus an "Other…" option that reveals a free-text field — the common
  * case is a click, not a typed email, which guards against typos to known
  * people. Entry points without options (e.g. the Emails page's "+ Compose")
- * get the plain editable field: anyone, anywhere. Sends via
+ * get the plain editable field: anyone, anywhere. Entry points that draft
+ * a personalized message (e.g. the thank-you page) pass
+ * `prefilledSubject` / `prefilledMessage`, which land in the form on open
+ * (the admin still edits before sending); `onSent` fires with the
+ * recipient address after a successful send only, so the entry point can
+ * react (e.g. mark the donor thanked). Sends via
  * POST /api/admin/emails/send, which reuses the shared send path: the
  * unsubscribe gate applies (unsubscribed recipients are blocked and
  * reported), and one SentEmail row (kind custom_message) is recorded per
@@ -68,8 +73,15 @@ export interface AdminEmailComposerProps {
   context?: ReactNode | null;
   /** Recipient preselected (a matching option) or pretyped (Other free text). */
   prefilledRecipient?: string | null;
+  /** Subject prefilled when the dialog opens (the admin still edits before sending). */
+  prefilledSubject?: string | null;
+  /** Message body prefilled when the dialog opens (the admin still edits before sending). */
+  prefilledMessage?: string | null;
   /** Known recipients offered as a select (plus "Other…" free text). Omit for a plain editable field. */
   recipientOptions?: EmailRecipientOption[] | null;
+  /** Called with the recipient address after a SUCCESSFUL send only (skipped
+      sends — unsubscribed, invalid address, SMTP failure — don't fire it). */
+  onSent?: (recipientEmail: string) => void;
   onClose: () => void;
 }
 
@@ -78,7 +90,10 @@ export function AdminEmailComposer({
   contextLabel = null,
   context = null,
   prefilledRecipient = null,
+  prefilledSubject = null,
+  prefilledMessage = null,
   recipientOptions = null,
+  onSent,
   onClose,
 }: AdminEmailComposerProps) {
   const queryClient = useQueryClient();
@@ -154,7 +169,7 @@ export function AdminEmailComposer({
   // Reset the form whenever the dialog opens — and when its prefill or option
   // match changes while open (e.g. the lazy referrer fetch landing). The
   // prefill lands in the select when it matches a known recipient, else in
-  // the Other free-text field.
+  // the Other free-text field; subject/message prefill land in their inputs.
   useEffect(() => {
     if (open) {
       if (prefillMatch) setRecipientChoice(prefillMatch);
@@ -162,10 +177,10 @@ export function AdminEmailComposer({
         setRecipientChoice(OTHER);
         setOtherRecipient(prefilledRecipient ?? "");
       }
-      setSubject("");
-      setMessage("");
+      setSubject(prefilledSubject ?? "");
+      setMessage(prefilledMessage ?? "");
     }
-  }, [open, prefilledRecipient, prefillMatch]);
+  }, [open, prefilledRecipient, prefillMatch, prefilledSubject, prefilledMessage]);
 
   const trimmedRecipient = recipient.trim();
   const canSend = trimmedRecipient.length > 0 && message.trim().length > 0;
@@ -178,6 +193,8 @@ export function AdminEmailComposer({
       queryClient.invalidateQueries({ queryKey: adminSentEmails });
       if (result.sent) {
         toast.success("Email sent");
+        // Only a real delivery counts (skipped sends above don't reach here).
+        onSent?.(trimmedRecipient);
       } else if (result.reason === "unsubscribed") {
         toast.info("Send skipped — the recipient has unsubscribed from our emails.");
       } else if (result.reason === "invalid_address") {

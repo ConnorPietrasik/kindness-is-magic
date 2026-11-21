@@ -22,6 +22,7 @@ import type {
   AdminReferrersListParams,
   AdminSendEmailPayload,
   AdminSendEmailResult,
+  AdminThankYouDonorsListParams,
   AdminUserCreate,
   AdminUsersListParams,
   AdminUserUpdate,
@@ -84,6 +85,8 @@ import type {
   ReferrerPayload,
   ReferrerSelfRegisterPayload,
   ReferrerSelfRegisterResponse,
+  ThankYouDonorsResponse,
+  ThankYouThankedResponse,
   User,
   UserDetail,
   UserDropdownItem,
@@ -923,6 +926,26 @@ export function adminListClaims(params?: AdminClaimsListParams): Promise<AdminCl
 /** Admin: restore a cancelled (soft-deleted) unpaid cash claim (fresh payment window). */
 export function adminRestoreClaim(claimId: number): Promise<FamilyClaimSummary> {
   return apiPost(`/api/donor/claims/${claimId}/restore`);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Thank-you emails (fulfilled sponsors + general-donation donors)
+// ---------------------------------------------------------------------------
+
+/** The donors owed a thank-you: fulfilled sponsors + general-donation buyers, merged per email. */
+export function adminListThankYouDonors(params?: AdminThankYouDonorsListParams): Promise<ThankYouDonorsResponse> {
+  const p = params ? { ...params, columns: params.columns?.join(",") } : undefined;
+  return apiGet("/api/admin/thank-you", p);
+}
+
+/** Mark a donor thanked (manual mark for out-of-band thanking; also the auto-mark after a send). */
+export function adminMarkDonorThanked(email: string): Promise<ThankYouThankedResponse> {
+  return apiPost("/api/admin/thank-you/thanked", { email });
+}
+
+/** Clear the thanked mark (correction). */
+export function adminUnmarkDonorThanked(email: string): Promise<ThankYouThankedResponse> {
+  return apiPost("/api/admin/thank-you/unthanked", { email });
 }
 
 // ---------------------------------------------------------------------------

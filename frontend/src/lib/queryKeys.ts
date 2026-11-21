@@ -276,3 +276,10 @@ export const adminZeffyUnmatchedSummary = ["adminZeffyUnmatchedSummary"] as cons
 
 /** Admin sponsorships list (status + pagination params passed at call site) */
 export const adminClaims = ["adminClaims"] as const;
+
+// ---------------------------------------------------------------------------
+// Admin — Thank-you emails (fulfilled sponsors + general-donation donors)
+// ---------------------------------------------------------------------------
+
+/** Admin thank-you donor list (filter/search/pagination params at call site) */
+export const thankYouDonors = ["thankYouDonors"] as const;

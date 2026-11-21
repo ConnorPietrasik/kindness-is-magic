@@ -33,8 +33,8 @@ import {
   deleteClaimViaApi,
   loginViaApi,
 } from "../helpers/api";
-import { getBaseUrl } from "../helpers/env";
-import { mockReset, mockSeedPayments, zeffyMockGate } from "../helpers/zeffy-mock";
+import { getBaseUrl, getEnvValue } from "../helpers/env";
+import { mockReset, mockSeedPayments, type MockPayment, zeffyMockGate } from "../helpers/zeffy-mock";
 
 /** Tag scoping this spec's mock payments (the suite runs fully parallel). */
 const TAG = "admin-zeffy";
@@ -43,6 +43,12 @@ const PASSWORD = "Password123!";
 const BIO_A = `E2E Zeffy Admin Family A ${SUFFIX}`;
 const BIO_B = `E2E Zeffy Admin Family B ${SUFFIX}`;
 const STRANGER_EMAIL = `e2e-zeffy-stranger-${SUFFIX}@example.com`;
+/** A payment on the separate general-donation campaign (never shown on this page) —
+ * seeded only when the stack's .env wires a general-donation campaign; the classic
+ * single-campaign setup has no such payment (every payment is dedicated-campaign).
+ * Read without throwing so the spec still runs in that setup. */
+const GENERAL_CAMPAIGN_ID = getEnvValue("ZEFFY_GENERAL_CAMPAIGN_ID");
+const GENERAL_EMAIL = `e2e-zeffy-general-${SUFFIX}@example.com`;
 
 interface Donor {
   userId: number;
@@ -147,13 +153,20 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
     data.claim1Id = await checkoutClaimViaApi(data.d1.email, PASSWORD, data.familyA!);
     data.claim2Id = await checkoutClaimViaApi(data.d2.email, PASSWORD, data.familyB!);
 
-    // Payments: each donor's exact amount, plus a stray one (direct form visit)
+    // Payments: each donor's exact amount, plus a stray one (direct form
+    // visit) — all on the dedicated campaign — plus one on the separate
+    // general-donation campaign (the reconciliation page must never show it),
+    // when the stack has one configured
     await mockReset(TAG);
-    await mockSeedPayments(TAG, [
+    const seed: MockPayment[] = [
       { email: data.d1.email, name: `Zeffy Donor One ${SUFFIX}`, amountUsd: 500 },
       { email: STRANGER_EMAIL, name: "Stray Visitor", amountUsd: 750 },
       { email: data.d2.email, name: `Zeffy Donor Two ${SUFFIX}`, amountUsd: 350 },
-    ]);
+    ];
+    if (GENERAL_CAMPAIGN_ID) {
+      seed.push({ email: GENERAL_EMAIL, name: "General Giver", amountUsd: 90, campaignId: GENERAL_CAMPAIGN_ID });
+    }
+    await mockSeedPayments(TAG, seed);
   });
 
   test.afterAll(async ({ request: req }) => {
@@ -189,17 +202,25 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       await page.getByRole("button", { name: "Sync with Zeffy" }).click();
 
       const row1 = page.locator("tr").filter({ hasText: data.d1!.email });
-      await expect(row1).toContainText("$500.00", { timeout: 10_000 });
+      await expect(row1).toContainText("$500", { timeout: 10_000 });
       await expect(row1).toContainText("Unmatched");
       await expect(row1.getByRole("button", { name: "Match manually" })).toBeVisible();
 
       const stray = page.locator("tr").filter({ hasText: STRANGER_EMAIL });
-      await expect(stray).toContainText("$750.00");
+      await expect(stray).toContainText("$750");
       await expect(stray).toContainText("Unmatched");
 
       const row2 = page.locator("tr").filter({ hasText: data.d2!.email });
-      await expect(row2).toContainText("$350.00");
+      await expect(row2).toContainText("$350");
       await expect(row2).toContainText("Unmatched");
+
+      // The general-donation campaign's payment was mirrored by the sync but
+      // never appears on the reconciliation page (the thank-you page is where
+      // it surfaces) — the point of the campaign split. (Classic single-campaign
+      // setup: no such payment was seeded.)
+      if (GENERAL_CAMPAIGN_ID) {
+        await expect(page.locator("tr").filter({ hasText: GENERAL_EMAIL })).toHaveCount(0);
+      }
 
       // Nothing is matched yet (scoped to the rows — the "Matched" column
       // header matches a page-wide search) — and the toggle defaults to
@@ -331,7 +352,7 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
         await page.goto("/admin/zeffy-payments");
         // The new mock payment only exists locally after a sync
         await page.getByRole("button", { name: "Sync with Zeffy" }).click();
-        const row = page.locator("tr").filter({ hasText: data.d2!.email }).filter({ hasText: "$500.00" });
+        const row = page.locator("tr").filter({ hasText: data.d2!.email }).filter({ hasText: "$500" });
         await expect(row.getByRole("button", { name: "Match manually" })).toBeVisible({ timeout: 10_000 });
         await row.getByRole("button", { name: "Match manually" }).click();
         await page.getByLabel(new RegExp(`Match sponsorship ${data.claim2Id} \\(family`)).check({ timeout: 10_000 });
@@ -365,8 +386,13 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       // d1's $500 payment was matched in the manual-match test — the row sits
       // behind the show-matched toggle and carries the Unmatch action.
       await page.getByLabel("Show matched").check();
-      const row1 = page.locator("tr").filter({ hasText: data.d1!.email }).filter({ hasText: "$500.00" });
+      const row1 = page.locator("tr").filter({ hasText: data.d1!.email }).filter({ hasText: "$500" });
       await expect(row1.getByRole("button", { name: "Unmatch" })).toBeVisible({ timeout: 10_000 });
+      // Even with matched/seen rows revealed, the general-donation campaign's
+      // payment stays out of this page (classic setup: none seeded)
+      if (GENERAL_CAMPAIGN_ID) {
+        await expect(page.locator("tr").filter({ hasText: GENERAL_EMAIL })).toHaveCount(0);
+      }
 
       // Cancel first: the dialog closes and nothing happens.
       await row1.getByRole("button", { name: "Unmatch" }).click();
@@ -381,7 +407,7 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       await expect(page.getByRole("alert").filter({ hasText: "Payment unmatched — 1 sponsorship back to pending" })).toBeVisible({ timeout: 10_000 });
 
       await page.getByLabel("Show matched").uncheck();
-      await expect(page.locator("tr").filter({ hasText: data.d1!.email }).filter({ hasText: "$500.00" })).toContainText("Unmatched", {
+      await expect(page.locator("tr").filter({ hasText: data.d1!.email }).filter({ hasText: "$500" })).toContainText("Unmatched", {
         timeout: 10_000,
       });
     } finally {

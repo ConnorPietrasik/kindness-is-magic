@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -357,7 +357,7 @@ describe("AdminZeffyPayments", () => {
 
     // Modal header: payment amount + buyer + date
     expect(await screen.findByText("Match payment manually")).toBeInTheDocument();
-    expect(screen.getByText(/\$600\.00 USD/)).toBeInTheDocument();
+    expect(screen.getByText(/\$600 USD/)).toBeInTheDocument();
     // Donor groups with display name, email, and cart total
     // ("Alice Donor" now also appears as the payment row's buyer)
     expect((await screen.findAllByText("Alice Donor")).length).toBe(2);
@@ -366,9 +366,10 @@ describe("AdminZeffyPayments", () => {
     // Both donor groups show their cart total
     expect(screen.getAllByText(/Cart total:/)).toHaveLength(2);
     expect(screen.getByText("$1100")).toBeInTheDocument();
-    // Per-claim rows with line totals
+    // Per-claim rows with line totals (scoped to the modal — the payment's
+    // own Amount cell in the list below also renders "$600")
     expect(screen.getByText("Family 3-1 + groceries")).toBeInTheDocument();
-    expect(screen.getByText("$600")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("$600")).toBeInTheDocument();
     // The anonymous donor shows the email as the name
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
     expect(screen.getByText("Family 3-3")).toBeInTheDocument();
@@ -394,7 +395,7 @@ describe("AdminZeffyPayments", () => {
 
     // Add the $500 claim — total now differs from the payment amount
     await user.click(screen.getByRole("checkbox", { name: "Match sponsorship 32 (family 3-2)" }));
-    expect(screen.getByText("Selected total ($1100.00) differs from the payment amount — use your judgment.")).toBeInTheDocument();
+    expect(screen.getByText("Selected total ($1,100) differs from the payment amount — use your judgment.")).toBeInTheDocument();
   });
 
   it("select-all toggles every claim for one donor", async () => {

@@ -47,6 +47,7 @@ def _zeffy_env(monkeypatch: pytest.MonkeyPatch):
     """Unconfigured Zeffy (the default) + zero throttle + fresh campaign cache."""
     monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "")
     monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "")
+    monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", "")
     monkeypatch.setattr(zeffy, "_transport_override", None)
     monkeypatch.setenv("ZEFFY_MIN_INTERVAL_SECONDS", "0")
     zeffy.clear_campaign_cache()
@@ -561,6 +562,119 @@ class TestUnmatchedSummary:
         resp = test_client.get("/api/admin/zeffy/unmatched-summary")
         assert resp.status_code == 200
         assert resp.json() == {"count": 0, "oldest_created_at": None}
+
+
+# ---------------------------------------------------------------------------
+# General-donation campaign (ZEFFY_GENERAL_CAMPAIGN_ID): mirrored, but kept
+# out of the reconciliation page + banner, never matched
+# ---------------------------------------------------------------------------
+
+
+class TestGeneralCampaignScoping:
+    """With a separate general-donation campaign configured, its payments
+    are mirrored (sync/webhook) but never shown on the reconciliation page,
+    counted toward the banner, or matched to a claim."""
+
+    GENERAL_ID = "campaign-general"
+
+    def test_list_and_summary_exclude_general_rows(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", self.GENERAL_ID)
+        _seed_mirror(db, _payment_raw(id="pay-ded", campaign_id=CAMPAIGN_ID, email=DONOR1_EMAIL))
+        _seed_mirror(db, _payment_raw(id="pay-gen", campaign_id=self.GENERAL_ID, email=DONOR2_EMAIL))
+        # Legacy row with no stored campaign id — still visible (dedicated side)
+        _seed_mirror(db, _payment_raw(id="pay-legacy", campaign_id=None, email=DONOR1_EMAIL))
+
+        _login_admin(test_client)
+        default = test_client.get("/api/admin/zeffy/payments").json()
+        assert {p["id"] for p in default["payments"]} == {"pay-ded", "pay-legacy"}
+        matched = test_client.get("/api/admin/zeffy/payments", params={"show_matched": "true"}).json()
+        assert {p["id"] for p in matched["payments"]} == {"pay-ded", "pay-legacy"}  # never shown
+        # The banner counts dedicated-campaign rows only
+        assert test_client.get("/api/admin/zeffy/unmatched-summary").json()["count"] == 2
+
+    def test_legacy_single_campaign_unchanged(self, test_client: TestClient, db: Session, admin_user):
+        """General id unset (the default): every mirror row shows — the classic setup."""
+        _seed_mirror(db, _payment_raw(id="pay-a", campaign_id="any-campaign", email=DONOR1_EMAIL))
+        _seed_mirror(db, _payment_raw(id="pay-b", campaign_id=None, email=DONOR1_EMAIL))
+
+        _login_admin(test_client)
+        body = test_client.get("/api/admin/zeffy/payments").json()
+        assert {p["id"] for p in body["payments"]} == {"pay-a", "pay-b"}
+
+    def test_sync_walks_both_campaigns(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        list_calls: list[str | None] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.startswith("/api/v1/campaigns/"):
+                cid = request.url.path.rsplit("/", 1)[1]
+                return httpx.Response(
+                    200,
+                    json={"id": cid, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"},
+                )
+            campaign = request.url.params.get("campaign")
+            list_calls.append(campaign)
+            if campaign == self.GENERAL_ID:
+                return httpx.Response(200, json=_envelope([_payment_raw(id="pay-gen-1", campaign_id=self.GENERAL_ID)]))
+            return httpx.Response(200, json=_envelope([_payment_raw(id="pay-ded-1", campaign_id=CAMPAIGN_ID)]))
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", self.GENERAL_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+
+        _login_admin(test_client)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 200
+        assert resp.json() == {"new_count": 2, "updated_count": 0}
+        # One walk per campaign
+        assert sorted(list_calls) == [CAMPAIGN_ID, self.GENERAL_ID]
+        rows = {r.payment_id: r.campaign_id for r in db.query(ZeffyPaymentRecord).all()}
+        assert rows == {"pay-ded-1": CAMPAIGN_ID, "pay-gen-1": self.GENERAL_ID}
+
+    def test_sync_fails_loudly_on_general_typo(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        """A typo'd general campaign id 503s admin sync (naming the setting)
+        before any walk — the loud failure the donor checkout deliberately
+        doesn't carry (its gate validates the dedicated campaign only)."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == f"/api/v1/campaigns/{self.GENERAL_ID}":
+                return httpx.Response(404, json={"error": {"code": "resource_not_found", "message": "nope"}})
+            if request.url.path.startswith("/api/v1/campaigns/"):
+                return httpx.Response(
+                    200,
+                    json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"},
+                )
+            return httpx.Response(200, json=_envelope([]))
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", CAMPAIGN_ID)
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", self.GENERAL_ID)
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(handler))
+        zeffy.clear_campaign_cache()
+
+        _login_admin(test_client)
+        resp = test_client.post("/api/admin/zeffy/sync")
+        assert resp.status_code == 503
+        assert "ZEFFY_GENERAL_CAMPAIGN_ID" in resp.json()["detail"]
+        # Validation runs before any walk — nothing mirrored
+        assert db.query(ZeffyPaymentRecord).count() == 0
+
+    def test_match_rejects_general_campaign_payment(self, test_client: TestClient, db: Session, admin_user, monkeypatch):
+        d1 = _donor_row(db, DONOR1_EMAIL)
+        f1 = _eligible_family(db, "General Campaign Match Family")
+        c1 = _pending_cash_claim(db, d1, f1)
+        raw = _payment_raw(id="pay-gen-match", amount=50_000, email=DONOR1_EMAIL, campaign_id=self.GENERAL_ID)
+        _configure_zeffy(monkeypatch, payments=[raw])
+        monkeypatch.setattr(zeffy, "ZEFFY_GENERAL_CAMPAIGN_ID", self.GENERAL_ID)
+
+        _login_admin(test_client)
+        resp = test_client.post(f"/api/admin/zeffy/payments/{raw['id']}/match", json={"claim_ids": [c1.id]})
+        assert resp.status_code == 400
+        assert "campaign" in resp.json()["detail"]
+        # Unmatchable — the match path never mirrors it either
+        assert db.query(ZeffyPaymentRecord).filter(ZeffyPaymentRecord.payment_id == "pay-gen-match").first() is None
 
 
 # ---------------------------------------------------------------------------

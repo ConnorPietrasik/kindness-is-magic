@@ -137,6 +137,14 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "email", label: "Email", visible: true },
     { key: "unsubscribed_at", label: "Unsubscribed", visible: true },
   ],
+  adminThankYou: [
+    { key: "email", label: "Donor", visible: true },
+    { key: "display_name", label: "Name", visible: true },
+    { key: "source", label: "Source", visible: true },
+    { key: "sponsorships", label: "Sponsorships", visible: true },
+    { key: "general_donations", label: "General Donations", visible: true },
+    { key: "thanked", label: "Thanked", visible: true },
+  ],
   adminEmailCampaigns: [
     { key: "subject", label: "Subject", visible: true },
     { key: "roles", label: "Roles", visible: true },
@@ -193,4 +201,10 @@ export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   family: ["family", "family_name"],
   commitment: ["commitment_type", "paid_at"],
   sponsorship_status: ["payment_status", "deleted_at", "fulfilled_at"],
+  // Admin thank-you — the summary cells each combine their side's fields
+  // (count + names/total + latest date), and the thanked cell shows the
+  // mark's timestamp + actor.
+  sponsorships: ["claim_count", "claim_family_names", "latest_fulfilled_at"],
+  general_donations: ["general_payment_count", "general_total_cents", "latest_donation_at"],
+  thanked: ["thanked_at", "thanked_by_name"],
 };

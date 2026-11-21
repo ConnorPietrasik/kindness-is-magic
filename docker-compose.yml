@@ -103,6 +103,7 @@ services:
       - ./e2e/mock:/mock:ro
     environment:
       - MOCK_CAMPAIGN_ID=${ZEFFY_CAMPAIGN_ID}
+      - MOCK_GENERAL_CAMPAIGN_ID=${ZEFFY_GENERAL_CAMPAIGN_ID}
       - MOCK_API_KEY=${ZEFFY_API_KEY}
     ports:
       - "8931:8931" # form page + test control, reachable from the host/LAN

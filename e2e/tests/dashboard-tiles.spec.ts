@@ -12,8 +12,10 @@ test.describe("Admin dashboard tiles", () => {
 
     await page.goto("/dashboard");
     const gear = page.getByRole("button", { name: "Toggle dashboard tiles" });
-    const emailsTile = page.getByRole("link", { name: /Emails/ });
-    const csvTile = page.getByRole("link", { name: /CSV Import/ });
+    // Tile anchors carry their stable key — name regexes are ambiguous
+    // ("Emails" ⊂ "Thank-You Emails")
+    const emailsTile = page.locator('a[data-tile-key="emails"]');
+    const csvTile = page.locator('a[data-tile-key="csv-upload"]');
     await expect(emailsTile).toBeVisible({ timeout: 10_000 });
 
     // CSV Import is hidden by default (mostly used for demo and testing)
@@ -21,7 +23,7 @@ test.describe("Admin dashboard tiles", () => {
 
     // Hide a tile from the popover
     await gear.click();
-    await page.getByRole("checkbox", { name: "Emails" }).uncheck();
+    await page.getByRole("checkbox", { name: "Emails", exact: true }).uncheck();
     await expect(emailsTile).toHaveCount(0);
 
     // Preference survives a reload
@@ -56,7 +58,7 @@ test.describe("Admin dashboard tiles", () => {
  * default): Manage Users, Manage Referrers, Manage Families, Manage
  * People, Invite Codes, Wish Approval, Deadlines, Manage Wishes, My
  * Assigned Gifts, Packing Slips, Delivery Slips, Blank Wish Cards, Emails,
- * Zeffy Payments, Browse Families.
+ * Thank-You Emails, Zeffy Payments, Browse Families.
  */
 test.describe("Admin dashboard tile order", () => {
   const tileGrid = (page: Page) => page.locator("div.grid").first().locator("a");

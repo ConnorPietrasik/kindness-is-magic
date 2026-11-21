@@ -13,6 +13,7 @@ import adminPackingSlips from "../assets/help/admin-packing-slips.png";
 import adminPeople from "../assets/help/admin-people.png";
 import adminReferrers from "../assets/help/admin-referrers.png";
 import adminSponsorships from "../assets/help/admin-sponsorships.png";
+import adminThankYou from "../assets/help/admin-thank-you.png";
 import adminUsers from "../assets/help/admin-users.png";
 import adminWishCards from "../assets/help/admin-wish-cards.png";
 import adminWishReview from "../assets/help/admin-wish-review.png";
@@ -330,6 +331,58 @@ export default function HelpAdmin() {
           ),
         },
         {
+          id: "thank-you",
+          title: "Thank-You Emails",
+          body: (
+            <>
+              <p>
+                After an event, this page collects everyone who is owed a personal thank-you: sponsors whose sponsorships are fulfilled,
+                plus the people who gave through the general donation link. Each donor appears once, even if they did both.
+              </p>
+              <HelpImage
+                src={adminThankYou}
+                alt="The thank-you emails page with one unthanked sponsor row and one thanked general-donor row"
+                caption="One row per donor, with source chips and the thanked state."
+              />
+              <h3>Reading a row</h3>
+              <ul>
+                <li>
+                  <strong>Source</strong> shows which side the donor is on: a sponsorship chip, a general chip, or both.
+                </li>
+                <li>
+                  <strong>Sponsorships</strong> lists how many are fulfilled and the families sponsored, with the most recent fulfillment
+                  date.
+                </li>
+                <li>
+                  <strong>General Donations</strong> shows the payment count, the total given, and the newest donation date — including a
+                  general donation paid on the sponsorship form by mistake, since anything not matched to a sponsorship lands here. (A donor
+                  with no email on the payment can't be listed — check the campaigns in the Zeffy dashboard for those.)
+                </li>
+                <li>
+                  <strong>Thanked</strong> shows when the donor was marked thanked, and by whom. Unthanked donors read “Not thanked”.
+                </li>
+              </ul>
+              <h3>Drafting a thank-you</h3>
+              <p>
+                Click <strong>Draft email</strong> on a row: the composer opens pre-filled with the donor's address, a subject, and a
+                personalized message confirming their sponsorship (without naming the family) or the total of their general donations. Edit
+                anything you like, then send — a successful send marks the donor thanked automatically, so the list keeps track for you.
+              </p>
+              <h3>Out-of-band thanking</h3>
+              <p>
+                If you thank someone outside the app — in person, by phone, or from your own email client — use{" "}
+                <strong>Mark thanked</strong>
+                on their row so the list stays honest. <strong>Mark unthanked</strong> clears the mark (a correction).
+              </p>
+              <h3>Finding a donor</h3>
+              <p>
+                Search by donor email, name, or a sponsored family name, filter by thanked state and source, and click a column header to
+                sort — all to work through what's left.
+              </p>
+            </>
+          ),
+        },
+        {
           id: "deadlines",
           title: "Event deadlines",
           body: (
@@ -495,6 +548,10 @@ export default function HelpAdmin() {
               <p>
                 New payments appear as they arrive (and a background sync runs hourly). <strong>Sync with Zeffy</strong> pulls any missing
                 payments immediately — useful right after a donor pays.
+              </p>
+              <p>
+                Payments on the separate general-donation campaign never appear here — they feed the <strong>Thank-You Emails</strong> list
+                instead (the reconciliation page only ever needs to handle sponsorship payments).
               </p>
             </>
           ),

@@ -6,6 +6,9 @@ import { COLUMN_FIELD_MAP, COLUMNS, type ColumnDef } from "../types/columns";
 
 const STORAGE_PREFIX = "kim:columns:";
 const EVENT_TYPE = "kim:column-visibility-change";
+// Resources keyed by email (no numeric "id" field on the backend model —
+// the hook's blanket "id" addition would 422 the list's columns param).
+const EMAIL_KEYED_RESOURCES = new Set(["adminEmailUnsubscribes", "adminThankYou"]);
 
 export function useColumnVisibility(resourceKey: string) {
   const defs: ColumnDef[] = COLUMNS[resourceKey] ?? [];
@@ -66,7 +69,7 @@ export function useColumnVisibility(resourceKey: string) {
       else resolved.add(key);
     }
     // "id" always needed for mutations — except resources keyed by email (no numeric id)
-    if (resourceKey !== "adminEmailUnsubscribes") resolved.add("id");
+    if (!EMAIL_KEYED_RESOURCES.has(resourceKey)) resolved.add("id");
     // "wishes" always sent for people — needed for wish cells AND detail/edit
     if (resourceKey === "adminPeople") resolved.add("wishes");
     // "family_count" always sent for referrers — needed for "X / Y" display in family_limit column

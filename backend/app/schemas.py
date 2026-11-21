@@ -2191,3 +2191,59 @@ class AdminZeffyMatchResponse(BaseModel):
 class AdminZeffyUnmatchResponse(BaseModel):
     payment_id: str
     claim_ids: list[int]
+
+
+# ---------------------------------------------------------------------------
+# Admin thank-you emails (fulfilled sponsors + general-donation donors)
+# ---------------------------------------------------------------------------
+
+
+class ThankYouDonor(BaseModel):
+    """One donor on the thank-you list.
+
+    ``source`` is ``claims`` (at least one fulfilled sponsorship),
+    ``general`` (one or more general-donation payments), or ``both`` —
+    the opposite side's fields stay zero/null. Names: the donor account's
+    display name (claim donors) or the newest general-donation buyer name.
+    """
+
+    email: str
+    display_name: str | None = None
+    source: Literal["claims", "general", "both"]
+    # Fulfilled-sponsorship side.
+    claim_count: int = 0
+    # Sponsored family names, in fulfillment order.
+    claim_family_names: list[str] = []
+    latest_fulfilled_at: datetime | None = None
+    # General-donation side (campaign payments stored on no sponsorship).
+    general_payment_count: int = 0
+    general_total_cents: int = 0
+    latest_donation_at: datetime | None = None
+    # Thanked state — null until the admin marks it (manual or via send).
+    thanked_at: datetime | None = None
+    thanked_by_name: str | None = None
+
+
+class ThankYouDonorsResponse(BaseModel):
+    donors: list[ThankYouDonor]
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 0
+
+
+class ThankYouMarkRequest(BaseModel):
+    """Body for mark/unmark-thanked.
+
+    The email rides in the body, not the path: the request middleware logs
+    every path (PII minimization — no donor emails in logs), mirroring the
+    resubscribe endpoint's body-carrying precedent."""
+
+    email: str = Field(..., min_length=1, max_length=120)
+
+
+class ThankYouThankedResponse(BaseModel):
+    """Result of marking a donor thanked / clearing the mark."""
+
+    email: str
+    thanked_at: datetime | None = None

@@ -613,11 +613,13 @@ describe("Dashboard — admin tiles", () => {
 
     const gear = await screen.findByRole("button", { name: "Toggle dashboard tiles" });
     expect(gear).toBeInTheDocument();
+    // Match by href: tile labels can substring-match sibling tiles ("Emails" ⊂ "Thank-You Emails")
+    const linkFor = (route: string) => screen.queryAllByRole("link").find((l) => l.getAttribute("href") === route);
     for (const tile of DASHBOARD_TILES.admin ?? []) {
       if (tile.visible) {
-        expect(screen.getByRole("link", { name: new RegExp(tile.label) })).toBeInTheDocument();
+        expect(linkFor(tile.route)).toBeDefined();
       } else {
-        expect(screen.queryByRole("link", { name: new RegExp(tile.label) })).not.toBeInTheDocument();
+        expect(linkFor(tile.route)).toBeUndefined();
       }
     }
   });
@@ -672,11 +674,12 @@ describe("Dashboard — admin tiles", () => {
     await user.click(await screen.findByRole("button", { name: "Toggle dashboard tiles" }));
     await user.click(screen.getByRole("button", { name: "Reset" }));
 
+    const linkFor = (route: string) => screen.queryAllByRole("link").find((l) => l.getAttribute("href") === route);
     for (const tile of DASHBOARD_TILES.admin ?? []) {
       if (tile.visible) {
-        expect(screen.getByRole("link", { name: new RegExp(tile.label) })).toBeInTheDocument();
+        expect(linkFor(tile.route)).toBeDefined();
       } else {
-        expect(screen.queryByRole("link", { name: new RegExp(tile.label) })).not.toBeInTheDocument();
+        expect(linkFor(tile.route)).toBeUndefined();
       }
     }
     expect(JSON.parse(localStorage.getItem("kim:dashboardTiles:admin") ?? "[]")).toEqual(

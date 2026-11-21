@@ -437,6 +437,7 @@ from app.admin_emails import email_admin_router  # noqa: E402
 from app.admin_campaigns import campaign_admin_router  # noqa: E402
 from app.admin_deadlines import deadline_admin_router  # noqa: E402
 from app.admin_zeffy import zeffy_admin_router  # noqa: E402
+from app.admin_thank_you import thank_you_admin_router  # noqa: E402
 
 app.include_router(referrer_admin_router)
 app.include_router(family_admin_router)
@@ -449,6 +450,7 @@ app.include_router(email_admin_router)
 app.include_router(campaign_admin_router)
 app.include_router(deadline_admin_router)
 app.include_router(zeffy_admin_router)
+app.include_router(thank_you_admin_router)
 
 # ---------------------------------------------------------------------------
 # Include self-service routes (Phase 3)

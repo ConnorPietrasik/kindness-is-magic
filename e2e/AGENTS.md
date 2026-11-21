@@ -66,7 +66,9 @@ Setup and cleanup still run in full (the filtered captures need the scenario dat
 
 ## Zeffy-dependent tests
 
-`donor-cart.spec.ts` and `admin-zeffy-payments.spec.ts` run the cash-sponsorship flow against the bundled `zeffy-mock` (see `helpers/zeffy-mock.ts`). They self-skip with a printed reason when the stack's `.env` is not wired to the mock — so with real Zeffy credentials configured, these two specs skip by design. Don't work around it: the real API is org-rate-limited and tests must never hit it. A standard dev stack (`.env.example` values) runs them.
+`donor-cart.spec.ts`, `admin-zeffy-payments.spec.ts`, and `admin-thank-you.spec.ts` run against the bundled `zeffy-mock` (see `helpers/zeffy-mock.ts`). They self-skip with a printed reason when the stack's `.env` is not wired to the mock — so with real Zeffy credentials configured, these specs skip by design. Don't work around it: the real API is org-rate-limited and tests must never hit it. A standard dev stack (`.env.example` values) runs them.
+
+The mock models the org's two campaigns: the dedicated sponsorship campaign (`ZEFFY_CAMPAIGN_ID`) and the separate general-donation campaign (`ZEFFY_GENERAL_CAMPAIGN_ID`). Seeded payments default to the dedicated campaign; `campaignId` opts into the general one. General-campaign payments never appear on the Zeffy-payments page (they feed the admin thank-you list). `admin-thank-you.spec.ts` self-skips when `ZEFFY_GENERAL_CAMPAIGN_ID` is unset (the classic single-campaign setup has no general donors); `admin-zeffy-payments.spec.ts` still runs in that setup — it just seeds no general-campaign payment and skips its never-shown assertions.
 
 ## Conventions
 

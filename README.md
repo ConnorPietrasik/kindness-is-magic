@@ -135,9 +135,10 @@ A payment can be applied by three paths, all idempotent:
 
 1. **Create a dedicated donation form** for sponsorships.
 2. **Generate an API key** — Settings → Integrations → API key → `ZEFFY_API_KEY`. The API is rate-limited per *organization* (100 req/min shared across all of its keys), so the client throttles outbound calls to a ~3 s minimum interval by default.
-3. **Note the form's campaign ID** (the dashboard, or one `GET /api/v1/campaigns` call) → `ZEFFY_CAMPAIGN_ID`. Payments on any other campaign are ignored.
-4. **Copy the form's public URL** → `ZEFFY_FORM_URL` (where checkout sends donors).
-5. **Register the webhook** — Settings → Integrations → Webhook:
+3. **Note the form's campaign ID** (the dashboard, or one `GET /api/v1/campaigns` call) → `ZEFFY_CAMPAIGN_ID`. Payments on any other campaign are ignored, except the optional general-donation campaign below.
+4. **(If the general donation link is a separate Zeffy form) note that form's campaign ID** → `ZEFFY_GENERAL_CAMPAIGN_ID`. Its payments are mirrored for the admin thank-you list but never reconciled to carts and never shown on the Zeffy payments page. Leave it empty when all giving flows through the single sponsorship form (classic setup: unmatched payments there — e.g. a wrong-form general donation — still surface on the thank-you list).
+5. **Copy the form's public URL** → `ZEFFY_FORM_URL` (where checkout sends donors).
+6. **Register the webhook** — Settings → Integrations → Webhook:
    - URL: `https://yourdomain.com/api/zeffy/webhook` (Traefik routes `/api` to the backend; `http://localhost/api/zeffy/webhook` while testing on the dev stack)
    - Subscribe to the payment-completed event (`payment.completed`)
    - Copy the `whsec_...` signing secret → `ZEFFY_WEBHOOK_SECRET`
@@ -150,7 +151,8 @@ A payment can be applied by three paths, all idempotent:
 |-----|-------|
 | `ZEFFY_API_KEY` | Org API key (Settings → Integrations); checkout/confirm return 503 without it |
 | `ZEFFY_FORM_URL` | Public URL of the dedicated sponsorship form |
-| `ZEFFY_CAMPAIGN_ID` | UUID of that form's campaign; other campaigns' payments are ignored |
+| `ZEFFY_CAMPAIGN_ID` | UUID of that form's campaign; other campaigns' payments are ignored (except the general-donation campaign) |
+| `ZEFFY_GENERAL_CAMPAIGN_ID` | UUID of the separate general-donation form's campaign (optional); its payments feed the admin thank-you list only — empty = classic single-campaign setup |
 | `ZEFFY_WEBHOOK_SECRET` | `whsec_...` from the webhook registration; empty = webhook disabled (503) |
 | `ZEFFY_API_BASE` | Local `zeffy-mock` only — remove for real deployments (defaults to `https://api.zeffy.com`) |
 | `ZEFFY_MIN_INTERVAL_SECONDS` | Min spacing between outbound Zeffy calls (default 3; 0 disables — mock only) |

@@ -61,6 +61,7 @@ All app code lives under `app/` (flat, no subdirectories):
 | `admin_campaigns.py` | Admin email campaigns (batch email: create/preview/list/detail/cancel) |
 | `admin_deadlines.py` | Admin CRUD for event deadlines (no `columns`/pagination, hard delete) |
 | `admin_zeffy.py` | Admin Zeffy payment reconciliation (list payments, manual match/unmatch) |
+| `admin_thank_you.py` | Admin thank-you emails (donors owed a thank-you: fulfilled sponsors + general donors, mark/unmark thanked) |
 | `config.py` | Business logic constants (e.g. `MAX_FAMILY_PERSONS`, `GIFT_CLAIM_CAP`) |
 | `deadlines.py` | Deadline enforcement (armed checks, batch actions, daily background task) |
 | `payments.py` | Cash-claim payment lifecycle (shared idempotent apply path, hourly expiry sweep) |

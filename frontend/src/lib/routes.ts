@@ -40,6 +40,7 @@ export const ROUTES = {
   ADMIN_EMAILS: "/admin/emails",
   ADMIN_ZEFFY_PAYMENTS: "/admin/zeffy-payments",
   ADMIN_SPONSORSHIPS: "/admin/sponsorships",
+  ADMIN_THANK_YOU: "/admin/thank-you",
 
   // ── Referrer self-service ─────────────────────────────────
   REFERRER_FAMILIES: "/referrer/families",
