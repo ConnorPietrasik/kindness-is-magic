@@ -14,7 +14,7 @@ httpx==0.28.1
 # framework, validation, rate-limit, and SMTP behavior. Bump deliberately
 # (re-resolve + full CI); keep starlette in sync with requirements-test.txt.
 starlette==1.10.0
-pydantic==2.14.3
+pydantic==2.14.4
 anyio==4.16.0
 limits==5.8.0
 aiosmtplib==5.1.3
