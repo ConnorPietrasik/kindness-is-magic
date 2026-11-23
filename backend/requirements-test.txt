@@ -14,3 +14,6 @@ pytest-xdist>=3.6
 # families), which fails on code written against 0.15 defaults. Lint results
 # must be bit-identical between the local venv and CI.
 ruff==0.15.21
+# Pinned exactly: CI (and local runs) must audit against the same tool
+# version, or findings differ bit-for-bit between the two.
+pip-audit==2.10.1

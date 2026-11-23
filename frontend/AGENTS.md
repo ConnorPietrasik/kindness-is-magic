@@ -125,6 +125,7 @@ Changes should:
 - compile (`npm run typecheck`)
 - pass lint with no errors or warnings (`npm run lint`)
 - pass tests (`npm run test`)
+- when `package-lock.json` changes: `npm audit --omit=dev` clean (CI enforces this on every PR)
 - follow existing project patterns
 - avoid introducing duplicate abstractions
 - make sure help pages are still accurate

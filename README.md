@@ -107,13 +107,18 @@ containers, volumes, and networks, including the database (`DEBUG=true` only).
 ## CI
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master` and
-on pull requests, with three parallel jobs: **backend** (ruff check + format,
-pytest against an ephemeral Postgres service container), **frontend**
-(typecheck, lint, Vitest, production build), and **e2e** (typecheck,
-Playwright suite). The e2e job spins up its own disposable dev stack at
-`http://localhost` from the repo — nothing to prepare locally. The Deploy
-(CD) workflow reuses this suite as its release gate via `workflow_call` —
-see **Releases (CD)** below.
+on pull requests, with three parallel jobs: **backend** (pip-audit on the
+pinned requirements, ruff check + format, pytest against an ephemeral
+Postgres service container), **frontend** (npm audit on the locked
+production tree, typecheck, lint, Vitest, production build), and **e2e**
+(npm audit, typecheck, Playwright suite). The e2e job spins up its own
+disposable dev stack at `http://localhost` from the repo — nothing to prepare
+locally.
+Dependabot (`.github/dependabot.yml`) opens weekly bump PRs for the
+`backend`/`frontend`/`e2e` dependency sets; each PR is merged only after the
+full suite passes, and the audit steps above keep pinned versions honest
+between bumps. The Deploy (CD) workflow reuses this suite as its release
+gate via `workflow_call` — see **Releases (CD)** below.
 
 ## Configuration
 

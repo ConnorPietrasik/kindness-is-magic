@@ -1,0 +1,23 @@
+# Weekly dependency-bump PRs. Every PR runs the full ci.yml suite (it fires
+# on all pull requests), so a bump is merged only after the same gate as any
+# other change — the "bump deliberately (re-resolve + full CI)" policy from
+# backend/requirements.txt, with the PR drafted for us. Security advisories
+# for already-pinned versions are picked up here as well as in the CI audit
+# steps (pip-audit / npm audit), which fail the build if a pinned version is
+# known-vulnerable. The pip entry covers BOTH requirements files in /backend
+# in one PR — keep the starlette pin in sync across them (see the comment in
+# requirements-test.txt).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"

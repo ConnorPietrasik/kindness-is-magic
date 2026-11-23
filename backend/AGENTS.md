@@ -132,5 +132,6 @@ After making code changes:
 
 - `../.venv/bin/ruff check .` and `../.venv/bin/ruff format --check .` clean
 - `./run_tests.sh` green
+- When `requirements*.txt` change: `../.venv/bin/pip-audit --strict -r requirements.txt -r requirements-test.txt` clean (CI enforces this on every PR)
 
 

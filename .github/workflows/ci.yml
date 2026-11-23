@@ -51,9 +51,20 @@ jobs:
         run: |
           # Root .venv: run_tests.sh hardcodes ../.venv/bin/python (same venv
           # as the local dev workflow). requirements-test.txt pulls in
-          # requirements.txt + ruff, covering the whole DoD in one install.
+          # requirements.txt + ruff + pip-audit, covering the whole DoD in one
+          # install.
           python -m venv .venv
           .venv/bin/pip install -r backend/requirements-test.txt
+      - name: pip-audit (prod + test requirements)
+        working-directory: backend
+        # Advisory gate for the pinned set: pip-audit resolves each file
+        # (transitives included) against the PyPI advisory database and exits
+        # non-zero on a hit. Runs before the suite so a newly published CVE
+        # fails fast. Range specs in requirements-test.txt (pytest>=...) are
+        # resolved to the latest satisfying version — the same one CI's pip
+        # install picks up. --strict makes tool warnings (e.g. an entry that
+        # stops resolving) fail the gate instead of degrading silently.
+        run: ../.venv/bin/pip-audit --strict -r requirements.txt -r requirements-test.txt
       - name: Ruff check
         working-directory: backend
         run: ../.venv/bin/ruff check .
@@ -81,6 +92,11 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+      - name: npm audit (production deps)
+        working-directory: frontend
+        # Audits the locked production tree (what ships in the bundle).
+        # Dev-only findings (build tooling) are deliberately out of scope.
+        run: npm audit --omit=dev
       - name: Typecheck
         working-directory: frontend
         run: npm run typecheck
@@ -109,6 +125,11 @@ jobs:
       - name: Install e2e dependencies
         working-directory: e2e
         run: npm ci
+      - name: npm audit
+        working-directory: e2e
+        # Full tree on purpose: every e2e dependency is devDependencies, so
+        # --omit=dev would audit nothing and always pass (a fake gate).
+        run: npm audit
       - name: Typecheck
         working-directory: e2e
         run: npm run typecheck
