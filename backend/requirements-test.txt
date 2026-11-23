@@ -1,5 +1,5 @@
 -r requirements.txt
-pytest>=7.4
+pytest>=9.2.0
 httpx>=0.28
 # Pinned exactly: starlette (unpinned, via fastapi>=0.46.0) switched its
 # TestClient to httpx2, and httpx2 2.16's IndexedCookieJar orders duplicate
