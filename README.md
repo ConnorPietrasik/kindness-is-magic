@@ -27,7 +27,7 @@ User-facing documentation lives in the app itself: every authenticated role gets
 
 | Layer | Stack |
 |-------|-------|
-| Backend | Python 3.11, FastAPI, SQLAlchemy 2.0, Alembic, PyJWT, bcrypt, psycopg 3, slowapi, fastapi-mail |
+| Backend | Python 3.14, FastAPI, SQLAlchemy 2.1, Alembic, PyJWT, bcrypt, psycopg 3, slowapi, fastapi-mail |
 | Frontend | React 19, Vite, TypeScript, React Query, Tailwind CSS 4, Biome |
 | Database | PostgreSQL 15 |
 | Tests | pytest (+ xdist), Vitest, Playwright |

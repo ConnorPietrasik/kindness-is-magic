@@ -4,6 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    // TS 7 dropped the old implicit auto-inclusion of node_modules/@types;
+    // name the ones this project relies on for globals (process, Buffer, ...).
+    "types": ["node"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

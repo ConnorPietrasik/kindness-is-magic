@@ -549,6 +549,37 @@ class TestPeopleSearch:
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
+    def test_wish_search_with_non_id_sort(self, test_client: TestClient, admin_user, family_record, db: Session):
+        # Regression: dedup via DISTINCT ON (person.id) made any sort whose
+        # leading ORDER BY isn't person.id fail with 500 ("SELECT DISTINCT ON
+        # expressions must match initial ORDER BY expressions").
+        from app.models import Person, PersonRole, Wish, WishType
+
+        # Alice has two matching wishes so the join really does duplicate rows.
+        p1 = Person(family_id=family_record.id, given_name="Alice", age=10, role=PersonRole.son)
+        db.add(p1)
+        db.flush()
+        db.add(Wish(person_id=p1.id, type=WishType.fun, description="Lego set"))
+        db.add(Wish(person_id=p1.id, type=WishType.practical, description="Lego truck"))
+
+        p2 = Person(family_id=family_record.id, given_name="Bob", age=10, role=PersonRole.son)
+        db.add(p2)
+        db.flush()
+        db.add(Wish(person_id=p2.id, type=WishType.fun, description="Art supplies"))
+        db.commit()
+        _admin_login(test_client)
+
+        resp = test_client.get("/api/admin/people", params={"search_wish": "Lego", "sort": "given_name"})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["people"][0]["given_name"] == "Alice"
+
+        # The broad `search` param goes through the same join/dedup path.
+        resp = test_client.get("/api/admin/people", params={"search": "Lego", "sort": "-age"})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["total"] == 1
+
     def test_targeted_filters_combine_with_and(self, test_client: TestClient, admin_user, family_record, db: Session):
         from app.models import Person, PersonRole, Wish, WishType
 

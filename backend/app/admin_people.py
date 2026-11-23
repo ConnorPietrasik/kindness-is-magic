@@ -120,9 +120,11 @@ def list_people(
         query = query.filter(Person.age <= max_age)
 
     # Deduplicate when wish join is active (a person with multiple wishes would
-    # otherwise appear multiple times in the result set).
+    # otherwise appear multiple times in the result set). Plain DISTINCT is
+    # safe: the join only duplicates identical person rows. (DISTINCT ON
+    # person.id would reject any sort whose leading ORDER BY isn't person.id.)
     if needs_wish_search:
-        query = query.distinct(Person.id)
+        query = query.distinct()
 
     total = query.count()
     offset = (page - 1) * page_size

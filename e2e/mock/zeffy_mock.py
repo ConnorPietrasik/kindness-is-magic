@@ -1,6 +1,6 @@
 """Mock Zeffy API + donation form for the dev/e2e stack.
 
-Runs as the ``zeffy-mock`` compose service (python:3.11-slim, stdlib only) so
+Runs as the ``zeffy-mock`` compose service (python:3.14-slim, stdlib only) so
 the full cash-sponsorship flow — checkout, manual confirm, admin
 unmatched-payments page, manual match — works end to end without a single
 call to the real, org-rate-limited Zeffy API.

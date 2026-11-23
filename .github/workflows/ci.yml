@@ -40,9 +40,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          # Matches the backend Dockerfile / compose test service; the local
-          # dev venv is newer and the suite is version-agnostic (pytest.ini).
-          python-version: "3.11"
+          # Matches the backend Dockerfile / compose test service and the
+          # local dev venv (python3.14); the suite is version-agnostic
+          # (pytest.ini).
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: |
             backend/requirements-test.txt
@@ -85,8 +86,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 20 matches frontend/Dockerfile (node:20-alpine).
-          node-version: 20
+          # Node 26 matches frontend/Dockerfile (node:26-alpine).
+          node-version: 26
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
@@ -119,7 +120,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 26 matches the host toolchain and frontend/Dockerfile
+          # (node:26-alpine).
+          node-version: 26
           cache: npm
           cache-dependency-path: e2e/package-lock.json
       - name: Install e2e dependencies

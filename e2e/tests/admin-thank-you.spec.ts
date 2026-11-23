@@ -153,7 +153,15 @@ test.describe.serial("Admin thank-you emails (Zeffy mock)", () => {
       await expect(sponsorRow).toContainText("Not thanked");
 
       await page.goto("/admin/zeffy-payments");
-      await page.getByRole("button", { name: "Sync with Zeffy" }).click();
+      // Wait for the sync the click triggers: the POST is issued a tick
+      // after the click resolves, and navigating to the thank-you page
+      // before it completes aborts it — the general donor would never
+      // reach the mirror and the assertions below would time out.
+      const [syncRes] = await Promise.all([
+        page.waitForResponse((res) => res.url().includes("/api/admin/zeffy/sync")),
+        page.getByRole("button", { name: "Sync with Zeffy" }).click(),
+      ]);
+      expect(syncRes.status()).toBe(200);
       // The general donor's payment is on the separate general-donation
       // campaign — the sync pulls it into the mirror, but it never appears
       // on the reconciliation page (the thank-you page is where it surfaces)

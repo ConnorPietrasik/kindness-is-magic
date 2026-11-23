@@ -2,7 +2,7 @@
 
 ## Stack
 
-- **FastAPI** + **SQLAlchemy 2.0** (declarative models) + **Alembic** for migrations
+- **FastAPI** + **SQLAlchemy 2.1** (declarative models) + **Alembic** for migrations
 - **PyJWT** for auth (access tokens + refresh tokens), **bcrypt** for password hashing
 - **psycopg** (v3) for Postgres
 - **slowapi** for rate limiting
@@ -10,7 +10,7 @@
 
 ## Runtime
 
-- **Python 3.11** (Docker image `python:3.11-slim`).
+- **Python 3.14** (Docker image `python:3.14-slim`).
 - Do not upgrade dependencies unless requested.
 
 ## Logging

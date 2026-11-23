@@ -1,7 +1,9 @@
 line-length = 140
 
-# Match the production runtime (backend/Dockerfile: python:3.11-slim) so the
-# formatter never emits 3.12+ syntax (e.g. same-quoted nested f-strings).
+# Deliberately below the production runtime (backend/Dockerfile:
+# python:3.14-slim): keeps the pinned ruff from emitting 3.12+ syntax (e.g.
+# same-quoted nested f-strings) or shifting lint rule selection, which a
+# py314 target would reformat across the codebase.
 target-version = "py311"
 
 [lint]

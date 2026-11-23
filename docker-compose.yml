@@ -96,7 +96,7 @@ services:
   # real, org-rate-limited Zeffy API. The dev/e2e .env points ZEFFY_API_BASE
   # here; real deployments leave it unset. Payments are in-memory only.
   zeffy-mock:
-    image: python:3.11-slim
+    image: python:3.14-slim
     working_dir: /mock
     command: python zeffy_mock.py
     volumes:
