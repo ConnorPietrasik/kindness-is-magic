@@ -23,6 +23,23 @@ def _referrer_login(client: TestClient) -> dict:
     return login_as(client, "referrer@test.com", "RefPass1234!")
 
 
+def _create_admin_user(db: Session, email: str):
+    """Create and commit an extra admin-role user (for last-admin guard tests)."""
+    from app.models import User, UserRole
+    from app.auth import get_password_hash
+
+    u = User(
+        email=email,
+        hashed_password=get_password_hash("AdminPass123!"),
+        role=UserRole.admin,
+        display_name=None,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
 # =========================================================================
 #  Admin — List Users
 # =========================================================================
@@ -519,8 +536,9 @@ class TestAdminUpdateUser:
         body = resp.json()
         assert body["display_name"] == "Updated Name"
 
-    def test_200_update_to_referrer(self, test_client: TestClient, admin_user, referrer_record):
+    def test_200_update_to_referrer(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         _admin_login(test_client)
+        _create_admin_user(db, "second_admin@test.com")  # so admin_user is not the last admin
         resp = test_client.patch(
             f"/api/admin/users/{admin_user.id}",
             json={"role": "referrer", "referrer_id": referrer_record.id},
@@ -530,8 +548,9 @@ class TestAdminUpdateUser:
         assert body["role"] == "referrer"
         assert body["referrer_id"] == referrer_record.id
 
-    def test_200_update_to_family(self, test_client: TestClient, admin_user, family_record):
+    def test_200_update_to_family(self, test_client: TestClient, admin_user, family_record, db: Session):
         _admin_login(test_client)
+        _create_admin_user(db, "second_admin@test.com")  # so admin_user is not the last admin
         resp = test_client.patch(
             f"/api/admin/users/{admin_user.id}",
             json={"role": "family", "family_id": family_record.id},
@@ -540,6 +559,33 @@ class TestAdminUpdateUser:
         body = resp.json()
         assert body["role"] == "family"
         assert body["family_id"] == family_record.id
+
+    def test_409_demote_last_admin(self, test_client: TestClient, admin_user, db: Session):
+        """Demoting the only active admin is rejected and the role is unchanged."""
+        from app.models import UserRole
+
+        _admin_login(test_client)
+        resp = test_client.patch(
+            f"/api/admin/users/{admin_user.id}",
+            json={"role": "donor"},
+        )
+        assert resp.status_code == 409
+        db.refresh(admin_user)
+        assert admin_user.role == UserRole.admin
+
+    def test_200_demote_soft_deleted_admin(self, test_client: TestClient, admin_user, db: Session):
+        """The guard only counts active admins — a soft-deleted admin can be demoted."""
+        _admin_login(test_client)
+        target = _create_admin_user(db, "softdel_demote@test.com")
+        target.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = test_client.patch(
+            f"/api/admin/users/{target.id}",
+            json={"role": "donor"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["role"] == "donor"
 
     def test_200_update_soft_deleted_user(self, test_client: TestClient, admin_user, db: Session):
         from app.models import User, UserRole
@@ -565,16 +611,18 @@ class TestAdminUpdateUser:
         body = resp.json()
         assert body["display_name"] == "Updated While Deleted"
 
-    def test_422_role_change_to_referrer_without_fk(self, test_client: TestClient, admin_user):
+    def test_422_role_change_to_referrer_without_fk(self, test_client: TestClient, admin_user, db: Session):
         _admin_login(test_client)
+        _create_admin_user(db, "second_admin@test.com")  # so admin_user is not the last admin
         resp = test_client.patch(
             f"/api/admin/users/{admin_user.id}",
             json={"role": "referrer"},
         )
         assert resp.status_code == 422
 
-    def test_422_role_change_to_family_without_fk(self, test_client: TestClient, admin_user):
+    def test_422_role_change_to_family_without_fk(self, test_client: TestClient, admin_user, db: Session):
         _admin_login(test_client)
+        _create_admin_user(db, "second_admin@test.com")  # so admin_user is not the last admin
         resp = test_client.patch(
             f"/api/admin/users/{admin_user.id}",
             json={"role": "family"},
@@ -636,6 +684,7 @@ class TestAdminUpdateUser:
         from app.models import Referrer
 
         _admin_login(test_client)
+        _create_admin_user(db, "second_admin@test.com")  # so admin_user is not the last admin
         ref = Referrer(name="Deleted Ref 2", family_limit=5, phone_number="555-888-8888", family_invite_code="KFI-DELT02")
         ref.deleted_at = datetime.now(timezone.utc)
         db.add(ref)
@@ -794,6 +843,14 @@ class TestAdminResetPassword:
 
 
 class TestAdminDeleteUser:
+    def test_409_delete_last_admin(self, test_client: TestClient, admin_user, db: Session):
+        """Deleting the only active admin is rejected and the user stays active."""
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/users/{admin_user.id}")
+        assert resp.status_code == 409
+        db.refresh(admin_user)
+        assert admin_user.deleted_at is None
+
     def test_204_success(self, test_client: TestClient, admin_user, db: Session):
         from app.models import User, UserRole
         from app.auth import get_password_hash

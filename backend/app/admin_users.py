@@ -136,6 +136,11 @@ user_admin_router = APIRouter(
 )
 
 
+def _active_admin_count(db: Session) -> int:
+    """Count active (non-soft-deleted) admin users."""
+    return db.query(User).filter(User.role == UserRole.admin, User.deleted_at.is_(None)).count()
+
+
 def _apply_role_filter(query, roles: str | None):
     """Apply role filtering to a user query.
 
@@ -347,6 +352,19 @@ def update_user(
     # Intentionally uses get_or_404 (not get_active_or_404) so admins can modify soft-deleted users.
     user = get_or_404(db, User, user_id, "User not found")
 
+    # Never allow the last active admin to be demoted away from the admin role.
+    if (
+        body.role is not None
+        and body.role != UserRole.admin
+        and user.role == UserRole.admin
+        and user.deleted_at is None
+        and _active_admin_count(db) == 1
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot demote the last active admin. Create or promote another admin first.",
+        )
+
     # Resolve sentinels so validation sees the effective values (0/'' → _CLEAR).
     update_data = body.model_dump(exclude_unset=True)
     resolved = _resolve_sentinels(user, update_data)
@@ -424,6 +442,16 @@ def delete_user(
     _admin: User = Depends(require_admin),
 ) -> Response:
     user = get_active_or_404(db, User, user_id, "User not found")
+
+    # Never allow the last active admin to be deleted (it would leave the app
+    # with no way to manage users, and the bootstrap seeder won't revive the
+    # soft-deleted ADMIN_EMAIL row).
+    if user.role == UserRole.admin and _active_admin_count(db) == 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete the last active admin. Create or promote another admin first.",
+        )
+
     user.deleted_at = datetime.now(timezone.utc)
     # Unassign delivery families so they are not orphaned
     db.query(Family).filter(Family.delivery_user_id == user_id).update({Family.delivery_user_id: None}, synchronize_session=False)
