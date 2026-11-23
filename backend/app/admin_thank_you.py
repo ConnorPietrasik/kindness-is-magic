@@ -118,7 +118,7 @@ def _general_donation_rows(db: Session):
         )
         .filter(
             ZeffyPaymentRecord.buyer_email.isnot(None),
-            ZeffyPaymentRecord.refund_status != "refunded",
+            ZeffyPaymentRecord.refund_status != "full",
             ZeffyPaymentRecord.payment_id.notin_(live_payment_ids),
         )
         .order_by(ZeffyPaymentRecord.created_at, ZeffyPaymentRecord.id)
@@ -241,7 +241,7 @@ def _is_current_candidate(db: Session, email: str) -> bool:
         db.query(ZeffyPaymentRecord.id)
         .filter(
             func.lower(ZeffyPaymentRecord.buyer_email) == email,
-            ZeffyPaymentRecord.refund_status != "refunded",
+            ZeffyPaymentRecord.refund_status != "full",
             ZeffyPaymentRecord.payment_id.notin_(live_payment_ids),
         )
         .first()

@@ -393,7 +393,7 @@ class TestSync:
                     200, json={"id": CAMPAIGN_ID, "title": "t", "url": "u", "status": "active", "type": "donation_form", "currency": "usd"}
                 )
             raw_refunded = dict(raw)
-            raw_refunded["refund_status"] = "refunded"
+            raw_refunded["refund_status"] = "full"
             raw_refunded["amount"] = 99_000
             return httpx.Response(200, json=_envelope([raw_refunded]))
 
@@ -408,7 +408,7 @@ class TestSync:
         assert resp.json() == {"new_count": 0, "updated_count": 1}
 
         db.refresh(record)
-        assert record.refund_status == "refunded"
+        assert record.refund_status == "full"
         assert record.amount_cents == 99_000
         assert record.seen_at is not None  # attention state untouched
 
@@ -848,7 +848,7 @@ class TestMatch:
         record = _seed_mirror(db, _payment_raw(id="pay-fresh", amount=50_000, email=DONOR1_EMAIL))
 
         fresh = _payment_raw(id="pay-fresh", amount=50_000, email=DONOR1_EMAIL)
-        fresh["refund_status"] = "refunded"
+        fresh["refund_status"] = "full"
         _configure_zeffy(monkeypatch, payments=[fresh])
         _login_admin(test_client)
 
@@ -857,7 +857,7 @@ class TestMatch:
         assert "already matched" in resp.json()["detail"]
 
         db.refresh(record)
-        assert record.refund_status == "refunded"  # fresh state persisted despite the rejection
+        assert record.refund_status == "full"  # fresh state persisted despite the rejection
         db.refresh(c1)
         assert c1.payment_status == ClaimPaymentStatus.pending  # nothing applied
 

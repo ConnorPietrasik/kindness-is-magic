@@ -925,6 +925,8 @@ class ZeffyPaymentRecord(Base):
     # known row refresh these (e.g. a refund), so the page shows a fresh
     # state.
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Zeffy's refund_status enum: "none" | "partial" | "full" (stored
+    # verbatim; "full" is the fully-refunded state).
     refund_status: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
     # Admin "seen" acknowledgment (banner suppression), set/cleared by the
     # seen endpoints; cleared again by the apply path on match.

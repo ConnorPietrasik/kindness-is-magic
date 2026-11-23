@@ -265,9 +265,14 @@ export default function AdminZeffyPayments() {
                           Unmatched
                         </span>
                       )}
-                      {payment.refund_status !== "none" && (
+                      {payment.refund_status === "full" && (
                         <span className="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
                           Refunded
+                        </span>
+                      )}
+                      {payment.refund_status === "partial" && (
+                        <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          Partially refunded
                         </span>
                       )}
                       {payment.matched && payment.claim_ids.length > 0 && (

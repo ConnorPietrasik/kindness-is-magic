@@ -1103,7 +1103,7 @@ export interface ZeffyPayment {
   matched: boolean;
   /** The admin's "no action needed" acknowledgment (null = still waiting). */
   seen_at: string | null;
-  /** "none" | "refunded" | … — refreshed by the match endpoint and the sync walk's newest known row. */
+  /** "none" | "partial" | "full" (Zeffy's refund_status enum) — refreshed by the match endpoint and the sync walk's newest known row. */
   refund_status: string;
 }
 

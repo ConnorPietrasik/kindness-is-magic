@@ -63,7 +63,14 @@ const refundedPayment: ZeffyPayment = {
   ...unmatchedPayment,
   id: "0195f3a2-bb0c-7b00-8000-000000000005",
   buyer_email: "refunded@example.com",
-  refund_status: "refunded",
+  refund_status: "full",
+};
+
+const partiallyRefundedPayment: ZeffyPayment = {
+  ...unmatchedPayment,
+  id: "0195f3a2-bb0c-7b00-8000-000000000006",
+  buyer_email: "partial@example.com",
+  refund_status: "partial",
 };
 
 /** Standard page envelope for a mocked list response. */
@@ -229,13 +236,14 @@ describe("AdminZeffyPayments", () => {
     expect(await screen.findByText("user29@example.com")).toBeInTheDocument();
   });
 
-  it("shows a refunded chip when the snapshot indicates a refund", async () => {
-    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([refundedPayment]));
+  it("shows a refund chip matching the snapshot's refund status (full vs. partial)", async () => {
+    vi.spyOn(api, "adminListZeffyPayments").mockResolvedValue(pageResponse([refundedPayment, partiallyRefundedPayment]));
 
     wrap();
 
     expect(await screen.findByText("refunded@example.com")).toBeInTheDocument();
     expect(screen.getByText("Refunded")).toBeInTheDocument();
+    expect(screen.getByText("Partially refunded")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no unmatched payments", async () => {

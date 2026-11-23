@@ -263,14 +263,14 @@ class TestListCandidates:
 
     def test_anonymous_and_refunded_payments_excluded(self, test_client: TestClient, admin_user, db: Session):
         _payment(db, "anon", None)
-        _payment(db, "refunded", "refunded@test.com", refund_status="refunded")
+        _payment(db, "refunded", "refunded@test.com", refund_status="full")
         _login_admin(test_client)
 
         body = test_client.get("/api/admin/thank-you").json()
         assert body["total"] == 0
 
     def test_partially_refunded_payment_included(self, test_client: TestClient, admin_user, db: Session):
-        _payment(db, "partial", "partial@test.com", refund_status="partially_refunded")
+        _payment(db, "partial", "partial@test.com", refund_status="partial")
         _login_admin(test_client)
 
         body = test_client.get("/api/admin/thank-you").json()
@@ -308,7 +308,7 @@ class TestListCandidates:
         assert body["donors"][0]["source"] == "general"
 
     def test_refunded_general_campaign_payment_excluded(self, test_client: TestClient, admin_user, db: Session):
-        _payment(db, "gc-ref", "gc-ref@test.com", name="GC Ref", campaign_id="c-general", refund_status="refunded")
+        _payment(db, "gc-ref", "gc-ref@test.com", name="GC Ref", campaign_id="c-general", refund_status="full")
         _login_admin(test_client)
 
         assert test_client.get("/api/admin/thank-you").json()["total"] == 0
