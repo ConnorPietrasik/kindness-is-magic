@@ -95,13 +95,13 @@ containers, volumes, and networks, including the database (`DEBUG=true` only).
 - **Frontend** — Vitest (unit/integration, jsdom):
 
   ```bash
-  cd frontend && npm run test                  # plus: npm run typecheck, npm run lint
+  cd frontend && npm run typecheck && npm run lint && npm run test
   ```
 
 - **E2E** — Playwright against the running dev stack (creates its own data + relies on info from the demo import):
 
   ```bash
-  cd e2e && npx playwright test
+  cd e2e && npm run typecheck && npx playwright test
   ```
 
 ## CI
@@ -109,8 +109,8 @@ containers, volumes, and networks, including the database (`DEBUG=true` only).
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master` and
 on pull requests, with three parallel jobs: **backend** (ruff check + format,
 pytest against an ephemeral Postgres service container), **frontend**
-(typecheck, lint, Vitest, production build), and **e2e** (the Playwright
-suite). The e2e job spins up its own disposable dev stack at
+(typecheck, lint, Vitest, production build), and **e2e** (typecheck,
+Playwright suite). The e2e job spins up its own disposable dev stack at
 `http://localhost` from the repo — nothing to prepare locally. The Deploy
 (CD) workflow reuses this suite as its release gate via `workflow_call` —
 see **Releases (CD)** below.

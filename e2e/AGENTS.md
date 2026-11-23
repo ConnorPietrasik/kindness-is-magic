@@ -27,6 +27,14 @@ npx playwright test tests/admin-*.spec.ts
 npx playwright test tests/role-*.spec.ts
 ```
 
+## Typecheck
+
+Typecheck must pass to be considered done after working on e2e tests.
+
+```bash
+cd /dockerx/e2e && npm run typecheck
+```
+
 ## Architecture
 
 Each test file is self-contained and creates its own data. Tests that need authenticated sessions create their own browser contexts with storageState files — do not rely on project-level storageState. The five storageState accounts (admin, referrer, family, purchaser, delivery) exist before any test runs, even with `--grep` — the admin is the bootstrap admin from `.env` (`ADMIN_EMAIL`/`ADMIN_PASSWORD`); the other four are CSV-seeded.
