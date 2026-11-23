@@ -6,7 +6,7 @@ httpx>=0.28
 # cookies by domain instead of insertion order — test behavior must be
 # identical in the local venv and CI, so pin both to the same versions.
 # Bump together, then re-run the backend suite.
-httpx2==2.16.0
+httpx2==2.16.2
 starlette==1.10.0
 pytest-asyncio>=0.21
 pytest-xdist>=3.6
