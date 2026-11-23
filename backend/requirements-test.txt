@@ -8,8 +8,8 @@ httpx>=0.28
 # both to the same versions. Bump together, then re-run the backend suite.
 httpx2==2.16.2
 starlette==1.10.0
-pytest-asyncio>=0.21
-pytest-xdist>=3.6
+pytest-asyncio>=1.5.0
+pytest-xdist>=3.8.0
 # Pinned exactly: ruff changed its default lint rule set in 0.16 (adds B/I/S/UP
 # families), which fails on code written against 0.15 defaults. Lint results
 # must be bit-identical between the local venv and CI.
