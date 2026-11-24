@@ -1,4 +1,3 @@
-Remove the (already shopping) note from the public families view
 Rename "reset lock" button to "unapprove" to make it clear. This shouldn't send any emails.
 Add referrer_note column for admin family list / wishes
 Add CC / BCC to email thing, save email bodies, and improve the email preview to show the whole "FROM:" thing.

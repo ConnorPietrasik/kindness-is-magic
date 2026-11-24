@@ -728,8 +728,6 @@ export interface PublicFamilySummary {
    * Hidden families have no claim, so it is null for them.
    */
   claim_status: string | null;
-  /** Admin-set lock: shopping has started — cash sponsorships only. */
-  cash_only: boolean;
 }
 
 /** Mirrors backend PublicFamilyListResponse — paginated public families list. */

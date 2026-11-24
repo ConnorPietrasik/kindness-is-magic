@@ -399,18 +399,6 @@ class TestCashToGiftsGate:
 
 
 class TestPublicReads:
-    def test_public_list_carries_cash_only(self, test_client: TestClient, db: Session):
-        locked = _claimable_family(db, "Public Locked Family")
-        open_fam = _claimable_family(db, "Public Open Family")
-        locked.cash_only = True
-        db.commit()
-
-        resp = test_client.get("/api/families")
-        assert resp.status_code == 200
-        by_id = {f["id"]: f for f in resp.json()["families"]}
-        assert by_id[locked.id]["cash_only"] is True
-        assert by_id[open_fam.id]["cash_only"] is False
-
     def test_wish_list_carries_cash_only(self, test_client: TestClient, db: Session):
         fam = _claimable_family(db, "WishList Locked Family")
         fam.cash_only = True

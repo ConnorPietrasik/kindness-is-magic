@@ -1660,9 +1660,6 @@ class PublicFamilySummary(BaseModel):
     min_age: int | None = None
     max_age: int | None = None
     claim_status: str | None = None
-    # Admin-set lock: shopping has started, cash sponsorships only —
-    # donors see an "(already shopping)" marker.
-    cash_only: bool = False
 
     model_config = {"from_attributes": True}
 

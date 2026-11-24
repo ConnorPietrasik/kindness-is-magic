@@ -208,7 +208,6 @@ def list_public_families(
                 min_age=ma,
                 max_age=xa,
                 claim_status=claim_status_for(claim) if claim is not None else None,
-                cash_only=fam.cash_only,
             )
         )
 

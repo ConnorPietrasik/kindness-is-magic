@@ -2,8 +2,8 @@
  * Admin cash-only family lock ("already shopping").
  *
  * Admin locks a fully-approved family to cash sponsorships via the edit form;
- * the public browse card and wish-list page show an "(already shopping)"
- * marker, and a donor's claim modal offers cash only (no gifts option).
+ * the public wish-list page shows an "(already shopping)" marker, and a
+ * donor's claim modal offers cash only (no gifts option).
  *
  * Self-contained: all data is API-created with unique suffixes and cleaned up
  * in afterAll (only records this spec created — never CSV-seeded rows).
@@ -19,12 +19,11 @@ import {
   deleteUserViaApi,
   loginViaApi,
 } from "../helpers/api";
-import { findRowInTable, findInPaginated } from "../helpers/assertions";
+import { findRowInTable } from "../helpers/assertions";
 
 const SUFFIX = Math.random().toString(36).slice(2, 8);
 const PASSWORD = "Password123!";
 const FAMILY_NAME = `Cash Only Family ${SUFFIX}`;
-/* Unique bio — the identifying text on the public browse card */
 const BIO = `E2E cash-only family ${SUFFIX}`;
 
 const testData: {
@@ -107,19 +106,9 @@ test.describe.serial("Admin cash-only family lock", () => {
     const updatedRow = adminPage.getByRole("row").filter({ hasText: FAMILY_NAME });
     await expect(updatedRow.getByText("Cash only", { exact: true })).toBeVisible();
 
-    /* ── Public (logged out): browse card + wish-list markers ── */
+    /* ── Public (logged out): the wish-list marker ── */
     const publicContext = await browser.newContext();
     const publicPage = await publicContext.newPage();
-
-    await publicPage.goto("/families");
-    await expect(publicPage.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible();
-
-    /* The browse grid is paginated and the new family sorts to the end
-       (id ascending), so walk "Next page" until the card appears. */
-    const card = await findInPaginated(publicPage, publicPage.locator("div.grid > a").filter({ hasText: BIO }), { maxPages: 20 });
-    expect(card).not.toBeNull();
-    await expect(card!).toBeVisible();
-    await expect(card!.getByText("(already shopping)")).toBeVisible();
 
     await publicPage.goto(`/families/${testData.familyId}/wish-list`);
     await expect(publicPage.getByText("(already shopping)")).toBeVisible({ timeout: 10_000 });
