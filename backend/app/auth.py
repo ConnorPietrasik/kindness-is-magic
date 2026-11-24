@@ -90,6 +90,16 @@ def generate_unique_family_invite_code(db: "Session") -> str:
 # bcrypt only accepts passwords of at most 72 bytes (UTF-8); longer input raises ValueError.
 PASSWORD_MAX_LENGTH = 72
 
+# DUMMY_PASSWORD_HASH is a precomputed bcrypt hash (rounds=12) of DUMMY_PASSWORD.
+# Login verifies unknown emails against it so both outcomes cost the same bcrypt
+# work — the response time must not reveal whether the account exists (timing
+# oracle). The password is deliberately a known, recorded constant rather than a
+# secret: login discards this hash's verification result for unknown emails, so
+# a match there can never authenticate, and recording the password keeps the
+# committed hash auditable.
+DUMMY_PASSWORD = "kindness-is-magic-dummy-password"
+DUMMY_PASSWORD_HASH = "$2b$12$flhtsPAEoXsHkFCqA5RLpuHEMkARaVmxgOTBNNg1VgU0qtcDIMPei"
+
 
 def get_password_hash(password: str) -> str:
     """Hash a plain-text password with bcrypt (rounds=12).

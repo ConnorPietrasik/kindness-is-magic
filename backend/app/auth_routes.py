@@ -18,6 +18,7 @@ from app.auth import (
     INVITE_EXPIRY_HOURS,
     SECRET_KEY,
     ALGORITHM,
+    DUMMY_PASSWORD_HASH,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
@@ -250,7 +251,12 @@ def unsubscribe_confirm(
 def login(request: Request, data: UserLogin, response: Response, db: Session = Depends(get_db)):
     """Authenticate and set HttpOnly cookies."""
     user = db.query(User).filter(User.email == data.email).first()
-    if not user or not verify_password(data.password, user.hashed_password):
+    # Always run bcrypt — for unknown emails against a throwaway hash — so the
+    # response time can't reveal whether the account exists. The outcome is
+    # discarded for unknown emails: ``user is None`` alone fails the check,
+    # even if the password happened to match the throwaway hash.
+    matched = verify_password(data.password, user.hashed_password if user is not None else DUMMY_PASSWORD_HASH)
+    if user is None or not matched:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

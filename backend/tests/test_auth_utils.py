@@ -8,6 +8,8 @@ import pytest
 from app.auth import (
     _DEFAULT_REFRESH_SECRET_KEY,
     _DEFAULT_SECRET_KEY,
+    DUMMY_PASSWORD,
+    DUMMY_PASSWORD_HASH,
     ALGORITHM,
     REFRESH_SECRET_KEY,
     clear_auth_cookies,
@@ -74,6 +76,16 @@ class TestPasswordHashing:
         hashed = get_password_hash("a" * 72)
         assert verify_password("a" * 73, hashed) is False
         assert verify_password("中" * 25, hashed) is False
+
+    def test_dummy_password_hash_matches_recorded_password(self):
+        """DUMMY_PASSWORD_HASH must stay the hash of DUMMY_PASSWORD at rounds=12.
+
+        Login relies on it for unknown-email timing parity, so the committed
+        hash has to verify against the recorded password (auditable) and keep
+        the same bcrypt cost class as get_password_hash (rounds=12).
+        """
+        assert verify_password(DUMMY_PASSWORD, DUMMY_PASSWORD_HASH) is True
+        assert DUMMY_PASSWORD_HASH.startswith("$2b$12$")
 
 
 # ---------------------------------------------------------------------------

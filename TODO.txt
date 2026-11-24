@@ -1,3 +1,10 @@
+Remove the (already shopping) note from the public families view
+Rename "reset lock" button to "unapprove" to make it clear. This shouldn't send any emails.
+Add referrer_note column for admin family list / wishes
+Add CC / BCC to email thing, save email bodies, and improve the email preview to show the whole "FROM:" thing.
+Add a way to view incoming emails; maybe either a "new unread in {mailbox}" alert for admins with a link to gmail?
+Bump Ruff?
 Make a way for families to upload thank you pictures / cards if they want to (which admins can forward to their donor)
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak
+NEXT SEASON - Email verification
