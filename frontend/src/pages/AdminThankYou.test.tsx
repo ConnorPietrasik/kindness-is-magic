@@ -108,6 +108,20 @@ describe("AdminThankYou", () => {
     expect(within(bobRow).getByRole("button", { name: "Mark unthanked" })).toBeInTheDocument();
   });
 
+  it("renders the table at wide width by default", async () => {
+    vi.spyOn(api, "adminListThankYouDonors").mockResolvedValue(listWith(makeDonor()));
+
+    wrap();
+
+    await screen.findByText("alice@example.com");
+
+    // This page defaults to wide (its multi-line summary cells need the
+    // room) — <main> carries the width class
+    const main = document.querySelector("main");
+    expect(main).toHaveClass("max-w-7xl");
+    expect(main).not.toHaveClass("max-w-[960px]");
+  });
+
   it("shows the empty state when nothing matches", async () => {
     vi.spyOn(api, "adminListThankYouDonors").mockResolvedValue(emptyList);
 

@@ -1,3 +1,5 @@
+Add way for purchasers to print their assigned wishcards
+Make the back button include sort / filter / page status
 Rename "reset lock" button to "unapprove" to make it clear. This shouldn't send any emails.
 Add referrer_note column for admin family list / wishes
 Add CC / BCC to email thing, save email bodies, and improve the email preview to show the whole "FROM:" thing.

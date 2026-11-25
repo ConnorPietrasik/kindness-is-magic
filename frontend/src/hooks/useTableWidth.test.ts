@@ -31,8 +31,8 @@ describe("useTableWidth", () => {
     expect(result.current.widthMode).toBe("compact");
   });
 
-  it("defaults to wide for resources with a wide default", () => {
-    const { result } = renderHook(() => useTableWidth("purchaserAssignedGifts"));
+  it.each(["purchaserAssignedGifts", "adminThankYou"])("defaults to wide for %s (wide default)", (resourceKey) => {
+    const { result } = renderHook(() => useTableWidth(resourceKey));
 
     expect(result.current.widthMode).toBe("wide");
     expect(result.current.widthClass).toBe("max-w-7xl");
