@@ -284,6 +284,7 @@ export default function AdminFamilies() {
     delivery: "Delivery",
     claim: "Sponsorship",
     cash_only: "Cash Only",
+    referrer_notes: "Referrer Notes",
     phone_number: (
       <div className="flex flex-col gap-1">
         <span>Phone</span>

@@ -13,6 +13,7 @@ const ALL_COLUMNS = [
   "referrer_id",
   "delivery",
   "claim",
+  "referrer_notes",
   "phone_number",
   "person_count",
   "verification_status",
@@ -222,6 +223,23 @@ describe("FamilyTableRow", () => {
 
   it("shows an em dash in the claim cell when unclaimed", () => {
     renderRow({ visibleColumns: ["claim"] });
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows the referrer note text (with a full-text title) when present", () => {
+    renderRow({
+      family: makeFamily({ referrer_notes: "Extra attention needed" }),
+      visibleColumns: ["referrer_notes"],
+    });
+
+    const note = screen.getByText("Extra attention needed");
+    expect(note).toBeInTheDocument();
+    expect(note).toHaveAttribute("title", "Extra attention needed");
+  });
+
+  it("shows an em dash in the referrer notes cell when there is no note", () => {
+    renderRow({ visibleColumns: ["referrer_notes"] });
 
     expect(screen.getByText("—")).toBeInTheDocument();
   });

@@ -83,11 +83,6 @@ export function FamilyTableRow({
     family_name: (
       <Td className={f.deleted_at != null ? "text-gray-400" : ""}>
         {f.family_name}
-        {f.deleted_at == null && f.referrer_notes != null && (
-          <span className="ml-1 text-xs" title="Has internal notes">
-            📝
-          </span>
-        )}
         {f.deleted_at == null && !isDeletedView && f.wish_lock_level === "admin" && (
           <Link
             to={route.familyWishList(f.id)}
@@ -139,6 +134,11 @@ export function FamilyTableRow({
         ) : (
           <span className="text-xs text-gray-400">—</span>
         )}
+      </Td>
+    ),
+    referrer_notes: (
+      <Td className="max-w-xs truncate text-xs text-gray-500">
+        {f.referrer_notes ? <span title={f.referrer_notes}>{f.referrer_notes}</span> : "—"}
       </Td>
     ),
     phone_number: <Td>{f.phone_number || "—"}</Td>,

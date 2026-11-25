@@ -305,6 +305,7 @@ const familyHeaders: Record<string, React.ReactNode> = {
   delivery: "Delivery",
   claim: "Sponsorship",
   cash_only: "Cash Only",
+  referrer_notes: "Referrer Notes",
   phone_number: "Phone",
   person_count: "People",
   verification_status: "Verification",

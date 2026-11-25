@@ -35,8 +35,17 @@ import {
 
 const STORAGE_ADMIN = "storage/admin.json";
 
-/** Default AdminFamilies header order (all columns visible by default). */
-const DEFAULT_FAMILY_HEADERS = ["ID", "Family Name", "Family Wish", "Contact", "Referrer", "Cash Only", "Actions"];
+/** Default AdminFamilies header order — the registry columns that are visible by default, plus Actions. */
+const DEFAULT_FAMILY_HEADERS = [
+  "ID",
+  "Family Name",
+  "Family Wish",
+  "Contact",
+  "Referrer",
+  "Cash Only",
+  "Referrer Notes",
+  "Actions",
+];
 /** AdminFamilies header order with "Referrer" dragged before "Family Wish". */
 const REORDERED_FAMILY_HEADERS = [
   "ID",
@@ -45,6 +54,7 @@ const REORDERED_FAMILY_HEADERS = [
   "Family Wish",
   "Contact",
   "Cash Only",
+  "Referrer Notes",
   "Actions",
 ];
 
@@ -77,7 +87,7 @@ test.describe("Admin families — column order", () => {
     await expect(familyHeaders(page)).toHaveText(DEFAULT_FAMILY_HEADERS);
 
     // Drag "Referrer" onto the left edge of "Family Wish" → before it.
-    const referrer = page.getByRole("columnheader", { name: "Referrer" });
+    const referrer = page.getByRole("columnheader", { name: "Referrer", exact: true });
     const familyWish = page.getByRole("columnheader", { name: "Family Wish" });
     await referrer.dragTo(familyWish, { targetPosition: { x: 4, y: 8 } });
 
@@ -233,7 +243,7 @@ test.describe("Admin referrer families — column order (shared with main famili
     await resetColumnsViaGear(page);
     await expect(familyHeaders(page)).toHaveText(DEFAULT_FAMILY_HEADERS);
 
-    const referrer = page.getByRole("columnheader", { name: "Referrer" });
+    const referrer = page.getByRole("columnheader", { name: "Referrer", exact: true });
     const familyWish = page.getByRole("columnheader", { name: "Family Wish" });
     await referrer.dragTo(familyWish, { targetPosition: { x: 4, y: 8 } });
     await expect(familyHeaders(page)).toHaveText(REORDERED_FAMILY_HEADERS);

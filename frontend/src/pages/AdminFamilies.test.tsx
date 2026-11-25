@@ -164,6 +164,21 @@ describe("AdminFamilies", () => {
     expect(screen.getAllByText("Edit")).toHaveLength(2);
   });
 
+  it("shows the Referrer Notes header by default and renders the family's note", async () => {
+    mockListApis();
+    vi.spyOn(api, "adminListFamilies").mockResolvedValue({
+      ...mockListResponse,
+      families: [makeFamily({ id: 1, family_name: "The Noteds", referrer_notes: "Extra attention needed" })],
+    });
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("columnheader", { name: "Referrer Notes" })).toBeInTheDocument();
+    });
+    expect(await screen.findByText("Extra attention needed")).toBeInTheDocument();
+  });
+
   it("shows empty state when no families", async () => {
     vi.spyOn(api, "adminListFamilies").mockResolvedValue({ families: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
     vi.spyOn(api, "adminGetReferrersDropdown").mockResolvedValue([]);
