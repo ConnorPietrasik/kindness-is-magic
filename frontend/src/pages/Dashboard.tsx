@@ -168,6 +168,7 @@ export default function Dashboard() {
           {user?.role === "purchaser" && (
             <>
               <NavCard to={ROUTES.PURCHASER_ASSIGNED_GIFTS} icon="🎁" label="Assigned Gifts" desc="View and manage your assigned gifts" />
+              <NavCard to={ROUTES.PURCHASER_WISH_CARDS} icon="🎴" label="Wish Cards" desc="Print wish cards for your gifts" />
               <NavCard to={ROUTES.PUBLIC_FAMILIES} icon="🎯" label="Browse Families" desc="Browse and sponsor families" />
             </>
           )}

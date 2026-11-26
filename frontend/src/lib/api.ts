@@ -94,6 +94,7 @@ import type {
   UserPasswordReset,
   WishBatchAssign,
   WishBatchMarkPurchased,
+  WishCardFamily,
   WishDetail,
   WishListResponse,
   WishPurchaseMark,
@@ -709,6 +710,11 @@ export function adminBatchMarkPurchased(payload: WishBatchMarkPurchased): Promis
   return apiPost("/api/admin/wishes/batch-mark-purchased", payload);
 }
 
+/** Wish-card data for every active wish assigned to the calling admin (print sheet — no pagination). */
+export function adminGetAssignedWishCards(): Promise<WishCardFamily[]> {
+  return apiGet("/api/admin/wishes/wish-cards");
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Deadlines
 // ---------------------------------------------------------------------------
@@ -1112,6 +1118,11 @@ export function purchaserBatchMarkPurchased(payload: WishBatchMarkPurchased): Pr
 /** Partial update of purchaser_note and/or received_at on an assigned wish. */
 export function purchaserUpdateWish(wishId: number, payload: Partial<PurchaserWishUpdate>): Promise<WishDetail> {
   return apiPatch(`/api/purchaser/wishes/${wishId}`, payload);
+}
+
+/** Wish-card data for every active wish assigned to the current purchaser (print sheet — no pagination). */
+export function purchaserGetWishCards(): Promise<WishCardFamily[]> {
+  return apiGet("/api/purchaser/wish-cards");
 }
 
 // ---------------------------------------------------------------------------

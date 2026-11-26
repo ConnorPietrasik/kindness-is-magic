@@ -17,6 +17,7 @@ from app.models import Family, Person, Referrer, User, UserRole, Wish, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
+    build_wish_card_sheet,
     build_wish_detail,
     build_wish_list_item,
     get_active_or_404,
@@ -28,6 +29,7 @@ from app.schemas import (
     AdminWishUpdate,
     WishBatchAssign,
     WishBatchMarkPurchased,
+    WishCardFamily,
     WishDetail,
     WishListResponse,
     WishListSummary,
@@ -422,6 +424,33 @@ def batch_mark_purchased(
 
     logger.info("Admin batch-marked %d wishes as purchased", len(wish_ids))
     return {"marked_count": len(wish_ids)}
+
+
+@admin_wishes_router.get("/wish-cards")
+def get_wish_cards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> list[WishCardFamily]:
+    """Return wish-card data for every active wish assigned to the current admin.
+
+    The admin's own print sheet ("My Assigned Gifts"), mirroring the
+    purchaser's ``/api/purchaser/wish-cards``: no pagination — the sheet is
+    meant to be printed in one go — family blocks in the grouped default
+    list order, each leading with its family wish (when assigned), then
+    people in id order with each person's wishes in type display order.
+
+    No family PII — the card prints display IDs only.
+    """
+    wishes = (
+        db.query(Wish)
+        .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
+        .filter(Wish.deleted_at.is_(None), Wish.assigned_to_id == current_user.id)
+        .order_by(Wish.id)
+        .all()
+    )
+    result = build_wish_card_sheet(db, wishes)
+    logger.info("Admin listed wish cards (families=%d)", len(result))
+    return result
 
 
 @admin_wishes_router.get("/{wish_id}")

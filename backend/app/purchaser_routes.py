@@ -17,6 +17,7 @@ from app.models import Family, Person, User, Wish, WishType
 from app.permissions import require_purchaser
 from app.response_builders import (
     apply_purchase_fields,
+    build_wish_card_sheet,
     build_wish_detail,
     get_active_or_404,
     get_or_404,
@@ -29,6 +30,7 @@ from app.schemas import (
     WishBatchMarkPurchased,
     WishDetail,
     WishPurchaseMark,
+    WishCardFamily,
 )
 from app.search_sort import (
     PURCHASER_WISH_SORT_FIELDS,
@@ -258,6 +260,35 @@ def list_wishes(
         page_size=page_size,
         total_pages=math.ceil(total / page_size) if total else 0,
     )
+
+
+@purchaser_router.get("/wish-cards")
+def get_wish_cards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_purchaser),
+) -> list[WishCardFamily]:
+    """Return wish-card data for every active wish assigned to the current purchaser.
+
+    No pagination — the sheet is meant to be printed in one go (delivery
+    packing slips are the precedent). Wishes are grouped by owner family in
+    the list endpoint's grouped default order; each family block leads with
+    its family wish (when assigned), then people in id order with each
+    person's wishes in type display order.
+
+    No family PII — only display IDs, matching the other purchaser
+    responses; person given_name/role/age ride along for card rendering
+    (the card prints "Son Alice" / "Age 7").
+    """
+    wishes = (
+        db.query(Wish)
+        .options(joinedload(Wish.person).joinedload(Person.family), joinedload(Wish.family))
+        .filter(Wish.deleted_at.is_(None), Wish.assigned_to_id == current_user.id)
+        .order_by(Wish.id)
+        .all()
+    )
+    result = build_wish_card_sheet(db, wishes)
+    logger.info("Purchaser listed wish cards (families=%d)", len(result))
+    return result
 
 
 @purchaser_router.get("/wishes/{wish_id}")

@@ -50,6 +50,7 @@ import {
   adminFamilies,
   adminReferrerDetail,
   adminReferrerFamilies,
+  adminWishCards,
   adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES } from "../lib/routes";
@@ -171,7 +172,7 @@ export default function AdminReferrerFamilies() {
             title: "Families",
             createButtonLabel: "+ Add family",
             sortToggle: { label: "Newest first", value: "-created_at" },
-            invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies, adminWishes],
+            invalidationKeys: [familiesKey, deletedFamiliesKey, adminFamilies, adminDeletedFamilies, adminWishes, adminWishCards],
             entityName: "Family",
           }}
           tabs={{

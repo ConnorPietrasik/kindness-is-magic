@@ -106,6 +106,8 @@ test.describe("Admin Blank Wish Cards", () => {
       expect(await cards.nth(i).evaluate((el) => getComputedStyle(el).breakInside)).toBe("avoid");
     }
     await expect(page.getByRole("button", { name: "🖨️ Print" })).toBeHidden();
+    /* The app header is screen chrome — it must not print */
+    await expect(page.locator("header")).toBeHidden();
 
     /* @page margin 0 keeps the browser from drawing its print
        header/footer (date, title, URL) */

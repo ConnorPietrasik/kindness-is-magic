@@ -90,6 +90,7 @@ describe("useWishLockActions", () => {
     await seedFreshQuery(["adminReviewQueue"], "queue");
     await seedFreshQuery(["adminPackingSlips"], "slips");
     await seedFreshQuery(["adminWishes"], "wishes");
+    await seedFreshQuery(["adminWishCards"], "wishCards");
     await seedFreshQuery(["unrelatedControl"], "control");
 
     const { result } = renderHook(() => useWishLockActions(), { wrapper });
@@ -102,6 +103,7 @@ describe("useWishLockActions", () => {
     expect(queryClient.getQueryState(["adminReviewQueue"])?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(["adminPackingSlips"])?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(["adminWishes"])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(["adminWishCards"])?.isInvalidated).toBe(true);
     // Unrelated caches are untouched
     expect(queryClient.getQueryState(["unrelatedControl"])?.isInvalidated).toBe(false);
   });

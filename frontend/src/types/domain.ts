@@ -876,6 +876,26 @@ export interface PurchaserWishUpdate {
   received_at?: string | null;
 }
 
+/** Mirrors WishCardPerson (no family PII). */
+export interface WishCardPerson {
+  display_id: string;
+  given_name: string;
+  role: PersonRole;
+  age: number;
+  wishes: DonorWishSummary[];
+}
+
+/**
+ * Mirrors WishCardFamily — one family block on a wish-card sheet (no
+ * family PII). A family appears iff ≥1 of its wishes is assigned; the
+ * ``family_wish`` is set iff the family wish itself is.
+ */
+export interface WishCardFamily {
+  display_id: string;
+  family_wish: DonorWishSummary | null;
+  people: WishCardPerson[];
+}
+
 // ---------------------------------------------------------------------------
 // Donor / Claims
 // ---------------------------------------------------------------------------

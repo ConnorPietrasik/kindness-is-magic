@@ -38,6 +38,7 @@ const AdminDeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() 
 const AdminWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishCards"));
 const AdminWishes: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminWishes"));
 const AdminAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminAssignedGifts"));
+const AdminAssignedWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminAssignedWishCards"));
 const AdminEmails: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminEmails"));
 const AdminZeffyPayments: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminZeffyPayments"));
 const AdminSponsorships: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/AdminSponsorships"));
@@ -45,6 +46,7 @@ const AdminThankYou: LazyExoticComponent<ComponentType<unknown>> = lazy(() => im
 const FamilyWishList: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishList"));
 const FamilyWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/FamilyWishCards"));
 const PurchaserAssignedGifts: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserAssignedGifts"));
+const PurchaserWishCards: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/PurchaserWishCards"));
 const DeliveryDashboard: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryDashboard"));
 const DeliveryPackingSlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliveryPackingSlips"));
 const DeliverySlips: LazyExoticComponent<ComponentType<unknown>> = lazy(() => import("./pages/DeliverySlips"));
@@ -229,6 +231,14 @@ export default function App() {
             }
           />
           <Route
+            path={ROUTES.ADMIN_ASSIGNED_WISH_CARDS}
+            element={
+              <ProtectedRoute roles={["admin"] as UserRole[]}>
+                <AdminAssignedWishCards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={ROUTES.ADMIN_EMAILS}
             element={
               <ProtectedRoute roles={["admin"] as UserRole[]}>
@@ -375,6 +385,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["purchaser"] as UserRole[]}>
                 <PurchaserAssignedGifts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={ROUTES.PURCHASER_WISH_CARDS}
+            element={
+              <ProtectedRoute roles={["purchaser"] as UserRole[]}>
+                <PurchaserWishCards />
               </ProtectedRoute>
             }
           />

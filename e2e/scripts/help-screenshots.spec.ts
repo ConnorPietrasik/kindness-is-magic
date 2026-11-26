@@ -136,7 +136,7 @@ const d: {
   deliveryUserId?: number;
   adminUserId?: number;
   purchaserWishIds: number[];
-  adminWishId?: number;
+  adminWishIds: number[];
   deliveryFamilyIds: number[];
   deadlineIds: number[];
   donorGiftClaimId?: number;
@@ -154,6 +154,7 @@ const d: {
   adminApi: null,
   queueFamilyEmail: "queue.contact@example.com",
   purchaserWishIds: [],
+  adminWishIds: [],
   deliveryFamilyIds: [],
   deadlineIds: [],
   inviteTokenIds: [],
@@ -243,8 +244,10 @@ test.describe.serial("help page screenshots", () => {
 
     const washingtonWishes = await listWishesViaApi(api, { familyId: washington.id });
     expect(washingtonWishes.wishes.length, "Washington family has no wishes in the demo seed").toBeGreaterThan(0);
-    d.adminWishId = washingtonWishes.wishes[0].id;
-    await batchAssignWishesViaApi(api, [d.adminWishId], d.adminUserId);
+    /* Two wishes (family + first person's) — the admin-assigned-gifts and
+       wish-cards shots show the same assignments, one row/card per wish */
+    d.adminWishIds = washingtonWishes.wishes.slice(0, 2).map((w) => w.id);
+    await batchAssignWishesViaApi(api, d.adminWishIds, d.adminUserId);
 
     d.deliveryFamilyIds = [williams.id, thompson.id];
     await assignFamiliesToDeliveryViaApi(api, d.deliveryFamilyIds, d.deliveryUserId);
@@ -465,6 +468,7 @@ test.describe.serial("help page screenshots", () => {
         await p.evaluate(() => window.localStorage.setItem("kim:tableWidth:adminAssignedGifts", "full"));
         await p.reload({ waitUntil: "load" });
       } }],
+      ["admin-assigned-wish-cards", "/admin/assigned-wish-cards", { heading: "Wish Cards" }],
       ["admin-packing-slips", "/admin/packing-slips", { selector: ".packing-slip-card" }],
       ["admin-delivery-slips", "/admin/delivery-slips", { selector: ".delivery-slip-card" }],
       ["admin-wish-cards", "/admin/wish-cards", { heading: "Blank Wish Cards" }],
@@ -584,11 +588,12 @@ test.describe.serial("help page screenshots", () => {
     await context.close();
   });
 
-  test("purchaser: capture assigned gifts", async ({ browser }) => {
+  test("purchaser: capture assigned gifts and wish cards", async ({ browser }) => {
     const context = await newRoleContext(browser, "purchaser");
     const page = await context.newPage();
 
     await capture(page, "purchaser-gifts", "/purchaser/assigned-gifts", { heading: "Assigned Gifts" });
+    await capture(page, "purchaser-wish-cards", "/purchaser/wish-cards", { heading: "Wish Cards" });
     await context.close();
   });
 
@@ -691,7 +696,7 @@ test.describe.serial("help page screenshots", () => {
       if (d.queueUserId != null) await deleteUserViaApi(api, d.queueUserId);
       /* Assignments back to unassigned */
       if (d.purchaserWishIds.length > 0) await batchAssignWishesViaApi(api, d.purchaserWishIds, 0);
-      if (d.adminWishId != null) await batchAssignWishesViaApi(api, [d.adminWishId], 0);
+      if (d.adminWishIds.length > 0) await batchAssignWishesViaApi(api, d.adminWishIds, 0);
       for (const familyId of d.deliveryFamilyIds) {
         await api.patch(`/api/admin/families/${familyId}`, { data: { delivery_user_id: 0 } });
       }

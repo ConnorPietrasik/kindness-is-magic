@@ -43,7 +43,7 @@ import {
   adminRestorePerson,
   adminUpdatePerson,
 } from "../lib/api";
-import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople, adminWishes } from "../lib/queryKeys";
+import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople, adminWishCards, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type { AdminPeopleListParams, PersonPayload } from "../types";
@@ -169,7 +169,7 @@ export default function AdminPeople() {
     createFn: isDeletedView ? undefined : adminCreatePerson,
     updateFn: isDeletedView ? undefined : adminUpdatePerson,
     deleteFn: isDeletedView ? undefined : adminDeletePerson,
-    invalidationKeys: [isDeletedView ? adminDeletedPeople : adminPeople, adminPackingSlips, adminWishes],
+    invalidationKeys: [isDeletedView ? adminDeletedPeople : adminPeople, adminPackingSlips, adminWishes, adminWishCards],
     entityName: "Person",
   });
 
@@ -182,6 +182,7 @@ export default function AdminPeople() {
       queryClient.invalidateQueries({ queryKey: adminPeople });
       queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishCards });
       queryClient.invalidateQueries({ queryKey: adminWishes });
       toast.success("Person restored");
     },
@@ -204,6 +205,7 @@ export default function AdminPeople() {
       queryClient.invalidateQueries({ queryKey: adminDeletedPeople });
       queryClient.invalidateQueries({ queryKey: adminFamilies });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishCards });
       toast.success("Family restored");
     },
   });

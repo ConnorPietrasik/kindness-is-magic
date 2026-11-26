@@ -2191,6 +2191,110 @@ class TestBatchMarkPurchased:
 
 
 # ---------------------------------------------------------------------------
+# Wish cards endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestAdminWishCards:
+    def _login_tree_admin(self, test_client, tree) -> None:
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": tree["admin"].email, "password": "AdminPass123!"},
+        )
+        assert resp.status_code == 200
+
+    def test_single_family_group(self, test_client, wish_tree, db):
+        """Assigned wishes group into one family block with person card data."""
+        for w in wish_tree["wishes"]:
+            w.assigned_to_id = wish_tree["admin"].id
+        db.commit()
+        self._login_tree_admin(test_client, wish_tree)
+
+        resp = test_client.get("/api/admin/wishes/wish-cards")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+
+        ref_id = wish_tree["referrer"].id
+        fam = data[0]
+        assert fam["display_id"] == f"{ref_id}-1"
+        # The family wish is not assigned — no family card
+        assert fam["family_wish"] is None
+
+        assert len(fam["people"]) == 1
+        person = fam["people"][0]
+        assert person["display_id"] == f"{ref_id}-1-1"
+        assert person["given_name"] == "WishChild"
+        assert person["role"] == PersonRole.son.value
+        assert person["age"] == 10
+
+        # Wishes in type display order (practical → fun), with their own display IDs
+        assert [w["display_id"] for w in person["wishes"]] == [f"{ref_id}-1-1A", f"{ref_id}-1-1B"]
+        assert [w["description"] for w in person["wishes"]] == ["A backpack", "A doll"]
+
+    def test_family_wish_card_when_assigned(self, test_client, wish_tree, db):
+        """An assigned family wish leads the family block as a family card."""
+        w = family_wish(db, wish_tree)
+        w.assigned_to_id = wish_tree["admin"].id
+        db.commit()
+        self._login_tree_admin(test_client, wish_tree)
+
+        resp = test_client.get("/api/admin/wishes/wish-cards")
+        assert resp.status_code == 200
+        fam = resp.json()[0]
+        ref_id = wish_tree["referrer"].id
+        assert fam["family_wish"] is not None
+        assert fam["family_wish"]["display_id"] == f"{ref_id}-1-F"
+        assert fam["family_wish"]["type"] == "family"
+        assert fam["family_wish"]["description"] == "Warm clothes"
+
+    def test_only_own_wishes(self, test_client, wish_tree, db):
+        """Wishes assigned to another user don't appear on the admin's sheet."""
+        from app.auth import get_password_hash
+
+        other_admin = User(
+            email="other_admin@test.com",
+            hashed_password=get_password_hash("AdminPass123!"),
+            role=UserRole.admin,
+            display_name=None,
+        )
+        db.add(other_admin)
+        db.commit()
+        db.refresh(other_admin)
+
+        wish_tree["wishes"][0].assigned_to_id = wish_tree["admin"].id
+        wish_tree["wishes"][1].assigned_to_id = other_admin.id
+        db.commit()
+        self._login_tree_admin(test_client, wish_tree)
+
+        resp = test_client.get("/api/admin/wishes/wish-cards")
+        assert resp.status_code == 200
+        person = resp.json()[0]["people"][0]
+        assert [w["id"] for w in person["wishes"]] == [wish_tree["wishes"][0].id]
+
+    def test_excludes_soft_deleted_wishes(self, test_client, wish_tree, db):
+        """Soft-deleted wishes are not printed."""
+        for w in wish_tree["wishes"]:
+            w.assigned_to_id = wish_tree["admin"].id
+        wish_tree["wishes"][0].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+        self._login_tree_admin(test_client, wish_tree)
+
+        resp = test_client.get("/api/admin/wishes/wish-cards")
+        assert resp.status_code == 200
+        person = resp.json()[0]["people"][0]
+        assert [w["id"] for w in person["wishes"]] == [wish_tree["wishes"][1].id]
+
+    def test_empty_when_nothing_assigned(self, test_client, wish_tree):
+        """No wishes assigned to the admin — empty sheet."""
+        self._login_tree_admin(test_client, wish_tree)
+
+        resp = test_client.get("/api/admin/wishes/wish-cards")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+# ---------------------------------------------------------------------------
 # Authorization tests
 # ---------------------------------------------------------------------------
 
@@ -2248,4 +2352,13 @@ class TestAuthorization:
             json={"email": referrer_user.email, "password": "RefPass1234!"},
         )
         resp = test_client.post("/api/admin/wishes/batch-mark-purchased", json={"wish_ids": [1], "purchased_where": "Target"})
+        assert resp.status_code == 403
+
+    def test_non_admin_wish_cards(self, test_client, referrer_user):
+        """Non-admin gets 403 on wish-cards."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": referrer_user.email, "password": "RefPass1234!"},
+        )
+        resp = test_client.get("/api/admin/wishes/wish-cards")
         assert resp.status_code == 403

@@ -7,15 +7,16 @@
  * so an admin can handwrite the details and attach a card to each gift.
  *
  * Fully static — the page is behind the admin-only route but makes no API
- * calls; the card counts are local UI state. The card chrome re-implements
- * the FamilyWishCards card components page-locally (consistent with how
- * WishCardView is handled there).
+ * calls; the card counts are local UI state. The blank card chrome
+ * re-implements the filled card layout page-locally (the grid and print
+ * styles come from the shared `WishCardSheet`).
  */
 
 import { useState } from "react";
 import { Button } from "../components/Button";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { Logo } from "../components/Logo";
+import { WishCardSheet } from "../components/WishCards";
 import { ROUTES } from "../lib/routes";
 
 /* ------------------------------------------------------------------ */
@@ -62,7 +63,7 @@ export default function AdminWishCards() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar className="no-print" left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* No-print toolbar */}
@@ -109,56 +110,13 @@ export default function AdminWishCards() {
             <p className="text-gray-500">No cards to print — set the counts above.</p>
           </div>
         ) : (
-          <div className="wish-cards-grid">
+          <WishCardSheet>
             {cards.map((card) => (
               <BlankCardView key={card.key} card={card} />
             ))}
-          </div>
+          </WishCardSheet>
         )}
       </main>
-
-      {/* Print styles — identical to FamilyWishCards (US Letter, 2×2 grid,
-          4 cards per page); the two pages are never mounted at once. */}
-      <style>{`
-        /* @page margin 0 — with any margin, the browser draws its print
-           header/footer (date, page title, URL) in that space. The visual
-           page margins come from the cards' own print margins instead. */
-        @page { size: letter; margin: 0; }
-        .wish-cards-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 3.7in));
-          gap: 0.2in;
-          justify-content: center;
-        }
-        .wish-card {
-          min-height: 4.9in;
-          /* Keep each card whole — the browser moves it to the next page
-             instead of splitting it across pages. */
-          break-inside: avoid;
-          page-break-inside: avoid;
-          overflow-wrap: break-word;
-        }
-        @media print {
-          .no-print { display: none !important; }
-          body { background: white !important; }
-          main { max-width: none !important; padding: 0 !important; }
-          /* Per-page visual margins: every card carries its own top/bottom
-             margin — block-level padding/margin would only apply at the
-             sheet's start/end, not on each page. 2 rows × (4.9in + 2×0.25in)
-             = 10.8in < 11in, so the 2×2 grid still fits per US Letter page. */
-          .wish-cards-grid { row-gap: 0; }
-          /* B&W print — the family card keeps a heavier border so the two
-             card styles stay distinguishable without color. */
-          .wish-card {
-            margin: 0.25in 0;
-            background: white !important;
-            color: black !important;
-            border-color: black !important;
-            box-shadow: none !important;
-          }
-          .wish-card--family { border-width: 3px !important; }
-        }
-      `}</style>
     </div>
   );
 }

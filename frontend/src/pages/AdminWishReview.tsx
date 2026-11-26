@@ -9,7 +9,7 @@
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { WishReviewQueue } from "../components/WishReviewQueue";
 import { adminApproveWishes, adminRejectWishes, listAdminReviewQueue } from "../lib/api";
-import { adminPackingSlips, adminReviewQueue, adminWishes } from "../lib/queryKeys";
+import { adminPackingSlips, adminReviewQueue, adminWishCards, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 
 export default function AdminWishReview() {
@@ -24,8 +24,8 @@ export default function AdminWishReview() {
         listFn={listAdminReviewQueue}
         approveFn={adminApproveWishes}
         rejectFn={adminRejectWishes}
-        approveInvalidate={[adminReviewQueue, adminPackingSlips, adminWishes]}
-        rejectInvalidate={[adminReviewQueue, adminWishes]}
+        approveInvalidate={[adminReviewQueue, adminPackingSlips, adminWishes, adminWishCards]}
+        rejectInvalidate={[adminReviewQueue, adminWishes, adminWishCards]}
         approveMessage="Wishes approved — family is now visible to donors"
         rejectMessage="Wishes sent back to referrer"
         showReferrerColumn

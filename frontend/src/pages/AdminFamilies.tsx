@@ -48,6 +48,7 @@ import {
   adminFamiliesDropdown,
   adminPackingSlips,
   adminPeople,
+  adminWishCards,
   adminWishes,
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
@@ -181,6 +182,7 @@ export default function AdminFamilies() {
       adminDeletedPeople,
       adminPackingSlips,
       adminWishes,
+      adminWishCards,
       adminFamiliesDropdown,
     ],
     entityName: "Family",

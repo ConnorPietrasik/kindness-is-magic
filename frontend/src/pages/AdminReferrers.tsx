@@ -46,7 +46,18 @@ import {
   adminRestoreReferrer,
   adminUpdateReferrer,
 } from "../lib/api";
-import { adminDeletedReferrers, adminReferrers, adminReferrersDropdown } from "../lib/queryKeys";
+import {
+  adminDeletedReferrers,
+  adminDeletedUsers,
+  adminFamilies,
+  adminPackingSlips,
+  adminReferrers,
+  adminReferrersDropdown,
+  adminReviewQueue,
+  adminUsers,
+  adminWishCards,
+  adminWishes,
+} from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "../types";
@@ -138,7 +149,22 @@ export default function AdminReferrers() {
     updateFn: isDeletedView ? undefined : adminUpdateReferrer,
     deleteFn: isDeletedView ? undefined : adminDeleteReferrer,
     restoreFn: adminRestoreReferrer,
-    invalidationKeys: [adminReferrers, adminDeletedReferrers, adminReferrersDropdown],
+    invalidationKeys: [
+      adminReferrers,
+      adminDeletedReferrers,
+      adminReferrersDropdown,
+      // Delete/restore cascades to the referrer's user accounts (users
+      // lists) and unassigns their delivery families and wishes (packing
+      // slips, wish lists); the referrer's name is also shown in the
+      // families list, review queue, and wish lists' referrer columns.
+      adminUsers,
+      adminDeletedUsers,
+      adminFamilies,
+      adminReviewQueue,
+      adminWishes,
+      adminPackingSlips,
+      adminWishCards,
+    ],
     entityName: "Referrer",
   });
 

@@ -10,14 +10,16 @@
  *    the family visible to donors immediately.
  *
  * Both invalidate the family lists, the wish review queue, packing slips,
- * and the wishes list. Pass `extraInvalidationKeys` for scoped lists that
- * also need refreshing (e.g. a referrer's family list).
+ * the wishes list, and the wish-card sheets (approval changes which
+ * families are in the active display-ID enumeration). Pass
+ * `extraInvalidationKeys` for scoped lists that also need refreshing (e.g.
+ * a referrer's family list).
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../context/ToastContext";
 import { adminApproveWishes, adminResetWishState } from "../lib/api";
-import { adminFamilies, adminPackingSlips, adminReviewQueue, adminWishes } from "../lib/queryKeys";
+import { adminFamilies, adminPackingSlips, adminReviewQueue, adminWishCards, adminWishes } from "../lib/queryKeys";
 
 export interface UseWishLockActionsOptions {
   /** Extra query keys to invalidate (e.g. a referrer-scoped family list). */
@@ -33,6 +35,7 @@ export function useWishLockActions(options: UseWishLockActionsOptions = {}) {
     adminReviewQueue,
     adminPackingSlips,
     adminWishes,
+    adminWishCards,
     ...(options.extraInvalidationKeys ?? []),
   ];
 

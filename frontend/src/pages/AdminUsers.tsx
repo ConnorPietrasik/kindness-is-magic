@@ -43,7 +43,7 @@ import {
   adminRestoreUser,
   adminUpdateUser,
 } from "../lib/api";
-import { adminDeletedUsers, adminUsers } from "../lib/queryKeys";
+import { adminDeletedUsers, adminFamilies, adminPackingSlips, adminUsers, adminWishCards, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
 import { normalizeUpdatePayload } from "../lib/utils";
 import type {
@@ -122,7 +122,18 @@ export default function AdminUsers() {
     updateFn: isDeletedView ? undefined : adminUpdateUser,
     deleteFn: isDeletedView ? undefined : adminDeleteUser,
     restoreFn: adminRestoreUser,
-    invalidationKeys: [adminUsers, adminDeletedUsers],
+    invalidationKeys: [
+      adminUsers,
+      adminDeletedUsers,
+      // Delete unassigns the user's wishes and delivery families (wish
+      // lists, packing slips) and clears the families' delivery columns;
+      // the user's display name also shows in the wish list's
+      // Assigned-to and the families' delivery-name columns.
+      adminWishes,
+      adminPackingSlips,
+      adminFamilies,
+      adminWishCards,
+    ],
     entityName: "User",
   });
 

@@ -81,6 +81,14 @@ export const DASHBOARD_TILES: Record<string, DashboardTileDef[]> = {
       visible: true,
     },
     {
+      key: "assigned-wish-cards",
+      route: ROUTES.ADMIN_ASSIGNED_WISH_CARDS,
+      icon: "🎴",
+      label: "Wish Cards",
+      desc: "Print wish cards for your assigned gifts",
+      visible: true,
+    },
+    {
       key: "packing-slips",
       route: ROUTES.ADMIN_PACKING_SLIPS,
       icon: "📦",

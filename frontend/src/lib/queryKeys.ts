@@ -224,6 +224,8 @@ export const familyWishList = (id: number) => ["familyWishList", id] as const;
 export const adminWishes = ["adminWishes"] as const;
 /** Single admin wish detail — matches useCrudManager's inline detail key shape. */
 export const adminWishDetail = (id: number) => ["adminWishes", "detail", id] as const;
+/** Wish-card sheet for all wishes assigned to the calling admin. */
+export const adminWishCards = ["adminWishCards"] as const;
 
 // ---------------------------------------------------------------------------
 // Purchaser — Wishes
@@ -233,6 +235,8 @@ export const adminWishDetail = (id: number) => ["adminWishes", "detail", id] as 
 export const purchaserWishes = ["purchaserWishes"] as const;
 /** Single purchaser wish detail — matches useCrudManager's inline detail key shape. */
 export const purchaserWishDetail = (id: number) => ["purchaserWishes", "detail", id] as const;
+/** Wish-card sheet for all wishes assigned to the current purchaser. */
+export const purchaserWishCards = ["purchaserWishCards"] as const;
 
 // ---------------------------------------------------------------------------
 // Delivery — Families

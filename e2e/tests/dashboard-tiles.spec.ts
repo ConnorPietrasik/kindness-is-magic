@@ -57,8 +57,8 @@ test.describe("Admin dashboard tiles", () => {
  * Default visible tile order (CSV Import and Sponsorships hidden by
  * default): Manage Users, Manage Referrers, Manage Families, Manage
  * People, Invite Codes, Wish Approval, Deadlines, Manage Wishes, My
- * Assigned Gifts, Packing Slips, Delivery Slips, Blank Wish Cards, Emails,
- * Thank-You Emails, Zeffy Payments, Browse Families.
+ * Assigned Gifts, Wish Cards, Packing Slips, Delivery Slips, Blank Wish
+ * Cards, Emails, Thank-You Emails, Zeffy Payments, Browse Families.
  */
 test.describe("Admin dashboard tile order", () => {
   const tileGrid = (page: Page) => page.locator("div.grid").first().locator("a");

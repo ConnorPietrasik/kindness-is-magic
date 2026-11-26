@@ -45,6 +45,7 @@ from app.schemas import (
     DeadlineItem,
     DeadlineListResponse,
     DeliverySlipItem,
+    DonorWishSummary,
     EmailCampaignDetail,
     EmailCampaignRecipientSummary,
     EmailCampaignSummary,
@@ -53,11 +54,17 @@ from app.schemas import (
     PackingSlipItem,
     PackingSlipPersonItem,
     ThankYouDonor,
+    WishCardFamily,
+    WishCardPerson,
     WishCreate,
     WishSummary,
 )
 
 T = TypeVar("T", bound=DeclarativeBase)
+
+# Person-wish types in card order on the wish-card sheets (an
+# adult person has only the "adult" wish).
+_WISH_CARD_TYPE_ORDER: dict[WishType, int] = {WishType.practical: 0, WishType.fun: 1, WishType.adult: 2}
 
 
 # ---------------------------------------------------------------------------
@@ -1249,6 +1256,96 @@ def build_packing_slips(db: Session, families: list[Family]) -> list[PackingSlip
                     )
                     for p in fam_people
                 ],
+            )
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Wish cards (purchaser + admin assigned-gift sheets)
+# ---------------------------------------------------------------------------
+
+
+def build_wish_card_sheet(db: Session, wishes: list[Wish]) -> list[WishCardFamily]:
+    """Build wish-card data from a batch of wishes assigned to one user.
+
+    Groups the wishes by their owner family, in the grouped default list
+    order (referrer-or-0, then family id); within a family:
+    the family wish first, then people in person-id order, each person's
+    wishes in type display order (practical, fun, adult) and id.
+
+    Display IDs use the unscoped flat format (what the public wish cards
+    print). Owner families or people outside the active enumeration
+    (soft-deleted, unverified) degrade to ``"0"`` — the wish itself still
+    appears, since it is active and assigned.
+
+    *wishes* must be eager-loaded with ``person`` (and the person's
+    ``family``) and ``family`` — the builder issues no per-wish lookups,
+    only the batched display-ID passes.
+    """
+    if not wishes:
+        return []
+
+    # Group by owner family: person's family for person wishes, the wish's
+    # own family for family wishes.
+    families: dict[int, Family] = {}
+    family_wishes: dict[int, list[Wish]] = {}
+    person_wishes: dict[int, dict[int, list[Wish]]] = {}  # family_id -> person_id -> wishes
+    for w in wishes:
+        person = w.person
+        fam = person.family if person is not None else w.family
+        fid = fam.id if fam is not None else (w.family_id or 0)
+        if fam is not None:
+            families[fid] = fam
+        if w.type == WishType.family:
+            family_wishes.setdefault(fid, []).append(w)
+        elif person is not None:
+            person_wishes.setdefault(fid, {}).setdefault(person.id, []).append(w)
+
+    # Same family-level order as the list endpoint's grouped default:
+    # referrer (unassigned first), then family id.
+    ordered_fam_ids = sorted(
+        set(family_wishes) | set(person_wishes),
+        key=lambda fid: ((families[fid].referrer_id or 0) if fid in families else 0, fid),
+    )
+
+    fam_display_map = compute_display_ids(db, "family", list(families.values()), scope=None) if families else {}
+
+    # One person per group — the grouping loop only files wishes under a
+    # non-None person, so each group's first wish carries the group's person.
+    page_persons = [ws[0].person for by_person in person_wishes.values() for ws in by_person.values()]
+    person_display_map = compute_display_ids(db, "person", page_persons, scope=None) if page_persons else {}
+
+    def _card_wish(w: Wish, owner_display_id: str) -> DonorWishSummary:
+        # Content-only wish carrying its own display ID (owner's flat ID +
+        # type suffix, e.g. 3-2-1A / 3-2-F) — the card prints it.
+        summary = DonorWishSummary.model_validate(w)
+        summary.display_id = wish_display_id(owner_display_id, w.type)
+        return summary
+
+    result: list[WishCardFamily] = []
+    for fid in ordered_fam_ids:
+        fam_display = fam_display_map.get(fid, "0")
+        fam_wish = family_wishes.get(fid)
+        people = []
+        for pid in sorted(person_wishes.get(fid, {})):
+            ws = sorted(person_wishes[fid][pid], key=lambda w: (_WISH_CARD_TYPE_ORDER.get(w.type, 3), w.id))
+            person = ws[0].person
+            per_display = person_display_map.get(pid, "0")
+            people.append(
+                WishCardPerson(
+                    display_id=per_display,
+                    given_name=person.given_name,
+                    role=person.role,
+                    age=person.age,
+                    wishes=[_card_wish(w, per_display) for w in ws],
+                )
+            )
+        result.append(
+            WishCardFamily(
+                display_id=fam_display,
+                family_wish=_card_wish(fam_wish[0], fam_display) if fam_wish else None,
+                people=people,
             )
         )
     return result

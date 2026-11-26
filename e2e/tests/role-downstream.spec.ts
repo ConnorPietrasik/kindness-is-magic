@@ -638,6 +638,8 @@ test.describe.serial("Role Downstream — delivery", () => {
     const card = page.locator(".packing-slip-card").first();
     expect(await card.evaluate((el) => getComputedStyle(el).breakInside)).toBe("avoid");
     expect(await card.evaluate((el) => getComputedStyle(el).breakAfter)).not.toBe("page");
+    /* The app header is screen chrome — it must not print */
+    await expect(page.locator("header")).toBeHidden();
 
     await context.close();
   });

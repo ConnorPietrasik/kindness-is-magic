@@ -126,6 +126,8 @@ export type {
   UserRole,
   WishBatchAssign,
   WishBatchMarkPurchased,
+  WishCardFamily,
+  WishCardPerson,
   WishCreate,
   WishDetail,
   WishListSummary,

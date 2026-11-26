@@ -37,7 +37,7 @@ import { useUsersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePagination } from "../hooks/usePagination";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminBatchAssignWishes, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
-import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
+import { adminPackingSlips, adminWishCards, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import {
@@ -165,7 +165,7 @@ export default function AdminWishes() {
     createFn: undefined,
     updateFn: adminUpdateWish,
     deleteFn: undefined,
-    invalidationKeys: [adminWishes, adminPackingSlips],
+    invalidationKeys: [adminWishes, adminPackingSlips, adminWishCards],
     entityName: "Wish",
   });
 
@@ -187,6 +187,7 @@ export default function AdminWishes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminWishes });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishCards });
       if (markPurchasedId != null) {
         queryClient.invalidateQueries({ queryKey: adminWishDetail(markPurchasedId) });
       }
@@ -201,6 +202,7 @@ export default function AdminWishes() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: adminWishes });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishCards });
       setSelectedIds(new Set());
       setBatchAssignOpen(false);
       setAssignUserId(null);

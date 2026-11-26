@@ -35,6 +35,7 @@ export const ROUTES = {
   ADMIN_WISH_CARDS: "/admin/wish-cards",
   ADMIN_WISHES: "/admin/wishes",
   ADMIN_ASSIGNED_GIFTS: "/admin/assigned-gifts",
+  ADMIN_ASSIGNED_WISH_CARDS: "/admin/assigned-wish-cards",
   // One page, three tabs (sent log / campaigns / unsubscribes) selected
   // by a ?tab= query param — see pages/AdminEmails.tsx.
   ADMIN_EMAILS: "/admin/emails",
@@ -54,6 +55,7 @@ export const ROUTES = {
 
   // ── Purchaser self-service ────────────────────────────────
   PURCHASER_ASSIGNED_GIFTS: "/purchaser/assigned-gifts",
+  PURCHASER_WISH_CARDS: "/purchaser/wish-cards",
 
   // ── Delivery self-service ────────────────────────────────
   DELIVERY_DASHBOARD: "/delivery",

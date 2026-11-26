@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFamiliesDropdown } from "../hooks/useDropdowns";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminBatchMarkPurchased, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
-import { adminPackingSlips, adminWishDetail, adminWishes } from "../lib/queryKeys";
+import { adminPackingSlips, adminWishCards, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 
 /* ------------------------------------------------------------------ */
@@ -38,7 +38,17 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar
+        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
+        right={
+          <Link
+            to={ROUTES.ADMIN_ASSIGNED_WISH_CARDS}
+            className="no-print rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
+          >
+            Wish Cards
+          </Link>
+        }
+      />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <AssignedGiftsView
@@ -46,7 +56,7 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
           emptyMessage="No wishes assigned to you."
           rootKey={adminWishes}
           detailKey={adminWishDetail}
-          invalidationKeys={[adminWishes, adminPackingSlips]}
+          invalidationKeys={[adminWishes, adminPackingSlips, adminWishCards]}
           // Annotated param so the view can infer the response type from this arrow's return
           listFn={(params: AssignedGiftsListParams) => adminListWishes({ ...params, assigned_to_id: userId })}
           columnResourceKey="adminAssignedGifts"

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import purchaserGifts from "../assets/help/purchaser-gifts.png";
+import purchaserWishCards from "../assets/help/purchaser-wish-cards.png";
 import { HelpImage } from "../components/HelpImage";
 import { HelpPage } from "../components/HelpPage";
 import { ROLE_HOME, ROUTES } from "../lib/routes";
@@ -63,6 +64,29 @@ export default function HelpPurchaser() {
                 Bought a whole family's list in one trip? Check several rows and click the <strong>Mark purchased</strong> button at the top
                 right to mark them together. Use <strong>Edit</strong> on a row to update the received date or your note, and the filters at
                 the top (status, type, search, purchased date range) keep the list manageable.
+              </p>
+            </>
+          ),
+        },
+        {
+          id: "wish-cards",
+          title: "Wish cards",
+          body: (
+            <>
+              <p>
+                When you buy the gifts, print your <strong>Wish Cards</strong> sheet — the button at the top right of your assigned gifts
+                list, or the card on your dashboard. It has one card per gift you are assigned, grouped by family in your list's default
+                order.
+              </p>
+              <HelpImage
+                src={purchaserWishCards}
+                alt="The wish cards page: a grid of printable cards, one per assigned wish, each showing the wish's ID, and a Print button"
+                caption="One card per gift — the ID, who it is for, and exactly what to buy."
+              />
+              <p>
+                Print the sheet and attach each card to the gift you buy for it. The big number on the card is the wish's ID — the person's
+                ID plus a letter for the wish type (family wishes end in -F) — which is how the delivery team matches each gift to the right
+                family and person.
               </p>
             </>
           ),

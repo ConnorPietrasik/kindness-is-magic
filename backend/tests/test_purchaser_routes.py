@@ -1278,6 +1278,143 @@ class TestPurchaserUpdateWish:
 
 
 # ---------------------------------------------------------------------------
+# Wish cards endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserWishCards:
+    def test_single_family_group(self, logged_in_purchaser, purchaser_wish_tree):
+        """Assigned wishes group into one family block with person card data."""
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+
+        ref_id = purchaser_wish_tree["referrer"].id
+        fam = data[0]
+        assert fam["display_id"] == f"{ref_id}-1"
+        # The family wish is not assigned — no family card
+        assert fam["family_wish"] is None
+
+        assert len(fam["people"]) == 1
+        person = fam["people"][0]
+        assert person["display_id"] == f"{ref_id}-1-1"
+        assert person["given_name"] == "PurchaserChild"
+        assert person["role"] == PersonRole.son.value
+        assert person["age"] == 10
+
+        # Wishes in type display order (practical → fun), with their own display IDs
+        assert [w["display_id"] for w in person["wishes"]] == [f"{ref_id}-1-1A", f"{ref_id}-1-1B"]
+        assert [w["description"] for w in person["wishes"]] == ["A backpack", "A doll"]
+        assert person["wishes"][0]["size"] == "Medium"
+        assert person["wishes"][1]["color"] is None
+
+    def test_family_wish_card_when_assigned(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An assigned family wish leads the family block as a family card."""
+        assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        fam = resp.json()[0]
+        ref_id = purchaser_wish_tree["referrer"].id
+        assert fam["family_wish"] is not None
+        assert fam["family_wish"]["display_id"] == f"{ref_id}-1-F"
+        assert fam["family_wish"]["type"] == "family"
+        assert fam["family_wish"]["description"] == "Warm clothes"
+
+    def test_family_wish_only_assignment(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Only the family wish assigned: block with a family card and no people."""
+        for w in purchaser_wish_tree["wishes"]:
+            w.assigned_to_id = None
+        assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        fam = resp.json()[0]
+        assert fam["family_wish"] is not None
+        assert fam["people"] == []
+
+    def test_grouped_order_across_families(self, test_client, purchaser_sort_tree):
+        """Two families: blocks in family order, family wish first, people in id order."""
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": purchaser_sort_tree["purchaser"].email, "password": "PurchSort123!"},
+        )
+        assert resp.status_code == 200
+
+        resp = test_client.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        data = resp.json()
+        ref_id = purchaser_sort_tree["referrer"].id
+
+        assert [f["display_id"] for f in data] == [f"{ref_id}-1", f"{ref_id}-2"]
+
+        # First family block: family wish, then each person's wishes in type order
+        first = data[0]
+        assert first["family_wish"]["display_id"] == f"{ref_id}-1-F"
+        assert [p["display_id"] for p in first["people"]] == [f"{ref_id}-1-1", f"{ref_id}-1-2"]
+        assert [w["display_id"] for w in first["people"][0]["wishes"]] == [f"{ref_id}-1-1A", f"{ref_id}-1-1B"]
+        assert [w["description"] for w in first["people"][0]["wishes"]] == [
+            "PSort First A practical",
+            "PSort First A fun",
+        ]
+        assert [w["display_id"] for w in first["people"][1]["wishes"]] == [f"{ref_id}-1-2A", f"{ref_id}-1-2B"]
+
+        # Second family block mirrors the first
+        second = data[1]
+        assert second["family_wish"]["display_id"] == f"{ref_id}-2-F"
+        assert [p["display_id"] for p in second["people"]] == [f"{ref_id}-2-1", f"{ref_id}-2-2"]
+
+    def test_no_family_pii(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Card payloads carry no family PII (same boundary as the wish list)."""
+        assign_family_wish(db, purchaser_wish_tree)
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+
+        def walk(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    assert key not in ("family_name", "contact_name", "phone_number", "address", "bio"), key
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(resp.json())
+
+    def test_only_own_wishes(self, logged_in_purchaser, purchaser_wish_tree, second_purchaser, db):
+        """Wishes assigned to another purchaser don't appear on the sheet."""
+        purchaser_wish_tree["wishes"][1].assigned_to_id = second_purchaser.id
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        person = resp.json()[0]["people"][0]
+        assert [w["id"] for w in person["wishes"]] == [purchaser_wish_tree["wishes"][0].id]
+
+    def test_excludes_soft_deleted_wishes(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Soft-deleted wishes are not printed."""
+        purchaser_wish_tree["wishes"][0].deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        person = resp.json()[0]["people"][0]
+        assert [w["id"] for w in person["wishes"]] == [purchaser_wish_tree["wishes"][1].id]
+
+    def test_empty_when_nothing_assigned(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """No assigned wishes — empty sheet."""
+        for w in purchaser_wish_tree["wishes"]:
+            w.assigned_to_id = None
+        db.commit()
+
+        resp = logged_in_purchaser.get("/api/purchaser/wish-cards")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+# ---------------------------------------------------------------------------
 # Authorization tests
 # ---------------------------------------------------------------------------
 
@@ -1291,6 +1428,7 @@ class TestPurchaserAuthorization:
         )
         assert test_client.get("/api/purchaser/wishes").status_code == 403
         assert test_client.get("/api/purchaser/wishes/1").status_code == 403
+        assert test_client.get("/api/purchaser/wish-cards").status_code == 403
 
     def test_referrer_cannot_access_purchaser_routes(self, test_client, referrer_user):
         """Referrer user gets 403 on purchaser routes."""
@@ -1300,6 +1438,7 @@ class TestPurchaserAuthorization:
         )
         assert test_client.get("/api/purchaser/wishes").status_code == 403
         assert test_client.get("/api/purchaser/wishes/1").status_code == 403
+        assert test_client.get("/api/purchaser/wish-cards").status_code == 403
 
     def test_admin_cannot_access_purchaser_routes(self, test_client, admin_user):
         """Admin user gets 403 on purchaser routes (they have their own admin routes)."""
@@ -1308,6 +1447,7 @@ class TestPurchaserAuthorization:
             json={"email": admin_user.email, "password": "AdminPass123!"},
         )
         assert test_client.get("/api/purchaser/wishes").status_code == 403
+        assert test_client.get("/api/purchaser/wish-cards").status_code == 403
 
 
 # ---------------------------------------------------------------------------

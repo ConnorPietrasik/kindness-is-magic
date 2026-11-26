@@ -1374,6 +1374,30 @@ class PurchaserWishListResponse(BaseModel):
     total_pages: int = 0
 
 
+class WishCardPerson(BaseModel):
+    """Single person on a wish-card sheet (no family PII)."""
+
+    display_id: str
+    given_name: str
+    role: PersonRole
+    age: int
+    wishes: list[DonorWishSummary] = []
+
+
+class WishCardFamily(BaseModel):
+    """One family block on a wish-card sheet (no family PII).
+
+    A family appears iff at least one of its wishes is assigned to the
+    sheet's owner; a person appears iff at least one of the person's wishes
+    is assigned; ``family_wish`` is set iff the family's family wish itself
+    is assigned.
+    """
+
+    display_id: str
+    family_wish: DonorWishSummary | None = None
+    people: list[WishCardPerson] = []
+
+
 def validate_wish_list(wishes: list[WishCreate]) -> None:
     """Validate non-empty wish list with no duplicate types."""
     if not wishes:

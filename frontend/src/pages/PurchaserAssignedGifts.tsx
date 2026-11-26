@@ -21,7 +21,7 @@ import {
   purchaserMarkPurchased,
   purchaserUpdateWish,
 } from "../lib/api";
-import { purchaserWishDetail, purchaserWishes } from "../lib/queryKeys";
+import { purchaserWishCards, purchaserWishDetail, purchaserWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 
 /* ------------------------------------------------------------------ */
@@ -34,7 +34,17 @@ export default function PurchaserAssignedGifts() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <HeaderBar left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />} />
+      <HeaderBar
+        left={<BackLink to={ROUTES.DASHBOARD} label="Dashboard" />}
+        right={
+          <Link
+            to={ROUTES.PURCHASER_WISH_CARDS}
+            className="no-print rounded-lg border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
+          >
+            Wish Cards
+          </Link>
+        }
+      />
 
       <main className={`mx-auto px-4 py-8 sm:px-6 ${widthClass}`}>
         <AssignedGiftsView
@@ -42,7 +52,7 @@ export default function PurchaserAssignedGifts() {
           emptyMessage="No wishes found."
           rootKey={purchaserWishes}
           detailKey={purchaserWishDetail}
-          invalidationKeys={[purchaserWishes]}
+          invalidationKeys={[purchaserWishes, purchaserWishCards]}
           listFn={purchaserListWishes}
           columnResourceKey="purchaserAssignedGifts"
           familyColumn={{ key: "family_display_id", sortable: false }}

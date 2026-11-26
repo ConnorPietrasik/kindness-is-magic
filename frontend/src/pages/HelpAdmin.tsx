@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import adminAssignedGifts from "../assets/help/admin-assigned-gifts.png";
+import adminAssignedWishCards from "../assets/help/admin-assigned-wish-cards.png";
 import adminCsvUpload from "../assets/help/admin-csv-upload.png";
 import adminDashboard from "../assets/help/admin-dashboard.png";
 import adminDeadlines from "../assets/help/admin-deadlines.png";
@@ -268,6 +269,18 @@ export default function HelpAdmin() {
                 instead, use the Manage Wishes page: assign one wish from its row, or check several and use <strong>Batch assign</strong> at
                 the top. As gifts get bought, the Purchased column fills in with the date; the where-it-was-bought detail lives in the
                 Purchased Where column, which is hidden by default.
+              </p>
+              <h3>Wish cards</h3>
+              <HelpImage
+                src={adminAssignedWishCards}
+                alt="The wish cards page: a grid of printable cards, one per assigned wish, each showing the wish's ID, and a Print button"
+                caption="One card per assigned gift — the ID, who it is for, and exactly what to buy."
+              />
+              <p>
+                When you buy the gifts on this list, print your <strong>Wish Cards</strong> sheet — the button at the top right of the page,
+                or the card on your dashboard. It has one card per gift you are assigned, grouped by family in the list's default order.
+                Print the sheet and attach each card to the gift you buy for it. The big number on the card is the wish's ID — the person's
+                ID plus a letter for the wish type (family wishes end in -F).
               </p>
               <h3>Packing slips</h3>
               <HelpImage

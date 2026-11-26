@@ -58,6 +58,7 @@ import {
   adminPackingSlips,
   adminReferrerDetail,
   adminReferrerFamilies,
+  adminWishCards,
   adminWishes,
 } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
@@ -259,7 +260,7 @@ export default function AdminFamilyPeople() {
             title: "People",
             createButtonLabel: "+ Add person",
             sortToggle: { label: "Newest first", value: "-created_at" },
-            invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips, adminWishes],
+            invalidationKeys: [peopleKey, deletedPeopleKey, familyKey, adminPackingSlips, adminWishes, adminWishCards],
             entityName: "Person",
           }}
           tabs={{
