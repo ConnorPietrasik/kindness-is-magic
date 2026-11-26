@@ -63,7 +63,16 @@ thank_you_admin_router = APIRouter(
 # aggregates, so the sort runs in Python via parse_sort_field rather than a
 # SQLAlchemy column registry). "thanked_at" reads the donor's DonorThank row.
 THANK_YOU_SORT_FIELDS: frozenset[str] = frozenset(
-    {"email", "display_name", "claim_count", "general_total_cents", "latest_fulfilled_at", "latest_donation_at", "thanked_at"}
+    {
+        "email",
+        "display_name",
+        "claim_count",
+        "general_total_cents",
+        "latest_fulfilled_at",
+        "latest_donation_at",
+        "latest_activity_at",
+        "thanked_at",
+    }
 )
 
 # Sentinel so None datetimes sort to one end with a comparable key.
@@ -133,6 +142,11 @@ def _collect_candidates(db: Session) -> dict[str, dict]:
     The claim side runs first so the account's display name takes
     precedence over the buyer name (falling back to the *newest* buyer
     name — rows are oldest-first, so last write wins).
+
+    ``latest_activity_at`` — the newest of the two side dates — is derived
+    in the final pass: a listable candidate always has at least one side,
+    so it is non-null in practice (the default sort's newest-first order
+    must not sink single-side donors the way a None date would).
     """
     candidates: dict[str, dict] = {}
 
@@ -149,6 +163,7 @@ def _collect_candidates(db: Session) -> dict[str, dict]:
                 "general_payment_count": 0,
                 "general_total_cents": 0,
                 "latest_donation_at": None,
+                "latest_activity_at": None,
             },
         )
 
@@ -170,6 +185,8 @@ def _collect_candidates(db: Session) -> dict[str, dict]:
 
     for s in candidates.values():
         s["display_name"] = s["display_name"] or s["buyer_name"]
+        side_dates = [d for d in (s["latest_fulfilled_at"], s["latest_donation_at"]) if d is not None]
+        s["latest_activity_at"] = max(side_dates) if side_dates else None
     return candidates
 
 
@@ -276,8 +293,9 @@ def list_thank_you_donors(
     name; ``source`` narrows to a candidate kind; ``thanked`` filters by
     the thanked state. The derived rows sort in Python via
     ``parse_sort_field`` over ``THANK_YOU_SORT_FIELDS`` (``-`` prefix for
-    descending); the default is email ascending. Standard page envelope;
-    ``columns`` supported.
+    descending); the default is the newest activity first
+    (``-latest_activity_at``), so the donors who most recently gave lead.
+    Standard page envelope; ``columns`` supported.
     """
     candidates = _collect_candidates(db)
 
@@ -304,7 +322,7 @@ def list_thank_you_donors(
         if pattern:
             rows = [(c, t) for c, t in rows if _search_matches(c, pattern)]
 
-    field, descending = parse_sort_field(sort, THANK_YOU_SORT_FIELDS, "email")
+    field, descending = parse_sort_field(sort, THANK_YOU_SORT_FIELDS, "latest_activity_at", default_descending=True)
     rows.sort(key=lambda ct: _sort_key(ct[0], ct[1], field), reverse=descending)
 
     total = len(rows)

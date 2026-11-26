@@ -184,6 +184,7 @@ def build_thank_you_donor(candidate: dict, thanks: DonorThank | None, thanked_by
         general_payment_count=candidate["general_payment_count"],
         general_total_cents=candidate["general_total_cents"],
         latest_donation_at=candidate["latest_donation_at"],
+        latest_activity_at=candidate["latest_activity_at"],
         thanked_at=thanks.thanked_at if thanks is not None else None,
         thanked_by_name=thanked_by_name,
     )

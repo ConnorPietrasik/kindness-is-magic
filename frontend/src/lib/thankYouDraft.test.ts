@@ -12,6 +12,7 @@ const BASE: ThankYouDonor = {
   general_payment_count: 0,
   general_total_cents: 0,
   latest_donation_at: null,
+  latest_activity_at: null,
   thanked_at: null,
   thanked_by_name: null,
 };

@@ -43,6 +43,7 @@ function makeDonor(overrides: Partial<ThankYouDonor> = {}): ThankYouDonor {
     general_payment_count: 0,
     general_total_cents: 0,
     latest_donation_at: null,
+    latest_activity_at: "2025-12-01T00:00:00Z",
     thanked_at: null,
     thanked_by_name: null,
     ...overrides,
@@ -84,6 +85,7 @@ describe("AdminThankYou", () => {
           general_payment_count: 2,
           general_total_cents: 12_500,
           latest_donation_at: "2025-12-10T00:00:00Z",
+          latest_activity_at: "2025-12-10T00:00:00Z",
           thanked_at: "2025-12-11T00:00:00Z",
           thanked_by_name: "Admin",
         })
@@ -100,6 +102,8 @@ describe("AdminThankYou", () => {
     expect(aliceRow).toHaveTextContent("The Example Family");
     expect(aliceRow).toHaveTextContent("Not thanked");
     expect(within(aliceRow).getByRole("button", { name: "Mark thanked" })).toBeInTheDocument();
+    // The Latest Activity column is sortable like the other derived columns
+    expect(screen.getByRole("button", { name: "Sort by Latest Activity" })).toBeInTheDocument();
 
     const bobRow = screen.getByText("bob@example.com").closest("tr")!;
     expect(bobRow).toHaveTextContent("General");

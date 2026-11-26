@@ -23,8 +23,8 @@ const DEFAULT_WIDTH_MODES: Record<string, TableWidthMode> = {
   // The purchaser's family column is hidden by default, so its table has
   // fewer columns than the other list pages — wide gives it more room.
   purchaserAssignedGifts: "wide",
-  // Six data columns plus a two-button action column — wide gives the
-  // multi-line cells room.
+  // Multi-line summary cells (counts, family lists, dates) plus a
+  // two-button action column — wide gives the table room.
   adminThankYou: "wide",
 };
 

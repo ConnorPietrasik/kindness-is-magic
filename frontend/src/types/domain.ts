@@ -1010,6 +1010,8 @@ export interface ThankYouDonor {
   general_payment_count: number;
   general_total_cents: number;
   latest_donation_at: string | null;
+  /** Newest of the two side dates — non-null for every listable donor. */
+  latest_activity_at: string | null;
   /** Null until the admin marks the donor thanked (manual or via send). */
   thanked_at: string | null;
   thanked_by_name: string | null;

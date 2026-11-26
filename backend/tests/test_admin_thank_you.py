@@ -401,12 +401,18 @@ class TestListFiltering:
         assert test_client.get("/api/admin/thank-you", params={"search": "gIl"}).json()["total"] == 1
         assert test_client.get("/api/admin/thank-you", params={"search": "nobody"}).json()["total"] == 0
 
-    def test_sort_default_email_asc_and_desc(self, test_client: TestClient, admin_user, db: Session):
+    def test_sort_default_newest_activity(self, test_client: TestClient, admin_user, db: Session):
         self._seed(db)
         _login_admin(test_client)
 
+        # Default = -latest_activity_at: the two NOW-dated donors lead (the
+        # stable tie-break follows candidate insertion order — the claim
+        # side is collected before the general side), then the older
+        # fulfillments.
         default = [d["email"] for d in test_client.get("/api/admin/thank-you").json()["donors"]]
-        assert default == sorted(default)
+        assert default == ["both@test.com", "general-only@test.com", "claims2@test.com", "claims1@test.com"]
+        asc = [d["email"] for d in test_client.get("/api/admin/thank-you", params={"sort": "email"}).json()["donors"]]
+        assert asc == sorted(asc)
         desc = [d["email"] for d in test_client.get("/api/admin/thank-you", params={"sort": "-email"}).json()["donors"]]
         assert desc == sorted(desc, reverse=True)
 
@@ -417,7 +423,33 @@ class TestListFiltering:
         by_total = [d["email"] for d in test_client.get("/api/admin/thank-you", params={"sort": "-general_total_cents"}).json()["donors"]]
         assert by_total[0] == "general-only@test.com"  # 15000 > 9000 > 0
         unknown = test_client.get("/api/admin/thank-you", params={"sort": "nope"}).json()["donors"]
-        assert [d["email"] for d in unknown] == sorted(d["email"] for d in unknown)  # default email asc
+        # Unknown field falls back to the newest-activity default
+        assert [d["email"] for d in unknown] == [
+            "both@test.com",
+            "general-only@test.com",
+            "claims2@test.com",
+            "claims1@test.com",
+        ]
+
+    def test_latest_activity_spans_both_sides(self, test_client: TestClient, admin_user, db: Session):
+        """latest_activity_at is the max of the two side dates, so a
+        both-side donor sorts by whichever side is newer."""
+        sponsor = _donor(db, "sponsor@test.com", "Sue")
+        _claim(db, sponsor, _family(db, "The Sues"), fulfilled=NOW - timedelta(days=1))
+        both = _donor(db, "both@test.com", "Beth")
+        _claim(db, both, _family(db, "The Beths"), fulfilled=NOW - timedelta(days=2))
+        pay = _payment(db, "both-1", "both@test.com", name="Buyer Beth", amount_cents=9_000)  # NOW
+        _login_admin(test_client)
+
+        donors = {d["email"]: d for d in test_client.get("/api/admin/thank-you").json()["donors"]}
+        # The both-side donor's latest activity is its general donation (newer than its fulfillment)
+        assert donors["both@test.com"]["latest_activity_at"] == pay.created_at.isoformat().replace("+00:00", "Z")
+        assert donors["sponsor@test.com"]["latest_activity_at"] is not None
+
+        desc = [d["email"] for d in test_client.get("/api/admin/thank-you", params={"sort": "-latest_activity_at"}).json()["donors"]]
+        assert desc == ["both@test.com", "sponsor@test.com"]  # NOW > NOW-1d
+        asc = [d["email"] for d in test_client.get("/api/admin/thank-you", params={"sort": "latest_activity_at"}).json()["donors"]]
+        assert asc == ["sponsor@test.com", "both@test.com"]
 
     def test_columns_subset_and_always_include(self, test_client: TestClient, admin_user, db: Session):
         self._seed(db)
@@ -441,6 +473,7 @@ class TestListFiltering:
         } <= keys
         # Other fields follow the column selection
         assert "latest_fulfilled_at" not in keys
+        assert "latest_activity_at" not in keys
         assert "thanked_by_name" not in keys
 
     def test_columns_unknown_field_422(self, test_client: TestClient, admin_user, db: Session):

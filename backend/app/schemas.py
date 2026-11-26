@@ -2217,6 +2217,8 @@ class ThankYouDonor(BaseModel):
     general_payment_count: int = 0
     general_total_cents: int = 0
     latest_donation_at: datetime | None = None
+    # Newest of the two side dates — non-null for every listable row.
+    latest_activity_at: datetime | None = None
     # Thanked state — null until the admin marks it (manual or via send).
     thanked_at: datetime | None = None
     thanked_by_name: str | None = None

@@ -359,6 +359,10 @@ export default function HelpAdmin() {
                   with no email on the payment can't be listed — check the campaigns in the Zeffy dashboard for those.)
                 </li>
                 <li>
+                  <strong>Latest Activity</strong> shows the donor's most recent gift or fulfillment across both sides — the list is
+                  newest-first by default, so the donors you most recently owe a thank-you lead.
+                </li>
+                <li>
                   <strong>Thanked</strong> shows when the donor was marked thanked, and by whom. Unthanked donors read “Not thanked”.
                 </li>
               </ul>
@@ -376,8 +380,8 @@ export default function HelpAdmin() {
               </p>
               <h3>Finding a donor</h3>
               <p>
-                Search by donor email, name, or a sponsored family name, filter by thanked state and source, and click a column header to
-                sort — all to work through what's left.
+                The list is newest-first by default. Search by donor email, name, or a sponsored family name, filter by thanked state and
+                source, and click a column header to sort — all to work through what's left.
               </p>
             </>
           ),

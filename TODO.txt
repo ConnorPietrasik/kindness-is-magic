@@ -1,4 +1,3 @@
-Make the donation thanking page be sorted by most recent donation by default
 Add way for purchasers to print their assigned wishcards
 Make the back button include sort / filter / page status
 Rename "reset lock" button to "unapprove" to make it clear. This shouldn't send any emails.

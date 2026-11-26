@@ -57,6 +57,7 @@ const COLUMN_SORT_FIELD: Record<string, string | undefined> = {
   display_name: "display_name",
   sponsorships: "claim_count",
   general_donations: "general_total_cents",
+  latest_activity: "latest_activity_at",
   thanked: "thanked_at",
 };
 
@@ -67,6 +68,7 @@ const COLUMN_HEADERS: Record<string, string> = {
   source: "Source",
   sponsorships: "Sponsorships",
   general_donations: "General Donations",
+  latest_activity: "Latest Activity",
   thanked: "Thanked",
 };
 
@@ -317,6 +319,11 @@ export default function AdminThankYou() {
                         )}
                       </Td>
                     ),
+                  latest_activity: donor.latest_activity_at ? (
+                    <Td className="whitespace-nowrap text-sm text-gray-700">{formatDateTime(donor.latest_activity_at)}</Td>
+                  ) : (
+                    <Td className="text-sm text-gray-400">—</Td>
+                  ),
                   thanked: (
                     <Td className="whitespace-nowrap text-sm">
                       {donor.thanked_at ? (

@@ -145,6 +145,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "source", label: "Source", visible: true },
     { key: "sponsorships", label: "Sponsorships", visible: true },
     { key: "general_donations", label: "General Donations", visible: true },
+    { key: "latest_activity", label: "Latest Activity", visible: true },
     { key: "thanked", label: "Thanked", visible: true },
   ],
   adminEmailCampaigns: [
@@ -208,5 +209,6 @@ export const COLUMN_FIELD_MAP: Record<string, string[]> = {
   // mark's timestamp + actor.
   sponsorships: ["claim_count", "claim_family_names", "latest_fulfilled_at"],
   general_donations: ["general_payment_count", "general_total_cents", "latest_donation_at"],
+  latest_activity: ["latest_activity_at"],
   thanked: ["thanked_at", "thanked_by_name"],
 };
