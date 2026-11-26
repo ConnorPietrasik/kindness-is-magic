@@ -18,7 +18,7 @@ const DEFAULT_REFERRER_ORDER = [
   "created_at",
 ];
 
-// adminWishes columns visible by default — 8 hidden columns sit between
+// adminWishes columns visible by default — 9 hidden columns sit between
 // "family_name" and "type" in the registry.
 const WISHES_VISIBLE = [
   "display_id",
@@ -152,7 +152,7 @@ describe("useColumnOrder", () => {
 
   it("moveBy skips hidden columns when visibleKeys is provided (left)", () => {
     // One left press on "type" lands it directly left of the visible
-    // "family_name" — not 8 presses, one per hidden column in between.
+    // "family_name" — not 9 presses, one per hidden column in between.
     const { result } = renderHook(() => useColumnOrder("adminWishes", WISHES_VISIBLE));
 
     act(() => {
@@ -163,7 +163,7 @@ describe("useColumnOrder", () => {
     // "type" is now directly left of "family_name" (which shifted one right).
     expect(order.indexOf("type")).toBe(order.indexOf("family_name") - 1);
     expect(order.indexOf("family_name")).toBe(6);
-    expect(order).toHaveLength(24);
+    expect(order).toHaveLength(25);
   });
 
   it("moveBy skips hidden columns when visibleKeys is provided (right)", () => {

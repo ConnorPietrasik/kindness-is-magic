@@ -35,6 +35,7 @@ const mockWish1: WishListSummary = {
   family_verification_status: "verified",
   referrer_pickup_window: "2025-12-24T17:00:00Z",
   family_bio: null,
+  family_referrer_notes: null,
   referrer_name: "Sam Referrer",
   referrer_phone_number: "555-0202",
   assigned_to_id: null,
@@ -66,6 +67,7 @@ const mockWish2: WishListSummary = {
   family_verification_status: "verified",
   referrer_pickup_window: "2025-12-24T17:00:00Z",
   family_bio: null,
+  family_referrer_notes: null,
   referrer_name: "Sam Referrer",
   referrer_phone_number: "555-0202",
   assigned_to_id: 3,
@@ -97,6 +99,7 @@ const mockFamilyWish: WishListSummary = {
   family_verification_status: null,
   referrer_pickup_window: null,
   family_bio: null,
+  family_referrer_notes: null,
   referrer_name: null,
   referrer_phone_number: null,
   assigned_to_id: null,
@@ -806,12 +809,14 @@ describe("AdminWishes", () => {
     expect(screen.queryByRole("button", { name: "Sort by Referrer" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sort by Created" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Filter by Person Note")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filter by Referrer Notes")).not.toBeInTheDocument();
 
     // …but available in the ColumnToggle popover
     await user.click(screen.getByRole("button", { name: "Toggle columns" }));
     expect(screen.getByLabelText("Role")).toBeInTheDocument();
     expect(screen.getByLabelText("Referrer")).toBeInTheDocument();
     expect(screen.getByLabelText("Created")).toBeInTheDocument();
+    expect(screen.getByLabelText("Referrer Notes")).toBeInTheDocument();
 
     // Enabling one renders its header and cells
     await user.click(screen.getByLabelText("Role"));

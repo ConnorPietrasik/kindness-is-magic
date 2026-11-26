@@ -775,8 +775,8 @@ def build_wish_list_item(
     *person* is ``None`` for family wishes, which resolve their family
     directly from ``wish.family_id``; person-wishes resolve it through the
     person. The owner family's fields (name, contact, phone, address,
-    verification status, bio) come from that family; the referrer's fields
-    (name, phone, pickup window) come from its referrer.
+    verification status, bio, referrer notes) come from that family; the
+    referrer's fields (name, phone, pickup window) come from its referrer.
 
     Pass *display_id* as the pre-computed wish display id (the owner's flat
     display id + type suffix); it stays None when the caller did not
@@ -821,6 +821,7 @@ def build_wish_list_item(
         "family_address": owner_family.address if owner_family is not None else None,
         "family_verification_status": owner_family.verification_status if owner_family is not None else None,
         "family_bio": owner_family.bio if owner_family is not None else None,
+        "family_referrer_notes": owner_family.referrer_notes if owner_family is not None else None,
         "referrer_name": referrer.name if referrer is not None else None,
         "referrer_phone_number": referrer.phone_number if referrer is not None else None,
         "referrer_pickup_window": referrer.pickup_window if referrer is not None else None,

@@ -104,6 +104,7 @@ export interface AdminWishesListParams extends AdminListParams {
   family_address?: string;
   family_verification_status?: string;
   family_bio?: string;
+  family_referrer_notes?: string;
   referrer_name?: string;
   referrer_phone_number?: string;
   assigned_to_name?: string;

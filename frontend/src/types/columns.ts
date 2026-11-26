@@ -70,6 +70,7 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "family_address", label: "Address", visible: false },
     { key: "family_verification_status", label: "Verification", visible: false },
     { key: "family_bio", label: "Bio", visible: false },
+    { key: "family_referrer_notes", label: "Referrer Notes", visible: false },
     // Referrer fields
     { key: "referrer_name", label: "Referrer", visible: false },
     { key: "referrer_phone_number", label: "Referrer Phone", visible: false },

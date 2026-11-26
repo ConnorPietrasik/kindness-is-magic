@@ -555,6 +555,7 @@ class TestListWishesNewFields:
             "family_address",
             "family_verification_status",
             "family_bio",
+            "family_referrer_notes",
             "referrer_name",
             "referrer_phone_number",
             "referrer_pickup_window",
@@ -703,11 +704,14 @@ class TestPerColumnSearch:
         assert resp.json()["total"] == 3
 
         wish_tree["family"].address = "12 Maple St"
+        wish_tree["family"].referrer_notes = "Prefers evening calls"
         second_fam.bio = "Loves gardening"
         db.commit()
         resp = logged_in_admin.get("/api/admin/wishes?family_address=Maple")
         assert resp.json()["total"] == 3
         resp = logged_in_admin.get("/api/admin/wishes?family_bio=gardening")
+        assert resp.json()["total"] == 3
+        resp = logged_in_admin.get("/api/admin/wishes?family_referrer_notes=evening")
         assert resp.json()["total"] == 3
 
         # Enum verification status matches as a whole value: "verified" hits,
@@ -921,6 +925,18 @@ class TestWishSorting:
         assert resp.status_code == 200
         names = [w["family_name"] for w in resp.json()["wishes"]]
         assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+    def test_sort_family_referrer_notes_nulls_last(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Wishes whose owner family has no referrer notes (NULL) sort last in both directions."""
+        wish_tree["family"].referrer_notes = "Prefers evening calls"
+        db.commit()
+        for sort_param in ("family_referrer_notes", "-family_referrer_notes"):
+            resp = logged_in_admin.get(f"/api/admin/wishes?sort={sort_param}")
+            assert resp.status_code == 200
+            items = resp.json()["wishes"]
+            assert [w["family_name"] for w in items] == ["Wish Family"] * 3 + ["Second Family"] * 3
+            assert items[0]["family_referrer_notes"] == "Prefers evening calls"
+            assert all(w["family_referrer_notes"] is None for w in items[3:])
 
     def test_sort_referrer_pickup_window(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
         # Two families need distinct referrers to carry distinct windows —

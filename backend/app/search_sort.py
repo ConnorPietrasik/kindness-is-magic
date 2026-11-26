@@ -251,6 +251,7 @@ WISH_SORT_FIELDS: dict[str, ColumnElement] = {
     "family_address": _owner_family_column("address"),
     "family_verification_status": _owner_family_column("verification_status"),
     "family_bio": _owner_family_column("bio"),
+    "family_referrer_notes": _owner_family_column("referrer_notes"),
     "referrer_name": WISH_REFERRER.name,
     "referrer_phone_number": WISH_REFERRER.phone_number,
     "referrer_pickup_window": WISH_REFERRER.pickup_window,
@@ -283,6 +284,7 @@ WISH_FAMILY_SEARCH_ATTRS: dict[str, str] = {
     "family_address": "address",
     "family_verification_status": "verification_status",
     "family_bio": "bio",
+    "family_referrer_notes": "referrer_notes",
 }
 
 # Per-column text search: item field name → column expression. Enum and

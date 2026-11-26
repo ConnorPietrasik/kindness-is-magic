@@ -416,6 +416,7 @@ export default function AdminWishes() {
                     <Td>{w.family_verification_status ? <ApprovalBadge status={w.family_verification_status} /> : "—"}</Td>
                   ),
                   family_bio: <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>,
+                  family_referrer_notes: <Td className="max-w-xs text-xs truncate">{w.family_referrer_notes || "—"}</Td>,
                   referrer_name: <Td>{w.referrer_name ?? "—"}</Td>,
                   referrer_phone_number: <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>,
                   referrer_pickup_window: (
@@ -851,6 +852,7 @@ const WISH_COLUMN_SEARCH: Record<string, "text" | "date"> = {
   family_address: "text",
   family_verification_status: "text",
   family_bio: "text",
+  family_referrer_notes: "text",
   referrer_name: "text",
   referrer_phone_number: "text",
   referrer_pickup_window: "date",

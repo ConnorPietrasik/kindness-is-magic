@@ -1301,6 +1301,7 @@ class WishListSummary(BaseModel):
     family_address: str | None = None
     family_verification_status: FamilyVerificationStatus | None = None
     family_bio: str | None = None
+    family_referrer_notes: str | None = None
     referrer_name: str | None = None
     referrer_phone_number: str | None = None
     referrer_pickup_window: datetime | None = None
