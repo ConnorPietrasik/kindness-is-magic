@@ -122,8 +122,6 @@ export default function AdminFamilies() {
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination, storageKey: "adminFamilies" });
   const [view, setView] = usePersistentState(listViewKey("adminFamilies", "filters"), DEFAULT_VIEW, sanitizeView);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
-  const [resetConfirm, setResetConfirm] = useState<number | null>(null);
-  const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   // Row whose "Send email" action was chosen (drives the page-level composer)
   const [sendEmailFamily, setSendEmailFamily] = useState<FamilyDetail | null>(null);
@@ -271,8 +269,8 @@ export default function AdminFamilies() {
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
 
-  // Wish-lock row actions (reset lock / fully approve)
-  const { resetMut, fullyApproveMut } = useWishLockActions();
+  // Wish-lock row actions (unapprove / fully approve)
+  const { resetMut, fullyApproveMut, onResetLock, onFullyApprove, confirmDialogs } = useWishLockActions();
 
   function handleCreate(formData: FamilyPayload) {
     createMut?.mutate(formData);
@@ -540,8 +538,8 @@ export default function AdminFamilies() {
                         onEdit={(id) => (editingId === id ? cancelForm() : openEdit(id))}
                         onDelete={(id) => confirmDelete(id)}
                         onRestore={(id) => setRestoreConfirm(id)}
-                        onResetLock={(id) => setResetConfirm(id)}
-                        onFullyApprove={(id) => setFullyApproveConfirm(id)}
+                        onResetLock={onResetLock}
+                        onFullyApprove={onFullyApprove}
                         onViewPackingSlip={(id) => navigate(route.adminPackingSlips([id]))}
                         onViewDeliverySlip={(id) => navigate(route.adminDeliverySlips([id]))}
                         isDeleting={deleteMut?.isPending ?? false}
@@ -641,49 +639,8 @@ export default function AdminFamilies() {
             confirmVariant="primary"
           />
 
-          {/* Reset wish lock confirmation */}
-          <ConfirmDialog
-            open={resetConfirm !== null}
-            title={
-              <>
-                Reset wish lock for family <strong>#{resetConfirm}</strong>?
-              </>
-            }
-            description="This will unlock the family's wishes so they can edit them again. Any admin approval will be removed."
-            onConfirm={() => {
-              if (resetConfirm != null) {
-                resetMut.mutate(resetConfirm);
-                setResetConfirm(null);
-              }
-            }}
-            onCancel={() => setResetConfirm(null)}
-            loading={resetMut.isPending}
-            confirmLabel="Yes, reset"
-            loadingLabel="Resetting…"
-            confirmVariant="secondary"
-          />
-
-          {/* Fully approve confirmation */}
-          <ConfirmDialog
-            open={fullyApproveConfirm !== null}
-            title={
-              <>
-                Fully approve family <strong>#{fullyApproveConfirm}</strong>?
-              </>
-            }
-            description="This will make the family's wishes visible to donors immediately, skipping referrer review."
-            onConfirm={() => {
-              if (fullyApproveConfirm != null) {
-                fullyApproveMut.mutate(fullyApproveConfirm);
-                setFullyApproveConfirm(null);
-              }
-            }}
-            onCancel={() => setFullyApproveConfirm(null)}
-            loading={fullyApproveMut.isPending}
-            confirmLabel="Yes, fully approve"
-            loadingLabel="Approving…"
-            confirmVariant="primary"
-          />
+          {/* Unapprove / fully approve confirmations (shared via useWishLockActions) */}
+          {confirmDialogs}
 
           {/* Send email — one composer for the whole table, prefilled per row */}
           <AdminEmailComposer

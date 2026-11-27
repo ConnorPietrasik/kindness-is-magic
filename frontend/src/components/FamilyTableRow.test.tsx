@@ -124,23 +124,23 @@ describe("FamilyTableRow", () => {
     expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/admin/families/1/people?from=referrer");
   });
 
-  it("family-locked row: Fully approve shown, Reset lock hidden, no packing slip by default", async () => {
+  it("family-locked row: Fully approve shown, Unapprove hidden, no packing slip by default", async () => {
     const { user } = renderRow();
 
     const menu = await openMenu(user);
     expect(within(menu).getByRole("menuitem", { name: "Fully approve" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Reset lock" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Unapprove" })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "View packing slip" })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "View delivery slip" })).not.toBeInTheDocument();
   });
 
-  it("admin-locked row: Reset lock shown, Fully approve hidden, wish-list link present", async () => {
+  it("admin-locked row: Unapprove shown, Fully approve hidden, wish-list link present", async () => {
     const { user } = renderRow({ family: makeFamily({ wish_lock_level: "admin" }) });
 
     expect(screen.getByRole("link", { name: "View wish list" })).toBeInTheDocument();
 
     const menu = await openMenu(user);
-    expect(within(menu).getByRole("menuitem", { name: "Reset lock" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Unapprove" })).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "Fully approve" })).not.toBeInTheDocument();
   });
 
@@ -179,17 +179,17 @@ describe("FamilyTableRow", () => {
     expect(within(menu).queryByRole("menuitem", { name: "Send email" })).not.toBeInTheDocument();
   });
 
-  it("menu callbacks fire for delete, reset lock, and fully approve", async () => {
+  it("menu callbacks fire for delete, unapprove, and fully approve", async () => {
     const { user, callbacks } = renderRow({ family: makeFamily({ wish_lock_level: "referrer" }) });
 
     const menu = await openMenu(user);
     await user.click(within(menu).getByRole("menuitem", { name: "Fully approve" }));
-    expect(callbacks.onFullyApprove).toHaveBeenCalledWith(1);
+    expect(callbacks.onFullyApprove).toHaveBeenCalledWith(1, "The Johnsons");
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const menu2 = screen.getByRole("menu");
-    await user.click(within(menu2).getByRole("menuitem", { name: "Reset lock" }));
-    expect(callbacks.onResetLock).toHaveBeenCalledWith(1);
+    await user.click(within(menu2).getByRole("menuitem", { name: "Unapprove" }));
+    expect(callbacks.onResetLock).toHaveBeenCalledWith(1, "The Johnsons");
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const menu3 = screen.getByRole("menu");

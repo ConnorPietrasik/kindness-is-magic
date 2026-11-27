@@ -13,7 +13,6 @@ import { AdminEmailComposer, type EmailRecipientOption } from "../components/Adm
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColumnToggle } from "../components/ColumnToggle";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
 import { defaultFamilyForm, defaultReferrerForm } from "../components/defaults";
 import { FamilyForm } from "../components/FamilyForm";
@@ -25,6 +24,7 @@ import {
   type HierarchicalManageParentRenderProps,
 } from "../components/HierarchicalManage";
 import { InfoRow } from "../components/InfoRow";
+import { MutationErrors } from "../components/MutationErrors";
 import { ReferrerForm } from "../components/ReferrerForm";
 import { Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
@@ -103,11 +103,11 @@ function ReferrerFamiliesPage({ refIdNum }: { refIdNum: number }) {
     return options;
   }, [referrerDetail, sendEmailTarget]);
 
-  // Wish-lock row actions (reset lock / fully approve) — also refreshes
+  // Wish-lock row actions (unapprove / fully approve) — also refreshes
   // this referrer's scoped family list
-  const { resetMut, fullyApproveMut } = useWishLockActions({ extraInvalidationKeys: [familiesKey] });
-
-  const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
+  const { resetMut, fullyApproveMut, onResetLock, onFullyApprove, confirmDialogs } = useWishLockActions({
+    extraInvalidationKeys: [familiesKey],
+  });
 
   // Delivery users lookup (for dropdown)
   const { deliveryUserMap, deliveryUsersLoading } = useDeliveryUsers();
@@ -172,8 +172,8 @@ function ReferrerFamiliesPage({ refIdNum }: { refIdNum: number }) {
                 displayColumns={displayColumns}
                 onReorder={reorder}
                 onMoveBy={moveBy}
-                onResetLock={(id) => resetMut.mutate(id)}
-                onFullyApprove={(id) => fullyApproveMut.mutate(id)}
+                onResetLock={onResetLock}
+                onFullyApprove={onFullyApprove}
                 onSendEmail={(id) => {
                   const fam = (rows as FamilyDetail[]).find((f) => f.id === id);
                   if (fam) setSendEmailTarget({ type: "family", family: fam });
@@ -208,27 +208,11 @@ function ReferrerFamiliesPage({ refIdNum }: { refIdNum: number }) {
           }}
         />
 
-        {/* Fully approve confirmation */}
-        <ConfirmDialog
-          open={fullyApproveConfirm !== null}
-          title={
-            <>
-              Fully approve family <strong>#{fullyApproveConfirm}</strong>?
-            </>
-          }
-          description="This will make the family's wishes visible to donors immediately, skipping referrer review."
-          onConfirm={() => {
-            if (fullyApproveConfirm != null) {
-              fullyApproveMut.mutate(fullyApproveConfirm);
-              setFullyApproveConfirm(null);
-            }
-          }}
-          onCancel={() => setFullyApproveConfirm(null)}
-          loading={fullyApproveMut.isPending}
-          confirmLabel="Yes, fully approve"
-          loadingLabel="Approving…"
-          confirmVariant="primary"
-        />
+        {/* Unapprove / fully approve confirmations (shared via useWishLockActions) */}
+        {confirmDialogs}
+
+        {/* Lock-action failures (HierarchicalManage only toasts its own CRUD mutations) */}
+        <MutationErrors mutations={[resetMut, fullyApproveMut]} />
 
         {/* Send email — one composer for the referrer (header) and the family
             rows (action menu); recipient select over the known recipients */}
@@ -346,8 +330,8 @@ function FamiliesTable({
   displayColumns: string[];
   onReorder: (dragged: string[], targetKey: string, position: "before" | "after") => void;
   onMoveBy: (unit: string[], delta: -1 | 1) => void;
-  onResetLock: (id: number) => void;
-  onFullyApprove: (id: number) => void;
+  onResetLock: (id: number, familyName: string) => void;
+  onFullyApprove: (id: number, familyName: string) => void;
   onSendEmail: (id: number) => void;
   isLockActionPending: boolean;
 }) {

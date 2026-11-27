@@ -276,8 +276,8 @@ test.describe.serial("Admin Family Lifecycle — fully approve", () => {
     /* Verify "Fully approve" is no longer in the menu (already at admin lock) */
     await approvedRow.getByRole("button", { name: "More actions" }).click();
     await expect(approvedRow.getByRole("menuitem", { name: "Fully approve" })).not.toBeVisible();
-    /* "Reset lock" should appear instead (lock !== family) */
-    await expect(approvedRow.getByRole("menuitem", { name: "Reset lock" })).toBeVisible();
+    /* "Unapprove" should appear instead (lock !== family) */
+    await expect(approvedRow.getByRole("menuitem", { name: "Unapprove" })).toBeVisible();
     await page.keyboard.press("Escape");
 
     await context.close();

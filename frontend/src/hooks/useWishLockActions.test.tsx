@@ -127,7 +127,7 @@ describe("useWishLockActions", () => {
     expect(queryClient.getQueryState(["unrelatedControl"])?.isInvalidated).toBe(false);
   });
 
-  it("shows the reset toast on success", async () => {
+  it("shows the unapprove toast on success", async () => {
     mockResetWishState.mockResolvedValue(makeFamily(1));
 
     const { result } = renderHook(() => useWishLockActions(), { wrapper: wrap() });
@@ -137,7 +137,7 @@ describe("useWishLockActions", () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain("Wish lock reset — family can now edit their wishes");
+      expect(document.body.textContent).toContain("Family unapproved — they can now edit their wishes");
     });
   });
 
@@ -168,6 +168,6 @@ describe("useWishLockActions", () => {
     });
 
     expect(queryClient.getQueryState(["adminFamilies"])?.isInvalidated).toBe(false);
-    expect(document.body.textContent).not.toContain("Wish lock reset");
+    expect(document.body.textContent).not.toContain("Family unapproved — they can now edit their wishes");
   });
 });

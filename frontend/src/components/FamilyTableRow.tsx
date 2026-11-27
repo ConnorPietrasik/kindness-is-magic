@@ -31,15 +31,15 @@ export interface FamilyTableRowProps {
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
   onRestore: (id: number) => void;
-  onResetLock: (id: number) => void;
-  onFullyApprove: (id: number) => void;
+  onResetLock: (id: number, familyName: string) => void;
+  onFullyApprove: (id: number, familyName: string) => void;
   /** Required when `showPackingSlipAction` is set. */
   onViewPackingSlip?: (id: number) => void;
   /** Required when `showDeliverySlipAction` is set. */
   onViewDeliverySlip?: (id: number) => void;
   isDeleting: boolean;
   isRestoring: boolean;
-  /** True while a reset-lock / fully-approve mutation is in-flight (disables the menu). */
+  /** True while an unapprove / fully-approve mutation is in-flight (disables the menu). */
   isLockActionPending: boolean;
 }
 
@@ -210,9 +210,9 @@ export function FamilyTableRow({
                   ...(f.wish_lock_level !== "family"
                     ? [
                         {
-                          label: "Reset lock",
+                          label: "Unapprove",
                           variant: "secondary" as const,
-                          onClick: () => onResetLock(f.id),
+                          onClick: () => onResetLock(f.id, f.family_name),
                         },
                       ]
                     : []),
@@ -220,7 +220,7 @@ export function FamilyTableRow({
                     ? [
                         {
                           label: "Fully approve",
-                          onClick: () => onFullyApprove(f.id),
+                          onClick: () => onFullyApprove(f.id, f.family_name),
                         },
                       ]
                     : []),

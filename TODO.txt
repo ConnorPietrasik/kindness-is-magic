@@ -1,5 +1,3 @@
-Make the back button include sort / filter / page status
-Rename "reset lock" button to "unapprove" to make it clear. This shouldn't send any emails.
 Add CC / BCC to email thing, save email bodies, and improve the email preview to show the whole "FROM:" thing.
 Add a way to view incoming emails; maybe either a "new unread in {mailbox}" alert for admins with a link to gmail?
 Bump Ruff?

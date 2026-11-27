@@ -177,8 +177,8 @@ export default function HelpAdmin() {
                   <strong>Edit</strong> updates the family profile (name, contact, address, phone, bio, family wish).
                 </li>
                 <li>
-                  The overflow menu (three dots) holds send email, view the packing and delivery slips, reset the wish lock, fully approve,
-                  and delete. The Deleted tab lists removed families, and a Restore button on each row brings one back.
+                  The overflow menu (three dots) holds send email, view the packing and delivery slips, unapprove, fully approve, and
+                  delete. The Deleted tab lists removed families, and a Restore button on each row brings one back.
                 </li>
               </ul>
             </>
