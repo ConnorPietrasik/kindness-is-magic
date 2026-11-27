@@ -5,3 +5,5 @@ Make a way for families to upload thank you pictures / cards if they want to (wh
 EVENTUALLY - Fine-tune a 1B model or something for automatically classifying wishes
 EVENTUALLY - Referrer "change code" button in case of leak
 NEXT SEASON - Email verification
+NEXT SEASON - Squish Alembic migrations
+NEXT SEASON - Hash reset / session tokens

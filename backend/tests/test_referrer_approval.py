@@ -242,6 +242,56 @@ class TestRejectedReferrerAuth:
         assert resp.status_code == 200
         assert resp.json()["message"] == "Login successful"
 
+    def test_reject_revokes_referrer_user_sessions_reapprove_does_not_revive(
+        self, test_client: TestClient, admin_user, referrer_user, db: Session
+    ):
+        """Rejecting a referrer kills the linked user's sessions; re-approving does not revive them."""
+        from app.models import RefreshToken
+
+        ref_id = referrer_user.referrer_id
+
+        # Referrer user has an active session
+        pre = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
+        assert pre.status_code == 200
+        refresh_before = test_client.cookies.get("refresh_token")
+        assert refresh_before is not None
+
+        # Admin rejects the referrer
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{ref_id}/reject")
+        assert resp.status_code == 200
+
+        # All of the user's refresh tokens are gone
+        assert db.query(RefreshToken).filter(RefreshToken.user_id == referrer_user.id).count() == 0
+
+        # While rejected, the pre-rejection token 401s
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+
+        # Admin re-approves the referrer
+        test_client.cookies.clear()
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{ref_id}/approve")
+        assert resp.status_code == 200
+
+        # The pre-rejection token must still be dead after re-approval —
+        # the user has to re-authenticate.
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "session has ended" in resp.json()["detail"].lower()
+
+        # The re-approved account can log in fresh
+        test_client.cookies.clear()
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": referrer_user.email, "password": "RefPass1234!"},
+        )
+        assert resp.status_code == 200
+
 
 # ---------------------------------------------------------------------------
 # TestSendFamilyInviteApprovalGate

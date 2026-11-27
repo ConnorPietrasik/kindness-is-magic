@@ -336,6 +336,46 @@ class TestAdminDeleteReferrer:
         post = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
         assert post.status_code == 200
 
+    def test_soft_delete_revokes_referrer_user_sessions_restore_does_not_revive(
+        self, test_client: TestClient, admin_user, referrer_user, db: Session
+    ):
+        """Deleting a referrer kills the linked user's sessions; restoring does not revive them."""
+        from app.models import RefreshToken
+
+        # Referrer user has an active session
+        pre = test_client.post("/api/auth/login", json={"email": referrer_user.email, "password": "RefPass1234!"})
+        assert pre.status_code == 200
+        refresh_before = test_client.cookies.get("refresh_token")
+        assert refresh_before is not None
+
+        # Admin deletes the referrer (cascades to disabling the linked user)
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/referrers/{referrer_user.referrer_id}")
+        assert resp.status_code == 204
+
+        # All of the disabled user's refresh tokens are gone
+        assert db.query(RefreshToken).filter(RefreshToken.user_id == referrer_user.id).count() == 0
+
+        # While deleted, the pre-delete token 401s
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+
+        # Admin restores the referrer (which restores the linked user)
+        test_client.cookies.clear()
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/referrers/{referrer_user.referrer_id}/restore")
+        assert resp.status_code == 200
+
+        # The pre-delete token must still be dead after restore —
+        # the user has to re-authenticate.
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "session has ended" in resp.json()["detail"].lower()
+
     def test_200_restore_soft_deleted_referrer(self, test_client: TestClient, admin_user, referrer_record, db: Session):
         _admin_login(test_client)
         # Soft-delete the referrer

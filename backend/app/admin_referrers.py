@@ -14,7 +14,18 @@ from sqlalchemy import func
 from app.auth import generate_unique_family_invite_code
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
-from app.models import EmailKind, EmailStatus, Family, FamilyVerificationStatus, Referrer, ReferrerApprovalStatus, SentEmail, User, Wish
+from app.models import (
+    EmailKind,
+    EmailStatus,
+    Family,
+    FamilyVerificationStatus,
+    RefreshToken,
+    Referrer,
+    ReferrerApprovalStatus,
+    SentEmail,
+    User,
+    Wish,
+)
 from app.permissions import require_admin
 from app.response_builders import (
     build_referrer_detail,
@@ -254,10 +265,12 @@ def delete_referrer(
     """Soft-delete a referrer and disable its linked user account(s).
 
     Cascade (mirrors ``delete_user``): the referrer's active user
-    account(s) are soft-deleted so the referrer can no longer log in, and
-    any delivery-family / wish assignments pointing at those users are
-    unassigned so none reference a disabled account. Families keep their
-    ``referrer_id`` (restoring the referrer brings the link back).
+    account(s) are soft-deleted so the referrer can no longer log in,
+    their refresh tokens are invalidated so a later restore cannot
+    silently re-activate pre-disable sessions, and any delivery-family /
+    wish assignments pointing at those users are unassigned so none
+    reference a disabled account. Families keep their ``referrer_id``
+    (restoring the referrer brings the link back).
     """
     ref = get_active_or_404(db, Referrer, ref_id, "Referrer not found")
     now = datetime.now(timezone.utc)
@@ -268,6 +281,9 @@ def delete_referrer(
     user_ids = [uid for (uid,) in db.query(User.id).filter(User.referrer_id == ref_id, User.deleted_at.is_(None)).all()]
     if user_ids:
         db.query(User).filter(User.id.in_(user_ids)).update({User.deleted_at: now}, synchronize_session=False)
+        # Invalidate all refresh tokens (force re-login on all devices), so a
+        # later restore cannot silently re-activate pre-disable sessions.
+        db.query(RefreshToken).filter(RefreshToken.user_id.in_(user_ids)).delete(synchronize_session="fetch")
         db.query(Family).filter(Family.delivery_user_id.in_(user_ids)).update({Family.delivery_user_id: None}, synchronize_session=False)
         db.query(Wish).filter(Wish.assigned_to_id.in_(user_ids)).update({Wish.assigned_to_id: None}, synchronize_session=False)
 
@@ -310,14 +326,24 @@ async def reject_referrer(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> ReferrerDetail:
-    """Reject a pending (or previously approved) referrer."""
+    """Reject a pending (or previously approved) referrer.
+
+    The referrer's user account(s) stay intact — rejection alone blocks
+    login and refresh — but their refresh tokens are invalidated, so a
+    later approval cannot silently re-activate pre-rejection sessions.
+    """
     ref = get_or_404(db, Referrer, ref_id, "Referrer not found")
 
     ref.approval_status = ReferrerApprovalStatus.rejected
+    # Invalidate all refresh tokens (force re-login on all devices), so a
+    # later approval cannot silently re-activate pre-rejection sessions.
+    user_ids = [uid for (uid,) in db.query(User.id).filter(User.referrer_id == ref_id, User.deleted_at.is_(None)).all()]
+    if user_ids:
+        db.query(RefreshToken).filter(RefreshToken.user_id.in_(user_ids)).delete(synchronize_session="fetch")
     db.commit()
     db.refresh(ref)
 
-    logger.info("Admin rejected referrer '%s' (id=%s)", ref.name, ref_id)
+    logger.info("Admin rejected referrer '%s' (id=%s, users invalidated=%d)", ref.name, ref_id, len(user_ids))
 
     # Send rejection email
     await _send_referrer_rejected_email(ref, db, user_id=_admin.id)

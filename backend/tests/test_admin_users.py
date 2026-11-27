@@ -922,6 +922,62 @@ class TestAdminDeleteUser:
         emails = [u["email"] for u in body["users"]]
         assert "reappear@test.com" in emails
 
+    def test_delete_revokes_refresh_tokens_restore_does_not_revive(self, test_client: TestClient, admin_user, db: Session):
+        """Deleting a user kills their sessions; restoring does not revive them."""
+        from app.models import RefreshToken, User, UserRole
+        from app.auth import get_password_hash
+
+        # Create a user with an active session
+        u = User(
+            email="delrestore@test.com",
+            hashed_password=get_password_hash("DelRestPass123!"),
+            role=UserRole.admin,
+            display_name=None,
+        )
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+
+        login_as(test_client, "delrestore@test.com", "DelRestPass123!")
+        refresh_before = test_client.cookies.get("refresh_token")
+        assert refresh_before is not None
+
+        # Admin deletes the user
+        _admin_login(test_client)
+        resp = test_client.delete(f"/api/admin/users/{u.id}")
+        assert resp.status_code == 204
+
+        # All of the user's refresh tokens are gone
+        assert db.query(RefreshToken).filter(RefreshToken.user_id == u.id).count() == 0
+
+        # While deleted, the pre-delete token 401s
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+
+        # Admin restores the user
+        test_client.cookies.clear()
+        _admin_login(test_client)
+        resp = test_client.post(f"/api/admin/users/{u.id}/restore")
+        assert resp.status_code == 200
+
+        # The pre-delete token must still be dead after restore —
+        # the user has to re-authenticate.
+        test_client.cookies.delete("refresh_token")
+        test_client.cookies.set("refresh_token", refresh_before)
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+        assert "session has ended" in resp.json()["detail"].lower()
+
+        # The restored account can log in fresh
+        test_client.cookies.clear()
+        resp = test_client.post(
+            "/api/auth/login",
+            json={"email": "delrestore@test.com", "password": "DelRestPass123!"},
+        )
+        assert resp.status_code == 200
+
     def test_404_not_found(self, test_client: TestClient, admin_user):
         _admin_login(test_client)
         resp = test_client.delete("/api/admin/users/99999")

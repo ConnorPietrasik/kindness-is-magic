@@ -453,6 +453,11 @@ def delete_user(
         )
 
     user.deleted_at = datetime.now(timezone.utc)
+    # Invalidate all refresh tokens (force re-login on all devices), so a
+    # later restore cannot silently re-activate pre-disable sessions.
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+    ).delete(synchronize_session="fetch")
     # Unassign delivery families so they are not orphaned
     db.query(Family).filter(Family.delivery_user_id == user_id).update({Family.delivery_user_id: None}, synchronize_session=False)
     # Unassign purchaser wishes so they are not orphaned
