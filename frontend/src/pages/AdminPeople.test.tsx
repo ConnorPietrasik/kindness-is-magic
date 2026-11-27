@@ -494,3 +494,115 @@ describe("AdminPeople", () => {
     });
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+describe("AdminPeople — persisted view state", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("drops a stale family filter once the dropdown loads (soft-deleted family)", async () => {
+    mockListApis();
+    // Family 5 is the only dropdown option — 999 is gone (soft-deleted)
+    localStorage.setItem("kim:listView:adminPeople:filters", JSON.stringify({ familyId: 999 }));
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+    // The stale ID is no longer sent and the select shows no phantom selection
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ family_id: undefined }));
+    });
+    expect(screen.getByLabelText("Family filter")).toHaveValue("");
+  });
+
+  it("keeps a valid saved family filter", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminPeople:filters", JSON.stringify({ familyId: 5 }));
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Family filter")).toHaveValue("5");
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ family_id: 5 }));
+    });
+  });
+
+  it("drops invalid stored numeric filters (a negative/NaN value would 422 the request)", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminPeople:filters", JSON.stringify({ minAge: "-3", maxAge: "abc" }));
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ min_age: undefined, max_age: undefined }));
+    });
+    // type="number" inputs resolve to null when empty (jest-dom)
+    expect(screen.getByLabelText("Minimum age")).toHaveValue(null);
+    expect(screen.getByLabelText("Maximum age")).toHaveValue(null);
+  });
+
+  it("keeps a saved family filter when the dropdown fetch fails (an error is not evidence the family is gone)", async () => {
+    mockListApis();
+    vi.mocked(api.adminGetFamiliesDropdown).mockRejectedValue(new Error("boom"));
+    localStorage.setItem("kim:listView:adminPeople:filters", JSON.stringify({ familyId: 5 }));
+
+    wrap(<AdminPeople />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+    // The saved filter survives the failed dropdown load
+    await waitFor(() => {
+      expect(api.adminListPeople).toHaveBeenLastCalledWith(expect.objectContaining({ family_id: 5 }));
+    });
+  });
+
+  it("does not send a live-typed negative min age (a negative/NaN value would 422 the request)", async () => {
+    const user = userEvent.setup();
+    // Auto-advance time so the 1000ms debounce fires quickly
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      mockListApis();
+      const listSpy = vi.mocked(api.adminListPeople).mockResolvedValue(mockListResponse);
+
+      wrap(<AdminPeople />);
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+
+      const minInput = screen.getByLabelText("Minimum age");
+      // "-3" is typeable into the number input (min only constrains the
+      // stepper) — the old code would have sent min_age=-3 and 422'd.
+      await user.type(minInput, "-3");
+      // …then a valid value so a debounced refetch actually fires (an
+      // unchanged query key wouldn't re-invoke the API).
+      await user.clear(minInput);
+      await user.type(minInput, "4");
+
+      await waitFor(() => {
+        expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ min_age: 4 }));
+      });
+      // No call ever carried a negative (or otherwise invalid) min age
+      for (const call of listSpy.mock.calls) {
+        const minAge = call[0]?.min_age;
+        if (minAge !== undefined) expect(minAge).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

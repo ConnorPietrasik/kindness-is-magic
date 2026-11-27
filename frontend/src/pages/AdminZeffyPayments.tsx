@@ -19,6 +19,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
@@ -31,7 +32,8 @@ import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminClearZeffyPaymentSeen,
@@ -49,16 +51,31 @@ import { formatApiError, formatDateTime, formatUsd } from "../lib/utils";
 import type { ZeffyPayment } from "../types";
 
 /* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminZeffyPaymentsView {
+  showMatched: boolean;
+}
+
+const DEFAULT_VIEW: AdminZeffyPaymentsView = { showMatched: false };
+
+function sanitizeView(raw: unknown): Partial<AdminZeffyPaymentsView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return { showMatched: r.showMatched === true };
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminZeffyPayments() {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const pagination = usePagination({ defaultPageSize: 25, pageSizeOptions: [20, 25, 50, 100] });
+  const pagination = usePagination({ storageKey: "adminZeffyPayments", defaultPageSize: 25, pageSizeOptions: [20, 25, 50, 100] });
 
   // Unmatched-only by default (the banner's population); the toggle shows
   // the full history (matched + seen rows).
-  const [showMatched, setShowMatched] = useState(false);
+  const [view, setView] = usePersistentState(listViewKey("adminZeffyPayments", "filters"), DEFAULT_VIEW, sanitizeView);
   const [matchTarget, setMatchTarget] = useState<ZeffyPayment | null>(null);
   const [unmatchTarget, setUnmatchTarget] = useState<ZeffyPayment | null>(null);
 
@@ -70,9 +87,17 @@ export default function AdminZeffyPayments() {
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
   const listParams = useMemo(
-    () => ({ ...pagination.params, columns: apiColumns, show_matched: showMatched }),
-    [pagination.params, apiColumns, showMatched]
+    () => ({ ...pagination.params, columns: apiColumns, show_matched: view.showMatched }),
+    [pagination.params, apiColumns, view.showMatched]
   );
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    pagination.reset();
+  }
+
+  const isViewNonDefault =
+    view.showMatched || pagination.page !== pagination.defaultPage || pagination.pageSize !== pagination.defaultPageSize;
 
   const {
     data: listData,
@@ -89,6 +114,10 @@ export default function AdminZeffyPayments() {
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
   );
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
 
   const payments = listData?.payments ?? [];
 
@@ -173,6 +202,7 @@ export default function AdminZeffyPayments() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Zeffy Payments</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             <Button variant="secondary" onClick={() => syncMut.mutate()} loading={syncMut.isPending}>
               Sync with Zeffy
             </Button>
@@ -198,9 +228,9 @@ export default function AdminZeffyPayments() {
             <input
               id="show-matched"
               type="checkbox"
-              checked={showMatched}
+              checked={view.showMatched}
               onChange={(e) => {
-                setShowMatched(e.target.checked);
+                setView((v) => ({ ...v, showMatched: e.target.checked }));
                 pagination.goToPage(1);
               }}
               className="h-4 w-4 rounded border-gray-300"
@@ -212,7 +242,7 @@ export default function AdminZeffyPayments() {
         {/* Table */}
         {payments.length === 0 ? (
           <Card>
-            <p className="py-8 text-center text-gray-400">{showMatched ? "No payments found." : "No unmatched payments."}</p>
+            <p className="py-8 text-center text-gray-400">{view.showMatched ? "No payments found." : "No unmatched payments."}</p>
           </Card>
         ) : (
           <Table>

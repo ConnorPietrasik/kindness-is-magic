@@ -11,7 +11,7 @@
  */
 
 import { Link } from "react-router-dom";
-import { AssignedGiftsView } from "../components/AssignedGifts";
+import { AssignedGiftsView, PURCHASER_ASSIGNED_GIFT_SORT_FIELDS } from "../components/AssignedGifts";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
@@ -55,6 +55,7 @@ export default function PurchaserAssignedGifts() {
           invalidationKeys={[purchaserWishes, purchaserWishCards]}
           listFn={purchaserListWishes}
           columnResourceKey="purchaserAssignedGifts"
+          sortFields={PURCHASER_ASSIGNED_GIFT_SORT_FIELDS}
           familyColumn={{ key: "family_display_id", sortable: false }}
           detailFn={purchaserGetWish}
           updateFn={purchaserUpdateWish}

@@ -5,7 +5,7 @@
  *  - Cards show fully-approved families only; unapproved families are hidden.
  *  - The member-count filters narrow the card list.
  *  - The sort button cycles family size / youngest age (both directions) and
- *    persists the choice in the URL.
+ *    persists the choice in the saved browse view (localStorage).
  *
  * Cards show display ID + bio (no family names), so each family is identified
  * by a unique bio. Setup creates three families with distinct member counts
@@ -344,14 +344,21 @@ test.describe.serial("Public Families Browse", () => {
     expect(pos[BIO_A]).toBeNull();
 
     /* Clear resets the filter inputs */
-    await page.getByRole("button", { name: "Clear" }).click();
+    await page.getByRole("button", { name: "Clear filters" }).click();
     await pastDebounce(page);
     await waitHeading(page);
     expect(await page.getByLabel("Min Family Members").inputValue()).toBe("");
     expect(await page.getByLabel("Max Family Members").inputValue()).toBe("");
   });
 
-  test("sort button cycles options and persists the choice in the URL", async ({ page }) => {
+  test("sort button cycles options and persists the choice in the saved view", async ({ page }) => {
+    /* The persisted sort value from the saved browse view (localStorage). */
+    const storedSort = () =>
+      page.evaluate(() => {
+        const raw = localStorage.getItem("kim:listView:publicFamilies:filters");
+        return raw ? (JSON.parse(raw) as { sort: string | null }).sort : null;
+      });
+
     await page.goto("/families");
     /* Start from a narrowed list (demo CSV has more approved families than
        one page holds). Order is checked with absolute positions across
@@ -365,7 +372,7 @@ test.describe.serial("Public Families Browse", () => {
     await expect(page.getByRole("button", { name: "Sort: Family Size ↑" })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page).toHaveURL(/sort=person_count/);
+    await expect.poll(storedSort).toBe("person_count");
     let pos = await cardPositions(page, [BIO_A, BIO_B]);
     expect(pos[BIO_B]).not.toBeNull();
     expect(pos[BIO_A]).not.toBeNull();
@@ -374,7 +381,7 @@ test.describe.serial("Public Families Browse", () => {
     /* Family Size ↓ — A first */
     await page.getByRole("button", { name: "Sort: Family Size ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Family Size ↓" })).toBeVisible();
-    await expect(page).toHaveURL(/sort=-person_count/);
+    await expect.poll(storedSort).toBe("-person_count");
     pos = await cardPositions(page, [BIO_A, BIO_B]);
     expect(pos[BIO_A]).not.toBeNull();
     expect(pos[BIO_B]).not.toBeNull();
@@ -383,7 +390,7 @@ test.describe.serial("Public Families Browse", () => {
     /* Youngest ↑ — A (youngest 3) before B (25) */
     await page.getByRole("button", { name: "Sort: Family Size ↓" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↑" })).toBeVisible();
-    await expect(page).toHaveURL(/sort=min_age/);
+    await expect.poll(storedSort).toBe("min_age");
     pos = await cardPositions(page, [BIO_A, BIO_B]);
     expect(pos[BIO_A]).not.toBeNull();
     expect(pos[BIO_B]).not.toBeNull();
@@ -392,15 +399,15 @@ test.describe.serial("Public Families Browse", () => {
     /* Youngest ↓ — B first */
     await page.getByRole("button", { name: "Sort: Youngest ↑" }).click();
     await expect(page.getByRole("button", { name: "Sort: Youngest ↓" })).toBeVisible();
-    await expect(page).toHaveURL(/sort=-min_age/);
+    await expect.poll(storedSort).toBe("-min_age");
     pos = await cardPositions(page, [BIO_A, BIO_B]);
     expect(pos[BIO_B]).not.toBeNull();
     expect(pos[BIO_A]).not.toBeNull();
     expect(pos[BIO_B]!).toBeLessThan(pos[BIO_A]!);
 
-    /* Back to Default — sort param removed from the URL */
+    /* Back to Default — sort removed from the saved view */
     await page.getByRole("button", { name: "Sort: Youngest ↓" }).click();
     await expect(page.getByRole("button", { name: "Sort: Default" })).toBeVisible();
-    await expect(page).not.toHaveURL(/sort=/);
+    await expect.poll(storedSort).toBeNull();
   });
 });

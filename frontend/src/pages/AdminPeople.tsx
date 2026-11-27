@@ -7,10 +7,11 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { Fragment, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -31,7 +32,8 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useFamiliesDropdown } from "../hooks/useDropdowns";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreatePerson,
@@ -45,7 +47,7 @@ import {
 } from "../lib/api";
 import { adminDeletedPeople, adminFamilies, adminPackingSlips, adminPeople, adminWishCards, adminWishes } from "../lib/queryKeys";
 import { route } from "../lib/routes";
-import { normalizeUpdatePayload } from "../lib/utils";
+import { normalizeUpdatePayload, parseNonNegativeInt, sanitizeNonNegativeInt } from "../lib/utils";
 import type { AdminPeopleListParams, PersonPayload } from "../types";
 import { personRoleLabel } from "../types";
 
@@ -61,23 +63,63 @@ function isFamilyDeletedError(error: unknown): boolean {
 }
 
 /* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminPeopleView {
+  search: string;
+  searchName: string;
+  searchRole: string;
+  searchNote: string;
+  searchWish: string;
+  minAge: string;
+  maxAge: string;
+  familyId: number | null;
+  sortField: string | null;
+  newestFirst: boolean;
+}
+
+const DEFAULT_VIEW: AdminPeopleView = {
+  search: "",
+  searchName: "",
+  searchRole: "",
+  searchNote: "",
+  searchWish: "",
+  minAge: "",
+  maxAge: "",
+  familyId: null,
+  sortField: null,
+  newestFirst: false,
+};
+
+const SORT_FIELDS = ["age", "-age"] as const;
+
+function sanitizeView(raw: unknown): Partial<AdminPeopleView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+  return {
+    search: str(r.search),
+    searchName: str(r.searchName),
+    searchRole: str(r.searchRole),
+    searchNote: str(r.searchNote),
+    searchWish: str(r.searchWish),
+    minAge: sanitizeNonNegativeInt(r.minAge),
+    maxAge: sanitizeNonNegativeInt(r.maxAge),
+    familyId: typeof r.familyId === "number" && Number.isInteger(r.familyId) && r.familyId >= 1 ? r.familyId : null,
+    sortField: (SORT_FIELDS as readonly string[]).includes(r.sortField as string) ? (r.sortField as string) : null,
+    newestFirst: r.newestFirst === true,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminPeople() {
-  const pagination = usePagination();
-  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
+  const pagination = usePagination({ storageKey: "adminPeople" });
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination, storageKey: "adminPeople" });
+  const [view, setView] = usePersistentState(listViewKey("adminPeople", "filters"), DEFAULT_VIEW, sanitizeView);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [pendingFamilyRestore, setPendingFamilyRestore] = useState<{ personId: number; familyId: number } | null>(null);
-  const [familyFilter, setFamilyFilter] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchName, setSearchName] = useState("");
-  const [searchRole, setSearchRole] = useState("");
-  const [searchNote, setSearchNote] = useState("");
-  const [searchWish, setSearchWish] = useState("");
-  const [minAge, setMinAge] = useState("");
-  const [maxAge, setMaxAge] = useState("");
-  const [sortField, setSortField] = useState<string | null>(null);
-  const [newestFirst, setNewestFirst] = useState(false);
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminPeople");
@@ -87,21 +129,20 @@ export default function AdminPeople() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
-  const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
-  const debouncedSearchRole = useDebouncedState(searchRole, 1000, () => pagination.goToPage(1));
-  const debouncedSearchNote = useDebouncedState(searchNote, 1000, () => pagination.goToPage(1));
-  const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
-  const debouncedMinAge = useDebouncedState(minAge, 1000, () => pagination.goToPage(1));
-  const debouncedMaxAge = useDebouncedState(maxAge, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+  const debouncedSearchName = useDebouncedState(view.searchName, 1000, () => pagination.goToPage(1));
+  const debouncedSearchRole = useDebouncedState(view.searchRole, 1000, () => pagination.goToPage(1));
+  const debouncedSearchNote = useDebouncedState(view.searchNote, 1000, () => pagination.goToPage(1));
+  const debouncedSearchWish = useDebouncedState(view.searchWish, 1000, () => pagination.goToPage(1));
+  const debouncedMinAge = useDebouncedState(view.minAge, 1000, () => pagination.goToPage(1));
+  const debouncedMaxAge = useDebouncedState(view.maxAge, 1000, () => pagination.goToPage(1));
 
   // Cycle sort: null → "age" → "-age" → null
   function handleSortToggle() {
-    setNewestFirst(false);
-    setSortField((prev) => {
-      if (prev === null) return "age";
-      if (prev === "age") return "-age";
-      return null;
+    setView((prev) => {
+      if (prev.sortField === null) return { ...prev, newestFirst: false, sortField: "age" };
+      if (prev.sortField === "age") return { ...prev, newestFirst: false, sortField: "-age" };
+      return { ...prev, newestFirst: false, sortField: null };
     });
     pagination.goToPage(1);
   }
@@ -109,30 +150,50 @@ export default function AdminPeople() {
   // "Newest first" and the column sort share the single `sort` param — enabling
   // one clears the other.
   function handleNewestToggle() {
-    setNewestFirst((prev) => !prev);
-    setSortField(null);
+    setView((prev) => ({ ...prev, newestFirst: !prev.newestFirst, sortField: null }));
     pagination.goToPage(1);
   }
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    handleTabChange("active"); // also resets pagination to page 1
+    pagination.reset(); // also resets the page size
+  }
+
+  const isViewNonDefault =
+    view.search !== "" ||
+    view.searchName !== "" ||
+    view.searchRole !== "" ||
+    view.searchNote !== "" ||
+    view.searchWish !== "" ||
+    view.minAge !== "" ||
+    view.maxAge !== "" ||
+    view.familyId !== null ||
+    view.sortField !== null ||
+    view.newestFirst ||
+    isDeletedView ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminPeopleListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
-      family_id: familyFilter ?? undefined,
+      family_id: view.familyId ?? undefined,
       search: debouncedSearch || undefined,
       search_name: debouncedSearchName || undefined,
       search_role: debouncedSearchRole || undefined,
       search_note: debouncedSearchNote || undefined,
       search_wish: debouncedSearchWish || undefined,
-      min_age: debouncedMinAge !== "" ? parseInt(debouncedMinAge, 10) : undefined,
-      max_age: debouncedMaxAge !== "" ? parseInt(debouncedMaxAge, 10) : undefined,
-      sort: newestFirst ? "-created_at" : sortField || undefined,
+      min_age: parseNonNegativeInt(debouncedMinAge),
+      max_age: parseNonNegativeInt(debouncedMaxAge),
+      sort: view.newestFirst ? "-created_at" : view.sortField || undefined,
     }),
     [
       pagination.params,
       apiColumns,
-      familyFilter,
+      view.familyId,
       debouncedSearch,
       debouncedSearchName,
       debouncedSearchRole,
@@ -140,8 +201,8 @@ export default function AdminPeople() {
       debouncedSearchWish,
       debouncedMinAge,
       debouncedMaxAge,
-      sortField,
-      newestFirst,
+      view.sortField,
+      view.newestFirst,
     ]
   );
 
@@ -215,8 +276,21 @@ export default function AdminPeople() {
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
+
   // Families lookup (for dropdown + display)
-  const { families, familyMap, familiesLoading } = useFamiliesDropdown();
+  const { families, familyMap, familiesLoading, familiesError } = useFamiliesDropdown();
+
+  // A saved family filter can point at a family that's since been soft-deleted
+  // (or created on another machine) — drop it once the dropdown loads, so the
+  // select can't sit blank with an invisible active filter. A failed
+  // dropdown fetch is NOT evidence the family is gone — keep the value.
+  useEffect(() => {
+    if (familiesLoading || familiesError) return;
+    setView((prev) => (prev.familyId != null && !families.some((f) => f.id === prev.familyId) ? { ...prev, familyId: null } : prev));
+  }, [families, familiesLoading, familiesError, setView]);
 
   function handleCreate(formData: PersonPayload) {
     createMut?.mutate(formData);
@@ -242,8 +316,8 @@ export default function AdminPeople() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by name"
-          value={searchName}
-          onChange={(e) => setSearchName(e.target.value)}
+          value={view.searchName}
+          onChange={(e) => setView((v) => ({ ...v, searchName: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -256,7 +330,7 @@ export default function AdminPeople() {
         className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
       >
         Age
-        <span className="text-[10px]">{sortField === "age" ? "↑" : sortField === "-age" ? "↓" : "⇅"}</span>
+        <span className="text-[10px]">{view.sortField === "age" ? "↑" : view.sortField === "-age" ? "↓" : "⇅"}</span>
       </button>
     ),
     wishes: (
@@ -266,8 +340,8 @@ export default function AdminPeople() {
           type="text"
           placeholder="Filter wishes…"
           aria-label="Filter by wishes"
-          value={searchWish}
-          onChange={(e) => setSearchWish(e.target.value)}
+          value={view.searchWish}
+          onChange={(e) => setView((v) => ({ ...v, searchWish: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -281,8 +355,8 @@ export default function AdminPeople() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by role"
-          value={searchRole}
-          onChange={(e) => setSearchRole(e.target.value)}
+          value={view.searchRole}
+          onChange={(e) => setView((v) => ({ ...v, searchRole: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -295,8 +369,8 @@ export default function AdminPeople() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by note"
-          value={searchNote}
-          onChange={(e) => setSearchNote(e.target.value)}
+          value={view.searchNote}
+          onChange={(e) => setView((v) => ({ ...v, searchNote: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -314,6 +388,7 @@ export default function AdminPeople() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage People</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -330,14 +405,19 @@ export default function AdminPeople() {
         {/* Filters */}
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button type="button" variant={newestFirst ? "primary" : "secondary"} aria-pressed={newestFirst} onClick={handleNewestToggle}>
+            <Button
+              type="button"
+              variant={view.newestFirst ? "primary" : "secondary"}
+              aria-pressed={view.newestFirst}
+              onClick={handleNewestToggle}
+            >
               Newest first
             </Button>
             <select
               aria-label="Family filter"
-              value={familyFilter ?? ""}
+              value={view.familyId ?? ""}
               onChange={(e) => {
-                setFamilyFilter(e.target.value ? parseInt(e.target.value, 10) : null);
+                setView((v) => ({ ...v, familyId: e.target.value ? parseInt(e.target.value, 10) : null }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -353,8 +433,8 @@ export default function AdminPeople() {
               type="text"
               placeholder="Search all fields…"
               aria-label="Search all fields"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />
@@ -362,8 +442,8 @@ export default function AdminPeople() {
               type="number"
               placeholder="Min age"
               aria-label="Minimum age"
-              value={minAge}
-              onChange={(e) => setMinAge(e.target.value)}
+              value={view.minAge}
+              onChange={(e) => setView((v) => ({ ...v, minAge: e.target.value }))}
               className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
               min="0"
@@ -372,8 +452,8 @@ export default function AdminPeople() {
               type="number"
               placeholder="Max age"
               aria-label="Maximum age"
-              value={maxAge}
-              onChange={(e) => setMaxAge(e.target.value)}
+              value={view.maxAge}
+              onChange={(e) => setView((v) => ({ ...v, maxAge: e.target.value }))}
               className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
               min="0"

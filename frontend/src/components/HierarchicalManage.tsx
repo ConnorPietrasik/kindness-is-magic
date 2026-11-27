@@ -29,11 +29,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../context/ToastContext";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
 import { formatApiError } from "../lib/utils";
 import type { AdminListParams } from "../types";
 import type { ButtonVariant } from "./Button";
 import { Button } from "./Button";
+import { ClearViewButton } from "./ClearViewButton";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CrudTabs } from "./CrudTabs";
 import { MutationErrors } from "./MutationErrors";
@@ -261,6 +262,18 @@ export interface HierarchicalManageProps<
   pagination?: HierarchicalManagePaginationConfig;
   /** Optional dialog text overrides */
   dialogs?: HierarchicalManageDialogsConfig;
+  /**
+   * Resource id for localStorage persistence of the children list view
+   * (page/pageSize under `kim:listView:<storageKey>:page` when pagination is
+   * enabled, and the active/deleted tab under `:tab` whenever this key is
+   * set — even without a deleted tab, where it just re-persists `"active"`).
+   * Scope it to the page instance — typically `"<page>:<entityId>"` — so
+   * state from one entity (e.g. a referrer's family list) never leaks into
+   * another. Also renders a "Clear filters" button in the children header
+   * while the saved view is non-default. Omit to keep the view in-memory
+   * (existing behavior).
+   */
+  storageKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +294,7 @@ export function HierarchicalManage<
   tabs,
   pagination,
   dialogs,
+  storageKey,
 }: HierarchicalManageProps<ParentDetail, ParentPayload, ListResponse, ChildSummary, ChildDetail, ChildPayload, ChildFormProps>) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -289,12 +303,15 @@ export function HierarchicalManage<
   const usePaginationControls = pagination?.enabled ?? false;
   const paginationCtrl = usePagination({
     defaultPageSize: pagination?.defaultPageSize,
+    storageKey: usePaginationControls ? storageKey : undefined,
   });
 
   /* ── Tab state ─────────────────────────────────────────── */
   const hasDeletedTab = !!tabs?.deleted;
   const { viewTab, isDeletedView, handleTabChange } = useCrudTabs(
-    usePaginationControls ? { pagination: { goToPage: paginationCtrl.goToPage } } : undefined
+    usePaginationControls || storageKey != null
+      ? { pagination: usePaginationControls ? { goToPage: paginationCtrl.goToPage } : undefined, storageKey }
+      : undefined
   );
 
   /* ── Sort toggle (optional, children header) ───────────── */
@@ -307,6 +324,20 @@ export function HierarchicalManage<
     setSortOn((v) => !v);
     if (usePaginationControls) paginationCtrl.goToPage(1);
   }, [usePaginationControls, paginationCtrl.goToPage]);
+
+  /* ── Children view persistence (opt-in via storageKey) ──── */
+  // Non-default when the saved tab is "deleted" or the saved page/pageSize
+  // differs from defaults — drives the "Clear filters" escape hatch.
+  const childViewNonDefault =
+    storageKey != null &&
+    ((hasDeletedTab && isDeletedView) ||
+      (usePaginationControls &&
+        (paginationCtrl.page !== paginationCtrl.defaultPage || paginationCtrl.pageSize !== paginationCtrl.defaultPageSize)));
+
+  function handleClearChildView() {
+    if (hasDeletedTab) handleTabChange("active");
+    if (usePaginationControls) paginationCtrl.reset();
+  }
 
   /* ── Derived CRUD config based on active tab ───────────── */
   const deletedTab = tabs?.deleted;
@@ -379,6 +410,12 @@ export function HierarchicalManage<
     () => getPaginationInfo(listTotal, paginationCtrl.page, paginationCtrl.pageSize),
     [listTotal, paginationCtrl.page, paginationCtrl.pageSize]
   );
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  // Skipped when pagination is disabled: the child list then ignores the
+  // page state entirely.
+  usePageClamp(usePaginationControls ? pageInfo.totalPages : 0, paginationCtrl.page, paginationCtrl.goToPage);
 
   /* ── Child form handlers ───────────────────────────────── */
   function handleChildCreate(formData: ChildPayload) {
@@ -477,6 +514,7 @@ export function HierarchicalManage<
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-900">{childConfig.title}</h3>
         <div className="flex items-center gap-3">
+          <ClearViewButton isNonDefault={childViewNonDefault} onClear={handleClearChildView} />
           {childConfig.sortToggle && !isDeletedView && (
             <Button type="button" variant={sortOn ? "primary" : "secondary"} aria-pressed={sortOn} onClick={handleSortToggle}>
               {childConfig.sortToggle.label}

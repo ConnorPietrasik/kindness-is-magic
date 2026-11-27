@@ -16,6 +16,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
@@ -28,7 +29,8 @@ import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminListClaims, adminRestoreClaim } from "../lib/api";
 import { adminClaims, familyWishList, publicFamilies } from "../lib/queryKeys";
@@ -41,6 +43,25 @@ const STATUS_FILTERS: { value: "" | "active" | "cancelled"; label: string }[] = 
   { value: "active", label: "Active" },
   { value: "cancelled", label: "Cancelled" },
 ];
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminSponsorshipsView {
+  status: "" | "active" | "cancelled";
+  search: string;
+}
+
+const DEFAULT_VIEW: AdminSponsorshipsView = { status: "", search: "" };
+
+function sanitizeView(raw: unknown): Partial<AdminSponsorshipsView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    status: r.status === "active" || r.status === "cancelled" ? r.status : undefined,
+    search: typeof r.search === "string" ? r.search : undefined,
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -58,9 +79,8 @@ function familyLabel(fam: Pick<ClaimFamilyInfo, "id" | "display_id">): string {
 export default function AdminSponsorships() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const pagination = usePagination({ defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
-  const [statusFilter, setStatusFilter] = useState<"" | "active" | "cancelled">("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const pagination = usePagination({ storageKey: "adminSponsorships", defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
+  const [view, setView] = usePersistentState(listViewKey("adminSponsorships", "filters"), DEFAULT_VIEW, sanitizeView);
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminSponsorships");
@@ -73,16 +93,27 @@ export default function AdminSponsorships() {
   // Claim whose restore is awaiting confirmation (null = closed)
   const [restoreConfirm, setRestoreConfirm] = useState<AdminClaim | null>(null);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    pagination.reset();
+  }
+
+  const isViewNonDefault =
+    view.status !== "" ||
+    view.search !== "" ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   const listParams = useMemo<AdminClaimsListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
-      status: statusFilter || undefined,
+      status: view.status || undefined,
       search: debouncedSearch || undefined,
     }),
-    [pagination.params, apiColumns, statusFilter, debouncedSearch]
+    [pagination.params, apiColumns, view.status, debouncedSearch]
   );
 
   const { data: listData, isLoading } = useQuery({
@@ -95,6 +126,10 @@ export default function AdminSponsorships() {
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
   );
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
 
   const claims = listData?.claims ?? [];
 
@@ -133,20 +168,21 @@ export default function AdminSponsorships() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Sponsorships</h2>
           <div className="flex flex-wrap items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             <input
               type="text"
               placeholder="Search by donor email or family name…"
               aria-label="Search by donor email or family name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />
             <select
               aria-label="Sponsorship status filter"
-              value={statusFilter}
+              value={view.status}
               onChange={(e) => {
-                setStatusFilter(e.target.value as "" | "active" | "cancelled");
+                setView((v) => ({ ...v, status: e.target.value as "" | "active" | "cancelled" }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"

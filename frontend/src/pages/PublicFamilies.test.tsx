@@ -157,6 +157,7 @@ describe("PublicFamilies", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     cleanup();
+    localStorage.clear();
   });
 
   it("renders loading state initially", () => {
@@ -347,22 +348,27 @@ describe("PublicFamilies", () => {
     );
   });
 
-  it("ignores a ?include_claimed=true URL param for non-admins", async () => {
+  it("does not apply a stored show-claimed value for non-admins", async () => {
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
-    // A donor pasting an admin's shareable link must not get claimed families
-    wrap(<PublicFamilies />, "/families?include_claimed=true", mockUser);
+    // An admin's saved view in this browser must not reveal claimed families
+    // to a non-admin session — the stored value stays inert.
+    localStorage.setItem("kim:listView:publicFamilies:filters", JSON.stringify({ showSponsored: true }));
+    wrap(<PublicFamilies />, "/families", mockUser);
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
     const params = spy.mock.calls[0]?.[0];
     expect(params?.include_claimed).toBeUndefined();
     expect(screen.queryByLabelText("Show sponsored families")).not.toBeInTheDocument();
+    // The inert stored value must not light up the clear affordance either
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
   });
 
-  it("restores the show-sponsored checkbox from the URL for admins", async () => {
+  it("restores the show-sponsored checkbox from storage for admins", async () => {
     const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
 
-    wrap(<PublicFamilies />, "/families?include_claimed=true", mockAdmin);
+    localStorage.setItem("kim:listView:publicFamilies:filters", JSON.stringify({ showSponsored: true }));
+    wrap(<PublicFamilies />, "/families", mockAdmin);
 
     const checkbox = (await screen.findByLabelText("Show sponsored families")) as HTMLInputElement;
     expect(checkbox).toBeChecked();
@@ -499,7 +505,8 @@ describe("PublicFamilies", () => {
     vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, families: revealed });
     vi.spyOn(api, "donorListClaims").mockResolvedValue(mockDonorClaims);
 
-    wrap(<PublicFamilies />, "/families?include_claimed=true", mockAdmin);
+    localStorage.setItem("kim:listView:publicFamilies:filters", JSON.stringify({ showSponsored: true }));
+    wrap(<PublicFamilies />, "/families", mockAdmin);
 
     await waitFor(() => expect(screen.getByText("Sponsored by me")).toBeInTheDocument());
     // Family 3-1 appears in the section but not twice (grid copy deduped out)
@@ -669,5 +676,97 @@ describe("PublicFamilies", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Sort: Family Size ↑" })).toBeInTheDocument();
     });
+  });
+
+  /* Persisted view state */
+
+  it("hydrates page, sort, and member-count filters from storage", async () => {
+    // total 30 at 12/page → the saved page 3 is valid (no clamp refetch mid-test)
+    const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue({ ...mockResponse, total: 30, total_pages: 3 });
+
+    localStorage.setItem("kim:listView:publicFamilies:page", JSON.stringify({ page: 3, pageSize: 12 }));
+    localStorage.setItem("kim:listView:publicFamilies:filters", JSON.stringify({ minPersonCount: "2", sort: "-min_age" }));
+
+    wrap(<PublicFamilies />);
+
+    // The hydrated view drives the list request
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ page: 3, min_person_count: 2, sort: "-min_age" }));
+    });
+    await screen.findByText("0-1");
+    expect(screen.getByRole("button", { name: "Sort: Youngest ↓" })).toBeInTheDocument();
+  });
+
+  it("persists filter edits to storage and Clear filters resets the view", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+    wrap(<PublicFamilies />);
+    await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+
+    await user.type(screen.getByLabelText("Min Family Members"), "3");
+    expect(JSON.parse(localStorage.getItem("kim:listView:publicFamilies:filters")!)).toEqual(
+      expect.objectContaining({ minPersonCount: "3" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    const filters = JSON.parse(localStorage.getItem("kim:listView:publicFamilies:filters")!);
+    expect(filters).toEqual({ minPersonCount: "", maxPersonCount: "", sort: null, showSponsored: false });
+    expect(JSON.parse(localStorage.getItem("kim:listView:publicFamilies:page")!)).toEqual({ page: 1, pageSize: 12 });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument());
+  });
+
+  it("drops invalid stored numeric filters (a below-min/negative/NaN value would 422 the request)", async () => {
+    const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+    // "0" is below the endpoint's minimum (counts are >= 1 here, unlike the
+    // admin pages) and must be dropped like any other 422-worthy value.
+    localStorage.setItem("kim:listView:publicFamilies:filters", JSON.stringify({ minPersonCount: "0", maxPersonCount: "-1" }));
+
+    wrap(<PublicFamilies />);
+
+    // Wait for the list to load (the filter bar only renders once the
+    // spinner is gone), then check the sanitized view.
+    await waitFor(() => {
+      expect(screen.getByLabelText("Min Family Members")).toBeInTheDocument();
+    });
+    const params = spy.mock.calls[0]?.[0];
+    expect(params?.min_person_count).toBeUndefined();
+    expect(params?.max_person_count).toBeUndefined();
+    // type="number" inputs resolve to null when empty (jest-dom)
+    expect(screen.getByLabelText("Min Family Members")).toHaveValue(null);
+    expect(screen.getByLabelText("Max Family Members")).toHaveValue(null);
+  });
+
+  it("does not send a live-typed below-minimum member count (the endpoint requires >= 1)", async () => {
+    const user = userEvent.setup();
+    // Auto-advance time so the 300ms debounce fires quickly
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      const spy = vi.spyOn(api, "listPublicFamilies").mockResolvedValue(mockResponse);
+
+      wrap(<PublicFamilies />);
+      await waitFor(() => expect(screen.getByText("0-1")).toBeInTheDocument());
+
+      const minInput = screen.getByLabelText("Min Family Members");
+      // "0" is typeable into the number input (min only constrains the
+      // stepper) — the old code would have sent min_person_count=0 and
+      // 422'd the request.
+      await user.type(minInput, "0");
+      // …then a valid value so a debounced refetch actually fires (an
+      // unchanged query key wouldn't re-invoke the API).
+      await user.clear(minInput);
+      await user.type(minInput, "2");
+
+      await waitFor(() => {
+        expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ min_person_count: 2 }));
+      });
+      // No call ever carried 0 or another below-minimum count
+      for (const call of spy.mock.calls) {
+        const minCount = call[0]?.min_person_count;
+        if (minCount !== undefined) expect(minCount).toBeGreaterThanOrEqual(1);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

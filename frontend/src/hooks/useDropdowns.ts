@@ -47,14 +47,15 @@ export function useFamiliesDropdown(): {
   families: FamilyDropdownItem[];
   familyMap: Record<number, string>;
   familiesLoading: boolean;
+  familiesError: boolean;
 } {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: adminFamiliesDropdown,
     queryFn: adminGetFamiliesDropdown,
   });
 
   const familyMap = useMemo(() => toMap(data ?? [], (f) => f.family_name), [data]);
-  return { families: data ?? [], familyMap, familiesLoading: isLoading };
+  return { families: data ?? [], familyMap, familiesLoading: isLoading, familiesError: isError };
 }
 
 /** Users for dropdown selects, filtered by a comma-separated role list. */
@@ -62,12 +63,13 @@ export function useUsersDropdown(roles: string): {
   users: UserDropdownItem[];
   userMap: Record<number, string>;
   usersLoading: boolean;
+  usersError: boolean;
 } {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: adminUsersDropdownRoles(roles),
     queryFn: () => adminGetUsersDropdown(roles),
   });
 
   const userMap = useMemo(() => toMap(data ?? [], (u) => u.display_name), [data]);
-  return { users: data ?? [], userMap, usersLoading: isLoading };
+  return { users: data ?? [], userMap, usersLoading: isLoading, usersError: isError };
 }

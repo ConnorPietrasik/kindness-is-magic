@@ -4,11 +4,12 @@
  *  - /families hides families that anyone sponsor (gift or cash) from every
  *    visitor's default list. The donor's OWN sponsored family moves to the
  *    "Sponsored by me" section above the grid (visible without any toggle).
- *  - The "Show sponsored families" toggle (URL: ?include_claimed=true) is
- *    admin-only and reveals claimed families with a three-state chip from
- *    claim_status — "Sponsored" (active) / "Awaiting payment" (pending cash)
- *    / "Fulfilled". Non-admins are unaffected even with the param in the URL
- *    (admin share link).
+ *  - The "Show sponsored families" toggle (saved-browse-view state in
+ *    localStorage) is admin-only and reveals claimed families with a
+ *    three-state chip from claim_status — "Sponsored" (active) /
+ *    "Awaiting payment" (pending cash) / "Fulfilled". Non-admins are
+ *    unaffected even when a saved view in the same browser has it enabled
+ *    (e.g. an admin used this machine).
  *  - The public wish list tells EVERY visitor the sponsorship status
  *    (no "Sponsor this family" CTA) so nobody is surprised by the 409.
  *  - The claiming donor sees their own status + claim-detail link on the wish list.
@@ -115,7 +116,7 @@ test.describe.serial("Sponsored visibility", () => {
     await admin.dispose();
   });
 
-  test("browse page hides sponsored families from anonymous visitors (toggle hidden, URL param ignored)", async ({
+  test("browse page hides sponsored families from anonymous visitors (toggle hidden, saved admin view ignored)", async ({
     page,
   }) => {
     await page.goto("/families");
@@ -128,12 +129,23 @@ test.describe.serial("Sponsored visibility", () => {
     /* The toggle is admin-only — anonymous visitors never see it */
     await expect(page.getByLabel("Show sponsored families")).toHaveCount(0);
 
+    /* An admin's saved browse view in this browser (localStorage) must not
+       reveal claimed families to an anonymous visitor — the stored value
+       stays inert outside an admin session. */
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "kim:listView:publicFamilies:filters",
+        JSON.stringify({ showSponsored: true })
+      );
+    });
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+    /* The inert stored value must not surface a "Clear filters" affordance
+       either — no filter is actually applied for a non-admin. */
+    await expect(page.getByRole("button", { name: "Clear filters" })).not.toBeVisible();
     /* Our family has exactly one member (no demo family does), so narrowing to
        1-member families keeps it on page 1 even though the demo CSV has more
-       fully-approved families than one browse page holds. The admin-only
-       ?include_claimed=true URL param must not reveal it to anonymous visitors. */
-    await page.goto("/families?include_claimed=true");
-    await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
+       fully-approved families than one browse page holds. */
     await page.getByLabel("Max Family Members").fill("1");
     await expect(page.getByRole("heading", { name: "Families Needing Gifts" })).toBeVisible({ timeout: 10_000 });
     await expect(card).toHaveCount(0);
@@ -147,7 +159,10 @@ test.describe.serial("Sponsored visibility", () => {
     await expect(card).toHaveCount(0);
 
     await page.getByLabel("Show sponsored families").check();
-    await expect(page).toHaveURL(/include_claimed=true/);
+    // The toggle state persists in the saved browse view (localStorage), not the URL
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("kim:listView:publicFamilies:filters") ?? ""))
+      .toContain('"showSponsored":true');
     /* 1-member narrowing — same rationale as the anonymous test in this file */
     await page.getByLabel("Max Family Members").fill("1");
     await expect(card).toBeVisible({ timeout: 10_000 });

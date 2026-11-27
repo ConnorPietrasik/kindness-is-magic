@@ -69,9 +69,21 @@ import { personRoleLabel } from "../types";
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
+/**
+ * The inner component is keyed by the route's family id, so navigating to a
+ * different family's people page remounts it instead of reusing the
+ * instance. That guarantees the persisted view state (tab) re-hydrates from
+ * the new family's storage slot — without the key, a param change would
+ * carry the previous family's view over *and* write it into the new family's
+ * slot.
+ */
 export default function AdminFamilyPeople() {
   const { id: famId } = useParams<{ id: string }>();
   const famIdNum = parseInt(famId!, 10);
+  return <FamilyPeoplePage key={famIdNum} famIdNum={famIdNum} />;
+}
+
+function FamilyPeoplePage({ famIdNum }: { famIdNum: number }) {
   const famIdStr = String(famIdNum);
 
   const peopleKey = adminFamilyPeople(famIdStr);
@@ -276,6 +288,7 @@ export default function AdminFamilyPeople() {
               readonly: true,
             },
           }}
+          storageKey={`adminFamilyPeople:${famIdNum}`}
         />
 
         {/* Send email — prefilled from the family contact; the recipient

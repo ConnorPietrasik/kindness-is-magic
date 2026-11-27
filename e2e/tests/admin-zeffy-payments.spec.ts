@@ -307,7 +307,9 @@ test.describe.serial("Admin Zeffy payments — manual reconciliation (Zeffy mock
       await expect(row1).toContainText("Matched", { timeout: 10_000 });
       await expect(row1.getByRole("link", { name: `Sponsorship ${data.claim1Id}` })).toBeVisible();
       await expect(row1.getByRole("button", { name: "Match manually" })).toHaveCount(0);
-      // …and stay hidden after a reload with the toggle off
+      // …and stay hidden after a reload with the toggle off (the toggle state
+      // now persists, so switch it off explicitly before reloading)
+      await page.getByLabel("Show matched").uncheck();
       await page.reload();
       await expect(page.getByRole("heading", { name: "Zeffy Payments" })).toBeVisible({ timeout: 10_000 });
       await expect(page.locator("tr").filter({ hasText: data.d1!.email })).toHaveCount(0);

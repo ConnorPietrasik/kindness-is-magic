@@ -349,7 +349,10 @@ test.describe.serial("Donor cart — cash sponsorship checkout (Zeffy mock)", ()
       await expect(card).toHaveCount(0);
 
       await page.getByLabel("Show sponsored families").check();
-      await expect(page).toHaveURL(/include_claimed=true/);
+      // The toggle state persists in the saved browse view (localStorage), not the URL
+      await expect
+        .poll(() => page.evaluate(() => localStorage.getItem("kim:listView:publicFamilies:filters") ?? ""))
+        .toContain('"showSponsored":true');
       await filterToOneMember(page);
       await expect(card).toBeVisible({ timeout: 10_000 });
       await expect(card).toContainText("Awaiting payment");

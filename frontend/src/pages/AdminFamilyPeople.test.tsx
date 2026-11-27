@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../context/AuthContext";
 import { ToastContainer } from "../context/ToastContext";
@@ -323,6 +323,103 @@ describe("AdminFamilyPeople", () => {
 
       expect(headerOrder()).toEqual(["ID", "Name", "Age", "Practical Wish", "Fun Wish", "Actions"]);
       expect(screen.queryByRole("button", { name: "Reset order" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("persisted tab state", () => {
+    it("hydrates the deleted tab from storage (scoped to the family)", async () => {
+      const user = userEvent.setup();
+      const deletedPerson = { given_name: "Ghost", deleted_at: "2025-02-02T00:00:00Z" };
+      vi.spyOn(api, "adminListDeletedPeople").mockResolvedValue({
+        people: [{ ...mockPerson, ...deletedPerson }],
+        total: 1,
+        page: 1,
+        page_size: 20,
+        total_pages: 1,
+      });
+      localStorage.setItem("kim:listView:adminFamilyPeople:5:tab", JSON.stringify("deleted"));
+
+      renderPage();
+
+      // The deleted endpoint backs the list, not the active one
+      await screen.findByText("Ghost");
+      expect(api.adminListDeletedPeople).toHaveBeenCalled();
+      expect(screen.getByRole("tab", { name: "Deleted" })).toHaveAttribute("aria-selected", "true");
+
+      // Non-default view → the clear affordance resets the saved tab
+      await user.click(screen.getByRole("button", { name: "Clear filters" }));
+      expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilyPeople:5:tab")!)).toBe("active");
+      expect(screen.getByRole("tab", { name: "Active" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+
+    it("ignores another family's saved tab", async () => {
+      localStorage.setItem("kim:listView:adminFamilyPeople:99:tab", JSON.stringify("deleted"));
+
+      renderPage();
+
+      await screen.findByText("Sam");
+      expect(screen.getByRole("tab", { name: "Active" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+
+    it("persists tab switches to storage", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, "adminListDeletedPeople").mockResolvedValue({ people: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
+
+      renderPage();
+      await screen.findByText("Sam");
+
+      await user.click(screen.getByRole("tab", { name: "Deleted" }));
+      expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilyPeople:5:tab")!)).toBe("deleted");
+      expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: "Active" }));
+      expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilyPeople:5:tab")!)).toBe("active");
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+
+    it("re-hydrates the target family's view when the route param changes (no remount)", async () => {
+      // Family 7 has its own saved view (the deleted tab); family 5 has none
+      localStorage.setItem("kim:listView:adminFamilyPeople:7:tab", JSON.stringify("deleted"));
+
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      queryClient.setQueryData(auth, headerUser);
+      const user = userEvent.setup();
+      vi.spyOn(api, "adminGetFamily").mockResolvedValue(mockFamily);
+      vi.spyOn(api, "adminListFamilyPeople").mockResolvedValue({ people: [mockPerson], total: 1, page: 1, page_size: 20, total_pages: 1 });
+      vi.spyOn(api, "adminListDeletedPeople").mockResolvedValue({ people: [], total: 0, page: 1, page_size: 20, total_pages: 0 });
+      vi.spyOn(api, "adminGetReferrersDropdown").mockResolvedValue([]);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([]);
+      vi.spyOn(api, "adminGetReferrer").mockResolvedValue(mockReferrer);
+      render(
+        <MemoryRouter initialEntries={["/admin/families/5/people"]}>
+          <QueryClientProvider client={queryClient}>
+            <ToastContainer>
+              <AuthProvider>
+                <Link to="/admin/families/7/people">to-family-7</Link>
+                <Routes>
+                  <Route path="/admin/families/:id/people" element={<AdminFamilyPeople />} />
+                </Routes>
+              </AuthProvider>
+            </ToastContainer>
+          </QueryClientProvider>
+        </MemoryRouter>
+      );
+
+      // Family 5's page shows its own (default) view
+      await screen.findByText("Sam");
+      expect(screen.getByRole("tab", { name: "Active" })).toHaveAttribute("aria-selected", "true");
+
+      // Navigate to family 7 within the same router — same route element, so
+      // the inner key must force the remount that re-reads storage
+      await user.click(screen.getByRole("link", { name: "to-family-7" }));
+
+      // Family 7's saved view is re-hydrated from its own slot…
+      await screen.findByRole("tab", { name: "Deleted" });
+      expect(screen.getByRole("tab", { name: "Deleted" })).toHaveAttribute("aria-selected", "true");
+      // …and the navigation did not clobber the saved tab with family 5's
+      expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilyPeople:7:tab")!)).toBe("deleted");
     });
   });
 });

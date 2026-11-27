@@ -25,13 +25,15 @@ import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { WishBatchMarkPurchased, WishDetail, WishPurchaseMark, WishType } from "../types";
 import type { ColumnDef } from "../types/columns";
 import { BatchMarkPurchasedDialog } from "./BatchMarkPurchasedDialog";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { ClearViewButton } from "./ClearViewButton";
 import { ColumnHeader } from "./ColumnHeader";
 import { ColumnToggle } from "./ColumnToggle";
 import { DatePicker } from "./DatePicker";
@@ -115,6 +117,13 @@ export interface AssignedGiftsViewProps<
    */
   columnResourceKey: "adminAssignedGifts" | "purchaserAssignedGifts";
   /**
+   * Backend sort whitelist for this instance's list endpoint — persisted
+   * sort values outside it are dropped on rehydration (they'd be sent and
+   * silently ignored). Pass ADMIN_ASSIGNED_GIFT_SORT_FIELDS or
+   * PURCHASER_ASSIGNED_GIFT_SORT_FIELDS.
+   */
+  sortFields: readonly string[];
+  /**
    * Family column config. Admin: key "family_name", text filter + sort.
    * Purchaser: key "family_display_id", no filter, no sort (presentational
    * only — purchaser responses carry no family PII).
@@ -160,6 +169,107 @@ const ASSIGNED_GIFTS_COLUMN_SEARCH: Record<string, "text" | "date"> = {
   purchaser_note: "text",
 };
 
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AssignedGiftsView {
+  purchased: string;
+  wishType: string;
+  search: string;
+  sortField: string;
+  columnSearch: Record<string, string>;
+}
+
+const DEFAULT_VIEW: AssignedGiftsView = { purchased: "all", wishType: "", search: "", sortField: "", columnSearch: {} };
+
+const PURCHASED_VALUES = ["all", "true", "false"] as const;
+const WISH_TYPES = ["", "adult", "practical", "fun", "family"] as const;
+
+/**
+ * Allowed sort fields per instance — each mirrors the backend whitelist of
+ * the list endpoint that instance fetches (an unknown field would only
+ * silently fall back to the default sort, so stale values are dropped).
+ * The two differ: the purchaser list supports a strict subset.
+ */
+// Mirrors the backend's WISH_SORT_FIELDS (admin wishes list).
+export const ADMIN_ASSIGNED_GIFT_SORT_FIELDS = [
+  "description",
+  "type",
+  "id",
+  "size",
+  "color",
+  "purchased_at",
+  "purchased_where",
+  "received_at",
+  "purchaser_note",
+  "created_at",
+  "person_given_name",
+  "person_role",
+  "person_age",
+  "person_note",
+  "family_name",
+  "family_contact_name",
+  "family_phone_number",
+  "family_address",
+  "family_verification_status",
+  "family_bio",
+  "family_referrer_notes",
+  "referrer_name",
+  "referrer_phone_number",
+  "referrer_pickup_window",
+  "assigned_to_name",
+] as const;
+// Mirrors the backend's PURCHASER_WISH_SORT_FIELDS (purchaser list).
+export const PURCHASER_ASSIGNED_GIFT_SORT_FIELDS = [
+  "type",
+  "description",
+  "size",
+  "color",
+  "person_given_name",
+  "purchased_at",
+  "purchased_where",
+  "received_at",
+  "purchaser_note",
+] as const;
+
+// Lazily built (ASSIGNED_GIFTS_COLUMN_SEARCH lives just above); sanitize
+// runs at mount, after module evaluation.
+function knownColumnSearchKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const [key, kind] of Object.entries(ASSIGNED_GIFTS_COLUMN_SEARCH)) {
+    if (kind === "text") keys.add(key);
+    else {
+      keys.add(`${key}_from`);
+      keys.add(`${key}_to`);
+    }
+  }
+  return keys;
+}
+
+export function sanitizeAssignedGiftsView(raw: unknown, sortFields: readonly string[]): Partial<AssignedGiftsView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const columnSearch: Record<string, string> = {};
+  if (typeof r.columnSearch === "object" && r.columnSearch !== null && !Array.isArray(r.columnSearch)) {
+    const known = knownColumnSearchKeys();
+    for (const [k, v] of Object.entries(r.columnSearch)) {
+      if (known.has(k) && typeof v === "string") columnSearch[k] = v;
+    }
+  }
+  let sortField: string | undefined;
+  if (typeof r.sortField === "string" && r.sortField !== "") {
+    const field = r.sortField.startsWith("-") ? r.sortField.slice(1) : r.sortField;
+    if (sortFields.includes(field)) sortField = r.sortField;
+  }
+  return {
+    purchased: (PURCHASED_VALUES as readonly string[]).includes(r.purchased as string) ? (r.purchased as string) : undefined,
+    wishType: (WISH_TYPES as readonly string[]).includes(r.wishType as string) ? (r.wishType as string) : undefined,
+    search: typeof r.search === "string" ? r.search : undefined,
+    sortField,
+    columnSearch: Object.keys(columnSearch).length > 0 ? columnSearch : undefined,
+  };
+}
+
 export function AssignedGiftsView<
   ListResponse extends { wishes: AssignedGiftRow[]; total: number } = { wishes: AssignedGiftRow[]; total: number },
 >({
@@ -170,6 +280,7 @@ export function AssignedGiftsView<
   invalidationKeys,
   listFn,
   columnResourceKey,
+  sortFields,
   familyColumn,
   detailFn,
   updateFn,
@@ -177,38 +288,52 @@ export function AssignedGiftsView<
   batchMarkPurchasedFn,
   renderFamilyCell,
 }: AssignedGiftsViewProps<ListResponse>) {
-  const [purchasedFilter, setPurchasedFilter] = useState<string>("all");
-  const [wishTypeFilter, setWishTypeFilter] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<string>("");
-  // Per-column search: one record keyed by list-param field (date inputs use
-  // `<field>_from` / `<field>_to`); empty entries are omitted from list params.
-  const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
+  const [view, setView] = usePersistentState(listViewKey(columnResourceKey, "filters"), DEFAULT_VIEW, (raw) =>
+    sanitizeAssignedGiftsView(raw, sortFields)
+  );
+  // Ephemeral selection / dialog state (not part of the saved view)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchMarkOpen, setBatchMarkOpen] = useState(false);
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
 
-  const pagination = usePagination({ defaultPageSize: DEFAULT_PAGE_SIZE });
+  const pagination = usePagination({ storageKey: columnResourceKey, defaultPageSize: DEFAULT_PAGE_SIZE });
   const queryClient = useQueryClient();
   const toast = useToast();
 
   // Debounce search so the list doesn't refetch on every keystroke
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
-  const debouncedColumnSearch = useDebouncedState(columnSearch, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+  const debouncedColumnSearch = useDebouncedState(view.columnSearch, 1000, () => pagination.goToPage(1));
 
-  const updateColumnSearch = useCallback((key: string, value: string) => {
-    setColumnSearch((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const updateColumnSearch = useCallback(
+    (key: string, value: string) => {
+      setView((prev) => ({ ...prev, columnSearch: { ...prev.columnSearch, [key]: value } }));
+    },
+    [setView]
+  );
 
   // Sort: clicking a column header cycles asc → desc → clear (grouped-by-family default)
   const handleSortClick = (field: string) => {
-    setSortField((prev) => {
-      if (prev === field) return `-${field}`;
-      if (prev === `-${field}`) return "";
-      return field;
+    setView((prev) => {
+      if (prev.sortField === field) return { ...prev, sortField: `-${field}` };
+      if (prev.sortField === `-${field}`) return { ...prev, sortField: "" };
+      return { ...prev, sortField: field };
     });
     pagination.goToPage(1);
   };
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    pagination.reset();
+  }
+
+  const isViewNonDefault =
+    view.purchased !== "all" ||
+    view.wishType !== "" ||
+    view.search !== "" ||
+    view.sortField !== "" ||
+    Object.values(view.columnSearch).some((v) => v !== "") ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   // Column visibility + user column order (each page persists under its own key)
   const { visibleColumns, defs } = useColumnVisibility(columnResourceKey);
@@ -226,7 +351,7 @@ export function AssignedGiftsView<
   // Drop filters for columns that are no longer visible, so a hidden column
   // can't keep filtering the list with no input left to clear it.
   useEffect(() => {
-    setColumnSearch((prev) => {
+    setView((prev) => {
       const visibleKeys = new Set<string>();
       for (const d of defs) {
         if (!visibleColumns.includes(d.key)) continue;
@@ -237,10 +362,10 @@ export function AssignedGiftsView<
           visibleKeys.add(`${d.key}_to`);
         }
       }
-      const kept = Object.fromEntries(Object.entries(prev).filter(([key]) => visibleKeys.has(key)));
-      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+      const kept = Object.fromEntries(Object.entries(prev.columnSearch).filter(([key]) => visibleKeys.has(key)));
+      return Object.keys(kept).length === Object.keys(prev.columnSearch).length ? prev : { ...prev, columnSearch: kept };
     });
-  }, [visibleColumns, defs]);
+  }, [visibleColumns, defs, setView]);
 
   // Per-column search params — non-empty entries only (empty → omitted)
   const columnSearchParams = useMemo(() => {
@@ -256,12 +381,12 @@ export function AssignedGiftsView<
     () => ({
       ...pagination.params,
       ...columnSearchParams,
-      purchased: purchasedFilter !== "all" ? purchasedFilter : undefined,
+      purchased: view.purchased !== "all" ? view.purchased : undefined,
       search: debouncedSearch || undefined,
-      wish_type: wishTypeFilter || undefined,
-      sort: sortField || undefined,
+      wish_type: view.wishType || undefined,
+      sort: view.sortField || undefined,
     }),
-    [pagination.params, columnSearchParams, purchasedFilter, debouncedSearch, wishTypeFilter, sortField]
+    [pagination.params, columnSearchParams, view.purchased, debouncedSearch, view.wishType, view.sortField]
   );
 
   // CRUD manager — list/detail/update only (no create/delete for wishes)
@@ -350,6 +475,10 @@ export function AssignedGiftsView<
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
+
   // Reset page on filter change
   const resetPage = () => {
     pagination.goToPage(1);
@@ -363,6 +492,7 @@ export function AssignedGiftsView<
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-bold text-violet-950">{title}</h2>
         <div className="flex items-center gap-3">
+          <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
           {!isDefaultOrder && (
             <Button variant="secondary" onClick={resetOrder}>
               Reset order
@@ -379,9 +509,9 @@ export function AssignedGiftsView<
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
           aria-label="Purchased filter"
-          value={purchasedFilter}
+          value={view.purchased}
           onChange={(e) => {
-            setPurchasedFilter(e.target.value);
+            setView((v) => ({ ...v, purchased: e.target.value }));
             resetPage();
           }}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -393,9 +523,9 @@ export function AssignedGiftsView<
 
         <select
           aria-label="Wish type filter"
-          value={wishTypeFilter}
+          value={view.wishType}
           onChange={(e) => {
-            setWishTypeFilter(e.target.value);
+            setView((v) => ({ ...v, wishType: e.target.value }));
             resetPage();
           }}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -411,9 +541,9 @@ export function AssignedGiftsView<
           type="text"
           placeholder="Search wishes…"
           aria-label="Search wishes"
-          value={searchQuery}
+          value={view.search}
           onChange={(e) => {
-            setSearchQuery(e.target.value);
+            setView((v) => ({ ...v, search: e.target.value }));
           }}
           className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
           autoComplete="off"
@@ -448,8 +578,8 @@ export function AssignedGiftsView<
                     label={defByKey[key]?.label ?? key}
                     field={key}
                     searchKind={ASSIGNED_GIFTS_COLUMN_SEARCH[key]}
-                    sortField={sortField}
-                    columnSearch={columnSearch}
+                    sortField={view.sortField}
+                    columnSearch={view.columnSearch}
                     onSort={handleSortClick}
                     onSearchChange={updateColumnSearch}
                   />

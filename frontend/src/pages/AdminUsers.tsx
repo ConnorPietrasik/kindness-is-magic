@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { ActionsDropdown } from "../components/ActionsDropdown";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -31,7 +32,8 @@ import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useFamiliesDropdown, useReferrersDropdown } from "../hooks/useDropdowns";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminCreateUser,
@@ -59,17 +61,50 @@ import type {
 } from "../types";
 
 /* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminUsersView {
+  role: string;
+  search: string;
+  sortField: string;
+}
+
+const DEFAULT_VIEW: AdminUsersView = { role: "", search: "", sortField: "" };
+
+const ROLES = ["admin", "donor", "referrer", "family", "purchaser", "delivery"] as const;
+const USER_SORT_FIELDS = [
+  "id",
+  "-id",
+  "display_name",
+  "-display_name",
+  "email",
+  "-email",
+  "role",
+  "-role",
+  "created_at",
+  "-created_at",
+] as const;
+
+function sanitizeView(raw: unknown): Partial<AdminUsersView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    role: (ROLES as readonly string[]).includes(r.role as string) ? (r.role as string) : undefined,
+    search: typeof r.search === "string" ? r.search : undefined,
+    sortField: (USER_SORT_FIELDS as readonly string[]).includes(r.sortField as string) ? (r.sortField as string) : undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminUsers() {
-  const [roleFilter, setRoleFilter] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<string>("");
+  const [view, setView] = usePersistentState(listViewKey("adminUsers", "filters"), DEFAULT_VIEW, sanitizeView);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
 
-  const pagination = usePagination();
-  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
+  const pagination = usePagination({ storageKey: "adminUsers" });
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination, storageKey: "adminUsers" });
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -81,18 +116,32 @@ export default function AdminUsers() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    handleTabChange("active"); // also resets pagination to page 1
+    pagination.reset(); // also resets the page size
+  }
+
+  const isViewNonDefault =
+    view.role !== "" ||
+    view.search !== "" ||
+    view.sortField !== "" ||
+    isDeletedView ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   // Build list params from filters (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminUsersListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
-      roles: roleFilter || undefined,
+      roles: view.role || undefined,
       search: debouncedSearch || undefined,
-      sort: sortField || undefined,
+      sort: view.sortField || undefined,
     }),
-    [pagination.params, apiColumns, roleFilter, debouncedSearch, sortField]
+    [pagination.params, apiColumns, view.role, debouncedSearch, view.sortField]
   );
 
   // CRUD manager for users
@@ -200,6 +249,10 @@ export default function AdminUsers() {
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
+
   const users = listData?.users ?? [];
 
   if (listLoading) return <PageSpinner />;
@@ -224,6 +277,7 @@ export default function AdminUsers() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Manage Users</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -243,9 +297,9 @@ export default function AdminUsers() {
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
               aria-label="Role filter"
-              value={roleFilter}
+              value={view.role}
               onChange={(e) => {
-                setRoleFilter(e.target.value);
+                setView((v) => ({ ...v, role: e.target.value }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -259,9 +313,9 @@ export default function AdminUsers() {
             </select>
             <select
               aria-label="Sort"
-              value={sortField}
+              value={view.sortField}
               onChange={(e) => {
-                setSortField(e.target.value);
+                setView((v) => ({ ...v, sortField: e.target.value }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -283,8 +337,8 @@ export default function AdminUsers() {
               placeholder="Search email or name…"
               aria-label="Search email or name"
               autoComplete="off"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             />
           </div>

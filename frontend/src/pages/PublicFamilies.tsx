@@ -6,9 +6,10 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { DeadlineBanner } from "../components/DeadlineBanner";
 import { HeaderBar } from "../components/HeaderBar";
 import { PageError } from "../components/PageError";
@@ -18,11 +19,14 @@ import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
 import { useDebouncedState } from "../hooks/useDebouncedState";
+import { usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { donorListClaims, listPublicFamilies, type PublicFamiliesListParams } from "../lib/api";
 import { CASH_CLAIM_AMOUNT_USD } from "../lib/constants";
 import { DONATE_URL } from "../lib/links";
 import { donorClaims, publicFamilies } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
+import { parseNonNegativeInt, sanitizeNonNegativeInt } from "../lib/utils";
 import { type FamilyClaimSummary, isPendingCash, type PublicFamilySummary } from "../types";
 
 /* ------------------------------------------------------------------ */
@@ -47,7 +51,7 @@ const SORT_CYCLE = ["person_count", "-person_count", "min_age", "-min_age", null
 type SortValue = (typeof SORT_CYCLE)[number];
 
 /* ------------------------------------------------------------------ */
-/* Filter state                                                        */
+/* Filter state (persisted)                                            */
 /* ------------------------------------------------------------------ */
 
 interface FilterState {
@@ -64,20 +68,30 @@ const DEFAULT_FILTERS: FilterState = {
   showSponsored: false,
 };
 
+function sanitizeFilters(raw: unknown): Partial<FilterState> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    // The browse endpoint requires counts >= 1 (the inputs say min=1 too),
+    // so a stored "0" must be dropped, not sent as a 422.
+    minPersonCount: sanitizeNonNegativeInt(r.minPersonCount, 1),
+    maxPersonCount: sanitizeNonNegativeInt(r.maxPersonCount, 1),
+    sort: (SORT_CYCLE as readonly (string | null)[]).includes(r.sort as string | null) ? (r.sort as SortValue) : undefined,
+    showSponsored: r.showSponsored === true,
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function PublicFamilies() {
   const { isAdmin, isClaimCapable } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const page = Number(searchParams.get("page")) || 1;
+  const pagination = usePagination({ storageKey: "publicFamilies", defaultPageSize: 12, pageSizeOptions: [12] });
 
-  // Sort is persisted in URL so it survives refresh. The show-claimed toggle
-  // is admin-only — an admin's shared ?include_claimed=true link must not
-  // reveal claimed families to non-admins.
-  const urlSort = searchParams.get("sort");
-  const initialSort: SortValue = SORT_CYCLE.includes(urlSort as SortValue) ? (urlSort as SortValue) : null;
-  const initialShowSponsored = isAdmin && searchParams.get("include_claimed") === "true";
+  // View state (sort, filters, show-claimed toggle, page) is persisted in
+  // localStorage so the browse view survives navigating to a wish list and
+  // back. The show-claimed toggle is admin-only — it is rendered and sent to
+  // the API only for admins, so a stored value is inert for non-admins.
+  const [filters, setFilters] = usePersistentState(listViewKey("publicFamilies", "filters"), DEFAULT_FILTERS, sanitizeFilters);
 
   // "Sponsored by me" section — the claimant's own claims, visible regardless
   // of the show-claimed toggle. One card per claim; the grid dedupes these
@@ -89,42 +103,20 @@ export default function PublicFamilies() {
   });
   const myClaimFamilyIds = useMemo(() => new Set((myClaims ?? []).map((c) => c.family.id)), [myClaims]);
 
-  // Local filter inputs (sort + sponsored toggle start from URL)
-  const [filters, setFilters] = useState<FilterState>(() => ({
-    ...DEFAULT_FILTERS,
-    sort: initialSort,
-    showSponsored: initialShowSponsored,
-  }));
-
-  // Debounced filter values (300ms) — writes sort + sponsored toggle to URL, resets page
-  // Use functional updater so we always read the current URL, not a stale closure.
-  const debouncedFilters = useDebouncedState(filters, 300, () => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      params.delete("page");
-      if (filters.sort) {
-        params.set("sort", filters.sort);
-      } else {
-        params.delete("sort");
-      }
-      if (isAdmin && filters.showSponsored) {
-        params.set("include_claimed", "true");
-      } else {
-        params.delete("include_claimed");
-      }
-      return params;
-    });
-  });
-
-  const pageSize = 12;
+  // Debounced filter values (300ms) gate the API call + page reset; the
+  // filters themselves persist to storage on every change.
+  const debouncedFilters = useDebouncedState(filters, 300, () => pagination.goToPage(1));
 
   // Build API params from debounced filters
   const apiParams: PublicFamiliesListParams = {
-    page,
-    page_size: pageSize,
+    page: pagination.page,
+    page_size: pagination.pageSize,
+    // Guard live-typed values the same way rehydrated ones are guarded: the
+    // endpoint requires counts >= 1, so a typed "0"/"-1" is sent as no
+    // filter instead of 422-ing the request.
+    min_person_count: parseNonNegativeInt(debouncedFilters.minPersonCount, 1),
+    max_person_count: parseNonNegativeInt(debouncedFilters.maxPersonCount, 1),
   };
-  if (debouncedFilters.minPersonCount) apiParams.min_person_count = parseInt(debouncedFilters.minPersonCount, 10);
-  if (debouncedFilters.maxPersonCount) apiParams.max_person_count = parseInt(debouncedFilters.maxPersonCount, 10);
   if (debouncedFilters.sort) apiParams.sort = debouncedFilters.sort;
   if (isAdmin && debouncedFilters.showSponsored) apiParams.include_claimed = true;
 
@@ -132,6 +124,10 @@ export default function PublicFamilies() {
     queryKey: [...publicFamilies, apiParams],
     queryFn: () => listPublicFamilies(apiParams),
   });
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(data ? data.total_pages : 0, pagination.page, pagination.goToPage);
 
   // Gift drop-off deadline banner (public — the rows feed every role, anonymous
   // included); renders nothing when no dated row is configured.
@@ -173,15 +169,21 @@ export default function PublicFamilies() {
 
   const sortLabel = SORT_OPTIONS.find((s) => s.value === debouncedFilters.sort)?.label ?? "Default";
 
-  const handlePageChange = (newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      params.delete("page");
-    } else {
-      params.set("page", String(newPage));
-    }
-    setSearchParams(params);
-  };
+  function handleClearView() {
+    setFilters(DEFAULT_FILTERS);
+    pagination.reset();
+  }
+
+  // The show-sponsored term counts only for admins — for everyone else the
+  // stored value is inert (not rendered, not sent), so it must not light up
+  // the clear affordance.
+  const isViewNonDefault =
+    filters.minPersonCount !== "" ||
+    filters.maxPersonCount !== "" ||
+    filters.sort !== null ||
+    (isAdmin && filters.showSponsored) ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -300,15 +302,7 @@ export default function PublicFamilies() {
             </label>
           )}
 
-          {(filters.minPersonCount || filters.maxPersonCount || filters.sort || filters.showSponsored) && (
-            <button
-              type="button"
-              onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 focus:border-btn-start focus:outline-none focus:ring-1 focus:ring-btn-start/50"
-            >
-              Clear
-            </button>
-          )}
+          <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
         </div>
 
         {/* Card grid — the claimant's own claimed families are deduped out
@@ -329,11 +323,11 @@ export default function PublicFamilies() {
 
         {/* Pagination */}
         <Pagination
-          page={data.page}
+          page={pagination.page}
           totalPages={data.total_pages}
           total={data.total}
-          pageSize={data.page_size}
-          onPageChange={handlePageChange}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
         />
       </main>
 

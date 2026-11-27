@@ -261,3 +261,47 @@ describe("AdminSponsorships", () => {
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+describe("AdminSponsorships — persisted view state", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("hydrates status filter and page from storage", async () => {
+    // total 150 at 100/page → the saved page 2 is valid (no clamp refetch mid-test)
+    vi.spyOn(api, "adminListClaims").mockResolvedValue({ ...listWith(makeClaim()), total: 150 });
+    localStorage.setItem("kim:listView:adminSponsorships:filters", JSON.stringify({ status: "cancelled" }));
+    localStorage.setItem("kim:listView:adminSponsorships:page", JSON.stringify({ page: 2, pageSize: 100 }));
+
+    wrap();
+
+    expect(await screen.findByText("alice@example.com")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sponsorship status filter")).toHaveValue("cancelled");
+
+    await waitFor(() => {
+      expect(api.adminListClaims).toHaveBeenCalledWith(expect.objectContaining({ status: "cancelled", page: 2, page_size: 100 }));
+    });
+  });
+
+  it("Clear filters resets the saved view", async () => {
+    // total 300 at 100/page → the saved page 3 is valid (no clamp refetch mid-test)
+    vi.spyOn(api, "adminListClaims").mockResolvedValue({ ...listWith(makeClaim()), total: 300 });
+    localStorage.setItem("kim:listView:adminSponsorships:filters", JSON.stringify({ status: "active", search: "old" }));
+    localStorage.setItem("kim:listView:adminSponsorships:page", JSON.stringify({ page: 3, pageSize: 100 }));
+
+    wrap();
+    expect(await screen.findByText("alice@example.com")).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(JSON.parse(localStorage.getItem("kim:listView:adminSponsorships:filters")!)).toEqual({ status: "", search: "" });
+    expect(JSON.parse(localStorage.getItem("kim:listView:adminSponsorships:page")!)).toEqual({ page: 1, pageSize: 50 });
+  });
+});

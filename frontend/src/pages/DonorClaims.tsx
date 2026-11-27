@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { DeadlineBanner } from "../components/DeadlineBanner";
 import { DraggableTh } from "../components/DraggableTh";
 import { HeaderBar } from "../components/HeaderBar";
@@ -11,6 +12,7 @@ import { PageSpinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useDeadlineBanner } from "../hooks/useDeadlineBanner";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { donorListClaims } from "../lib/api";
 import { PAYMENT_REASSURANCE_COPY } from "../lib/constants";
 import { donorClaims } from "../lib/queryKeys";
@@ -25,8 +27,23 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "fulfilled", label: "Fulfilled" },
 ];
 
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface DonorClaimsView {
+  status: string;
+}
+
+const DEFAULT_VIEW: DonorClaimsView = { status: "" };
+
+function sanitizeView(raw: unknown): Partial<DonorClaimsView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return { status: r.status === "active" || r.status === "fulfilled" ? r.status : undefined };
+}
+
 export default function DonorClaims() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [view, setView] = usePersistentState(listViewKey("donorClaims", "filters"), DEFAULT_VIEW, sanitizeView);
 
   const giftDropoffDeadline = useDeadlineBanner("gift_dropoff");
 
@@ -39,9 +56,9 @@ export default function DonorClaims() {
     isError,
     error,
   } = useQuery({
-    queryKey: [...donorClaims, statusFilter],
+    queryKey: [...donorClaims, view.status],
     queryFn: () =>
-      donorListClaims(statusFilter === "active" ? { fulfilled: false } : statusFilter === "fulfilled" ? { fulfilled: true } : undefined),
+      donorListClaims(view.status === "active" ? { fulfilled: false } : view.status === "fulfilled" ? { fulfilled: true } : undefined),
   });
 
   if (isLoading) return <PageSpinner />;
@@ -63,6 +80,7 @@ export default function DonorClaims() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">My Sponsorships</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={view.status !== ""} onClear={() => setView(DEFAULT_VIEW)} />
             {!isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -70,8 +88,8 @@ export default function DonorClaims() {
             )}
             <select
               aria-label="Sponsorship status filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={view.status}
+              onChange={(e) => setView((v) => ({ ...v, status: e.target.value }))}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             >
               {STATUS_FILTERS.map((f) => (

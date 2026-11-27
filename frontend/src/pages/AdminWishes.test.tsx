@@ -1064,4 +1064,56 @@ describe("AdminWishes", () => {
     const familyWishRow = screen.getByText("A weekend at the beach").closest("tr");
     expect(familyWishRow).toHaveTextContent("Family #5");
   });
+
+  describe("persisted view state", () => {
+    it("drops a stale assigned-to filter once the user dropdown loads (soft-deleted user)", async () => {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      // mockUser is id 3 — 4242 is gone (soft-deleted)
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+      localStorage.setItem("kim:listView:adminWishes:filters", JSON.stringify({ assignedTo: 4242 }));
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+      // The stale ID is no longer sent and the select shows no phantom selection
+      await waitFor(() => {
+        expect(api.adminListWishes).toHaveBeenLastCalledWith(expect.objectContaining({ assigned_to_id: undefined }));
+      });
+      expect(screen.getByLabelText("Assigned to filter")).toHaveValue("");
+    });
+
+    it("keeps a valid saved assigned-to filter", async () => {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+      localStorage.setItem("kim:listView:adminWishes:filters", JSON.stringify({ assignedTo: mockUser.id }));
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(api.adminListWishes).toHaveBeenLastCalledWith(expect.objectContaining({ assigned_to_id: mockUser.id }));
+      });
+      expect(screen.getByLabelText("Assigned to filter")).toHaveValue(String(mockUser.id));
+    });
+
+    it("keeps a saved assigned-to filter when the user dropdown fetch fails (an error is not evidence the user is gone)", async () => {
+      vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+      vi.spyOn(api, "adminGetUsersDropdown").mockRejectedValue(new Error("boom"));
+      localStorage.setItem("kim:listView:adminWishes:filters", JSON.stringify({ assignedTo: mockUser.id }));
+
+      wrap(<AdminWishes />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+      // The saved filter survives the failed dropdown load
+      await waitFor(() => {
+        expect(api.adminListWishes).toHaveBeenLastCalledWith(expect.objectContaining({ assigned_to_id: mockUser.id }));
+      });
+    });
+  });
 });

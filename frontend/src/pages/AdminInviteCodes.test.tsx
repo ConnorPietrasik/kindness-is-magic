@@ -9,7 +9,7 @@ import * as api from "../lib/api";
 import { auth } from "../lib/queryKeys";
 import { headerUser } from "../test/fixtures";
 import type { InviteListResponse, ReferrerInviteRemindResponse, ReferrerInviteSummary } from "../types";
-import AdminInviteCodes from "./AdminInviteCodes";
+import AdminInviteCodes, { sanitizeInviteCodesView } from "./AdminInviteCodes";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -216,5 +216,40 @@ describe("AdminInviteCodes", () => {
     // Releasing Redeemed only hands the filter back.
     await user.click(screen.getByLabelText("Redeemed only"));
     expect(screen.getByLabelText("Expired only")).toBeEnabled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Persisted view sanitizer                                            */
+/* ------------------------------------------------------------------ */
+
+describe("sanitizeInviteCodesView", () => {
+  it("keeps valid booleans and string search", () => {
+    expect(sanitizeInviteCodesView({ showRedeemed: true, showExpired: false, search: "KRI-" })).toEqual({
+      showRedeemed: true,
+      showExpired: false,
+      search: "KRI-",
+    });
+  });
+
+  it("drops invalid types", () => {
+    expect(sanitizeInviteCodesView({ showRedeemed: "true", showExpired: 1, search: 42 })).toEqual({});
+  });
+
+  it("drops Expired when Redeemed only is stored (the pair is mutually exclusive and always empty)", () => {
+    expect(sanitizeInviteCodesView({ showRedeemed: true, showExpired: true })).toEqual({ showRedeemed: true });
+  });
+
+  it("keeps Expired when Redeemed only is off (expired is a subset of unredeemed)", () => {
+    expect(sanitizeInviteCodesView({ showExpired: true })).toEqual({ showExpired: true });
+    expect(sanitizeInviteCodesView({ showRedeemed: false, showExpired: true })).toEqual({
+      showRedeemed: false,
+      showExpired: true,
+    });
+  });
+
+  it("returns nothing for non-object input", () => {
+    expect(sanitizeInviteCodesView("garbage")).toEqual({});
+    expect(sanitizeInviteCodesView(null)).toEqual({});
   });
 });

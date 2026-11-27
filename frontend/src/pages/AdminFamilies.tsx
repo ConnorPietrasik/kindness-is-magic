@@ -10,6 +10,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -29,7 +30,8 @@ import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
 import { useDeliveryUsers } from "../hooks/useDeliveryUsers";
 import { useReferrersDropdown } from "../hooks/useDropdowns";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { useWishLockActions } from "../hooks/useWishLockActions";
 import {
@@ -52,30 +54,76 @@ import {
   adminWishes,
 } from "../lib/queryKeys";
 import { route } from "../lib/routes";
-import { getLockLevelRowClass, normalizeUpdatePayload } from "../lib/utils";
+import { getLockLevelRowClass, normalizeUpdatePayload, parseNonNegativeInt, sanitizeNonNegativeInt } from "../lib/utils";
 import type { AdminFamiliesListParams, FamilyDetail, FamilyPayload } from "../types";
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminFamiliesView {
+  search: string;
+  searchName: string;
+  searchContact: string;
+  searchPhone: string;
+  searchWish: string;
+  minPersonCount: string;
+  maxPersonCount: string;
+  verificationStatus: string;
+  lockLevel: string;
+  sortField: string | null;
+  newestFirst: boolean;
+}
+
+const DEFAULT_VIEW: AdminFamiliesView = {
+  search: "",
+  searchName: "",
+  searchContact: "",
+  searchPhone: "",
+  searchWish: "",
+  minPersonCount: "",
+  maxPersonCount: "",
+  verificationStatus: "",
+  lockLevel: "",
+  sortField: null,
+  newestFirst: false,
+};
+
+const VERIFICATION_STATUSES = ["pending", "verified", "rejected"] as const;
+const LOCK_LEVELS = ["family", "referrer", "admin"] as const;
+const SORT_FIELDS = ["person_count", "-person_count"] as const;
+
+function sanitizeView(raw: unknown): Partial<AdminFamiliesView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+  return {
+    search: str(r.search),
+    searchName: str(r.searchName),
+    searchContact: str(r.searchContact),
+    searchPhone: str(r.searchPhone),
+    searchWish: str(r.searchWish),
+    minPersonCount: sanitizeNonNegativeInt(r.minPersonCount),
+    maxPersonCount: sanitizeNonNegativeInt(r.maxPersonCount),
+    verificationStatus: (VERIFICATION_STATUSES as readonly string[]).includes(r.verificationStatus as string)
+      ? (r.verificationStatus as string)
+      : undefined,
+    lockLevel: (LOCK_LEVELS as readonly string[]).includes(r.lockLevel as string) ? (r.lockLevel as string) : undefined,
+    sortField: (SORT_FIELDS as readonly string[]).includes(r.sortField as string) ? (r.sortField as string) : null,
+    newestFirst: r.newestFirst === true,
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminFamilies() {
   const navigate = useNavigate();
-  const pagination = usePagination();
-  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
+  const pagination = usePagination({ storageKey: "adminFamilies" });
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination, storageKey: "adminFamilies" });
+  const [view, setView] = usePersistentState(listViewKey("adminFamilies", "filters"), DEFAULT_VIEW, sanitizeView);
   const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState<number | null>(null);
   const [fullyApproveConfirm, setFullyApproveConfirm] = useState<number | null>(null);
-  const [verificationFilter, setVerificationFilter] = useState<string>("");
-  const [lockLevelFilter, setLockLevelFilter] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchName, setSearchName] = useState("");
-  const [searchContact, setSearchContact] = useState("");
-  const [searchPhone, setSearchPhone] = useState("");
-  const [searchWish, setSearchWish] = useState("");
-  const [minPersonCount, setMinPersonCount] = useState("");
-  const [maxPersonCount, setMaxPersonCount] = useState("");
-  const [sortField, setSortField] = useState<string | null>(null);
-  const [newestFirst, setNewestFirst] = useState(false);
   const [lockEditConfirm, setLockEditConfirm] = useState<boolean>(false);
   // Row whose "Send email" action was chosen (drives the page-level composer)
   const [sendEmailFamily, setSendEmailFamily] = useState<FamilyDetail | null>(null);
@@ -89,21 +137,20 @@ export default function AdminFamilies() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
-  const debouncedSearchName = useDebouncedState(searchName, 1000, () => pagination.goToPage(1));
-  const debouncedSearchContact = useDebouncedState(searchContact, 1000, () => pagination.goToPage(1));
-  const debouncedSearchPhone = useDebouncedState(searchPhone, 1000, () => pagination.goToPage(1));
-  const debouncedSearchWish = useDebouncedState(searchWish, 1000, () => pagination.goToPage(1));
-  const debouncedMinPersonCount = useDebouncedState(minPersonCount, 1000, () => pagination.goToPage(1));
-  const debouncedMaxPersonCount = useDebouncedState(maxPersonCount, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+  const debouncedSearchName = useDebouncedState(view.searchName, 1000, () => pagination.goToPage(1));
+  const debouncedSearchContact = useDebouncedState(view.searchContact, 1000, () => pagination.goToPage(1));
+  const debouncedSearchPhone = useDebouncedState(view.searchPhone, 1000, () => pagination.goToPage(1));
+  const debouncedSearchWish = useDebouncedState(view.searchWish, 1000, () => pagination.goToPage(1));
+  const debouncedMinPersonCount = useDebouncedState(view.minPersonCount, 1000, () => pagination.goToPage(1));
+  const debouncedMaxPersonCount = useDebouncedState(view.maxPersonCount, 1000, () => pagination.goToPage(1));
 
   // Cycle sort: null → "person_count" → "-person_count" → null
   function handleSortToggle() {
-    setNewestFirst(false);
-    setSortField((prev) => {
-      if (prev === null) return "person_count";
-      if (prev === "person_count") return "-person_count";
-      return null;
+    setView((prev) => {
+      if (prev.sortField === null) return { ...prev, newestFirst: false, sortField: "person_count" };
+      if (prev.sortField === "person_count") return { ...prev, newestFirst: false, sortField: "-person_count" };
+      return { ...prev, newestFirst: false, sortField: null };
     });
     pagination.goToPage(1);
   }
@@ -111,10 +158,31 @@ export default function AdminFamilies() {
   // "Newest first" and the column sort share the single `sort` param — enabling
   // one clears the other.
   function handleNewestToggle() {
-    setNewestFirst((prev) => !prev);
-    setSortField(null);
+    setView((prev) => ({ ...prev, newestFirst: !prev.newestFirst, sortField: null }));
     pagination.goToPage(1);
   }
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    handleTabChange("active"); // also resets pagination to page 1
+    pagination.reset(); // also resets the page size
+  }
+
+  const isViewNonDefault =
+    view.search !== "" ||
+    view.searchName !== "" ||
+    view.searchContact !== "" ||
+    view.searchPhone !== "" ||
+    view.searchWish !== "" ||
+    view.minPersonCount !== "" ||
+    view.maxPersonCount !== "" ||
+    view.verificationStatus !== "" ||
+    view.lockLevel !== "" ||
+    view.sortField !== null ||
+    view.newestFirst ||
+    isDeletedView ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminFamiliesListParams>(
@@ -126,11 +194,11 @@ export default function AdminFamilies() {
       search_contact: debouncedSearchContact || undefined,
       search_phone: debouncedSearchPhone || undefined,
       search_wish: debouncedSearchWish || undefined,
-      verification_status: verificationFilter || undefined,
-      wish_lock_level: lockLevelFilter || undefined,
-      min_person_count: debouncedMinPersonCount !== "" ? parseInt(debouncedMinPersonCount, 10) : undefined,
-      max_person_count: debouncedMaxPersonCount !== "" ? parseInt(debouncedMaxPersonCount, 10) : undefined,
-      sort: newestFirst ? "-created_at" : sortField || undefined,
+      verification_status: view.verificationStatus || undefined,
+      wish_lock_level: view.lockLevel || undefined,
+      min_person_count: parseNonNegativeInt(debouncedMinPersonCount),
+      max_person_count: parseNonNegativeInt(debouncedMaxPersonCount),
+      sort: view.newestFirst ? "-created_at" : view.sortField || undefined,
     }),
     [
       pagination.params,
@@ -142,10 +210,10 @@ export default function AdminFamilies() {
       debouncedSearchWish,
       debouncedMinPersonCount,
       debouncedMaxPersonCount,
-      verificationFilter,
-      lockLevelFilter,
-      sortField,
-      newestFirst,
+      view.verificationStatus,
+      view.lockLevel,
+      view.sortField,
+      view.newestFirst,
     ]
   );
 
@@ -192,6 +260,10 @@ export default function AdminFamilies() {
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
   );
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
 
   // Referrers lookup (for dropdown + display)
   const { referrerMap, referrersLoading } = useReferrersDropdown();
@@ -247,8 +319,8 @@ export default function AdminFamilies() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by family name"
-          value={searchName}
-          onChange={(e) => setSearchName(e.target.value)}
+          value={view.searchName}
+          onChange={(e) => setView((v) => ({ ...v, searchName: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -261,8 +333,8 @@ export default function AdminFamilies() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by family wish"
-          value={searchWish}
-          onChange={(e) => setSearchWish(e.target.value)}
+          value={view.searchWish}
+          onChange={(e) => setView((v) => ({ ...v, searchWish: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -275,8 +347,8 @@ export default function AdminFamilies() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by contact name"
-          value={searchContact}
-          onChange={(e) => setSearchContact(e.target.value)}
+          value={view.searchContact}
+          onChange={(e) => setView((v) => ({ ...v, searchContact: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -294,8 +366,8 @@ export default function AdminFamilies() {
           type="text"
           placeholder="Filter…"
           aria-label="Filter by phone number"
-          value={searchPhone}
-          onChange={(e) => setSearchPhone(e.target.value)}
+          value={view.searchPhone}
+          onChange={(e) => setView((v) => ({ ...v, searchPhone: e.target.value }))}
           className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none transition-colors focus:border-btn-start focus:ring-1 focus:ring-btn-start/20"
           autoComplete="off"
         />
@@ -308,7 +380,7 @@ export default function AdminFamilies() {
         className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700"
       >
         Person Count
-        <span className="text-[10px]">{sortField === "person_count" ? "↑" : sortField === "-person_count" ? "↓" : "⇅"}</span>
+        <span className="text-[10px]">{view.sortField === "person_count" ? "↑" : view.sortField === "-person_count" ? "↓" : "⇅"}</span>
       </button>
     ),
     verification_status: "Verification",
@@ -326,6 +398,7 @@ export default function AdminFamilies() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Families</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -342,14 +415,19 @@ export default function AdminFamilies() {
         {/* Filters */}
         {!isDeletedView && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button type="button" variant={newestFirst ? "primary" : "secondary"} aria-pressed={newestFirst} onClick={handleNewestToggle}>
+            <Button
+              type="button"
+              variant={view.newestFirst ? "primary" : "secondary"}
+              aria-pressed={view.newestFirst}
+              onClick={handleNewestToggle}
+            >
               Newest first
             </Button>
             <select
               aria-label="Verification status filter"
-              value={verificationFilter}
+              value={view.verificationStatus}
               onChange={(e) => {
-                setVerificationFilter(e.target.value);
+                setView((v) => ({ ...v, verificationStatus: e.target.value }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -361,9 +439,9 @@ export default function AdminFamilies() {
             </select>
             <select
               aria-label="Lock level filter"
-              value={lockLevelFilter}
+              value={view.lockLevel}
               onChange={(e) => {
-                setLockLevelFilter(e.target.value);
+                setView((v) => ({ ...v, lockLevel: e.target.value }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -379,8 +457,8 @@ export default function AdminFamilies() {
                 min="0"
                 placeholder="Min"
                 aria-label="Minimum people"
-                value={minPersonCount}
-                onChange={(e) => setMinPersonCount(e.target.value)}
+                value={view.minPersonCount}
+                onChange={(e) => setView((v) => ({ ...v, minPersonCount: e.target.value }))}
                 className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
                 autoComplete="off"
               />
@@ -390,8 +468,8 @@ export default function AdminFamilies() {
                 min="0"
                 placeholder="Max"
                 aria-label="Maximum people"
-                value={maxPersonCount}
-                onChange={(e) => setMaxPersonCount(e.target.value)}
+                value={view.maxPersonCount}
+                onChange={(e) => setView((v) => ({ ...v, maxPersonCount: e.target.value }))}
                 className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
                 autoComplete="off"
               />
@@ -401,8 +479,8 @@ export default function AdminFamilies() {
               type="text"
               placeholder="Search all fields…"
               aria-label="Search all fields"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />

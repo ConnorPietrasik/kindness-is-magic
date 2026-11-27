@@ -199,6 +199,47 @@ describe("DonorClaims", () => {
     expect(await screen.findByText("Unable to Load Sponsorships")).toBeInTheDocument();
   });
 
+  describe("persisted view state", () => {
+    it("hydrates the status filter from storage", async () => {
+      const listSpy = vi.spyOn(api, "donorListClaims").mockResolvedValue([mockFulfilledClaim]);
+      localStorage.setItem("kim:listView:donorClaims:filters", JSON.stringify({ status: "fulfilled" }));
+
+      wrap(<DonorClaims />);
+
+      await screen.findByText("2-2");
+      expect(screen.getByLabelText("Sponsorship status filter")).toHaveValue("fulfilled");
+      await waitFor(() => {
+        expect(listSpy).toHaveBeenLastCalledWith({ fulfilled: true });
+      });
+    });
+
+    it("persists filter changes and Clear filters resets the saved view", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveClaim]);
+
+      wrap(<DonorClaims />);
+      await waitFor(() => expect(screen.getByText("2-1")).toBeInTheDocument());
+
+      await user.selectOptions(screen.getByLabelText("Sponsorship status filter"), "active");
+      expect(JSON.parse(localStorage.getItem("kim:listView:donorClaims:filters")!)).toEqual({ status: "active" });
+
+      await user.click(screen.getByRole("button", { name: "Clear filters" }));
+      expect(JSON.parse(localStorage.getItem("kim:listView:donorClaims:filters")!)).toEqual({ status: "" });
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+
+    it("falls back to the default for invalid stored values", async () => {
+      vi.spyOn(api, "donorListClaims").mockResolvedValue([mockActiveClaim]);
+      localStorage.setItem("kim:listView:donorClaims:filters", JSON.stringify({ status: "bogus" }));
+
+      wrap(<DonorClaims />);
+
+      await waitFor(() => expect(screen.getByText("2-1")).toBeInTheDocument());
+      expect(screen.getByLabelText("Sponsorship status filter")).toHaveValue("");
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("column order", () => {
     const headerOrder = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
 

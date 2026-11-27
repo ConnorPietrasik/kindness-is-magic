@@ -17,9 +17,11 @@ import {
   normalizePayload,
   normalizeUpdatePayload,
   nowIso,
+  parseNonNegativeInt,
   safeGetItem,
   safeRemoveItem,
   safeSetItem,
+  sanitizeNonNegativeInt,
   setPendingClaimFamilyId,
   toDatetimeLocalValue,
 } from "./utils";
@@ -103,6 +105,54 @@ describe("humanize", () => {
     expect(humanize("")).toBe("");
     expect(humanize(null)).toBe("");
     expect(humanize(undefined)).toBe("");
+  });
+});
+
+describe("sanitizeNonNegativeInt", () => {
+  it('keeps plain digit strings (including "0") with the default minimum', () => {
+    expect(sanitizeNonNegativeInt("0")).toBe("0");
+    expect(sanitizeNonNegativeInt(0)).toBeUndefined(); // number, not the input's string form
+    expect(sanitizeNonNegativeInt("7")).toBe("7");
+  });
+
+  it("drops non-digit and non-string values", () => {
+    expect(sanitizeNonNegativeInt("-5")).toBeUndefined();
+    expect(sanitizeNonNegativeInt("3.5")).toBeUndefined();
+    expect(sanitizeNonNegativeInt("abc")).toBeUndefined();
+    expect(sanitizeNonNegativeInt(7)).toBeUndefined();
+    expect(sanitizeNonNegativeInt(null)).toBeUndefined();
+  });
+
+  it("enforces a caller-supplied minimum (public browse requires >= 1)", () => {
+    expect(sanitizeNonNegativeInt("0", 1)).toBeUndefined();
+    expect(sanitizeNonNegativeInt("00", 1)).toBeUndefined();
+    expect(sanitizeNonNegativeInt("1", 1)).toBe("1");
+    expect(sanitizeNonNegativeInt("01", 1)).toBe("01");
+    expect(sanitizeNonNegativeInt("2", 1)).toBe("2");
+  });
+});
+
+describe("parseNonNegativeInt", () => {
+  it('parses plain digit strings (including "0") to numbers with the default minimum', () => {
+    expect(parseNonNegativeInt("0")).toBe(0);
+    expect(parseNonNegativeInt("7")).toBe(7);
+    expect(parseNonNegativeInt("01")).toBe(1);
+  });
+
+  it("returns undefined for negative, decimal, non-string, and empty values", () => {
+    expect(parseNonNegativeInt("-5")).toBeUndefined();
+    expect(parseNonNegativeInt("3.5")).toBeUndefined();
+    expect(parseNonNegativeInt("abc")).toBeUndefined();
+    expect(parseNonNegativeInt(7)).toBeUndefined();
+    expect(parseNonNegativeInt(null)).toBeUndefined();
+    expect(parseNonNegativeInt("")).toBeUndefined();
+  });
+
+  it("enforces a caller-supplied minimum (public browse requires >= 1)", () => {
+    expect(parseNonNegativeInt("0", 1)).toBeUndefined();
+    expect(parseNonNegativeInt("00", 1)).toBeUndefined();
+    expect(parseNonNegativeInt("1", 1)).toBe(1);
+    expect(parseNonNegativeInt("2", 1)).toBe(2);
   });
 });
 

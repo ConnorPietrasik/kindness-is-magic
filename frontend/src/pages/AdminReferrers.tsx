@@ -14,6 +14,7 @@ import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CrudTabs } from "../components/CrudTabs";
@@ -32,7 +33,8 @@ import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useCrudTabs } from "../hooks/useCrudTabs";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import {
   adminApproveReferrer,
@@ -63,12 +65,36 @@ import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
 import type { AdminReferrersListParams, ReferrerDetail, ReferrerPayload } from "../types";
 
 /* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminReferrersView {
+  approvalStatus: string;
+  search: string;
+}
+
+const DEFAULT_VIEW: AdminReferrersView = { approvalStatus: "", search: "" };
+
+const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
+
+function sanitizeView(raw: unknown): Partial<AdminReferrersView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    approvalStatus: (APPROVAL_STATUSES as readonly string[]).includes(r.approvalStatus as string)
+      ? (r.approvalStatus as string)
+      : undefined,
+    search: typeof r.search === "string" ? r.search : undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminReferrers() {
   const queryClient = useQueryClient();
-  const pagination = usePagination();
-  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination });
+  const pagination = usePagination({ storageKey: "adminReferrers" });
+  const { viewTab, isDeletedView, handleTabChange } = useCrudTabs({ pagination, storageKey: "adminReferrers" });
+  const [view, setView] = usePersistentState(listViewKey("adminReferrers", "filters"), DEFAULT_VIEW, sanitizeView);
   // Inline invite-code generator, toggled from the header (generation is
   // global, so the button stays available in the Deleted tab too)
   const [showGenerator, setShowGenerator] = useState(false);
@@ -78,8 +104,6 @@ export default function AdminReferrers() {
   const [resetSentEmailsConfirm, setResetSentEmailsConfirm] = useState<number | null>(null);
   // Row whose "Send email" action was chosen (drives the page-level composer)
   const [sendEmailReferrer, setSendEmailReferrer] = useState<ReferrerDetail | null>(null);
-  const [approvalFilter, setApprovalFilter] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
 
   const approveMut = useMutation({
     mutationFn: adminApproveReferrer,
@@ -110,7 +134,20 @@ export default function AdminReferrers() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    handleTabChange("active"); // also resets pagination to page 1
+    pagination.reset(); // also resets the page size
+  }
+
+  const isViewNonDefault =
+    view.approvalStatus !== "" ||
+    view.search !== "" ||
+    isDeletedView ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   // Build list params (no include_deleted — deleted uses separate endpoint)
   const listParams = useMemo<AdminReferrersListParams>(
@@ -118,9 +155,9 @@ export default function AdminReferrers() {
       ...pagination.params,
       columns: apiColumns,
       search: debouncedSearch || undefined,
-      approval_status: approvalFilter || undefined,
+      approval_status: view.approvalStatus || undefined,
     }),
-    [pagination.params, apiColumns, debouncedSearch, approvalFilter]
+    [pagination.params, apiColumns, debouncedSearch, view.approvalStatus]
   );
 
   const {
@@ -173,6 +210,10 @@ export default function AdminReferrers() {
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
+
   function handleCreate(formData: ReferrerPayload) {
     createMut?.mutate(formData);
   }
@@ -209,6 +250,7 @@ export default function AdminReferrers() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Manage Referrers</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             <Button onClick={() => setShowGenerator(!showGenerator)}>{showGenerator ? "Hide generator" : "Invite referrers"}</Button>
             {!isDeletedView && !isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
@@ -232,9 +274,9 @@ export default function AdminReferrers() {
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
               aria-label="Approval status filter"
-              value={approvalFilter}
+              value={view.approvalStatus}
               onChange={(e) => {
-                setApprovalFilter(e.target.value);
+                setView((v) => ({ ...v, approvalStatus: e.target.value }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -248,8 +290,8 @@ export default function AdminReferrers() {
               type="text"
               placeholder="Search by name…"
               aria-label="Search by name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />

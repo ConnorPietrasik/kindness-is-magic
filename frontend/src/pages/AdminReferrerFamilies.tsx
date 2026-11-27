@@ -60,9 +60,21 @@ import type { FamilyDetail, FamilyPayload, ReferrerDetail } from "../types";
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
+/**
+ * The inner component is keyed by the route's referrer id, so navigating to
+ * a different referrer's families page remounts it instead of reusing the
+ * instance. That guarantees the persisted view state (page/tab) re-hydrates
+ * from the new referrer's storage slot — without the key, a param change
+ * would carry the previous referrer's view over *and* write it into the new
+ * referrer's slot.
+ */
 export default function AdminReferrerFamilies() {
   const { id: refId } = useParams<{ id: string }>();
   const refIdNum = parseInt(refId!, 10);
+  return <ReferrerFamiliesPage key={refIdNum} refIdNum={refIdNum} />;
+}
+
+function ReferrerFamiliesPage({ refIdNum }: { refIdNum: number }) {
   const refIdStr = String(refIdNum);
 
   const referrerKey = adminReferrerDetail(refIdStr);
@@ -189,6 +201,7 @@ export default function AdminReferrerFamilies() {
             },
           }}
           pagination={{ enabled: true }}
+          storageKey={`adminReferrerFamilies:${refIdNum}`}
           dialogs={{
             deleteDescription: "This will also soft-delete all people in the family.",
             restoreDescription: "This will also restore all people in the family.",

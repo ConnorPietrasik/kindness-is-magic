@@ -12,6 +12,7 @@ import { Fragment, useMemo, useState } from "react";
 import { ApprovalBadge } from "../components/ApprovalBadge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DraggableTh } from "../components/DraggableTh";
@@ -26,7 +27,8 @@ import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useCrudManager } from "../hooks/useCrudManager";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminExtendInvite, adminListInvites, adminRemindInvite, adminRevokeInvite } from "../lib/api";
 import { adminInvites } from "../lib/queryKeys";
@@ -34,17 +36,44 @@ import { formatDateTime, isExpiredInvite } from "../lib/utils";
 import type { InviteListParams } from "../types";
 
 /* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+// showRedeemed is tri-state: undefined = all, true = redeemed only,
+// false = unredeemed only.
+interface AdminInviteCodesView {
+  showRedeemed: boolean | undefined;
+  showExpired: boolean | undefined;
+  search: string;
+}
+
+const DEFAULT_VIEW: AdminInviteCodesView = { showRedeemed: undefined, showExpired: undefined, search: "" };
+
+export function sanitizeInviteCodesView(raw: unknown): Partial<AdminInviteCodesView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const showRedeemed = typeof r.showRedeemed === "boolean" ? r.showRedeemed : undefined;
+  const showExpired = typeof r.showExpired === "boolean" ? r.showExpired : undefined;
+  return {
+    showRedeemed,
+    // "Expired" (unredeemed-and-lapsed) can never hold alongside "Redeemed
+    // only" — drop it on rehydration, the same as the checkbox change
+    // handlers do, so a stored value can't yield the impossible (always
+    // empty) combination.
+    showExpired: showRedeemed === true && showExpired === true ? undefined : showExpired,
+    search: typeof r.search === "string" ? r.search : undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 export default function AdminInviteCodes() {
-  const pagination = usePagination();
+  const pagination = usePagination({ storageKey: "adminInvites" });
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  const [showRedeemed, setShowRedeemed] = useState<boolean | undefined>(undefined);
-  const [showExpired, setShowExpired] = useState<boolean | undefined>(undefined);
+  const [view, setView] = usePersistentState(listViewKey("adminInvites", "filters"), DEFAULT_VIEW, sanitizeInviteCodesView);
   const [revokeConfirm, setRevokeConfirm] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminInvites");
@@ -54,17 +83,29 @@ export default function AdminInviteCodes() {
   // Visible columns in the user's custom order (drives header + row render).
   const displayColumns = useMemo(() => orderedKeys.filter((k) => visibleColumns.includes(k)), [orderedKeys, visibleColumns]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    pagination.reset();
+  }
+
+  const isViewNonDefault =
+    view.showRedeemed !== undefined ||
+    view.showExpired !== undefined ||
+    view.search !== "" ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   const listParams = useMemo<InviteListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
-      redeemed: showRedeemed ?? undefined,
-      expired: showExpired ?? undefined,
+      redeemed: view.showRedeemed ?? undefined,
+      expired: view.showExpired ?? undefined,
       search: debouncedSearch || undefined,
     }),
-    [pagination.params, apiColumns, showRedeemed, showExpired, debouncedSearch]
+    [pagination.params, apiColumns, view.showRedeemed, view.showExpired, debouncedSearch]
   );
 
   // useCrudManager for list + revoke
@@ -119,11 +160,15 @@ export default function AdminInviteCodes() {
     [listData?.total, pagination.page, pagination.pageSize]
   );
 
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
+
   const invites = listData?.invites ?? [];
 
   // "Expired" means unredeemed-and-lapsed, so it can never hold alongside
   // "Redeemed only" — the pair would just render an empty table.
-  const expiredFilterBlocked = showRedeemed === true;
+  const expiredFilterBlocked = view.showRedeemed === true;
 
   if (listLoading) return <PageSpinner />;
 
@@ -148,6 +193,7 @@ export default function AdminInviteCodes() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-violet-950">Invite Codes</h2>
           <div className="flex items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             {!isDefaultOrder && (
               <Button variant="secondary" onClick={resetOrder}>
                 Reset order
@@ -170,8 +216,8 @@ export default function AdminInviteCodes() {
             type="text"
             placeholder="Search by code or email…"
             aria-label="Search by code or email"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={view.search}
+            onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
             className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
             autoComplete="off"
           />
@@ -179,11 +225,14 @@ export default function AdminInviteCodes() {
             <label className="flex items-center gap-1.5">
               <input
                 type="checkbox"
-                checked={showRedeemed === true}
+                checked={view.showRedeemed === true}
                 onChange={(e) => {
                   const redeemedOnly = e.target.checked;
-                  setShowRedeemed(redeemedOnly ? true : undefined);
-                  if (redeemedOnly) setShowExpired(undefined);
+                  setView((v) => ({
+                    ...v,
+                    showRedeemed: redeemedOnly ? true : undefined,
+                    ...(redeemedOnly ? { showExpired: undefined } : {}),
+                  }));
                 }}
                 className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
               />
@@ -192,8 +241,8 @@ export default function AdminInviteCodes() {
             <label className="flex items-center gap-1.5">
               <input
                 type="checkbox"
-                checked={showRedeemed === false}
-                onChange={(e) => setShowRedeemed(e.target.checked ? false : undefined)}
+                checked={view.showRedeemed === false}
+                onChange={(e) => setView((v) => ({ ...v, showRedeemed: e.target.checked ? false : undefined }))}
                 className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
               />
               Unredeemed only
@@ -201,8 +250,8 @@ export default function AdminInviteCodes() {
             <label className={`flex items-center gap-1.5 ${expiredFilterBlocked ? "cursor-not-allowed text-gray-400" : ""}`}>
               <input
                 type="checkbox"
-                checked={showExpired === true}
-                onChange={(e) => setShowExpired(e.target.checked ? true : undefined)}
+                checked={view.showExpired === true}
+                onChange={(e) => setView((v) => ({ ...v, showExpired: e.target.checked ? true : undefined }))}
                 disabled={expiredFilterBlocked}
                 title={expiredFilterBlocked ? "Expired codes are unredeemed, so this cannot combine with Redeemed only." : undefined}
                 className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:cursor-not-allowed"

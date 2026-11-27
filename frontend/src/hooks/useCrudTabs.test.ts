@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCrudTabs } from "./useCrudTabs";
+import { listViewKey } from "./usePersistentState";
 
 describe("useCrudTabs", () => {
   /* ── Initial state ──────────────────────────────────────── */
@@ -74,5 +75,48 @@ describe("useCrudTabs", () => {
     expect(goToPage).toHaveBeenCalledTimes(2);
     expect(goToPage).toHaveBeenNthCalledWith(1, 1);
     expect(goToPage).toHaveBeenNthCalledWith(2, 1);
+  });
+
+  /* ── localStorage persistence (storageKey) ───────────── */
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("does not touch localStorage without a storageKey", () => {
+    const { result } = renderHook(() => useCrudTabs());
+
+    act(() => {
+      result.current.handleTabChange("deleted");
+    });
+
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("hydrates the tab from storage", () => {
+    localStorage.setItem(listViewKey("test", "tab"), JSON.stringify("deleted"));
+
+    const { result } = renderHook(() => useCrudTabs({ storageKey: "test" }));
+
+    expect(result.current.viewTab).toBe("deleted");
+    expect(result.current.isDeletedView).toBe(true);
+  });
+
+  it("falls back to 'active' for invalid stored values", () => {
+    localStorage.setItem(listViewKey("test", "tab"), JSON.stringify("bogus"));
+
+    const { result } = renderHook(() => useCrudTabs({ storageKey: "test" }));
+
+    expect(result.current.viewTab).toBe("active");
+  });
+
+  it("persists tab switches to storage", () => {
+    const { result } = renderHook(() => useCrudTabs({ storageKey: "test" }));
+
+    act(() => {
+      result.current.handleTabChange("deleted");
+    });
+
+    expect(JSON.parse(localStorage.getItem(listViewKey("test", "tab"))!)).toBe("deleted");
   });
 });

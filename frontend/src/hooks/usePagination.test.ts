@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { getPaginationInfo, usePagination } from "./usePagination";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getPaginationInfo, usePageClamp, usePagination } from "./usePagination";
+import { listViewKey } from "./usePersistentState";
 
 // ---------------------------------------------------------------------------
 // Tests — usePagination
@@ -177,6 +178,140 @@ describe("usePagination", () => {
     const { result } = renderHook(() => usePagination({ pageSizeOptions: [5, 25, 75] }));
 
     expect(result.current.pageSizeOptions).toEqual([5, 25, 75]);
+  });
+
+  it("exposes the effective default page and page size", () => {
+    const defaults = renderHook(() => usePagination());
+    expect(defaults.result.current.defaultPage).toBe(1);
+    expect(defaults.result.current.defaultPageSize).toBe(20);
+
+    const custom = renderHook(() => usePagination({ defaultPage: 2, defaultPageSize: 50 }));
+    expect(custom.result.current.defaultPage).toBe(2);
+    expect(custom.result.current.defaultPageSize).toBe(50);
+  });
+
+  /* ── localStorage persistence (storageKey) ───────────── */
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("does not touch localStorage without a storageKey", () => {
+    const { result } = renderHook(() => usePagination());
+
+    act(() => {
+      result.current.goToPage(3);
+    });
+
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("hydrates page and pageSize from storage", () => {
+    localStorage.setItem(listViewKey("test", "page"), JSON.stringify({ page: 4, pageSize: 50 }));
+
+    const { result } = renderHook(() => usePagination({ storageKey: "test" }));
+
+    expect(result.current.page).toBe(4);
+    expect(result.current.pageSize).toBe(50);
+  });
+
+  it("falls back to defaults for invalid stored values", () => {
+    localStorage.setItem(listViewKey("test", "page"), JSON.stringify({ page: 0, pageSize: 999 }));
+
+    const { result } = renderHook(() => usePagination({ storageKey: "test" }));
+
+    expect(result.current.page).toBe(1);
+    expect(result.current.pageSize).toBe(20);
+  });
+
+  it("falls back to defaults for malformed stored data", () => {
+    localStorage.setItem(listViewKey("test", "page"), "not json");
+
+    const { result } = renderHook(() => usePagination({ storageKey: "test" }));
+
+    expect(result.current.page).toBe(1);
+    expect(result.current.pageSize).toBe(20);
+  });
+
+  it("respects custom pageSizeOptions when validating stored values", () => {
+    localStorage.setItem(listViewKey("test", "page"), JSON.stringify({ page: 2, pageSize: 25 }));
+
+    // 25 is a valid option here
+    const valid = renderHook(() => usePagination({ storageKey: "test", pageSizeOptions: [10, 25] }));
+    expect(valid.result.current.pageSize).toBe(25);
+
+    // …and invalid with the default options
+    const invalid = renderHook(() => usePagination({ storageKey: "test" }));
+    expect(invalid.result.current.pageSize).toBe(20);
+  });
+
+  it("persists page changes to storage", () => {
+    const { result } = renderHook(() => usePagination({ storageKey: "test" }));
+
+    act(() => {
+      result.current.goToPage(3);
+      result.current.setPageSize(50);
+    });
+
+    expect(JSON.parse(localStorage.getItem(listViewKey("test", "page"))!)).toEqual({ page: 1, pageSize: 50 });
+  });
+
+  it("persists reset back to defaults", () => {
+    const { result } = renderHook(() => usePagination({ storageKey: "test" }));
+
+    act(() => {
+      result.current.goToPage(5);
+      result.current.reset();
+    });
+
+    expect(JSON.parse(localStorage.getItem(listViewKey("test", "page"))!)).toEqual({ page: 1, pageSize: 20 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — usePageClamp
+// ---------------------------------------------------------------------------
+
+describe("usePageClamp", () => {
+  it("clamps a stale page to the last valid page", () => {
+    const goToPage = vi.fn();
+
+    renderHook(() => usePageClamp(3, 50, goToPage));
+
+    expect(goToPage).toHaveBeenCalledTimes(1);
+    expect(goToPage).toHaveBeenCalledWith(3);
+  });
+
+  it("does nothing while the page is in range", () => {
+    const goToPage = vi.fn();
+
+    renderHook(() => usePageClamp(3, 3, goToPage));
+
+    expect(goToPage).not.toHaveBeenCalled();
+  });
+
+  it("does nothing while totalPages is 0 (loading or empty list)", () => {
+    const goToPage = vi.fn();
+
+    renderHook(() => usePageClamp(0, 50, goToPage));
+
+    expect(goToPage).not.toHaveBeenCalled();
+  });
+
+  it("re-clamps when a later response reports a smaller total", () => {
+    const goToPage = vi.fn();
+    const { rerender } = renderHook(
+      ({ totalPages, page }: { totalPages: number; page: number }) => usePageClamp(totalPages, page, goToPage),
+      { initialProps: { totalPages: 5, page: 3 } }
+    );
+
+    expect(goToPage).not.toHaveBeenCalled();
+
+    // The page is still 3, but the list now has 2 pages
+    rerender({ totalPages: 2, page: 3 });
+
+    expect(goToPage).toHaveBeenCalledTimes(1);
+    expect(goToPage).toHaveBeenCalledWith(2);
   });
 });
 

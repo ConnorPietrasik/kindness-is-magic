@@ -16,6 +16,7 @@ import { Fragment, useMemo, useState } from "react";
 import { AdminEmailComposer } from "../components/AdminEmailComposer";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { ColumnToggle } from "../components/ColumnToggle";
 import { DraggableTh } from "../components/DraggableTh";
@@ -28,7 +29,8 @@ import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
 import { useColumnVisibility } from "../hooks/useColumnVisibility";
 import { useDebouncedState } from "../hooks/useDebouncedState";
-import { getPaginationInfo, usePagination } from "../hooks/usePagination";
+import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
+import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
 import { adminListThankYouDonors, adminMarkDonorThanked, adminUnmarkDonorThanked } from "../lib/api";
 import { thankYouDonors } from "../lib/queryKeys";
@@ -71,6 +73,47 @@ const COLUMN_HEADERS: Record<string, string> = {
   latest_activity: "Latest Activity",
   thanked: "Thanked",
 };
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+interface AdminThankYouView {
+  thanked: "" | "unthanked" | "thanked";
+  source: "" | "claims" | "general" | "both";
+  search: string;
+  sortField: string;
+}
+
+const DEFAULT_VIEW: AdminThankYouView = { thanked: "", source: "", search: "", sortField: "" };
+
+// Mirrors the backend's THANK_YOU_SORT_FIELDS so a stored sort never reaches
+// the API with a value it would silently ignore.
+const SORT_FIELDS = [
+  "email",
+  "display_name",
+  "claim_count",
+  "general_total_cents",
+  "latest_fulfilled_at",
+  "latest_donation_at",
+  "latest_activity_at",
+  "thanked_at",
+] as const;
+
+function sanitizeView(raw: unknown): Partial<AdminThankYouView> {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  let sortField: string | undefined;
+  if (typeof r.sortField === "string" && r.sortField !== "") {
+    const field = r.sortField.startsWith("-") ? r.sortField.slice(1) : r.sortField;
+    if ((SORT_FIELDS as readonly string[]).includes(field)) sortField = r.sortField;
+  }
+  return {
+    thanked: r.thanked === "unthanked" || r.thanked === "thanked" ? r.thanked : undefined,
+    source: r.source === "claims" || r.source === "general" || r.source === "both" ? r.source : undefined,
+    search: typeof r.search === "string" ? r.search : undefined,
+    sortField,
+  };
+}
 
 /** Read-only reference under the composer title: what the donor gave. */
 function DonorContextBlock({ donor }: { donor: ThankYouDonor }) {
@@ -117,12 +160,8 @@ function SourceChips({ donor }: { donor: ThankYouDonor }) {
 export default function AdminThankYou() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const pagination = usePagination({ defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
-  const [thankedFilter, setThankedFilter] = useState<"" | "unthanked" | "thanked">("");
-  const [sourceFilter, setSourceFilter] = useState<"" | "claims" | "general" | "both">("");
-  const [searchQuery, setSearchQuery] = useState("");
-  // Sort: clicking a column header cycles asc → desc → clear ("" → none)
-  const [sortField, setSortField] = useState<string>("");
+  const pagination = usePagination({ storageKey: "adminThankYou", defaultPageSize: 50, pageSizeOptions: [20, 50, 100, 200] });
+  const [view, setView] = usePersistentState(listViewKey("adminThankYou", "filters"), DEFAULT_VIEW, sanitizeView);
 
   // Column visibility + user column order
   const { visibleColumns, apiColumns } = useColumnVisibility("adminThankYou");
@@ -136,28 +175,41 @@ export default function AdminThankYou() {
   const [draftFor, setDraftFor] = useState<ThankYouDonor | null>(null);
   const draft = useMemo(() => (draftFor ? buildThankYouDraft(draftFor) : null), [draftFor]);
 
-  const debouncedSearch = useDebouncedState(searchQuery, 1000, () => pagination.goToPage(1));
+  const debouncedSearch = useDebouncedState(view.search, 1000, () => pagination.goToPage(1));
 
   // Sort: clicking a column header cycles asc → desc → clear
   const handleSortClick = (field: string) => {
-    setSortField((prev) => {
-      if (prev === field) return `-${field}`;
-      if (prev === `-${field}`) return "";
-      return field;
+    setView((prev) => {
+      if (prev.sortField === field) return { ...prev, sortField: `-${field}` };
+      if (prev.sortField === `-${field}`) return { ...prev, sortField: "" };
+      return { ...prev, sortField: field };
     });
     pagination.goToPage(1);
   };
+
+  function handleClearView() {
+    setView(DEFAULT_VIEW);
+    pagination.reset();
+  }
+
+  const isViewNonDefault =
+    view.thanked !== "" ||
+    view.source !== "" ||
+    view.search !== "" ||
+    view.sortField !== "" ||
+    pagination.page !== pagination.defaultPage ||
+    pagination.pageSize !== pagination.defaultPageSize;
 
   const listParams = useMemo<AdminThankYouDonorsListParams>(
     () => ({
       ...pagination.params,
       columns: apiColumns,
       search: debouncedSearch || undefined,
-      source: sourceFilter || undefined,
-      thanked: thankedFilter === "thanked" ? true : thankedFilter === "unthanked" ? false : undefined,
-      sort: sortField || undefined,
+      source: view.source || undefined,
+      thanked: view.thanked === "thanked" ? true : view.thanked === "unthanked" ? false : undefined,
+      sort: view.sortField || undefined,
     }),
-    [pagination.params, apiColumns, sourceFilter, thankedFilter, debouncedSearch, sortField]
+    [pagination.params, apiColumns, view.source, view.thanked, debouncedSearch, view.sortField]
   );
 
   const { data: listData, isLoading } = useQuery({
@@ -170,6 +222,10 @@ export default function AdminThankYou() {
     () => getPaginationInfo(listData?.total ?? 0, pagination.page, pagination.pageSize),
     [listData?.total, pagination.page, pagination.pageSize]
   );
+
+  // A persisted page can be stale (the list shrank since it was saved) —
+  // once the response reports its total, clamp to the last valid page.
+  usePageClamp(pageInfo.totalPages, pagination.page, pagination.goToPage);
 
   const donors = listData?.donors ?? [];
 
@@ -200,20 +256,21 @@ export default function AdminThankYou() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-violet-950">Thank-You Emails</h2>
           <div className="flex flex-wrap items-center gap-3">
+            <ClearViewButton isNonDefault={isViewNonDefault} onClear={handleClearView} />
             <input
               type="text"
               placeholder="Search by email, name, or family…"
               aria-label="Search by email, name, or family"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={view.search}
+              onChange={(e) => setView((v) => ({ ...v, search: e.target.value }))}
               className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
               autoComplete="off"
             />
             <select
               aria-label="Thanked filter"
-              value={thankedFilter}
+              value={view.thanked}
               onChange={(e) => {
-                setThankedFilter(e.target.value as "" | "unthanked" | "thanked");
+                setView((v) => ({ ...v, thanked: e.target.value as "" | "unthanked" | "thanked" }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -226,9 +283,9 @@ export default function AdminThankYou() {
             </select>
             <select
               aria-label="Source filter"
-              value={sourceFilter}
+              value={view.source}
               onChange={(e) => {
-                setSourceFilter(e.target.value as "" | "claims" | "general" | "both");
+                setView((v) => ({ ...v, source: e.target.value as "" | "claims" | "general" | "both" }));
                 pagination.goToPage(1);
               }}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
@@ -271,7 +328,7 @@ export default function AdminThankYou() {
                       <ColumnHeader
                         label={COLUMN_HEADERS[key] ?? key}
                         field={sortFieldForColumn}
-                        sortField={sortField}
+                        sortField={view.sortField}
                         columnSearch={{}}
                         onSort={handleSortClick}
                         onSearchChange={() => {}}

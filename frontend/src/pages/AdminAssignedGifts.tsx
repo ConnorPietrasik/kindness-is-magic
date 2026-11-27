@@ -9,7 +9,7 @@
  */
 
 import { Link } from "react-router-dom";
-import { type AssignedGiftsListParams, AssignedGiftsView } from "../components/AssignedGifts";
+import { ADMIN_ASSIGNED_GIFT_SORT_FIELDS, type AssignedGiftsListParams, AssignedGiftsView } from "../components/AssignedGifts";
 import { BackLink, HeaderBar } from "../components/HeaderBar";
 import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
@@ -60,6 +60,7 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
           // Annotated param so the view can infer the response type from this arrow's return
           listFn={(params: AssignedGiftsListParams) => adminListWishes({ ...params, assigned_to_id: userId })}
           columnResourceKey="adminAssignedGifts"
+          sortFields={ADMIN_ASSIGNED_GIFT_SORT_FIELDS}
           familyColumn={{ key: "family_name", sortable: true }}
           detailFn={adminGetWish}
           updateFn={adminUpdateWish}

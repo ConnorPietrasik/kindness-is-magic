@@ -653,3 +653,222 @@ describe("AdminFamilies", () => {
     });
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Persisted view state                                                */
+/* ------------------------------------------------------------------ */
+
+describe("AdminFamilies — persisted view state", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("hydrates filters, sort, and pagination from storage", async () => {
+    mockListApis();
+    // 150 families at 50/page → page 3 is valid (no clamp refetch mid-test)
+    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ ...mockListResponse, total: 150, page: 3, page_size: 50, total_pages: 3 });
+    localStorage.setItem(
+      "kim:listView:adminFamilies:filters",
+      JSON.stringify({ verificationStatus: "rejected", searchName: "Johnson", sortField: "person_count" })
+    );
+    localStorage.setItem("kim:listView:adminFamilies:page", JSON.stringify({ page: 3, pageSize: 50 }));
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    // Filter + sort controls rehydrate
+    expect(screen.getByLabelText("Verification status filter")).toHaveValue("rejected");
+    expect(screen.getByLabelText("Filter by family name")).toHaveValue("Johnson");
+
+    // And the hydrated view drives the list request
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 3, page_size: 50, search_name: "Johnson", verification_status: "rejected", sort: "person_count" })
+      );
+    });
+  });
+
+  it("hydrates the deleted tab from storage", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminFamilies:tab", JSON.stringify("deleted"));
+
+    wrap(<AdminFamilies />);
+
+    // The deleted endpoint (not the active one) backs the list
+    await waitFor(() => {
+      expect(api.adminListDeletedFamilies).toHaveBeenCalled();
+    });
+    expect(api.adminListFamilies).not.toHaveBeenCalled();
+  });
+
+  it("persists filter edits to storage", async () => {
+    mockListApis();
+    wrap(<AdminFamilies />);
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Search all fields"), "bed");
+
+    expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilies:filters")!)).toEqual(expect.objectContaining({ search: "bed" }));
+  });
+
+  it("falls back to defaults for malformed stored data", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminFamilies:filters", "{not json");
+    localStorage.setItem("kim:listView:adminFamilies:page", "oops");
+    localStorage.setItem("kim:listView:adminFamilies:tab", JSON.stringify("bogus"));
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Verification status filter")).toHaveValue("");
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(expect.objectContaining({ page: 1, page_size: 20 }));
+    });
+  });
+
+  it("Clear filters resets the saved view", async () => {
+    mockListApis();
+    // 101 families at 50/page → page 2 is valid (no clamp refetch mid-test)
+    vi.spyOn(api, "adminListFamilies").mockResolvedValue({ ...mockListResponse, total: 101, page: 2, page_size: 50, total_pages: 3 });
+    localStorage.setItem("kim:listView:adminFamilies:filters", JSON.stringify({ verificationStatus: "rejected", search: "old" }));
+    localStorage.setItem("kim:listView:adminFamilies:page", JSON.stringify({ page: 2, pageSize: 50 }));
+
+    wrap(<AdminFamilies />);
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+
+    // Non-default view → the clear button is visible
+    const user = userEvent.setup();
+    const clear = screen.getByRole("button", { name: "Clear filters" });
+    await user.click(clear);
+
+    expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilies:filters")!)).toEqual({
+      search: "",
+      searchName: "",
+      searchContact: "",
+      searchPhone: "",
+      searchWish: "",
+      minPersonCount: "",
+      maxPersonCount: "",
+      verificationStatus: "",
+      lockLevel: "",
+      sortField: null,
+      newestFirst: false,
+    });
+    expect(JSON.parse(localStorage.getItem("kim:listView:adminFamilies:page")!)).toEqual({ page: 1, pageSize: 20 });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("hides Clear filters while the view is at defaults", async () => {
+    mockListApis();
+    wrap(<AdminFamilies />);
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
+  it("clamps a stale persisted page to the last page", async () => {
+    mockListApis();
+    vi.spyOn(api, "adminListFamilies").mockResolvedValue({
+      ...mockListResponse,
+      total: 48,
+      page_size: 20,
+      total_pages: 3,
+    });
+    localStorage.setItem("kim:listView:adminFamilies:page", JSON.stringify({ page: 99, pageSize: 20 }));
+
+    wrap(<AdminFamilies />);
+
+    // The stale page goes out first (empty slice from the server)…
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(expect.objectContaining({ page: 99, page_size: 20 }));
+    });
+    // …then the clamp refetches the last valid page
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(expect.objectContaining({ page: 3, page_size: 20 }));
+    });
+  });
+
+  it("drops invalid stored numeric filters (a negative/NaN value would 422 the request)", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminFamilies:filters", JSON.stringify({ minPersonCount: "-5", maxPersonCount: "abc" }));
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(
+        expect.objectContaining({ min_person_count: undefined, max_person_count: undefined })
+      );
+    });
+    // type="number" inputs resolve to null when empty (jest-dom)
+    expect(screen.getByLabelText("Minimum people")).toHaveValue(null);
+    expect(screen.getByLabelText("Maximum people")).toHaveValue(null);
+  });
+
+  it("keeps a valid stored numeric filter", async () => {
+    mockListApis();
+    localStorage.setItem("kim:listView:adminFamilies:filters", JSON.stringify({ minPersonCount: "2" }));
+
+    wrap(<AdminFamilies />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Minimum people")).toHaveValue(2);
+    await waitFor(() => {
+      expect(api.adminListFamilies).toHaveBeenCalledWith(expect.objectContaining({ min_person_count: 2 }));
+    });
+  });
+
+  it("does not send a live-typed negative min people (a negative/NaN value would 422 the request)", async () => {
+    const user = userEvent.setup();
+    // Auto-advance time so the 1000ms debounce fires quickly
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 50 });
+    try {
+      mockListApis();
+      const listSpy = vi.mocked(api.adminListFamilies).mockResolvedValue(mockListResponse);
+
+      wrap(<AdminFamilies />);
+      await waitFor(() => {
+        expect(screen.getByText("The Johnsons")).toBeInTheDocument();
+      });
+
+      const minInput = screen.getByLabelText("Minimum people");
+      // "-5" is typeable into the number input (min only constrains the
+      // stepper) — the old code would have sent min_person_count=-5 and 422'd.
+      await user.type(minInput, "-5");
+      // …then a valid value so a debounced refetch actually fires (an
+      // unchanged query key wouldn't re-invoke the API).
+      await user.clear(minInput);
+      await user.type(minInput, "3");
+
+      await waitFor(() => {
+        expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ min_person_count: 3 }));
+      });
+      // No call ever carried a negative (or otherwise invalid) min count
+      for (const call of listSpy.mock.calls) {
+        const minCount = call[0]?.min_person_count;
+        if (minCount !== undefined) expect(minCount).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

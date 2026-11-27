@@ -38,6 +38,33 @@ export function safeRemoveItem(key: string): void {
 }
 
 /**
+ * Sanitize a stored non-negative integer filter value (min/max counts/ages).
+ *
+ * Returns the value only when it is a plain digit string — the format the
+ * type=number inputs produce (including "0") — and it is at least `min`
+ * (default 0). Anything else (below the minimum, negative, decimal, or
+ * garbage from a hand-edited localStorage) is dropped so a stale stored
+ * value can never reach the API as a 422. Pass the endpoint's lower bound as
+ * `min` (e.g. 1 for the public browse's member counts, which the API
+ * requires to be ≥ 1; the admin min/max filters accept 0).
+ */
+export function sanitizeNonNegativeInt(value: unknown, min = 0): string | undefined {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return undefined;
+  return Number(value) >= min ? value : undefined;
+}
+
+/**
+ * Parsed form of {@link sanitizeNonNegativeInt} for API params: a plain
+ * non-negative digit string (>= `min`) becomes its number; anything else
+ * (below the minimum, negative, decimal, non-string, or garbage) becomes
+ * `undefined` — so a live-typed value can never reach the endpoint as a 422.
+ */
+export function parseNonNegativeInt(value: unknown, min = 0): number | undefined {
+  const clean = sanitizeNonNegativeInt(value, min);
+  return clean === undefined ? undefined : Number(clean);
+}
+
+/**
  * Normalize a stored user-defined key order against a registry.
  *
  * Keeps only keys present in the registry (in stored order), drops
