@@ -8,9 +8,11 @@ loop is disabled in tests via DISABLE_BACKGROUND_TASKS).
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.config import CASH_CLAIM_AMOUNT_USD, CASH_CLAIM_PAYMENT_HOURS
 from app.models import (
     ClaimPaymentStatus,
     CommitmentType,
@@ -18,6 +20,7 @@ from app.models import (
     DeadlineMode,
     DeadlineType,
     EmailKind,
+    EmailStatus,
     Family,
     FamilyClaim,
     FamilyVerificationStatus,
@@ -97,6 +100,24 @@ def _sent_rows(db: Session, kind: EmailKind) -> list[SentEmail]:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture()
+def fresh_zeffy_campaign_cache():
+    """Clear the per-process Zeffy campaign validation cache around the test.
+
+    A successful campaign validation is cached per process. The teardown
+    drops this test's "c-dedicated" entry so a later test in the same
+    worker that expects its own mock transport to serve (or fail) the
+    campaign lookup is not answered from the cache instead. The pre-clear
+    likewise keeps this test's lookup in its own mock's path when an
+    earlier test cached the same ID.
+    """
+    from app import zeffy
+
+    zeffy.clear_campaign_cache()
+    yield
+    zeffy.clear_campaign_cache()
+
+
 class TestCommitmentToggle:
     def test_gifts_to_cash(self, test_client: TestClient, db: Session, admin_user):
         """gifts→cash: pending + fresh 48h window + "please pay" nudge."""
@@ -119,6 +140,127 @@ class TestCommitmentToggle:
         # The nudge went out (a one-item checkout)
         assert len(_sent_rows(db, EmailKind.payment_request)) == 1
         assert body.get("email_error") is None
+
+    def test_gifts_to_cash_nudge_quotes_whole_cart(
+        self, test_client: TestClient, db: Session, admin_user, monkeypatch, fresh_zeffy_campaign_cache
+    ):
+        """gifts→cash on top of an existing pending cash claim, before any
+        nudge went out this window: the nudge quotes the donor's whole cart
+        (the amount the cart page and the webhook's exact-match rule both
+        require) with the cart's earliest expiry — and, being the window's
+        nudge, it suppresses a second one at checkout. (With a nudge already
+        sent this window the toggle sends none — one per window is intended;
+        the cart page carries the live total.)"""
+        import httpx
+
+        from app import zeffy
+        from app.payments import send_email as real_send_email
+
+        # Checkout (below) gates on a configured Zeffy campaign — the mock
+        # serves only the campaign lookup (anything else 404s, like the real
+        # API, so an unexpected Zeffy call fails loudly instead of getting a
+        # bogus 200).
+        def _campaign_only(req: httpx.Request) -> httpx.Response:
+            if req.url.path == "/api/v1/campaigns/c-dedicated":
+                return httpx.Response(
+                    200,
+                    json={
+                        "id": "c-dedicated",
+                        "title": "t",
+                        "url": "https://zeffy.com/f/x",
+                        "status": "active",
+                        "type": "donation_form",
+                        "currency": "usd",
+                    },
+                )
+            return httpx.Response(404, json={"error": {"code": "resource_not_found", "message": "nope"}})
+
+        monkeypatch.setattr(zeffy, "ZEFFY_API_KEY", "test-key")
+        monkeypatch.setattr(zeffy, "ZEFFY_CAMPAIGN_ID", "c-dedicated")
+        monkeypatch.setattr("app.donor_routes.ZEFFY_FORM_URL", "https://zeffy.com/f/x")
+        monkeypatch.setenv("ZEFFY_MIN_INTERVAL_SECONDS", "0")
+        monkeypatch.setattr(zeffy, "_transport_override", httpx.MockTransport(_campaign_only))
+
+        _login_donor(test_client)
+        old_fam = _eligible_family(db, "Old Cart Family")
+        old_claim = _claim(
+            db,
+            _donor_id(db),
+            old_fam,
+            commitment_type=CommitmentType.cash,
+            payment_status=ClaimPaymentStatus.pending,
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+        gift_claim = _gift_claim(db, _eligible_family(db, "Toggle Cart Family"))
+
+        captures: list[dict] = []
+
+        async def _capture_send(*args, **kwargs):
+            captures.append({"subject": kwargs.get("subject"), "body": kwargs.get("html_body")})
+            return await real_send_email(*args, **kwargs)
+
+        with patch("app.payments.send_email", new=_capture_send):
+            resp = test_client.patch(f"/api/donor/claims/{gift_claim.id}", json={"commitment_type": "cash"})
+            assert resp.status_code == 200
+
+            # The cart now holds two claims — the nudge must quote that total.
+            cart = test_client.get("/api/donor/cart").json()
+            assert cart["item_count"] == 2
+            cart_total = 2 * CASH_CLAIM_AMOUNT_USD
+            assert cart["total_usd"] == cart_total
+
+            assert len(captures) == 1
+            assert f"payment of ${cart_total:,.0f} required" in captures[0]["subject"]
+            # The emailed total row matches the cart total (a one-claim nudge
+            # would total a single line against a two-line cart)
+            assert f">${cart_total:,.0f}</" in captures[0]["body"]
+            # Expiry is the cart's earliest (the older claim's window), not
+            # the toggled claim's fresh window
+            earliest = old_claim.created_at + timedelta(hours=CASH_CLAIM_PAYMENT_HOURS)
+            assert earliest.strftime("%B %d, %Y at %I:%M %p UTC") in captures[0]["body"]
+
+            # The toggle nudge is the window's nudge — checkout sends no second one.
+            assert test_client.post("/api/donor/cart/checkout", json={}).status_code == 200
+            assert len(captures) == 1
+
+    def test_gifts_to_cash_no_nudge_when_already_sent_this_window(self, test_client: TestClient, db: Session, admin_user):
+        """A nudge already sent this window (e.g. at the original checkout)
+        suppresses the toggle's nudge — one per window is intended: the
+        toggle still applies, no second "please pay" goes out, and the
+        donor's latest nudge may still quote the pre-toggle total (the cart
+        page carries the live one)."""
+        _login_donor(test_client)
+        _claim(
+            db,
+            _donor_id(db),
+            _eligible_family(db, "Suppressed Nudge Family"),
+            commitment_type=CommitmentType.cash,
+            payment_status=ClaimPaymentStatus.pending,
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+        # The window's nudge already went out — the dedup reads the email
+        # log, so seeding its row simulates the earlier send
+        db.add(SentEmail(recipient_email=DONOR_EMAIL, kind=EmailKind.payment_request, status=EmailStatus.sent))
+        db.commit()
+        gift_claim = _gift_claim(db, _eligible_family(db, "Suppressed Family"))
+
+        captures: list[dict] = []
+
+        async def _capture_send(*args, **kwargs):
+            captures.append(kwargs)
+            return {"sent": True, "reason": None}
+
+        with patch("app.payments.send_email", new=_capture_send):
+            resp = test_client.patch(f"/api/donor/claims/{gift_claim.id}", json={"commitment_type": "cash"})
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["commitment_type"] == "cash"
+        assert body["payment_status"] == "pending"
+        assert body.get("email_error") is None
+        # The change applies, but the window's nudge is not re-sent
+        assert len(captures) == 0
+        assert len(_sent_rows(db, EmailKind.payment_request)) == 1
 
     def test_gifts_to_cash_smtp_failure_sets_email_error(self, test_client: TestClient, db: Session, admin_user):
         """gifts→cash + nudge SMTP failure → toggle still succeeds, email_error set."""

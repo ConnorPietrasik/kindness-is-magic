@@ -689,9 +689,16 @@ async def update_claim(
       change** — re-sending the same type is a plain no-op:
 
       * **gifts→cash** — the claim enters the payment flow (``pending``,
-        a fresh 48h window via ``created_at = now``) and the "please pay"
-        nudge goes out (a one-item checkout; the once-per-window rule
-        applies).
+        a fresh 48h window via ``created_at = now``). The "please pay"
+        nudge goes to the claim's donor for their whole pending cart —
+        the total the cart page shows and the Zeffy webhook's exact-match
+        rule uses (a one-claim email would quote a total the webhook could
+        never match). One nudge per payment window is intended: when one
+        already went out this window (e.g. at the original checkout) the
+        toggle sends none, so the donor's latest nudge may still quote
+        the pre-toggle total — the cart page carries the live one. A
+        nudge that does go out doubles as the window's nudge and
+        suppresses a duplicate at checkout.
       * **cash→gifts** — only possible while pending: the claim is released
         (``paid``; the donor never got a gift confirmation, so one goes out
         now) and must pass the standard new-gift-claim checks (a conversion
@@ -726,7 +733,10 @@ async def update_claim(
         db.commit()
         db.refresh(claim)
         logger.info("User %s toggled claim %s gifts→cash (new payment window)", user.id, claim_id)
-        email_error = await send_payment_request_email(db, user, [claim])
+        # To the claim's donor, not the actor (this endpoint also admits
+        # admins); the whole-cart total and once-per-window rule: docstring.
+        donor = claim.donor_user
+        email_error = await send_payment_request_email(db, donor, pending_cash_claims_for(db, donor.id))
     elif new_type == CommitmentType.gifts and claim.commitment_type == CommitmentType.cash:
         # cash→gifts: release the claim (pending only) as a new gift claim.
         if claim.payment_status != ClaimPaymentStatus.pending:
