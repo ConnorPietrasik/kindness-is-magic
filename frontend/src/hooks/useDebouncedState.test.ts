@@ -114,6 +114,26 @@ describe("useDebouncedState", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("does not call onChange after mount when StrictMode double-runs the mount effect", () => {
+    vi.useFakeTimers();
+
+    // Regression test for the first-render-flag bug: with the old
+    // implementation the StrictMode double mount effect armed a timer that
+    // fired the callback ~delay ms after every mount (full story in the
+    // `lastEmitted` comment in useDebouncedState.ts; production builds don't
+    // double-run effects, so only this config catches it).
+    // NB: use the `reactStrictMode` option rather than rendering your own
+    // <StrictMode> around the hook: in React 19.3 the double-run only happens
+    // when <StrictMode> sits at the root of the rendered tree (it then covers
+    // every nested component); a <StrictMode> rendered under the root — e.g.
+    // inside a wrapper component — does not trigger it.
+    const onChange = vi.fn();
+    renderHook(() => useDebouncedState("initial", DELAY, onChange), { reactStrictMode: true });
+
+    act(() => vi.advanceTimersByTime(DELAY * 2));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("works with numeric values", () => {
     vi.useFakeTimers();
 

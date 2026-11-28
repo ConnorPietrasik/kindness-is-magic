@@ -5,12 +5,12 @@
  * localStorage so the view survives navigating away and back by any path.
  * These specs verify the core guarantees:
  *
- * - Admin /admin/families: search + sort + page size survive (a) the header
- *   back button from a family's people page, (b) leaving via the dashboard
- *   and returning, and (c) a reload; "Clear filters" then restores the
- *   default view. A persisted page past the last page (the list shrank
- *   since it was saved) clamps back to the last page instead of rendering
- *   an empty list.
+ * - Admin /admin/families: search + sort + page number + page size survive
+ *   (a) the header back button from a family's people page, (b) leaving via
+ *   the dashboard and returning, and (c) a reload; "Clear filters" then
+ *   restores the default view. A persisted page past the last page (the list
+ *   shrank since it was saved) clamps back to the last page instead of
+ *   rendering an empty list.
  * - Donor /donor/claims: the status filter survives a round trip to a
  *   sponsorship detail via the header back link.
  *
@@ -41,7 +41,7 @@ import {
 const STORAGE_ADMIN = "storage/admin.json";
 
 test.describe("Admin families — persisted view state", () => {
-  test("search + sort + page size survive back button, another route and reload; Clear filters resets", async ({ browser }) => {
+  test("search + sort + page number + page size survive back button, another route and reload; Clear filters resets", async ({ browser }) => {
     const context = await browser.newContext({ storageState: STORAGE_ADMIN });
     const page = await context.newPage();
     await page.goto("/admin/families");
@@ -72,6 +72,20 @@ test.describe("Admin families — persisted view state", () => {
     // The non-default view makes the clear affordance visible
     await expect(clearBtn).toBeVisible();
 
+    // Page number: navigate to page 2 — the value persisted alongside sort
+    // and page size (the spurious StrictMode reset that used to clobber it
+    // back to page 1 has a unit-level regression test in
+    // frontend/src/hooks/useDebouncedState.test.ts). Capture only the range,
+    // not the total: the total is a live global count that parallel specs
+    // mutate while this test runs (fullyParallel suite, and many specs
+    // create/soft-delete families), so an exact full-text match would flake.
+    await page.getByRole("button", { name: "Next page" }).click();
+    await page.waitForLoadState("networkidle");
+    const rawRange = await page.getByText(/Showing \d+–\d+ of \d+/).first().innerText();
+    const rangeMatch = /Showing (\d+–\d+) of \d+/.exec(rawRange);
+    if (!rangeMatch) throw new Error(`pagination bar not in range form: ${rawRange}`);
+    const page2Range = rangeMatch[1]; // e.g. "11–20"
+
     // --- (a) Round trip via the header back button ---
     await manage.first().click();
     await page.waitForURL(/\/admin\/families\/\d+\/people/);
@@ -82,6 +96,9 @@ test.describe("Admin families — persisted view state", () => {
     // The exact prior view is back
     await expect(newestBtn).toHaveAttribute("aria-pressed", "true");
     await expect(pageSize).toHaveValue("10");
+    await expect(page.getByText(/Showing \d+–\d+ of \d+/).first()).toHaveText(
+      new RegExp(`Showing ${page2Range} of \\d+`)
+    );
 
     // --- (b) Leave via a different path (dashboard) and return ---
     await page.getByLabel("Home").click();
@@ -91,6 +108,9 @@ test.describe("Admin families — persisted view state", () => {
 
     await expect(newestBtn).toHaveAttribute("aria-pressed", "true");
     await expect(pageSize).toHaveValue("10");
+    await expect(page.getByText(/Showing \d+–\d+ of \d+/).first()).toHaveText(
+      new RegExp(`Showing ${page2Range} of \\d+`)
+    );
 
     // --- Search text: set it, then prove it survives its own round trip ---
     // (Unique string — the list empties, but the persisted input rehydrates.)
@@ -143,14 +163,22 @@ test.describe("Admin families — persisted view state", () => {
     await expect(page.getByText("No families yet.")).toHaveCount(0);
     await expect(page.locator("tbody tr[data-id]")).not.toHaveCount(0);
 
-    // …and the pagination bar reports a sane range (the stale page used to
-    // render e.g. "Showing 981–48 of 48").
+    // …and the pagination bar lands on the clamped last page, not page 1.
+    // Asserting the range *ends* at the total instead would flake: ~20
+    // parallel specs create/soft-delete families, so the live total can cross
+    // a page-size boundary mid-assertion, and the clamp only ever moves the
+    // page down — a clamped page 3 stops being the last page once the total
+    // passes 60. "Not page 1" + a well-formed range catches a broken clamp
+    // without tracking the total.
     await expect
       .poll(async () => {
         const raw = await page.getByText(/Showing \d+–\d+ of \d+|\d+ total/).first().innerText().catch(() => "");
-        const range = raw.match(/Showing (\d+)–(\d+) of \d+/);
-        if (range) return Number(range[1]) <= Number(range[2]);
-        return /^\d+ total$/.test(raw);
+        const range = raw.match(/Showing (\d+)–(\d+) of (\d+)/);
+        if (!range) return /^\d+ total$/.test(raw); // single page — the clamped page *is* page 1
+        const start = Number(range[1]);
+        const end = Number(range[2]);
+        const total = Number(range[3]);
+        return start > 1 && start <= end && end <= total;
       })
       .toBe(true);
 
