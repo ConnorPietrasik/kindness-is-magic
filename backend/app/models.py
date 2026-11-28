@@ -143,7 +143,8 @@ class PasswordResetToken(Base):
 
     __tablename__ = "password_reset_tokens"
     __table_args__ = (
-        # Invalidation query filters (user_id, used_at) together.
+        # Invalidation queries filter on user_id (the leading column);
+        # used_at is still read by the one-shot lookup and legacy consumed rows.
         Index("ix_password_reset_tokens_user_id_used_at", "user_id", "used_at"),
     )
 
@@ -414,9 +415,9 @@ class RefreshToken(Base):
     endpoint) the old row is stamped with ``rotated_at`` instead of deleted,
     so a concurrent client that still holds the pre-rotation token (the
     browser cookie jar is shared across tabs) is tolerated for a short grace
-    window after rotation.  Rows outside the window are garbage-collected on
-    the next refresh.  Logout and password-change hard-delete rows, ending
-    the session for good.
+    window after rotation.  Rows outside the window (or past their expiry)
+    are garbage-collected on the next refresh.  Logout and password-change
+    hard-delete rows, ending the session for good.
     """
 
     __tablename__ = "refresh_tokens"

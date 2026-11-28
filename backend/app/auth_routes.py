@@ -372,11 +372,16 @@ def refresh(
     # Tolerate it, but do NOT slide rotated_at — otherwise a captured token
     # could be replayed forever, minting new tokens indefinitely.
 
-    # Housekeeping: drop this user's rotated rows past the grace window
+    # Housekeeping: drop this user's rotated rows past the grace window and
+    # any rows whose tokens have already expired (e.g. a session that logged
+    # in and never refreshed or logged out — the JWT's own ``exp`` already
+    # makes such tokens unusable; the row just kept the string around).
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
-        RefreshToken.rotated_at.isnot(None),
-        RefreshToken.rotated_at < now - timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS),
+        (
+            (RefreshToken.rotated_at.isnot(None) & (RefreshToken.rotated_at < now - timedelta(seconds=REFRESH_ROTATION_GRACE_SECONDS)))
+            | (RefreshToken.expires_at < now)
+        ),
     ).delete(synchronize_session=False)
 
     # Issue new tokens and set cookies
@@ -431,10 +436,10 @@ def change_password(
 
     user.hashed_password = get_password_hash(data.new_password)
 
-    # Invalidate any existing password-reset tokens
+    # Invalidate all of the user's password-reset tokens (outstanding or
+    # expired — consumed rows are deleted on use, so none should remain)
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
-        PasswordResetToken.used_at.is_(None),
     ).delete(synchronize_session="fetch")
 
     # Invalidate all refresh tokens (force re-login on all devices)
@@ -468,10 +473,10 @@ async def forgot_password(request: Request, data: ForgotPassword, db: Session = 
     # Generate token
     raw_token = secrets.token_urlsafe(32)
 
-    # Invalidate any existing reset tokens for this user
+    # Invalidate all existing reset tokens for this user (outstanding or
+    # expired — consumed rows are deleted on use, so none should remain)
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
-        PasswordResetToken.used_at.is_(None),
     ).delete(synchronize_session="fetch")
 
     reset = PasswordResetToken(
@@ -537,7 +542,10 @@ def reset_password(request: Request, data: ResetPassword, db: Session = Depends(
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     user.hashed_password = get_password_hash(data.new_password)
-    reset.used_at = datetime.now(timezone.utc)
+    # Delete the consumed row outright — the token is one-shot and there is
+    # no audit value in keeping the raw string around (the log line below
+    # records the reset).
+    db.delete(reset)
 
     # Invalidate all refresh tokens (force re-login on all devices)
     db.query(RefreshToken).filter(

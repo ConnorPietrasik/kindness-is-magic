@@ -306,6 +306,38 @@ class TestForgotPassword:
         assert resp.status_code == 200
         assert "reset" in resp.json()["message"].lower() or "exists" in resp.json()["message"].lower()
 
+    def test_forgot_password_clears_outstanding_and_expired_rows(self, test_client: TestClient, admin_user, db: Session):
+        """A new reset request clears the user's old rows — outstanding and
+        expired alike — leaving only the fresh token."""
+        from app.models import PasswordResetToken
+
+        db.add_all(
+            [
+                PasswordResetToken(
+                    user_id=admin_user.id,
+                    token="stale-outstanding-token",
+                    expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+                ),
+                PasswordResetToken(
+                    user_id=admin_user.id,
+                    token="stale-expired-token",
+                    expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+                ),
+            ]
+        )
+        db.commit()
+
+        resp = test_client.post(
+            "/api/auth/forgot-password",
+            json={"email": "admin@test.com"},
+        )
+        assert resp.status_code == 200
+
+        db.expire_all()
+        rows = db.query(PasswordResetToken).filter(PasswordResetToken.user_id == admin_user.id).all()
+        assert len(rows) == 1
+        assert rows[0].token not in ("stale-outstanding-token", "stale-expired-token")
+
     def test_forgot_password_nonexistent_user(self, test_client: TestClient):
         """Should still return 200 to avoid email enumeration."""
         resp = test_client.post(
@@ -454,6 +486,29 @@ class TestResetPassword:
             json={"email": "admin@test.com", "password": "ResetPass1234!"},
         )
         assert login_resp.status_code == 200
+
+    def test_reset_password_deletes_consumed_row(self, test_client: TestClient, admin_user, db: Session):
+        """A consumed reset token row is deleted, not just stamped."""
+        from app.models import PasswordResetToken
+
+        raw_token = "consume-me-token"
+        db.add(
+            PasswordResetToken(
+                user_id=admin_user.id,
+                token=raw_token,
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            )
+        )
+        db.commit()
+
+        resp = test_client.post(
+            "/api/auth/reset-password",
+            json={"token": raw_token, "new_password": "ResetPass1234!"},
+        )
+        assert resp.status_code == 200
+
+        db.expire_all()
+        assert db.query(PasswordResetToken).filter(PasswordResetToken.token == raw_token).first() is None
 
     def test_reset_password_disabled_user_rejected(self, test_client: TestClient, db: Session):
         """A reset token cannot rewrite the password of a disabled account.
@@ -709,6 +764,33 @@ class TestRefresh:
         resp = test_client.post("/api/auth/refresh")
         assert resp.status_code == 401
         assert "session has ended" in resp.json()["detail"].lower()
+
+    def test_refresh_prunes_expired_rows(self, test_client: TestClient, db: Session, admin_user):
+        """Housekeeping on refresh also drops rows whose tokens have expired
+        (e.g. a session that logged in and never refreshed or logged out),
+        while the presented token's row survives."""
+        from app.models import RefreshToken
+
+        login_as(test_client, "admin@test.com", "AdminPass123!")
+        live_token = test_client.cookies.get("refresh_token")
+
+        # An abandoned session: never rotated, token long past its expiry.
+        db.add(
+            RefreshToken(
+                user_id=admin_user.id,
+                token="abandoned-expired-jwt",
+                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+            )
+        )
+        db.commit()
+
+        resp = test_client.post("/api/auth/refresh")
+        assert resp.status_code == 200
+
+        db.expire_all()
+        assert db.query(RefreshToken).filter(RefreshToken.token == "abandoned-expired-jwt").first() is None
+        # The presented (unexpired) token's row is kept (stamped rotated).
+        assert db.query(RefreshToken).filter(RefreshToken.token == live_token).first() is not None
 
     def test_refresh_after_logout_fails(self, test_client: TestClient, admin_user):
         """A refresh token extracted before logout cannot be used after logout."""
