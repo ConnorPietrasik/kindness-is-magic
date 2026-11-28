@@ -436,7 +436,6 @@ class TestSync:
         endpoint rolls the session back and reports the conflict instead of a
         500; the row already exists (the winner's) and the next sync
         converges."""
-        from types import SimpleNamespace
 
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
@@ -451,12 +450,29 @@ class TestSync:
         zeffy.clear_campaign_cache()
         _login_admin(test_client)
 
-        class _UniqueViolation(Exception):
-            pgcode = "23505"  # SQLSTATE unique_violation
+        # Produce the driver's genuine unique violation on the mirror's
+        # one-row-per-payment index (rival row, then the conflicting one),
+        # so the re-raised exception carries psycopg's real attributes.
+        # A hand-written stand-in would just re-encode whatever assumption
+        # the production code has about the driver — and could never catch
+        # a constraint-name mismatch between schema shapes.
+        def _mirror_row(payment_id: str) -> ZeffyPaymentRecord:
+            return ZeffyPaymentRecord(
+                payment_id=payment_id,
+                created_at=datetime.now(timezone.utc),
+                amount_cents=1000,
+                currency="USD",
+                status="succeeded",
+            )
 
-            def __init__(self):
-                super().__init__('duplicate key value violates unique constraint "uq_zeffy_payments_payment_id"')
-                self.diag = SimpleNamespace(constraint_name="uq_zeffy_payments_payment_id")
+        db.add(_mirror_row("pay-race"))
+        db.flush()
+        try:
+            db.add(_mirror_row("pay-race"))
+            db.flush()
+        except IntegrityError as race_err:
+            race_orig = race_err.orig
+        db.rollback()
 
         def _commit_losing_race():
             # Flush like a real commit so the INSERT lands in the savepoint,
@@ -465,7 +481,7 @@ class TestSync:
             raise IntegrityError(
                 "INSERT INTO zeffy_payments (payment_id) VALUES (%(payment_id)s)",
                 {"payment_id": "pay-race"},
-                _UniqueViolation(),
+                race_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_losing_race)
@@ -480,7 +496,6 @@ class TestSync:
         """A commit failure that isn't the mirror's payment_id unique index
         (e.g. an FK violation) must not be mislabelled as a lost race — the
         global SQLAlchemy handler turns it into a generic 500."""
-        from types import SimpleNamespace
 
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.path == f"/api/v1/campaigns/{CAMPAIGN_ID}":
@@ -495,18 +510,29 @@ class TestSync:
         zeffy.clear_campaign_cache()
         _login_admin(test_client)
 
-        class _ForeignKeyViolation(Exception):
-            pgcode = "23503"  # SQLSTATE foreign_key_violation
-
-            def __init__(self):
-                super().__init__('insert or update on table "zeffy_payments" violates foreign key constraint "fk_zeffy_payments_seen_by"')
-                self.diag = SimpleNamespace(constraint_name="fk_zeffy_payments_seen_by")
+        # Genuine FK violation from the driver (unknown seen_by user), so
+        # the 500 path runs on a real psycopg error, not a stand-in.
+        try:
+            db.add(
+                ZeffyPaymentRecord(
+                    payment_id="pay-race2",
+                    created_at=datetime.now(timezone.utc),
+                    amount_cents=1000,
+                    currency="USD",
+                    status="succeeded",
+                    seen_by=9_999_999,
+                )
+            )
+            db.flush()
+        except IntegrityError as fk_err:
+            fk_orig = fk_err.orig
+        db.rollback()
 
         def _commit_fk_violation():
             raise IntegrityError(
                 "INSERT INTO zeffy_payments (payment_id) VALUES (%(payment_id)s)",
                 {"payment_id": "pay-race2"},
-                _ForeignKeyViolation(),
+                fk_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_fk_violation)

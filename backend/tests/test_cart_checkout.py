@@ -11,7 +11,6 @@ import hmac
 import json
 import time
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -644,17 +643,37 @@ class TestCheckout:
 
         _create_donor(test_client)
         fam = _eligible_family(db, "Race Family")
+        fam_id = fam.id
         _configure_zeffy(monkeypatch)
+        donor_id = db.query(User).filter(User.email == DONOR_EMAIL).first().id
 
-        class _UniqueViolation(Exception):
-            """Stand-in for psycopg's UniqueViolation: pgcode + diag.constraint_name
-            exactly as the driver fills them for a real index violation."""
-
-            pgcode = "23505"  # SQLSTATE unique_violation
-
-            def __init__(self):
-                super().__init__('duplicate key value violates unique constraint "uq_family_claims_family_active"')
-                self.diag = SimpleNamespace(constraint_name="uq_family_claims_family_active")
+        # Produce the driver's genuine unique violation on the same index
+        # (rival claim, then the conflicting one), so the re-raised
+        # exception carries psycopg's real attributes. A hand-written
+        # stand-in would just re-encode whatever assumption the production
+        # code has about the driver.
+        db.add(
+            FamilyClaim(
+                donor_user_id=donor_id,
+                family_id=fam_id,
+                commitment_type=CommitmentType.cash,
+                payment_status=ClaimPaymentStatus.pending,
+            )
+        )
+        db.flush()
+        try:
+            db.add(
+                FamilyClaim(
+                    donor_user_id=donor_id,
+                    family_id=fam_id,
+                    commitment_type=CommitmentType.cash,
+                    payment_status=ClaimPaymentStatus.pending,
+                )
+            )
+            db.flush()
+        except IntegrityError as race_err:
+            race_orig = race_err.orig
+        db.rollback()
 
         def _commit_losing_race():
             # Flush like a real commit so the claim lands in the savepoint,
@@ -662,13 +681,13 @@ class TestCheckout:
             db.flush()
             raise IntegrityError(
                 "INSERT INTO family_claims (family_id) VALUES (%(family_id)s)",
-                {"family_id": fam.id},
-                _UniqueViolation(),
+                {"family_id": fam_id},
+                race_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_losing_race)
 
-        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam.id}]})
+        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam_id}]})
         assert resp.status_code == 409
         assert "was just sponsored" in resp.json()["detail"]
 
@@ -684,7 +703,24 @@ class TestCheckout:
 
         _create_donor(test_client)
         fam = _eligible_family(db, "FK Family")
+        fam_id = fam.id
         _configure_zeffy(monkeypatch)
+
+        # Genuine FK violation from the driver (unknown donor id), so the
+        # 500 path runs on a real psycopg error, not a stand-in.
+        try:
+            db.add(
+                FamilyClaim(
+                    donor_user_id=9_999_999,
+                    family_id=fam_id,
+                    commitment_type=CommitmentType.cash,
+                    payment_status=ClaimPaymentStatus.pending,
+                )
+            )
+            db.flush()
+        except IntegrityError as fk_err:
+            fk_orig = fk_err.orig
+        db.rollback()
 
         def _commit_fk_failure():
             # Flush so the claim lands in the savepoint, then fail the way
@@ -692,13 +728,13 @@ class TestCheckout:
             db.flush()
             raise IntegrityError(
                 "INSERT INTO family_claims (donor_user_id) VALUES (%(donor_user_id)s)",
-                {"donor_user_id": 1},
-                Exception('insert or update on table "family_claims" violates foreign key constraint ...'),
+                {"donor_user_id": 9_999_999},
+                fk_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_fk_failure)
 
-        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam.id}]})
+        resp = test_client.post("/api/donor/cart/checkout", json={"items": [{"family_id": fam_id}]})
         assert resp.status_code == 500
         assert resp.json()["detail"] == "An internal database error occurred"
 

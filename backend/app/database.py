@@ -117,10 +117,11 @@ def is_active_claim_race(exc: IntegrityError) -> bool:
     genuine surprise and should be re-raised to the 500 handler rather than
     mislabelled as "already sponsored".
 
-    Detection is duck-typed on the driver error: ``pgcode`` is the SQLSTATE
-    (23505 = unique_violation) and ``diag`` is psycopg's error diagnostics,
-    so a missing ``orig`` (programmatically raised) simply isn't a race.
+    Detection is duck-typed on the driver error: ``sqlstate`` is the SQLSTATE
+    the driver fills (23505 = unique_violation) and ``diag`` is psycopg's
+    error diagnostics, so a missing ``orig`` (programmatically raised)
+    simply isn't a race.
     """
     orig = exc.orig
     diag = getattr(orig, "diag", None)
-    return getattr(orig, "pgcode", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_family_claims_family_active"
+    return getattr(orig, "sqlstate", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_family_claims_family_active"

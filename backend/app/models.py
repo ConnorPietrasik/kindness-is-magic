@@ -909,10 +909,17 @@ class ZeffyPaymentRecord(Base):
     """
 
     __tablename__ = "zeffy_payments"
+    __table_args__ = (
+        # One mirror row per Zeffy payment id. The name matches the
+        # migration's index exactly, so create_all-built schemas (tests)
+        # report the same constraint_name as migrated ones — the mirror
+        # race detector matches on it.
+        Index("uq_zeffy_payments_payment_id", "payment_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     # Zeffy payment id (UUID string) — unique: one mirror row per payment.
-    payment_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    payment_id: Mapped[str] = mapped_column(String(64), nullable=False)
     # When Zeffy recorded the payment (its ``created`` unix timestamp).
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -1,3 +1,11 @@
+Add a bio column to the admin family list
+Add a "cash only" column to the admin manage wishes page
+Add a family approval status column to the admin manage wishes page
+Add a way to mark things as unpurchased (to clean up if they marked it wrong)
+Add "unassigned" as a filter option for wishes
+A separate "okay to shop" admin-only checkbox? Maybe they coud use purchaser note? Some way to indicate that something is fine to shop for despite still being listed (so that donors can still choose it / not see a list of only "cash-only" stuff)
+Maybe a faded arrow on columns to indicate that they're sortable? And then the arrows darken when in use.
+Allow users to have multiple roles; for example, a referrer that is also a purchaser (admin-set only)
 Add CC / BCC to email thing, save email bodies, and improve the email preview to show the whole "FROM:" thing.
 Add a way to view incoming emails; maybe either a "new unread in {mailbox}" alert for admins with a link to gmail?
 Bump Ruff?
@@ -7,3 +15,4 @@ EVENTUALLY - Referrer "change code" button in case of leak
 NEXT SEASON - Email verification
 NEXT SEASON - Squish Alembic migrations
 NEXT SEASON - Hash reset / session tokens
+NEXT SEASON - A separate pet wish category so they only get one

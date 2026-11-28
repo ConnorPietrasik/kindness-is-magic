@@ -125,7 +125,7 @@ def _is_mirror_payment_race(exc: IntegrityError) -> bool:
     """
     orig = exc.orig
     diag = getattr(orig, "diag", None)
-    return getattr(orig, "pgcode", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_zeffy_payments_payment_id"
+    return getattr(orig, "sqlstate", None) == "23505" and getattr(diag, "constraint_name", None) == "uq_zeffy_payments_payment_id"
 
 
 def _dedicated_campaign_filter() -> list:

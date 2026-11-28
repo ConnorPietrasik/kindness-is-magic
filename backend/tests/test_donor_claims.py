@@ -1,7 +1,6 @@
 """Tests for donor claims: self-registration, claim CRUD, fulfill."""
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
@@ -245,21 +244,40 @@ class TestClaimCreation:
         """Simulated double-claim race: a rival claim commits between our
         check and insert, so the partial unique index fires at commit time.
         The loser must get the 409, not the catch-all 500."""
-        from app.models import FamilyClaim
+        from app.models import CommitmentType, ClaimPaymentStatus, FamilyClaim, User
 
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
+        fam_id = fam.id
+        donor_id = db.query(User).filter(User.email == DONOR_EMAIL).first().id
 
-        class _UniqueViolation(Exception):
-            """Stand-in for psycopg's UniqueViolation: pgcode + diag.constraint_name
-            exactly as the driver fills them for a real index violation."""
-
-            pgcode = "23505"  # SQLSTATE unique_violation
-
-            def __init__(self):
-                super().__init__('duplicate key value violates unique constraint "uq_family_claims_family_active"')
-                self.diag = SimpleNamespace(constraint_name="uq_family_claims_family_active")
+        # Produce the driver's genuine unique violation on the same index
+        # (rival claim, then the conflicting one), so the re-raised
+        # exception carries psycopg's real attributes. A hand-written
+        # stand-in would just re-encode whatever assumption the production
+        # code has about the driver.
+        rival = FamilyClaim(
+            donor_user_id=donor_id,
+            family_id=fam_id,
+            commitment_type=CommitmentType.gifts,
+            payment_status=ClaimPaymentStatus.paid,
+        )
+        db.add(rival)
+        db.flush()
+        try:
+            db.add(
+                FamilyClaim(
+                    donor_user_id=donor_id,
+                    family_id=fam_id,
+                    commitment_type=CommitmentType.gifts,
+                    payment_status=ClaimPaymentStatus.paid,
+                )
+            )
+            db.flush()
+        except IntegrityError as race_err:
+            race_orig = race_err.orig
+        db.rollback()
 
         def _commit_losing_race():
             # Flush like a real commit so the INSERT lands in the savepoint,
@@ -267,31 +285,48 @@ class TestClaimCreation:
             db.flush()
             raise IntegrityError(
                 "INSERT INTO family_claims (family_id) VALUES (%(family_id)s)",
-                {"family_id": fam.id},
-                _UniqueViolation(),
+                {"family_id": fam_id},
+                race_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_losing_race)
 
         resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
+            f"/api/families/{fam_id}/claim",
             json={"commitment_type": "gifts"},
         )
         assert resp.status_code == 409
         assert resp.json()["detail"] == "This family is already sponsored"
 
         # The flushed INSERT is gone — the handler rolled the session back.
-        assert db.query(FamilyClaim).filter_by(family_id=fam.id).first() is None
+        assert db.query(FamilyClaim).filter_by(family_id=fam_id).first() is None
 
     def test_claim_commit_unrelated_integrity_error_500s(self, test_client: TestClient, db: Session, monkeypatch):
         """A commit failure that isn't the one-active-claim unique index (e.g.
         an FK violation) must not be mislabelled as a lost race — the global
         SQLAlchemy handler turns it into a generic 500."""
-        from app.models import FamilyClaim
+        from app.models import CommitmentType, ClaimPaymentStatus, FamilyClaim
 
         _create_donor(test_client)
         data = _create_claimed_family(db)
         fam = data["family"]
+        fam_id = fam.id
+
+        # Genuine FK violation from the driver (unknown donor id), so the
+        # 500 path runs on a real psycopg error, not a stand-in.
+        try:
+            db.add(
+                FamilyClaim(
+                    donor_user_id=9_999_999,
+                    family_id=fam_id,
+                    commitment_type=CommitmentType.gifts,
+                    payment_status=ClaimPaymentStatus.paid,
+                )
+            )
+            db.flush()
+        except IntegrityError as fk_err:
+            fk_orig = fk_err.orig
+        db.rollback()
 
         def _commit_fk_failure():
             # Flush so the INSERT lands in the savepoint, then fail the way
@@ -299,14 +334,14 @@ class TestClaimCreation:
             db.flush()
             raise IntegrityError(
                 "INSERT INTO family_claims (donor_user_id) VALUES (%(donor_user_id)s)",
-                {"donor_user_id": 1},
-                Exception('insert or update on table "family_claims" violates foreign key constraint ...'),
+                {"donor_user_id": 9_999_999},
+                fk_orig,
             )
 
         monkeypatch.setattr(db, "commit", _commit_fk_failure)
 
         resp = test_client.post(
-            f"/api/families/{fam.id}/claim",
+            f"/api/families/{fam_id}/claim",
             json={"commitment_type": "gifts"},
         )
         assert resp.status_code == 500
@@ -314,7 +349,7 @@ class TestClaimCreation:
 
         # The session was rolled back before re-raising: the flushed INSERT
         # is gone and the session is still usable.
-        assert db.query(FamilyClaim).filter_by(family_id=fam.id).first() is None
+        assert db.query(FamilyClaim).filter_by(family_id=fam_id).first() is None
 
     def test_claim_gift_cap_enforced(self, test_client: TestClient, db: Session):
         """Claim 6th family with gifts → 400 (cap at 5)."""
