@@ -922,18 +922,38 @@ function TileToggle({ roleKey }: TileToggleProps) {
         ⚙️
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
+        // max-w keeps the popover inside the viewport on narrow screens: it is
+        // right-anchored to the gear button, so on a phone the fixed w-56 would
+        // run past the left screen edge and clip the checkboxes.
+        <div className="absolute right-0 z-50 mt-1 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
           <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Tiles</p>
           <div className="max-h-72 space-y-1 overflow-y-auto">
             {defs.map((tile) => (
               <label key={tile.key} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={visibleTiles.includes(tile.key)}
-                  onChange={() => toggleTile(tile.key)}
-                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                  autoComplete="off"
-                />
+                {/*
+                  Drawn with appearance-none instead of the native control:
+                  the OS-themed bitmap rasterizes at the device-pixel phase the
+                  checkbox happens to land on, so at fractional display scaling
+                  its left edge snaps between a full and a shaved pixel as the
+                  window moves (flicker). A CSS-drawn box antialiases
+                  continuously and renders identically on every OS/browser.
+                */}
+                <span className="relative inline-flex h-4 w-4">
+                  <input
+                    type="checkbox"
+                    checked={visibleTiles.includes(tile.key)}
+                    onChange={() => toggleTile(tile.key)}
+                    className="peer h-4 w-4 appearance-none rounded border border-gray-300 bg-white transition-colors checked:border-btn-start checked:bg-btn-start focus:outline-none focus:ring-2 focus:ring-btn-start/50"
+                  />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 m-auto h-3.5 w-3.5 text-white opacity-0 transition-opacity peer-checked:opacity-100"
+                  >
+                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
                 {tile.label}
               </label>
             ))}
