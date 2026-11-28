@@ -338,6 +338,7 @@ export default function AdminFamilies() {
         />
       </div>
     ),
+    bio: "Bio",
     contact_name: (
       <div className="flex flex-col gap-1">
         <span>Contact</span>

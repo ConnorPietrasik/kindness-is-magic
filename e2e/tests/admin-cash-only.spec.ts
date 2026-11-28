@@ -102,9 +102,9 @@ test.describe.serial("Admin cash-only family lock", () => {
     await adminPage.getByRole("button", { name: "Yes, update" }).click();
     await expect(adminPage.getByText("Family updated")).toBeVisible({ timeout: 10_000 });
 
-    // The row now carries the Cash Only badge
+    // The row's cash-only cell shows a checkmark with a "Cash only" tooltip
     const updatedRow = adminPage.getByRole("row").filter({ hasText: FAMILY_NAME });
-    await expect(updatedRow.getByText("Cash only", { exact: true })).toBeVisible();
+    await expect(updatedRow.getByTitle("Cash only")).toBeVisible();
 
     /* ── Public (logged out): the wish-list marker ── */
     const publicContext = await browser.newContext();

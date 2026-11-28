@@ -298,6 +298,7 @@ const familyHeaders: Record<string, React.ReactNode> = {
   display_id: "ID",
   family_name: "Family Name",
   family_wish: "Family Wish",
+  bio: "Bio",
   contact_name: "Contact",
   referrer_id: "Referrer",
   delivery: "Delivery",

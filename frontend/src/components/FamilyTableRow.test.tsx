@@ -9,10 +9,12 @@ const ALL_COLUMNS = [
   "display_id",
   "family_name",
   "family_wish",
+  "bio",
   "contact_name",
   "referrer_id",
   "delivery",
   "claim",
+  "cash_only",
   "referrer_notes",
   "phone_number",
   "person_count",
@@ -42,6 +44,7 @@ function makeFamily(overrides: Partial<FamilyDetail> = {}): FamilyDetail {
     wish_lock_level: "family",
     wish_review_requested_at: null,
     wish_rejection_reason: null,
+    cash_only: false,
     referrer_notes: null,
     contact_email: null,
     claim_status: null,
@@ -223,6 +226,38 @@ describe("FamilyTableRow", () => {
 
   it("shows an em dash in the claim cell when unclaimed", () => {
     renderRow({ visibleColumns: ["claim"] });
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows the bio text (with a full-text title) when present", () => {
+    renderRow({
+      family: makeFamily({ bio: "Loving grandparents with a big backyard" }),
+      visibleColumns: ["bio"],
+    });
+
+    const bio = screen.getByText("Loving grandparents with a big backyard");
+    expect(bio).toBeInTheDocument();
+    expect(bio).toHaveAttribute("title", "Loving grandparents with a big backyard");
+  });
+
+  it("shows an em dash in the bio cell when there is no bio", () => {
+    renderRow({ visibleColumns: ["bio"] });
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows a checkmark in the cash-only cell when set", () => {
+    renderRow({ family: makeFamily({ cash_only: true }), visibleColumns: ["cash_only"] });
+
+    const check = screen.getByText("✅");
+    expect(check).toBeInTheDocument();
+    expect(check).toHaveAttribute("title", "Cash only");
+    expect(check).toHaveAttribute("aria-label", "Cash only");
+  });
+
+  it("shows an em dash in the cash-only cell when not set", () => {
+    renderRow({ visibleColumns: ["cash_only"] });
 
     expect(screen.getByText("—")).toBeInTheDocument();
   });

@@ -98,6 +98,7 @@ export function FamilyTableRow({
       </Td>
     ),
     family_wish: <Td className="max-w-xs truncate">{f.family_wish ?? ""}</Td>,
+    bio: <Td className="max-w-xs truncate text-xs text-gray-500">{f.bio ? <span title={f.bio}>{f.bio}</span> : "—"}</Td>,
     contact_name: <Td>{f.contact_name}</Td>,
     referrer_id: (
       <Td>
@@ -128,8 +129,8 @@ export function FamilyTableRow({
     cash_only: (
       <Td>
         {f.cash_only ? (
-          <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800">
-            Cash only
+          <span title="Cash only" role="img" aria-label="Cash only">
+            ✅
           </span>
         ) : (
           <span className="text-xs text-gray-400">—</span>
