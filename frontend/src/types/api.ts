@@ -90,6 +90,9 @@ export interface AdminWishesListParams extends AdminListParams {
   purchased?: string;
   search?: string;
   wish_type?: string;
+  /** Owner-family state filters (omitted = all). */
+  family_cash_only?: boolean;
+  family_wish_lock_level?: string;
   // Per-column text search
   description?: string;
   size?: string;

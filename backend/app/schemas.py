@@ -1302,6 +1302,8 @@ class WishListSummary(BaseModel):
     family_verification_status: FamilyVerificationStatus | None = None
     family_bio: str | None = None
     family_referrer_notes: str | None = None
+    family_cash_only: bool | None = None
+    family_wish_lock_level: WishLockLevel | None = None
     referrer_name: str | None = None
     referrer_phone_number: str | None = None
     referrer_pickup_window: datetime | None = None

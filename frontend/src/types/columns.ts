@@ -72,6 +72,9 @@ export const COLUMNS: Record<string, ColumnDef[]> = {
     { key: "family_verification_status", label: "Verification", visible: false },
     { key: "family_bio", label: "Bio", visible: false },
     { key: "family_referrer_notes", label: "Referrer Notes", visible: false },
+    { key: "family_cash_only", label: "Cash Only", visible: false },
+    // The family's wish_lock_level, shown under approval-friendly names
+    { key: "family_wish_lock_level", label: "Family Approval", visible: false },
     // Referrer fields
     { key: "referrer_name", label: "Referrer", visible: false },
     { key: "referrer_phone_number", label: "Referrer Phone", visible: false },

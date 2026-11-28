@@ -38,6 +38,8 @@ const mockWish1: WishListSummary = {
   family_referrer_notes: null,
   referrer_name: "Sam Referrer",
   referrer_phone_number: "555-0202",
+  family_cash_only: false,
+  family_wish_lock_level: "admin",
   assigned_to_id: null,
   assigned_to_name: null,
   purchased_at: null,
@@ -70,6 +72,8 @@ const mockWish2: WishListSummary = {
   family_referrer_notes: null,
   referrer_name: "Sam Referrer",
   referrer_phone_number: "555-0202",
+  family_cash_only: false,
+  family_wish_lock_level: "admin",
   assigned_to_id: 3,
   assigned_to_name: "Jane Admin",
   purchased_at: "2025-12-01T10:00:00Z",
@@ -100,6 +104,8 @@ const mockFamilyWish: WishListSummary = {
   referrer_pickup_window: null,
   family_bio: null,
   family_referrer_notes: null,
+  family_cash_only: null,
+  family_wish_lock_level: null,
   referrer_name: null,
   referrer_phone_number: null,
   assigned_to_id: null,
@@ -1040,6 +1046,99 @@ describe("AdminWishes", () => {
 
     // The ID header is not sortable
     expect(screen.queryByRole("button", { name: "Sort by ID" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Cash Only and Family Approval hidden by default, offers them in ColumnToggle", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue({
+      wishes: [{ ...mockWish1, family_cash_only: true }, mockFamilyWish],
+      total: 2,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+    });
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    // Hidden by default
+    expect(screen.queryByRole("button", { name: "Sort by Cash Only" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sort by Family Approval" })).not.toBeInTheDocument();
+
+    // …but available in the ColumnToggle popover
+    await user.click(screen.getByRole("button", { name: "Toggle columns" }));
+    await user.click(screen.getByLabelText("Cash Only"));
+    await user.click(screen.getByLabelText("Family Approval"));
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sort by Cash Only" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Sort by Family Approval" })).toBeInTheDocument();
+
+    // Johnsons row: cash-only families get a green checkmark (like the family
+    // list); fully approved — the badge label shows once in the row plus once
+    // in the approval filter's options
+    const cashOnlyRow = screen.getByText("Winter jacket").closest("tr");
+    expect(cashOnlyRow).toContainElement(screen.getByRole("img", { name: "Cash only" }));
+    expect(screen.getAllByText("Approved")).toHaveLength(2);
+
+    // Family wish row (no owner family data): both cells fall back to a dash
+    const familyWishRow = screen.getByText("A weekend at the beach").closest("tr");
+    expect(familyWishRow).not.toHaveTextContent("Approved");
+    expect(familyWishRow).not.toContainElement(screen.getByRole("img", { name: "Cash only" }));
+
+    // Both new headers sort via the standard asc → desc cycle
+    const lastListParams = () => {
+      const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+      return calls[calls.length - 1]?.[0] as AdminWishesListParams | undefined;
+    };
+    const cashOnlyHeader = () => screen.getByRole("button", { name: "Sort by Cash Only" });
+    await user.click(cashOnlyHeader());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("family_cash_only"));
+    await user.click(cashOnlyHeader());
+    await waitFor(() => expect(lastListParams()?.sort).toBe("-family_cash_only"));
+  });
+
+  it("sends family approval and cash-only filter params from the selects", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+
+    const lastListParams = () => {
+      const calls = (api.adminListWishes as ReturnType<typeof vi.spyOn>).mock.calls;
+      return calls[calls.length - 1]?.[0] as AdminWishesListParams | undefined;
+    };
+
+    // Defaults are not sent
+    expect(lastListParams()?.family_wish_lock_level).toBeUndefined();
+    expect(lastListParams()?.family_cash_only).toBeUndefined();
+
+    // The select options carry the admin-facing approval labels; the raw
+    // lock level goes on the wire
+    await user.selectOptions(screen.getByLabelText("Family approval filter"), "referrer");
+    await waitFor(() => expect(lastListParams()?.family_wish_lock_level).toBe("referrer"));
+
+    await user.selectOptions(screen.getByLabelText("Cash only filter"), "false");
+    await waitFor(() => expect(lastListParams()?.family_cash_only).toBe(false));
+
+    // Back to defaults drops both params
+    await user.selectOptions(screen.getByLabelText("Family approval filter"), "");
+    await user.selectOptions(screen.getByLabelText("Cash only filter"), "all");
+    await waitFor(() => {
+      expect(lastListParams()?.family_wish_lock_level).toBeUndefined();
+      expect(lastListParams()?.family_cash_only).toBeUndefined();
+    });
   });
 
   it("renders the family cell from the server-provided name (fallback to Family #id)", async () => {

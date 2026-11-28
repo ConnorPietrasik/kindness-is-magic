@@ -328,6 +328,10 @@ export interface WishListSummary {
   family_bio: string | null;
   /** Null when the owner family has no referrer notes (or the column is filtered out). */
   family_referrer_notes: string | null;
+  /** Null when the owner family doesn't exist (or the column is filtered out). */
+  family_cash_only: boolean | null;
+  /** Null when the owner family doesn't exist (or the column is filtered out). */
+  family_wish_lock_level: WishLockLevel | null;
   /** Null when the owner family has no referrer (or it is soft-deleted). */
   referrer_name: string | null;
   referrer_phone_number: string | null;

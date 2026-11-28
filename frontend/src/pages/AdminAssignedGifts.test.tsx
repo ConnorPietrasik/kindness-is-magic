@@ -36,6 +36,8 @@ const wishBase = {
   referrer_pickup_window: null,
   family_bio: null,
   family_referrer_notes: null,
+  family_cash_only: null,
+  family_wish_lock_level: null,
   referrer_name: null,
   referrer_phone_number: null,
   created_at: null,

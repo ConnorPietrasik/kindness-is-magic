@@ -14,6 +14,7 @@ from app.models import (
     User,
     UserRole,
     Wish,
+    WishLockLevel,
     WishType,
 )
 from tests.conftest import make_family
@@ -556,6 +557,8 @@ class TestListWishesNewFields:
             "family_verification_status",
             "family_bio",
             "family_referrer_notes",
+            "family_cash_only",
+            "family_wish_lock_level",
             "referrer_name",
             "referrer_phone_number",
             "referrer_pickup_window",
@@ -581,6 +584,76 @@ class TestListWishesNewFields:
         assert resp.status_code == 200
         by_desc = {w["description"]: w for w in resp.json()["wishes"]}
         assert by_desc["A backpack"]["created_at"] == created.isoformat().replace("+00:00", "Z")
+
+
+class TestOwnerFamilyStateFields:
+    def test_fields_mirrors_owner_family(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Both owner paths (person wishes and the family wish) carry the family's raw state."""
+        wish_tree["family"].cash_only = True
+        wish_tree["family"].wish_lock_level = WishLockLevel.admin
+        second_family_with_wishes["family"].wish_lock_level = WishLockLevel.referrer
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes")
+        assert resp.status_code == 200
+        by_family: dict[str, list[dict]] = {}
+        for item in resp.json()["wishes"]:
+            by_family.setdefault(item["family_name"], []).append(item)
+        assert len(by_family["Wish Family"]) == 3
+        assert len(by_family["Second Family"]) == 3
+        for item in by_family["Wish Family"]:
+            assert item["family_cash_only"] is True
+            assert item["family_wish_lock_level"] == "admin"
+        for item in by_family["Second Family"]:
+            assert item["family_cash_only"] is False
+            assert item["family_wish_lock_level"] == "referrer"
+
+    def test_columns_selection_sends_requested_state_fields(self, logged_in_admin, wish_tree):
+        """columns=... whitelists the new fields like the other family fields."""
+        resp = logged_in_admin.get("/api/admin/wishes?columns=family_cash_only,family_wish_lock_level")
+        assert resp.status_code == 200
+        for item in resp.json()["wishes"]:
+            assert set(item) == {"id", "type", "description", "family_id", "family_cash_only", "family_wish_lock_level"}
+
+    def test_filter_by_cash_only(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """cash-only filter matches across both owner paths (3 wishes per family)."""
+        wish_tree["family"].cash_only = True
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_cash_only=true")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+        assert {w["family_name"] for w in resp.json()["wishes"]} == {"Wish Family"}
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_cash_only=false")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+        assert {w["family_name"] for w in resp.json()["wishes"]} == {"Second Family"}
+
+    def test_filter_by_wish_lock_level(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Each lock level keeps only that family's wishes."""
+        wish_tree["family"].wish_lock_level = WishLockLevel.admin
+        second_family_with_wishes["family"].wish_lock_level = WishLockLevel.referrer
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_wish_lock_level=admin")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+        assert {w["family_name"] for w in resp.json()["wishes"]} == {"Wish Family"}
+
+        resp = logged_in_admin.get("/api/admin/wishes?family_wish_lock_level=referrer")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+        assert {w["family_name"] for w in resp.json()["wishes"]} == {"Second Family"}
+
+        # No family remains at the family level
+        resp = logged_in_admin.get("/api/admin/wishes?family_wish_lock_level=family")
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+    def test_filter_by_wish_lock_level_invalid_422(self, logged_in_admin, wish_tree):
+        resp = logged_in_admin.get("/api/admin/wishes?family_wish_lock_level=bogus")
+        assert resp.status_code == 422
 
 
 class TestOwnerResolution:
@@ -925,6 +998,37 @@ class TestWishSorting:
         assert resp.status_code == 200
         names = [w["family_name"] for w in resp.json()["wishes"]]
         assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+    def test_sort_family_cash_only(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """cash_only asc: non-cash-only families first; desc flips the order."""
+        wish_tree["family"].cash_only = True
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=family_cash_only")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-family_cash_only")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Wish Family"] * 3 + ["Second Family"] * 3
+
+    def test_sort_family_wish_lock_level(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
+        """Lock levels sort by approval progression (family < referrer < admin)."""
+        wish_tree["family"].wish_lock_level = WishLockLevel.admin
+        second_family_with_wishes["family"].wish_lock_level = WishLockLevel.referrer
+        db.commit()
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=family_wish_lock_level")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Second Family"] * 3 + ["Wish Family"] * 3
+
+        resp = logged_in_admin.get("/api/admin/wishes?sort=-family_wish_lock_level")
+        assert resp.status_code == 200
+        names = [w["family_name"] for w in resp.json()["wishes"]]
+        assert names == ["Wish Family"] * 3 + ["Second Family"] * 3
 
     def test_sort_family_referrer_notes_nulls_last(self, logged_in_admin, wish_tree, second_family_with_wishes, db):
         """Wishes whose owner family has no referrer notes (NULL) sort last in both directions."""

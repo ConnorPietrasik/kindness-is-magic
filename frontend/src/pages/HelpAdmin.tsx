@@ -225,6 +225,11 @@ export default function HelpAdmin() {
                 Size and Color columns carry the details a shopper needs. The Purchased column fills in as purchasers buy gifts, and
                 Assigned to shows which purchaser owns the wish.
               </p>
+              <p>
+                Two columns are hidden by default: <strong>Cash Only</strong> (shopping has started, so the family accepts cash sponsorships
+                only) and <strong>Family Approval</strong> (where the family is in the approval flow: unapproved, awaiting approval, or
+                approved). Toggle them on from the column menu, and use the matching filters above the table to narrow the list.
+              </p>
               <h3>Batch assign</h3>
               <p>
                 Check the boxes next to several wishes, then click <strong>Batch assign</strong> to give them all to one purchaser in a

@@ -28,6 +28,7 @@ import { OptionalLabel } from "../components/OptionalLabel";
 import { Pagination } from "../components/Pagination";
 import { PageSpinner, Spinner } from "../components/Spinner";
 import { Table, TableBody, TableHead, Td, Th, Tr } from "../components/Table";
+import { WishLockBadge } from "../components/WishLockBadge";
 import { WishTypeBadge } from "../components/WishTypeBadge";
 import { useToast } from "../context/ToastContext";
 import { useColumnOrder } from "../hooks/useColumnOrder";
@@ -50,6 +51,7 @@ import {
   type WishBatchAssign,
   type WishDetail,
   type WishListResponse,
+  type WishLockLevel,
   type WishPurchaseMark,
   type WishType,
 } from "../types";
@@ -63,6 +65,8 @@ interface AdminWishesView {
   assignedTo: number | null;
   purchased: string;
   wishType: string;
+  cashOnly: string;
+  approvalStatus: string;
   sortField: string;
   search: string;
   columnSearch: Record<string, string>;
@@ -72,13 +76,28 @@ const DEFAULT_VIEW: AdminWishesView = {
   assignedTo: null,
   purchased: "all",
   wishType: "",
+  cashOnly: "all",
+  approvalStatus: "",
   sortField: "",
   search: "",
   columnSearch: {},
 };
 
 const PURCHASED_VALUES = ["all", "true", "false"] as const;
+const CASH_ONLY_VALUES = ["all", "true", "false"] as const;
+const APPROVAL_VALUES = ["", "family", "referrer", "admin"] as const;
 const WISH_TYPES = ["", "adult", "practical", "fun", "family"] as const;
+
+/**
+ * Admin-facing label for the family's wish lock level — the Family Approval
+ * column and filter show approval terminology instead of the raw lock level,
+ * so admins don't need to know the lock model.
+ */
+const APPROVAL_LABELS: Record<WishLockLevel, string> = {
+  family: "Unapproved",
+  referrer: "Awaiting approval",
+  admin: "Approved",
+};
 // Mirrors the backend's wish sort whitelist — an unknown field would only
 // silently fall back to the default sort, so stale values are dropped.
 const WISH_SORT_FIELDS = [
@@ -103,6 +122,8 @@ const WISH_SORT_FIELDS = [
   "family_verification_status",
   "family_bio",
   "family_referrer_notes",
+  "family_cash_only",
+  "family_wish_lock_level",
   "referrer_name",
   "referrer_phone_number",
   "referrer_pickup_window",
@@ -142,6 +163,8 @@ function sanitizeView(raw: unknown): Partial<AdminWishesView> {
     assignedTo: typeof r.assignedTo === "number" && Number.isInteger(r.assignedTo) && r.assignedTo >= 1 ? r.assignedTo : null,
     purchased: (PURCHASED_VALUES as readonly string[]).includes(r.purchased as string) ? (r.purchased as string) : undefined,
     wishType: (WISH_TYPES as readonly string[]).includes(r.wishType as string) ? (r.wishType as string) : undefined,
+    cashOnly: (CASH_ONLY_VALUES as readonly string[]).includes(r.cashOnly as string) ? (r.cashOnly as string) : undefined,
+    approvalStatus: (APPROVAL_VALUES as readonly string[]).includes(r.approvalStatus as string) ? (r.approvalStatus as string) : undefined,
     sortField,
     search: typeof r.search === "string" ? r.search : undefined,
     columnSearch: Object.keys(columnSearch).length > 0 ? columnSearch : undefined,
@@ -193,6 +216,8 @@ export default function AdminWishes() {
     view.assignedTo !== null ||
     view.purchased !== "all" ||
     view.wishType !== "" ||
+    view.cashOnly !== "all" ||
+    view.approvalStatus !== "" ||
     view.sortField !== "" ||
     view.search !== "" ||
     Object.values(view.columnSearch).some((v) => v !== "") ||
@@ -251,11 +276,24 @@ export default function AdminWishes() {
       person_id: undefined,
       assigned_to_id: view.assignedTo ?? undefined,
       purchased: view.purchased !== "all" ? view.purchased : undefined,
+      family_cash_only: view.cashOnly === "true" ? true : view.cashOnly === "false" ? false : undefined,
+      family_wish_lock_level: view.approvalStatus || undefined,
       search: debouncedSearch || undefined,
       wish_type: view.wishType || undefined,
       sort: view.sortField || undefined,
     }),
-    [pagination.params, columnSearchParams, apiColumns, view.assignedTo, view.purchased, debouncedSearch, view.wishType, view.sortField]
+    [
+      pagination.params,
+      columnSearchParams,
+      apiColumns,
+      view.assignedTo,
+      view.purchased,
+      view.cashOnly,
+      view.approvalStatus,
+      debouncedSearch,
+      view.wishType,
+      view.sortField,
+    ]
   );
 
   // CRUD manager — no create/delete (wishes managed via person CRUD)
@@ -456,6 +494,37 @@ export default function AdminWishes() {
             <option value="family">Family</option>
           </select>
 
+          <select
+            aria-label="Family approval filter"
+            value={view.approvalStatus}
+            onChange={(e) => {
+              setView((v) => ({ ...v, approvalStatus: e.target.value }));
+              resetPage();
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          >
+            <option value="">All approval statuses</option>
+            {(Object.keys(APPROVAL_LABELS) as WishLockLevel[]).map((level) => (
+              <option key={level} value={level}>
+                {APPROVAL_LABELS[level]}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Cash only filter"
+            value={view.cashOnly}
+            onChange={(e) => {
+              setView((v) => ({ ...v, cashOnly: e.target.value }));
+              resetPage();
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-btn-start focus:ring-2 focus:ring-btn-start/20"
+          >
+            <option value="all">All families</option>
+            <option value="true">Cash only</option>
+            <option value="false">Not cash only</option>
+          </select>
+
           <input
             type="text"
             placeholder="Search everything…"
@@ -540,6 +609,20 @@ export default function AdminWishes() {
                   ),
                   family_bio: <Td className="max-w-xs truncate">{w.family_bio ?? "—"}</Td>,
                   family_referrer_notes: <Td className="max-w-xs text-xs truncate">{w.family_referrer_notes || "—"}</Td>,
+                  family_cash_only: (
+                    <Td>
+                      {w.family_cash_only ? (
+                        <span title="Cash only" role="img" aria-label="Cash only">
+                          ✅
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </Td>
+                  ),
+                  family_wish_lock_level: (
+                    <Td>{w.family_wish_lock_level ? <WishLockBadge level={w.family_wish_lock_level} labels={APPROVAL_LABELS} /> : "—"}</Td>
+                  ),
                   referrer_name: <Td>{w.referrer_name ?? "—"}</Td>,
                   referrer_phone_number: <Td className="whitespace-nowrap">{w.referrer_phone_number ?? "—"}</Td>,
                   referrer_pickup_window: (

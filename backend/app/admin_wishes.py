@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.column_filter import ColumnRequest, column_filtered_page
 from app.database import get_db
 from app.display_ids import compute_display_ids, wish_display_id
-from app.models import Family, Person, Referrer, User, UserRole, Wish, WishType
+from app.models import Family, Person, Referrer, User, UserRole, Wish, WishLockLevel, WishType
 from app.permissions import require_admin
 from app.response_builders import (
     apply_purchase_fields,
@@ -92,6 +92,8 @@ def list_wishes(
     purchased: str | None = Query(None),
     search: str | None = Query(None),
     wish_type: WishType | None = Query(None),
+    family_cash_only: bool | None = Query(None),
+    family_wish_lock_level: WishLockLevel | None = Query(None),
     columns: str | None = Query(None),
     sort: str | None = Query(None),
     # Per-column text search: one optional param per text-searchable field
@@ -235,6 +237,12 @@ def list_wishes(
             query = query.filter(WISH_DATE_RANGE_FIELDS[field] < _utc_day_start(to_day + timedelta(days=1)))
     if wish_type is not None:
         query = query.filter(Wish.type == wish_type)
+    # Owner-family state filters: match across both family paths (the
+    # person's family or the wish's direct family), like family_id.
+    if family_cash_only is not None:
+        query = query.filter(or_(Family.cash_only == family_cash_only, DIRECT_FAMILY.cash_only == family_cash_only))
+    if family_wish_lock_level is not None:
+        query = query.filter(or_(Family.wish_lock_level == family_wish_lock_level, DIRECT_FAMILY.wish_lock_level == family_wish_lock_level))
 
     total = query.count()
 

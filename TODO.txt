@@ -1,6 +1,3 @@
-Add a bio column to the admin family list
-Add a "cash only" column to the admin manage wishes page
-Add a family approval status column to the admin manage wishes page
 Add a way to mark things as unpurchased (to clean up if they marked it wrong)
 Add "unassigned" as a filter option for wishes
 A separate "okay to shop" admin-only checkbox? Maybe they coud use purchaser note? Some way to indicate that something is fine to shop for despite still being listed (so that donors can still choose it / not see a list of only "cash-only" stuff)
