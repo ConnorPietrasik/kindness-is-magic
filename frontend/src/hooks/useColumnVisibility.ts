@@ -74,6 +74,10 @@ export function useColumnVisibility(resourceKey: string) {
     if (resourceKey === "adminPeople") resolved.add("wishes");
     // "family_count" always sent for referrers — needed for "X / Y" display in family_limit column
     if (resourceKey === "adminReferrers") resolved.add("family_count");
+    // "purchased_at" always sent for the wish list — the row's Mark/Unmark
+    // purchased button depends on it, so hiding the column must not change
+    // which button a purchased row offers
+    if (resourceKey === "adminWishes") resolved.add("purchased_at");
     return Array.from(resolved);
   }, [resourceKey, visibleColumns]);
 

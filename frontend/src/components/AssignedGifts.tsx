@@ -5,12 +5,13 @@
  * endpoint's `assigned_to_id` filter) and PurchaserAssignedGifts (scoped to
  * the current purchaser by the purchaser endpoint itself). Owns the list
  * query (via useCrudManager, update-only), checkbox selection, the
- * mark-purchased and batch-mark-purchased mutations + dialogs, and the
- * inline edit form for the purchase-tracking fields (purchaser note,
- * received at). The page supplies the chrome (HeaderBar, <main> — including
- * the useTableWidth width class, which syncs with the view's ColumnToggle
- * via window events), config (API functions, query keys, heading/copy, the
- * column resource key, the family column), and the family cell renderer.
+ * mark-purchased / unmark-purchased and batch-mark-purchased mutations +
+ * dialogs, and the inline edit form for the purchase-tracking fields
+ * (purchaser note, received at). The page supplies the chrome (HeaderBar,
+ * <main> — including the useTableWidth width class, which syncs with the
+ * view's ColumnToggle via window events), config (API functions, query keys,
+ * heading/copy, the column resource key, the family column), and the family
+ * cell renderer.
  *
  * Spreadsheet columns mirror the admin Manage Wishes pattern: per-column
  * filter inputs in the headers, click-to-sort (asc → desc → clear),
@@ -36,6 +37,7 @@ import { Card } from "./Card";
 import { ClearViewButton } from "./ClearViewButton";
 import { ColumnHeader } from "./ColumnHeader";
 import { ColumnToggle } from "./ColumnToggle";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { DatePicker } from "./DatePicker";
 import { DraggableTh } from "./DraggableTh";
 import { MarkPurchasedDialog, type MarkPurchasedDialogWish } from "./MarkPurchasedDialog";
@@ -135,6 +137,8 @@ export interface AssignedGiftsViewProps<
   updateFn: (id: number, data: Partial<AssignedGiftsEditFormState>) => Promise<WishDetail>;
   /** Mark a single wish as purchased. */
   markPurchasedFn: (id: number, data: WishPurchaseMark) => Promise<WishDetail>;
+  /** Undo mark-purchased on a single wish (confirmation-gated in the view). */
+  unmarkPurchasedFn: (id: number) => Promise<WishDetail>;
   /** Batch-mark selected wishes as purchased. */
   batchMarkPurchasedFn: (payload: WishBatchMarkPurchased) => Promise<{ marked_count: number }>;
   /**
@@ -285,6 +289,7 @@ export function AssignedGiftsView<
   detailFn,
   updateFn,
   markPurchasedFn,
+  unmarkPurchasedFn,
   batchMarkPurchasedFn,
   renderFamilyCell,
 }: AssignedGiftsViewProps<ListResponse>) {
@@ -295,6 +300,7 @@ export function AssignedGiftsView<
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchMarkOpen, setBatchMarkOpen] = useState(false);
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
+  const [unmarkId, setUnmarkId] = useState<number | null>(null);
 
   const pagination = usePagination({ storageKey: columnResourceKey, defaultPageSize: DEFAULT_PAGE_SIZE });
   const queryClient = useQueryClient();
@@ -417,6 +423,19 @@ export function AssignedGiftsView<
       }
       setMarkPurchasedId(null);
       toast.success("Wish marked as purchased");
+    },
+  });
+
+  // Unmark-purchased mutation (undo — opens only after confirmation)
+  const unmarkMut = useMutation({
+    mutationFn: (id: number) => unmarkPurchasedFn(id),
+    onSuccess: () => {
+      invalidationKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: Array.isArray(key) ? key : [key] }));
+      if (unmarkId != null) {
+        queryClient.invalidateQueries({ queryKey: detailKey(unmarkId) });
+      }
+      setUnmarkId(null);
+      toast.success("Wish unmarked as purchased");
     },
   });
 
@@ -646,15 +665,27 @@ export function AssignedGiftsView<
                         >
                           {editingId === w.id ? "Done" : "Edit"}
                         </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => setMarkPurchasedId(w.id)}
-                          disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                        >
-                          Mark purchased
-                        </Button>
+                        {w.purchased_at != null ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => setUnmarkId(w.id)}
+                            disabled={unmarkMut.isPending}
+                          >
+                            Unmark purchased
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="px-3 py-1.5 text-xs"
+                            onClick={() => setMarkPurchasedId(w.id)}
+                            disabled={markPurchasedMut.isPending}
+                          >
+                            Mark purchased
+                          </Button>
+                        )}
                       </div>
                     </Td>
                   </Tr>
@@ -718,8 +749,22 @@ export function AssignedGiftsView<
         loading={batchMarkMut.isPending}
       />
 
+      {/* Unmark-purchased confirmation — destructive (clears purchase details) */}
+      <ConfirmDialog
+        open={unmarkId !== null}
+        title="Unmark this wish as purchased?"
+        description="The purchased date, location and received date will be cleared. The purchaser note is kept."
+        confirmLabel="Yes, unmark"
+        loadingLabel="Unmarking…"
+        loading={unmarkMut.isPending}
+        onConfirm={() => {
+          if (unmarkId != null) unmarkMut.mutate(unmarkId);
+        }}
+        onCancel={() => setUnmarkId(null)}
+      />
+
       {/* Errors */}
-      <MutationErrors mutations={[updateMut, markPurchasedMut, batchMarkMut]} />
+      <MutationErrors mutations={[updateMut, markPurchasedMut, unmarkMut, batchMarkMut]} />
     </>
   );
 }

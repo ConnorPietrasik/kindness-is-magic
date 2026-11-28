@@ -702,6 +702,11 @@ export function adminMarkPurchased(wishId: number, payload: WishPurchaseMark): P
   return apiPost(`/api/admin/wishes/${wishId}/mark-purchased`, payload);
 }
 
+/** Undo mark-purchased on any wish (clears purchase fields; keeps the note). */
+export function adminUnmarkPurchased(wishId: number): Promise<WishDetail> {
+  return apiPost(`/api/admin/wishes/${wishId}/unmark-purchased`);
+}
+
 export function adminBatchAssignWishes(payload: WishBatchAssign): Promise<{ assigned_count: number }> {
   return apiPost("/api/admin/wishes/batch-assign", payload);
 }
@@ -1108,6 +1113,11 @@ export function purchaserGetWish(wishId: number): Promise<WishDetail> {
 /** Mark a wish as purchased (purchased_at defaults to now; "" clears). */
 export function purchaserMarkPurchased(wishId: number, payload: WishPurchaseMark): Promise<WishDetail> {
   return apiPost(`/api/purchaser/wishes/${wishId}/mark-purchased`, payload);
+}
+
+/** Undo mark-purchased on an assigned wish (clears purchase fields; keeps the note). */
+export function purchaserUnmarkPurchased(wishId: number): Promise<WishDetail> {
+  return apiPost(`/api/purchaser/wishes/${wishId}/unmark-purchased`);
 }
 
 /** Batch-mark assigned wishes as purchased (purchased_at defaults to now; "" clears; no note). */

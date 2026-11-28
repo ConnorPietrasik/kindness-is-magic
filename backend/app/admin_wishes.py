@@ -536,3 +536,39 @@ def mark_purchased(
 
     logger.info("Admin marked wish (id=%d) as purchased", wish_id)
     return WishDetail(**build_wish_detail(wish, person, db))
+
+
+@admin_wishes_router.post("/{wish_id}/unmark-purchased")
+def unmark_purchased(
+    wish_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> WishDetail:
+    """Undo mark-purchased on any active wish (e.g. the wrong gift was clicked).
+
+    Clears ``purchased_at``, ``purchased_where`` and ``received_at``.
+    ``purchaser_note`` is preserved (it may explain why the wish was
+    marked), and ``assigned_to_id`` is not changed.  400 if the wish is
+    not marked purchased.
+    """
+    wish = get_active_or_404(db, Wish, wish_id, "Wish not found")
+
+    if wish.purchased_at is None:
+        raise HTTPException(status_code=400, detail="Wish is not marked as purchased")
+
+    person = get_or_404(db, Person, wish.person_id, "Person not found") if wish.person_id is not None else None
+
+    # purchaser_note=None is a no-op — the note survives the undo
+    apply_purchase_fields(
+        wish,
+        purchased_at=_CLEAR,
+        purchased_where=None,
+        purchaser_note=None,
+        received_at=_CLEAR,
+    )
+
+    db.commit()
+    db.refresh(wish)
+
+    logger.info("Admin unmarked wish (id=%d) as purchased", wish_id)
+    return WishDetail(**build_wish_detail(wish, person, db))

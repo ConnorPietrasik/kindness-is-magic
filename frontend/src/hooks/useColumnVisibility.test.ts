@@ -79,6 +79,23 @@ describe("useColumnVisibility", () => {
     expect(familiesResult.current.apiColumns).not.toContain("wishes");
   });
 
+  it("always includes purchased_at in apiColumns for adminWishes only", () => {
+    const { result: wishesResult } = renderHook(() => useColumnVisibility("adminWishes"));
+    expect(wishesResult.current.apiColumns).toContain("purchased_at");
+
+    const { result: familiesResult } = renderHook(() => useColumnVisibility("adminFamilies"));
+    expect(familiesResult.current.apiColumns).not.toContain("purchased_at");
+  });
+
+  it("keeps purchased_at in adminWishes apiColumns when the column is hidden", () => {
+    // Hidden by a saved view that dropped every purchase-tracking column
+    localStorage.setItem("kim:columns:adminWishes", JSON.stringify(["display_id", "description"]));
+
+    const { result } = renderHook(() => useColumnVisibility("adminWishes"));
+    expect(result.current.visibleColumns).not.toContain("purchased_at");
+    expect(result.current.apiColumns).toContain("purchased_at");
+  });
+
   it("resetToDefaults restores the default set", () => {
     localStorage.setItem("kim:columns:adminReferrers", JSON.stringify(["phone_number", "created_at"]));
 

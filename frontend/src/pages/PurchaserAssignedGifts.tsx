@@ -19,6 +19,7 @@ import {
   purchaserGetWish,
   purchaserListWishes,
   purchaserMarkPurchased,
+  purchaserUnmarkPurchased,
   purchaserUpdateWish,
 } from "../lib/api";
 import { purchaserWishCards, purchaserWishDetail, purchaserWishes } from "../lib/queryKeys";
@@ -60,6 +61,7 @@ export default function PurchaserAssignedGifts() {
           detailFn={purchaserGetWish}
           updateFn={purchaserUpdateWish}
           markPurchasedFn={purchaserMarkPurchased}
+          unmarkPurchasedFn={purchaserUnmarkPurchased}
           batchMarkPurchasedFn={purchaserBatchMarkPurchased}
           renderFamilyCell={(w) =>
             w.wish_lock_level === "admin" ? (

@@ -357,6 +357,7 @@ export interface WishPurchaseMark {
 /** Payload for batch-assigning wishes to a user. */
 export interface WishBatchAssign {
   wish_ids: number[];
+  /** The user to assign to, or `0` to unassign (the backend's clear-FK sentinel). */
   assigned_to_id: number;
 }
 

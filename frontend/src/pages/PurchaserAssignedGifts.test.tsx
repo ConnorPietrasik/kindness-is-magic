@@ -193,6 +193,45 @@ describe("PurchaserAssignedGifts", () => {
     });
   });
 
+  it("unmarks a purchased wish through the confirmation dialog", async () => {
+    const user = userEvent.setup();
+    const purchasedWish: PurchaserWishSummary = {
+      ...adminLockedWish,
+      id: 4,
+      display_id: "2-1-2B",
+      description: "Gloves",
+      purchased_at: "2025-12-01T10:00:00Z",
+      purchased_where: "Target",
+    };
+    vi.spyOn(api, "purchaserListWishes").mockResolvedValue(listResponse([purchasedWish]));
+    const unmarkSpy = vi.spyOn(api, "purchaserUnmarkPurchased").mockResolvedValue(mockWishDetail);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Gloves")).toBeInTheDocument();
+    });
+
+    // A purchased row shows the undo button instead of "Mark purchased"
+    expect(screen.queryByRole("button", { name: "Mark purchased" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Unmark purchased" }));
+
+    // Confirmation dialog opens; cancelling does not call the API
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Unmark this wish as purchased?")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(unmarkSpy).not.toHaveBeenCalled();
+
+    // Reopening and confirming calls the API
+    await user.click(screen.getByRole("button", { name: "Unmark purchased" }));
+    const reopened = await screen.findByRole("alertdialog");
+    await user.click(within(reopened).getByRole("button", { name: "Yes, unmark" }));
+
+    await waitFor(() => {
+      expect(unmarkSpy).toHaveBeenCalledWith(4);
+    });
+  });
+
   it("refetches with the wish type filter when changed", async () => {
     const user = userEvent.setup();
     const listSpy = vi.spyOn(api, "purchaserListWishes").mockResolvedValue({

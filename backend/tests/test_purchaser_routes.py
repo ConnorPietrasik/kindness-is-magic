@@ -903,6 +903,73 @@ class TestPurchaserMarkPurchased:
 
 
 # ---------------------------------------------------------------------------
+# Unmark-purchased endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestPurchaserUnmarkPurchased:
+    def test_unmark_clears_purchase_fields(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """Unmark clears purchased_at, purchased_where and received_at."""
+        wish = purchaser_wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        wish.purchased_where = "Target"
+        wish.received_at = datetime(2026, 2, 15, 10, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.post(f"/api/purchaser/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is None
+        assert data["purchased_where"] is None
+        assert data["received_at"] is None
+
+    def test_unmark_preserves_note_and_assignment(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """The note survives the undo and assigned_to_id is unchanged."""
+        wish = purchaser_wish_tree["wishes"][0]
+        original_assigned_to = wish.assigned_to_id
+        wish.purchased_at = datetime.now(timezone.utc)
+        wish.purchaser_note = "Bought the wrong item"
+        db.commit()
+
+        resp = logged_in_purchaser.post(f"/api/purchaser/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchaser_note"] == "Bought the wrong item"
+        assert data["assigned_to_id"] == original_assigned_to
+
+    def test_unmark_family_wish(self, logged_in_purchaser, purchaser_wish_tree, db):
+        """An assigned family wish can be unmarked (no person fields)."""
+        w = assign_family_wish(db, purchaser_wish_tree)
+        w.purchased_at = datetime.now(timezone.utc)
+        w.purchased_where = "Target"
+        db.commit()
+
+        resp = logged_in_purchaser.post(f"/api/purchaser/wishes/{w.id}/unmark-purchased")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is None
+        assert data["purchased_where"] is None
+        assert data["person_id"] is None
+
+    def test_unmark_not_purchased_400(self, logged_in_purchaser, purchaser_wish_tree):
+        """Unmarking a wish that is not marked purchased is a 400."""
+        wish = purchaser_wish_tree["wishes"][0]
+
+        resp = logged_in_purchaser.post(f"/api/purchaser/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 400
+
+    def test_unmark_unassigned_wish(self, logged_in_purchaser, purchaser_wish_tree, second_purchaser, db):
+        """Unmarking a wish assigned to another purchaser returns 403."""
+        wish = purchaser_wish_tree["wishes"][1]
+        wish.assigned_to_id = second_purchaser.id
+        wish.purchased_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = logged_in_purchaser.post(f"/api/purchaser/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # Batch mark-purchased endpoint tests
 # ---------------------------------------------------------------------------
 

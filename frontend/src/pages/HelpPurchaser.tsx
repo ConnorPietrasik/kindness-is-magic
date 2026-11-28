@@ -59,6 +59,10 @@ export default function HelpPurchaser() {
                 Click <strong>Mark purchased</strong> on a row. A small form asks for the date (pre-filled with today), where you bought it,
                 an optional note, and an optional received date. Save, and the row shows a green check with your date.
               </p>
+              <p>
+                Clicked the wrong gift? The button turns into <strong>Unmark purchased</strong> once a row is marked — click it and confirm,
+                and the purchase date, location and received date are cleared. Your note is kept.
+              </p>
               <h3>Bulk actions and edits</h3>
               <p>
                 Bought a whole family's list in one trip? Check several rows and click the <strong>Mark purchased</strong> button at the top

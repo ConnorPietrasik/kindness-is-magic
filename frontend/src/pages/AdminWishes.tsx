@@ -2,10 +2,11 @@
  * Admin — Manage Wishes
  *
  * Flat paginated list of all wishes with filters, inline edit, mark-purchased
- * dialog, and batch-assign with checkbox selection.
+ * dialog (with confirmation-gated unmark), and batch-assign with checkbox
+ * selection.
  *
  * Wishes are created/deleted via person CRUD — this page only handles
- * list, detail, update, mark-purchased, and batch-assign.
+ * list, detail, update, mark/unmark-purchased, and batch-assign.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import { Card } from "../components/Card";
 import { ClearViewButton } from "../components/ClearViewButton";
 import { ColumnHeader } from "../components/ColumnHeader";
 import { ColumnToggle } from "../components/ColumnToggle";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DatePicker } from "../components/DatePicker";
 import { DraggableTh } from "../components/DraggableTh";
 import { FormField } from "../components/FormField";
@@ -39,7 +41,14 @@ import { useUsersDropdown } from "../hooks/useDropdowns";
 import { getPaginationInfo, usePageClamp, usePagination } from "../hooks/usePagination";
 import { listViewKey, usePersistentState } from "../hooks/usePersistentState";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminBatchAssignWishes, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
+import {
+  adminBatchAssignWishes,
+  adminGetWish,
+  adminListWishes,
+  adminMarkPurchased,
+  adminUnmarkPurchased,
+  adminUpdateWish,
+} from "../lib/api";
 import { adminPackingSlips, adminWishCards, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 import { formatDateTime, normalizeUpdatePayload } from "../lib/utils";
@@ -179,6 +188,7 @@ export default function AdminWishes() {
   // Ephemeral selection / dialog state (not part of the saved view)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [markPurchasedId, setMarkPurchasedId] = useState<number | null>(null);
+  const [unmarkId, setUnmarkId] = useState<number | null>(null);
   const [batchAssignOpen, setBatchAssignOpen] = useState(false);
   const [assignUserId, setAssignUserId] = useState<number | null>(null);
 
@@ -350,17 +360,33 @@ export default function AdminWishes() {
     },
   });
 
+  // Unmark-purchased mutation (undo — fires only after confirmation)
+  const unmarkMut = useMutation({
+    mutationFn: (id: number) => adminUnmarkPurchased(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminWishes });
+      queryClient.invalidateQueries({ queryKey: adminPackingSlips });
+      queryClient.invalidateQueries({ queryKey: adminWishCards });
+      if (unmarkId != null) {
+        queryClient.invalidateQueries({ queryKey: adminWishDetail(unmarkId) });
+      }
+      setUnmarkId(null);
+      toast.success("Wish unmarked as purchased");
+    },
+  });
+
   // Batch-assign mutation
   const batchAssignMut = useMutation({
     mutationFn: (payload: WishBatchAssign) => adminBatchAssignWishes(payload),
-    onSuccess: (data) => {
+    onSuccess: (data, payload) => {
       queryClient.invalidateQueries({ queryKey: adminWishes });
       queryClient.invalidateQueries({ queryKey: adminPackingSlips });
       queryClient.invalidateQueries({ queryKey: adminWishCards });
       setSelectedIds(new Set());
       setBatchAssignOpen(false);
       setAssignUserId(null);
-      toast.success(`${data.assigned_count} wish${data.assigned_count > 1 ? "es" : ""} assigned`);
+      const verb = payload.assigned_to_id === 0 ? "unassigned" : "assigned";
+      toast.success(`${data.assigned_count} wish${data.assigned_count > 1 ? "es" : ""} ${verb}`);
     },
   });
 
@@ -682,15 +708,27 @@ export default function AdminWishes() {
                           >
                             {editingId === w.id ? "Done" : "Edit"}
                           </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="px-3 py-1.5 text-xs"
-                            onClick={() => setMarkPurchasedId(w.id)}
-                            disabled={w.purchased_at != null || markPurchasedMut.isPending}
-                          >
-                            Mark purchased
-                          </Button>
+                          {w.purchased_at != null ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => setUnmarkId(w.id)}
+                              disabled={unmarkMut.isPending}
+                            >
+                              Unmark purchased
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1.5 text-xs"
+                              onClick={() => setMarkPurchasedId(w.id)}
+                              disabled={markPurchasedMut.isPending}
+                            >
+                              Mark purchased
+                            </Button>
+                          )}
                           <ActionsDropdown
                             items={[
                               {
@@ -707,8 +745,10 @@ export default function AdminWishes() {
                                     {
                                       label: "Unassign",
                                       variant: "secondary" as const,
-                                      onClick: () => openEdit(w.id),
-                                      disabled: !!editingId && editingId !== w.id,
+                                      // 0 is the backend's clear-FK sentinel — the batch
+                                      // endpoint unassigns instead of assigning
+                                      onClick: () => batchAssignMut.mutate({ wish_ids: [w.id], assigned_to_id: 0 }),
+                                      disabled: batchAssignMut.isPending || editingId != null,
                                     },
                                   ]
                                 : []),
@@ -773,6 +813,20 @@ export default function AdminWishes() {
           loading={markPurchasedMut.isPending}
         />
 
+        {/* Unmark-purchased confirmation — destructive (clears purchase details) */}
+        <ConfirmDialog
+          open={unmarkId !== null}
+          title="Unmark this wish as purchased?"
+          description="The purchased date, location and received date will be cleared. The purchaser note is kept."
+          confirmLabel="Yes, unmark"
+          loadingLabel="Unmarking…"
+          loading={unmarkMut.isPending}
+          onConfirm={() => {
+            if (unmarkId != null) unmarkMut.mutate(unmarkId);
+          }}
+          onCancel={() => setUnmarkId(null)}
+        />
+
         {/* Batch-assign dialog */}
         <BatchAssignDialog
           open={batchAssignOpen}
@@ -795,7 +849,7 @@ export default function AdminWishes() {
         />
 
         {/* Errors */}
-        <MutationErrors mutations={[updateMut, markPurchasedMut, batchAssignMut]} />
+        <MutationErrors mutations={[updateMut, markPurchasedMut, unmarkMut, batchAssignMut]} />
       </main>
     </div>
   );

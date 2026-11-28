@@ -836,6 +836,12 @@ describe("admin wish API functions", () => {
     });
   });
 
+  it("adminUnmarkPurchased — POST /api/admin/wishes/:id/unmark-purchased (no body)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 7, purchased_at: null } });
+    await apiModule.adminUnmarkPurchased(7);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/admin/wishes/7/unmark-purchased");
+  });
+
   it("adminBatchAssignWishes — POST /api/admin/wishes/batch-assign", async () => {
     mockAxiosInstance.post.mockResolvedValueOnce({ data: { assigned_count: 3 } });
     const result = await apiModule.adminBatchAssignWishes({ wish_ids: [1, 2, 3], assigned_to_id: 5 });
@@ -1038,6 +1044,12 @@ describe("purchaser API functions", () => {
     expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/purchaser/wishes/7/mark-purchased", {
       purchased_where: "Amazon",
     });
+  });
+
+  it("purchaserUnmarkPurchased — POST /api/purchaser/wishes/:id/unmark-purchased (no body)", async () => {
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: { id: 7, purchased_at: null } });
+    await apiModule.purchaserUnmarkPurchased(7);
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith("/api/purchaser/wishes/7/unmark-purchased");
   });
 
   it("purchaserUpdateWish — PATCH /api/purchaser/wishes/:id", async () => {

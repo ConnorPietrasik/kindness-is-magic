@@ -2008,6 +2008,103 @@ class TestBatchAssign:
 
 
 # ---------------------------------------------------------------------------
+# Unmark-purchased endpoint tests
+# ---------------------------------------------------------------------------
+
+
+class TestUnmarkPurchased:
+    def test_unmark_clears_purchase_fields(self, test_client, admin_user, wish_tree, db):
+        """Unmark clears purchased_at, purchased_where and received_at."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        wish.purchased_where = "Walmart"
+        wish.received_at = datetime(2026, 2, 15, 10, 0, tzinfo=timezone.utc)
+        db.commit()
+
+        resp = test_client.post(f"/api/admin/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is None
+        assert data["purchased_where"] is None
+        assert data["received_at"] is None
+
+    def test_unmark_preserves_note(self, test_client, admin_user, wish_tree, db):
+        """The purchaser note survives the undo."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.purchased_at = datetime.now(timezone.utc)
+        wish.purchaser_note = "Bought the wrong item"
+        db.commit()
+
+        resp = test_client.post(f"/api/admin/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 200
+        assert resp.json()["purchaser_note"] == "Bought the wrong item"
+
+    def test_unmark_any_wish(self, test_client, admin_user, wish_tree, db):
+        """Admin can unmark a wish marked by someone else; assignment is untouched."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        from app.auth import get_password_hash
+
+        purchaser = User(
+            email="unmark-purchaser@test.com",
+            hashed_password=get_password_hash("PurchPass123!"),
+            role=UserRole.purchaser,
+            display_name=None,
+        )
+        db.add(purchaser)
+        db.commit()
+        db.refresh(purchaser)
+
+        wish = wish_tree["wishes"][0]
+        wish.assigned_to_id = purchaser.id
+        wish.purchased_at = datetime.now(timezone.utc)
+        wish.purchased_where = "Target"
+        db.commit()
+
+        resp = test_client.post(f"/api/admin/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased_at"] is None
+        assert data["purchased_where"] is None
+        # Unmark does not reassign — the wish stays with its original owner
+        assert data["assigned_to_id"] == purchaser.id
+
+    def test_unmark_not_purchased_400(self, test_client, admin_user, wish_tree):
+        """Unmarking a wish that is not marked purchased is a 400."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+
+        resp = test_client.post(f"/api/admin/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 400
+
+    def test_unmark_deleted_wish_404(self, test_client, admin_user, wish_tree, db):
+        """Unmarking a soft-deleted wish is a 404."""
+        test_client.post(
+            "/api/auth/login",
+            json={"email": admin_user.email, "password": "AdminPass123!"},
+        )
+        wish = wish_tree["wishes"][0]
+        wish.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        resp = test_client.post(f"/api/admin/wishes/{wish.id}/unmark-purchased")
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
 # Batch mark-purchased endpoint tests
 # ---------------------------------------------------------------------------
 

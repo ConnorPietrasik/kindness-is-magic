@@ -19,7 +19,10 @@
  * second setup reuses the referrer's email and fails with 409 (emails stay
  * reserved even after soft-delete). Each group gets its own random suffix so
  * groups can never collide with each other either.
- * No test depends on an earlier test's mutation, so in-group order is safe.
+ * The unmark test is the one in-group dependency: describe.serial runs it
+ * after the single-mark test, which buys the first unpurchased row (the
+ * coat); the unmark test ends with the coat unmarked, so no later test
+ * depends on its state.
  */
 import { test, expect } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
@@ -365,6 +368,39 @@ test.describe.serial("Role Downstream — purchaser assigned gifts", () => {
     await statusSelect.selectOption({ label: "Unpurchased" });
     await expect(funRow).toBeHidden({ timeout: 10_000 });
     await expect(earlyRow).toBeHidden();
+
+    await context.close();
+  });
+
+  test("purchaser unmarks a purchased wish", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(PURCHASER.purchaserEmail);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.goto("/purchaser/assigned-gifts");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    const coatRow = page.getByRole("row").filter({ hasText: "Warm winter coat" });
+    await expect(coatRow).toBeVisible({ timeout: 10_000 });
+
+    // The single-mark test (earlier in this serial group) bought the first
+    // unpurchased row — the coat — so the undo has a purchased row
+    const unmarkBtn = coatRow.getByRole("button", { name: "Unmark purchased" });
+    await expect(unmarkBtn).toBeVisible({ timeout: 10_000 });
+
+    // Click the undo and confirm in the confirmation dialog
+    await unmarkBtn.click();
+    await expect(page.getByRole("alertdialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("alertdialog").getByRole("button", { name: "Yes, unmark" }).click();
+
+    // Success toast; the row goes back to the mark button
+    await expect(page.getByText("Wish unmarked as purchased")).toBeVisible({ timeout: 10_000 });
+    await expect(coatRow.getByRole("button", { name: "Mark purchased" })).toBeVisible({ timeout: 10_000 });
 
     await context.close();
   });

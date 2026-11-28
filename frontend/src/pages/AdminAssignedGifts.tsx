@@ -15,7 +15,14 @@ import { PageSpinner } from "../components/Spinner";
 import { useAuth } from "../context/AuthContext";
 import { useFamiliesDropdown } from "../hooks/useDropdowns";
 import { useTableWidth } from "../hooks/useTableWidth";
-import { adminBatchMarkPurchased, adminGetWish, adminListWishes, adminMarkPurchased, adminUpdateWish } from "../lib/api";
+import {
+  adminBatchMarkPurchased,
+  adminGetWish,
+  adminListWishes,
+  adminMarkPurchased,
+  adminUnmarkPurchased,
+  adminUpdateWish,
+} from "../lib/api";
 import { adminPackingSlips, adminWishCards, adminWishDetail, adminWishes } from "../lib/queryKeys";
 import { ROUTES, route } from "../lib/routes";
 
@@ -65,6 +72,7 @@ function AdminAssignedGiftsList({ userId }: { userId: number }) {
           detailFn={adminGetWish}
           updateFn={adminUpdateWish}
           markPurchasedFn={adminMarkPurchased}
+          unmarkPurchasedFn={adminUnmarkPurchased}
           batchMarkPurchasedFn={adminBatchMarkPurchased}
           renderFamilyCell={(w) => (
             <Link to={route.adminFamilyPeople(w.family_id)} className="text-btn-start hover:underline">

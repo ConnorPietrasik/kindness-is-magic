@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -356,7 +356,7 @@ describe("AdminWishes", () => {
     expect(screen.getByText(/✓/)).toBeInTheDocument();
   });
 
-  it("disables Mark purchased button for already purchased wishes", async () => {
+  it("shows Unmark purchased instead of Mark purchased on purchased rows", async () => {
     vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
     vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
 
@@ -366,10 +366,12 @@ describe("AdminWishes", () => {
       expect(screen.getByText("Bob")).toBeInTheDocument();
     });
 
-    const markPurchasedButtons = screen.getAllByText("Mark purchased");
-    // Bob's wish is already purchased — button should be disabled
-    // Alice's wish is not purchased — button should be enabled
-    expect(markPurchasedButtons.length).toBeGreaterThanOrEqual(1);
+    // Bob's wish is already purchased — his row offers the undo button instead
+    // of the mark button (Alice's unpurchased row keeps "Mark purchased")
+    const bobRow = screen.getAllByRole("row").find((row) => row.textContent?.includes("Bob"));
+    expect(bobRow).toBeDefined();
+    expect(within(bobRow!).queryByRole("button", { name: "Unmark purchased" })).toBeInTheDocument();
+    expect(within(bobRow!).queryByRole("button", { name: "Mark purchased" })).not.toBeInTheDocument();
   });
 
   it("edit flow opens form and calls update mutation", async () => {
@@ -472,6 +474,62 @@ describe("AdminWishes", () => {
     // Retry re-fetches the detail and the form appears
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByLabelText("Purchased Where");
+  });
+
+  it("unmark-purchased confirms and calls the mutation", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    const unmarkSpy = vi.spyOn(api, "adminUnmarkPurchased").mockResolvedValue(mockWishDetail);
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob")).toBeInTheDocument();
+    });
+
+    // Bob's row is purchased — its button is the undo ("Mark purchased" is
+    // gone from that row; Alice's unpurchased row still offers it)
+    await user.click(screen.getByRole("button", { name: "Unmark purchased" }));
+
+    // Confirmation dialog opens; cancelling does not call the API
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Unmark this wish as purchased?")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(unmarkSpy).not.toHaveBeenCalled();
+
+    // Reopening and confirming calls the API with the row's wish id
+    await user.click(screen.getByRole("button", { name: "Unmark purchased" }));
+    const reopened = await screen.findByRole("alertdialog");
+    await user.click(within(reopened).getByRole("button", { name: "Yes, unmark" }));
+
+    await waitFor(() => {
+      expect(unmarkSpy).toHaveBeenCalledWith(2);
+    });
+  });
+
+  it("unassigns a wish from the row menu", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "adminListWishes").mockResolvedValue(mockWishListResponse);
+    vi.spyOn(api, "adminGetUsersDropdown").mockResolvedValue([mockUser]);
+    const unassignSpy = vi.spyOn(api, "adminBatchAssignWishes").mockResolvedValue({ assigned_count: 1 });
+
+    wrap(<AdminWishes />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob")).toBeInTheDocument();
+    });
+
+    // Bob's wish is assigned — the row menu offers the quick unassign
+    const bobRow = screen.getAllByRole("row").find((row) => row.textContent?.includes("Bob"));
+    expect(bobRow).toBeDefined();
+    await user.click(within(bobRow!).getByRole("button", { name: "More actions" }));
+    await user.click(within(bobRow!).getByRole("menuitem", { name: "Unassign" }));
+
+    // 0 is the backend's clear-FK sentinel — the batch endpoint unassigns
+    await waitFor(() => {
+      expect(unassignSpy).toHaveBeenCalledWith({ wish_ids: [2], assigned_to_id: 0 });
+    });
   });
 
   it("batch assign dialog opens with selected wishes", async () => {

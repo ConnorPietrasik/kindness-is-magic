@@ -1,16 +1,17 @@
 /**
- * Admin Wish Management — view wishes, filter, search, edit, mark purchased, batch assign.
+ * Admin Wish Management — view wishes, filter, search, edit, mark/unmark
+ * purchased, batch assign.
  *
  * Read-only tests (list, filter, search) use CSV-seeded wishes.
- * Mutation tests (edit, mark purchased, batch assign) use an isolated family
- * so parallel workers don't step on each other's wishes.
+ * Mutation tests (edit, mark/unmark purchased, batch assign, unassign) use
+ * an isolated family so parallel workers don't step on each other's wishes.
  * Spreadsheet-view tests (per-column search, date ranges, header sort) use a
  * third isolated family whose purchase date is set via the API.
  *
  * Family scoping goes through the Family column's search input (family names
  * carry the unique run suffix); there is no family dropdown on this page.
  */
-import { test, expect, request } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import {
   createIsolatedFamilyScenario,
   deleteReferrerViaApi,
@@ -18,7 +19,6 @@ import {
   deleteUserViaApi,
   loginViaApi,
   listWishesViaApi,
-  batchAssignWishesViaApi,
 } from "../helpers/api";
 
 // ── Read-only tests (CSV-seeded data — safe for parallel) ───────────────────
@@ -283,15 +283,40 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     await context.close();
   });
 
-  test("batch assign wishes to a user", async ({ browser, request: req }) => {
-    if (!mutationData.familyId || !mutationData.purchaserUserId) test.skip();
+  test("unmark wish as purchased", async ({ browser }) => {
+    if (!mutationData.familyId) test.skip();
 
-    // First, un-purchase any wishes we marked in the previous test so batch assign has something to work with
-    const api = await loginViaApi(req);
-    const wishes = await listWishesViaApi(api, { familyId: mutationData.familyId });
-    // We need unpurchased wishes for batch assign. If all are purchased from the previous test,
-    // we can still test with the purchased ones (the UI just shows them).
-    await api.dispose();
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/wishes");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    // Filter to our isolated family
+    await page.getByLabel("Filter by Family").fill(MUTATION_SUFFIX);
+
+    const ourRow = page.getByRole("row").filter({ hasText: MUTATION_PERSON_NAME }).first();
+    await expect(ourRow).toBeVisible({ timeout: 10_000 });
+
+    // The mark test (earlier in this serial group) purchased our row, so
+    // the undo has a purchased row
+    const unmarkBtn = ourRow.getByRole("button", { name: "Unmark purchased" });
+    await expect(unmarkBtn).toBeVisible({ timeout: 10_000 });
+
+    // Click the undo and confirm in the confirmation dialog
+    await unmarkBtn.click();
+    await expect(page.getByRole("alertdialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("alertdialog").getByRole("button", { name: "Yes, unmark" }).click();
+
+    // Success toast; the row goes back to the mark button (admins can re-mark)
+    await expect(page.getByText("Wish unmarked as purchased")).toBeVisible({ timeout: 10_000 });
+    await expect(ourRow.getByRole("button", { name: "Mark purchased" })).toBeVisible({ timeout: 10_000 });
+
+    await context.close();
+  });
+
+  test("batch assign wishes to a user", async ({ browser }) => {
+    if (!mutationData.familyId || !mutationData.purchaserUserId) test.skip();
 
     const context = await browser.newContext({ storageState: "storage/admin.json" });
     const page = await context.newPage();
@@ -318,14 +343,52 @@ test.describe.serial("Admin Wish Management — mutations", () => {
     // Dialog header contains "1 wish" inside <strong>
     await expect(page.getByText("1 wish")).toBeVisible({ timeout: 10_000 });
 
-    // Select a user from the dropdown (first non-placeholder option)
-    await page.locator("label", { hasText: "Assign to" }).locator("..").locator("select").selectOption({ index: 1 });
+    // Select the test purchaser from the dropdown by its unique display
+    // name — index 1 is the "Unassigned" sentinel, not a user
+    await page
+      .locator("label", { hasText: "Assign to" })
+      .locator("..")
+      .locator("select")
+      .selectOption({ label: `Purchaser ${MUTATION_SUFFIX}` });
 
     // Submit — use exact match to avoid matching "Batch assign"
     await page.getByRole("button", { name: "Assign", exact: true }).click();
 
-    // Success toast
-    await expect(page.getByText(/wish.*assigned/i).first()).toBeVisible({ timeout: 10_000 });
+    // Success toast — exact match, so the unassign path's toast
+    // ("1 wish unassigned") can never satisfy it
+    await expect(page.getByText("1 wish assigned", { exact: true })).toBeVisible({ timeout: 10_000 });
+
+    await context.close();
+  });
+
+  test("unassign a wish from the row menu", async ({ browser }) => {
+    if (!mutationData.familyId) test.skip();
+
+    const context = await browser.newContext({ storageState: "storage/admin.json" });
+    const page = await context.newPage();
+
+    await page.goto("/admin/wishes");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10_000 });
+
+    // Filter to our isolated family and wait for the debounced filter to
+    // apply — a positional row locator (nth(1)) is always visible on the
+    // unfiltered table, so visibility alone would click the wrong row
+    await page.getByLabel("Filter by Family").fill(MUTATION_SUFFIX);
+    await expect(page.getByRole("row")).toHaveCount(4, { timeout: 10_000 });
+
+    // The batch-assign test (earlier in this serial group) assigned the
+    // first data row — the family wish, which leads each family block in
+    // the grouped default order — to the test purchaser
+    const ourRow = page.getByRole("row").nth(1);
+
+    // The quick unassign lives in the row's kebab menu
+    await ourRow.getByRole("button", { name: "More actions" }).click();
+    await ourRow.getByRole("menuitem", { name: "Unassign" }).click();
+
+    // Success toast; the menu item is gone once the row is unassigned
+    await expect(page.getByText("1 wish unassigned")).toBeVisible({ timeout: 10_000 });
+    await ourRow.getByRole("button", { name: "More actions" }).click();
+    await expect(ourRow.getByRole("menuitem", { name: "Unassign" })).toHaveCount(0);
 
     await context.close();
   });

@@ -223,7 +223,8 @@ export default function HelpAdmin() {
               <p>
                 The type badge tells you who the wish is for: a whole-family wish, an adult's wish, or a child's practical or fun wish. The
                 Size and Color columns carry the details a shopper needs. The Purchased column fills in as purchasers buy gifts, and
-                Assigned to shows which purchaser owns the wish.
+                Assigned to shows which purchaser owns the wish. From a row you can mark a gift purchased yourself, or unmark a gift that
+                was marked by mistake — yours or a purchaser's — after a confirm prompt.
               </p>
               <p>
                 Two columns are hidden by default: <strong>Cash Only</strong> (shopping has started, so the family accepts cash sponsorships
@@ -270,10 +271,11 @@ export default function HelpAdmin() {
               />
               <p>
                 This page lists the wishes assigned to you personally: for when you shop for a family yourself. Mark a gift purchased from
-                its row, or select several rows and use the <strong>Mark purchased</strong> button at the top. To hand wishes to a purchaser
-                instead, use the Manage Wishes page: assign one wish from its row, or check several and use <strong>Batch assign</strong> at
-                the top. As gifts get bought, the Purchased column fills in with the date; the where-it-was-bought detail lives in the
-                Purchased Where column, which is hidden by default.
+                its row, or select several rows and use the <strong>Mark purchased</strong> button at the top. Marked the wrong one? The
+                row's button becomes <strong>Unmark purchased</strong> — confirm, and the purchase details are cleared (your note is kept).
+                To hand wishes to a purchaser instead, use the Manage Wishes page: assign one wish from its row, or check several and use{" "}
+                <strong>Batch assign</strong> at the top. As gifts get bought, the Purchased column fills in with the date; the
+                where-it-was-bought detail lives in the Purchased Where column, which is hidden by default.
               </p>
               <h3>Wish cards</h3>
               <HelpImage
